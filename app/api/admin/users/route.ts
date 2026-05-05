@@ -16,7 +16,7 @@ export async function GET(): Promise<NextResponse> {
     const [profilesRes, assignmentsRes, branchesRes, authRes] = await Promise.all([
       supabase.from('user_profiles').select('id, role, display_name'),
       supabase.from('user_branch_assignments').select('user_id, branch_id'),
-      supabase.from('branches').select('id, name').order('name'),
+      supabase.from('branches').select('id, name').eq('is_active', true).eq('is_revenue_generating', true).order('name'),
       supabase.auth.admin.listUsers(),
     ])
 

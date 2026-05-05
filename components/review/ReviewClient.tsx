@@ -9,6 +9,7 @@ interface EmpAssignment {
   id: string
   rawName: string
   entityCode: string
+  currentPayrollCodeId: string | null
   aiCandidateId: string | null
   aiCandidateName: string | null
   aiScore: number | null
@@ -33,7 +34,23 @@ interface FuelCard {
 }
 
 interface Group { id: string; name: string }
-interface Branch { id: string; name: string }
+
+interface Branch {
+  id: string
+  name: string
+  isCorporate: boolean
+  isRevenueGenerating: boolean
+  businessCode: string
+}
+
+interface PayrollCode {
+  id: string
+  code: string
+  laborType: string
+  branchId: string | null
+  branchName: string
+  entityCode: string
+}
 
 interface ReviewData {
   employeeAssignments: EmpAssignment[]
@@ -41,6 +58,7 @@ interface ReviewData {
   fuelCards: FuelCard[]
   groups: Group[]
   branches: Branch[]
+  payrollCodes: PayrollCode[]
 }
 
 // ─── Section header ───────────────────────────────────────────────────────────
@@ -122,23 +140,47 @@ function ActionBtn({
   )
 }
 
+const selectStyle: React.CSSProperties = {
+  background: '#2a2a2a',
+  border: '1px solid #333333',
+  borderRadius: 6,
+  padding: '4px 8px',
+  fontSize: 12,
+  color: '#cccccc',
+  fontFamily: 'inherit',
+}
+
 // ─── Employee Matches section ──────────────────────────────────────────────────
 
 function EmployeeMatchesSection({
   items,
+  payrollCodes,
   onDismiss,
 }: {
   items: EmpAssignment[]
+  payrollCodes: PayrollCode[]
   onDismiss: (id: string) => void
 }) {
   const [busy, setBusy] = useState<string | null>(null)
+  const [selectedCode, setSelectedCode] = useState<Record<string, string>>({})
+
+  // Group payroll codes by branch name for the dropdown
+  const codesByBranch = payrollCodes.reduce<Record<string, PayrollCode[]>>((acc, pc) => {
+    const key = pc.branchName
+    if (!acc[key]) acc[key] = []
+    acc[key].push(pc)
+    return acc
+  }, {})
+  const branchGroups = Object.keys(codesByBranch).sort()
 
   async function handleAction(item: EmpAssignment, action: 'confirm' | 'skip') {
     setBusy(item.id)
     try {
       const body: Record<string, unknown> = { action }
-      if (action === 'confirm' && item.aiCandidateId) {
-        body.employeeId = item.aiCandidateId
+      if (action === 'confirm' && item.aiCandidateId) body.employeeId = item.aiCandidateId
+      const chosenCode = selectedCode[item.id]
+      if (chosenCode && chosenCode !== item.currentPayrollCodeId) {
+        body.payrollCodeId = chosenCode
       }
       const res = await fetch(`/api/admin/review/employee-assignments/${item.id}`, {
         method: 'PATCH',
@@ -158,59 +200,83 @@ function EmployeeMatchesSection({
         <EmptyQueue message="No pending employee matches." />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-          {items.map((item, i) => (
-            <div
-              key={item.id}
-              style={{
-                padding: '12px 0',
-                borderTop: i === 0 ? '1px solid #2a2a2a' : '1px solid #2a2a2a',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12,
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, color: '#cccccc' }}>
-                  Import name:{' '}
-                  <span style={{ color: '#ffffff', fontWeight: 500 }}>
-                    &ldquo;{item.rawName}&rdquo;
-                  </span>{' '}
-                  <span style={{ color: '#555555' }}>({item.entityCode})</span>
+          {items.map((item, i) => {
+            const currentCode = selectedCode[item.id] ?? item.currentPayrollCodeId ?? ''
+            return (
+              <div
+                key={item.id}
+                style={{
+                  padding: '12px 0',
+                  borderTop: i === 0 ? '1px solid #2a2a2a' : '1px solid #2a2a2a',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, color: '#cccccc' }}>
+                    Import name:{' '}
+                    <span style={{ color: '#ffffff', fontWeight: 500 }}>
+                      &ldquo;{item.rawName}&rdquo;
+                    </span>{' '}
+                    <span style={{ color: '#555555' }}>({item.entityCode})</span>
+                  </div>
+                  {item.aiCandidateName ? (
+                    <div style={{ fontSize: 12, color: '#888888', marginTop: 3 }}>
+                      Suggested match:{' '}
+                      <span style={{ color: '#ff6b00' }}>{item.aiCandidateName}</span>
+                      {item.aiScore !== null && (
+                        <span style={{ color: '#555555' }}>
+                          {' '}[{Math.round(item.aiScore)}%]
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: '#555555', marginTop: 3 }}>
+                      No AI match suggestion
+                    </div>
+                  )}
+                  <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 11, color: '#666666' }}>Payroll code:</span>
+                    <select
+                      value={currentCode}
+                      onChange={(e) =>
+                        setSelectedCode((s) => ({ ...s, [item.id]: e.target.value }))
+                      }
+                      style={{ ...selectStyle, fontSize: 11 }}
+                    >
+                      <option value="">— select payroll code —</option>
+                      {branchGroups.map((branchName) => (
+                        <optgroup key={branchName} label={branchName}>
+                          {codesByBranch[branchName].map((pc) => (
+                            <option key={pc.id} value={pc.id}>
+                              {pc.code} ({pc.entityCode} / {pc.laborType})
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                {item.aiCandidateName ? (
-                  <div style={{ fontSize: 12, color: '#888888', marginTop: 3 }}>
-                    Suggested match:{' '}
-                    <span style={{ color: '#ff6b00' }}>{item.aiCandidateName}</span>
-                    {item.aiScore !== null && (
-                      <span style={{ color: '#555555' }}>
-                        {' '}[{Math.round(item.aiScore)}%]
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 12, color: '#555555', marginTop: 3 }}>
-                    No AI match suggestion
-                  </div>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                {item.aiCandidateName && (
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0, paddingTop: 2 }}>
+                  {item.aiCandidateName && (
+                    <ActionBtn
+                      label="Confirm Match"
+                      variant="primary"
+                      disabled={busy === item.id}
+                      onClick={() => handleAction(item, 'confirm')}
+                    />
+                  )}
                   <ActionBtn
-                    label="Confirm Match"
-                    variant="primary"
+                    label="Skip"
                     disabled={busy === item.id}
-                    onClick={() => handleAction(item, 'confirm')}
+                    onClick={() => handleAction(item, 'skip')}
                   />
-                )}
-                <ActionBtn
-                  label="Skip"
-                  disabled={busy === item.id}
-                  onClick={() => handleAction(item, 'skip')}
-                />
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
@@ -256,7 +322,6 @@ function PayrollItemsSection({
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {items.map((item, i) => {
             const chosenGroupId = selected[item.id] ?? item.currentGroupId
-            const suggestedGroup = groups.find((g) => g.name === item.suggestedGroup)
             return (
               <div
                 key={item.id}
@@ -289,15 +354,7 @@ function PayrollItemsSection({
                   <select
                     value={chosenGroupId}
                     onChange={(e) => setSelected((s) => ({ ...s, [item.id]: e.target.value }))}
-                    style={{
-                      background: '#2a2a2a',
-                      border: '1px solid #333333',
-                      borderRadius: 6,
-                      padding: '4px 8px',
-                      fontSize: 12,
-                      color: '#cccccc',
-                      fontFamily: 'inherit',
-                    }}
+                    style={selectStyle}
                   >
                     <option value="">— select group —</option>
                     {groups.map((g) => (
@@ -324,6 +381,10 @@ function PayrollItemsSection({
 
 // ─── Unassigned Fuel Cards section ────────────────────────────────────────────
 
+// Select value encoding:
+//   UUID string      → assign to branch (set branch_id, clear business_tag)
+//   "tag:xxx"        → set business_tag, clear branch_id
+
 function FuelCardsSection({
   cards,
   branches,
@@ -336,15 +397,25 @@ function FuelCardsSection({
   const [busy, setBusy] = useState<string | null>(null)
   const [selected, setSelected] = useState<Record<string, string>>({})
 
+  const snOperations = branches.filter((b) => b.isRevenueGenerating && b.businessCode === 'SN')
+  const snCorporate = branches.filter((b) => b.isCorporate && b.businessCode === 'SN')
+  const otherBiz = branches.filter((b) => b.businessCode !== 'SN')
+
   async function handleAssign(card: FuelCard) {
-    const branchId = selected[card.id]
-    if (!branchId) return
+    const val = selected[card.id]
+    if (!val) return
     setBusy(card.id)
     try {
+      const body: Record<string, string> = {}
+      if (val.startsWith('tag:')) {
+        body.businessTag = val.slice(4)
+      } else {
+        body.branchId = val
+      }
       const res = await fetch(`/api/admin/review/fuel-cards/${card.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ branchId }),
+        body: JSON.stringify(body),
       })
       if (res.ok) onDismiss(card.id)
     } finally {
@@ -392,22 +463,34 @@ function FuelCardsSection({
                 <select
                   value={selected[card.id] ?? ''}
                   onChange={(e) => setSelected((s) => ({ ...s, [card.id]: e.target.value }))}
-                  style={{
-                    background: '#2a2a2a',
-                    border: '1px solid #333333',
-                    borderRadius: 6,
-                    padding: '4px 8px',
-                    fontSize: 12,
-                    color: '#cccccc',
-                    fontFamily: 'inherit',
-                  }}
+                  style={selectStyle}
                 >
-                  <option value="">— assign to branch —</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
+                  <option value="">— assign branch or tag —</option>
+                  {snOperations.length > 0 && (
+                    <optgroup label="Operations">
+                      {snOperations.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {snCorporate.length > 0 && (
+                    <optgroup label="Corporate">
+                      {snCorporate.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {otherBiz.length > 0 && (
+                    <optgroup label="Other Businesses">
+                      {otherBiz.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <optgroup label="Tag as Business">
+                    <option value="tag:western_highways">Tag as Western Highways</option>
+                    <option value="tag:signs">Tag as Signs</option>
+                  </optgroup>
                 </select>
                 <ActionBtn
                   label="Assign"
@@ -445,9 +528,11 @@ export default function ReviewClient() {
   function dismiss(type: keyof ReviewData, id: string) {
     setData((prev) => {
       if (!prev) return prev
+      const field = prev[type]
+      if (!Array.isArray(field)) return prev
       return {
         ...prev,
-        [type]: (prev[type] as { id: string }[]).filter((item) => item.id !== id),
+        [type]: field.filter((item: { id: string }) => item.id !== id),
       }
     })
   }
@@ -483,6 +568,7 @@ export default function ReviewClient() {
         <>
           <EmployeeMatchesSection
             items={data.employeeAssignments}
+            payrollCodes={data.payrollCodes}
             onDismiss={(id) => dismiss('employeeAssignments', id)}
           />
           <PayrollItemsSection

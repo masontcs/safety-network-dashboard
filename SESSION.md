@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 5, 2026 — Session: executive + district manager + employee detail + goals/targets built
+## Last updated: May 5, 2026 — Session: Sacramento→Modesto branch merge + is_active audit + review queue branch/code selectors fixed
 
 ---
 
@@ -81,6 +81,42 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ---
 
+## 3b. RECENT CHANGES (May 5, 2026)
+
+### Sacramento → Modesto Branch Merge
+- Migration `20260505000001_merge_sacramento_into_modesto.sql` applied to production
+- Adds `is_active` column to `branches` table
+- Reassigns all historical payroll, revenue, fuel, employee, user, and target data from Sacramento to Modesto
+- Deactivates Sacramento's payroll_codes and revenue_codes (`is_active = false`)
+- Sets Sacramento branch: `is_active = false`, `is_revenue_generating = false`
+- Seed updated: Sacramento inserted as inactive for fresh installs
+- Verified: Sacramento has 0 active transactions, 0 active codes; Modesto has 16 revenue records
+
+### `is_active` Audit — All Branch Queries Fixed
+Every branch selector query now filters `is_active = true` so Sacramento never appears:
+- `app/admin/page.tsx` — added `eq('is_active', true)`
+- `app/admin/targets/page.tsx` — added `eq('is_active', true)`
+- `app/executive/page.tsx` — added `eq('is_active', true)`
+- `app/api/admin/users/route.ts` — added `eq('is_active', true)` + `eq('is_revenue_generating', true)` (was unfiltered)
+- `app/api/allocation/summary/route.ts` — added `eq('is_active', true)`
+- `lib/supabase/database.types.ts` — added `is_active` to branches Row/Insert/Update
+- `manager/page.tsx` and `district/page.tsx` were already correct
+
+### Review Queue — Branch & Payroll Code Selectors Fixed
+**Fuel card assignment dropdown:**
+- Now queries all active branches (not just revenue-generating)
+- Grouped: Operations / Corporate / Other Businesses / Tag as Business
+- "Tag as Western Highways" and "Tag as Signs" options set `business_tag` instead of `branch_id`
+- PATCH endpoint accepts `{ businessTag }` and clears `branch_id`, or accepts `{ branchId }` and clears `business_tag`
+
+**Employee assignment payroll code picker:**
+- API now fetches `payroll_code_id` on unconfirmed assignments + all active payroll codes (87, incl. Corp/HQ)
+- Each row shows a grouped payroll code dropdown (grouped by branch name)
+- On confirm, sends changed `payrollCodeId` to update `employee_entity_assignments.payroll_code_id`
+- PATCH endpoint accepts optional `payrollCodeId`
+
+---
+
 ## 4. WHAT HAS NOT BEEN STARTED
 
 - ~~Employee detail page~~ — **DONE**
@@ -118,7 +154,32 @@ npx vitest run
 
 ---
 
-## 7. HOW TO START THE DEV SERVER
+## 7. DEPLOYMENT
+
+### Git / GitHub
+- Git repo initialized in `/Users/masondoty/Documents/sn_project`
+- Remote: GitHub (private repo — connect via `gh repo create` or manually)
+- `.gitignore` excludes: `.env.local`, `node_modules`, `.next`, `.claude/`, `supabase/.temp/`
+- Two commits on `main`: initial commit + supabase/.temp cleanup
+
+### Vercel
+- Connected to GitHub repo via Vercel dashboard
+- Framework: Next.js (auto-detected), build: `npm run build`
+- All four environment variables must be set in Vercel → Project Settings → Environment Variables:
+  - `NEXT_PUBLIC_SUPABASE_URL` — public, safe to expose
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — public, safe to expose
+  - `SUPABASE_SERVICE_ROLE_KEY` — **mark Sensitive**
+  - `ANTHROPIC_API_KEY` — **mark Sensitive**
+
+### Production URL
+- https://safety-network-dashboard.vercel.app/login
+
+### Migrations applied to production
+- `fiscal_months` and `branch_targets` migrations applied and live in DB (May 5, 2026)
+
+---
+
+## 8. HOW TO START THE DEV SERVER
 
 ```bash
 cd /Users/masondoty/Documents/sn_project
@@ -136,5 +197,5 @@ npm run typecheck
 ## 8. OPEN QUESTIONS
 
 - **Review queue badge count:** Will show unresolved review queue item count in the top nav — loaded on page render only (no polling). Not yet implemented.
-- **Goals/Targets:** ~~Not yet implemented.~~ **DONE.** Migration file at `supabase/migrations/20260101000008_branch_targets.sql` — must be applied manually via `npx supabase db push` (MCP tool lacks permission for this project).
+- **Goals/Targets:** ~~Not yet implemented.~~ **DONE.** Migration applied to production May 5, 2026.
 - **Executive/Admin viewing allocation for MTD/YTD:** Allocation is always fetched for the selected periodDate (current week). For MTD/YTD views, the "Net After Overhead" card notes "overhead: current week" to clarify. Summing allocation across multiple weeks is deferred.

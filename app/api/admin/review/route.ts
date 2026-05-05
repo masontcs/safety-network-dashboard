@@ -12,11 +12,11 @@ export async function GET(): Promise<NextResponse> {
 
     const supabase = createServiceClient()
 
-    // Fetch all three queues in parallel
-    const [empRes, itemRes, cardRes, groupRes, branchRes] = await Promise.all([
+    // Fetch all queues + reference data in parallel
+    const [empRes, itemRes, cardRes, groupRes, branchRes, codeRes, bizRes] = await Promise.all([
       supabase
         .from('employee_entity_assignments')
-        .select('id, raw_name_in_report, ai_match_score, ai_match_candidate, entity_id')
+        .select('id, raw_name_in_report, ai_match_score, ai_match_candidate, entity_id, payroll_code_id')
         .eq('is_confirmed', false),
       supabase
         .from('payroll_items')
@@ -27,7 +27,17 @@ export async function GET(): Promise<NextResponse> {
         .select('id, card_name, vendor, employee_id, branch_id, business_tag')
         .eq('is_confirmed', false),
       supabase.from('payroll_item_groups').select('id, name'),
-      supabase.from('branches').select('id, name').eq('is_revenue_generating', true).order('name'),
+      supabase
+        .from('branches')
+        .select('id, name, is_corporate, is_revenue_generating, business_id')
+        .eq('is_active', true)
+        .order('name'),
+      supabase
+        .from('payroll_codes')
+        .select('id, code, labor_type, branch_id, entity_id')
+        .eq('is_active', true)
+        .order('code'),
+      supabase.from('businesses').select('id, code'),
     ])
 
     if (empRes.error) throw new Error(empRes.error.message)
@@ -38,10 +48,19 @@ export async function GET(): Promise<NextResponse> {
     const payrollItems = itemRes.data ?? []
     const fuelCards = cardRes.data ?? []
     const groups = groupRes.data ?? []
-    const branches = branchRes.data ?? []
+    const rawBranches = branchRes.data ?? []
+    const rawCodes = codeRes.data ?? []
+    const businesses = bizRes.data ?? []
 
-    // Resolve entity codes for employee assignments
-    const entityIds = [...new Set(empAssignments.map((e) => e.entity_id))]
+    const bizCodeMap = Object.fromEntries(
+      (businesses as { id: string; code: string }[]).map((b) => [b.id, b.code]),
+    )
+
+    // Resolve entity codes
+    const entityIds = [...new Set([
+      ...empAssignments.map((e) => e.entity_id),
+      ...rawCodes.map((c) => c.entity_id),
+    ])]
     const { data: entities } = await supabase
       .from('entities')
       .select('id, code')
@@ -49,7 +68,12 @@ export async function GET(): Promise<NextResponse> {
 
     const entityMap = Object.fromEntries((entities ?? []).map((e) => [e.id, e.code]))
 
-    // Resolve AI candidate employee names for assignments
+    // Resolve branch names for payroll codes
+    const branchNameMap = Object.fromEntries(
+      (rawBranches as { id: string; name: string }[]).map((b) => [b.id, b.name]),
+    )
+
+    // Resolve AI candidate names
     const candidateIds = empAssignments
       .map((e) => e.ai_match_candidate)
       .filter((id): id is string => id !== null)
@@ -59,10 +83,7 @@ export async function GET(): Promise<NextResponse> {
       .in('id', candidateIds.length > 0 ? candidateIds : ['__none__'])
 
     const candidateMap = Object.fromEntries(
-      (candidates ?? []).map((e) => [
-        e.id,
-        `${e.first_name} ${e.last_name}`.trim(),
-      ]),
+      (candidates ?? []).map((e) => [e.id, `${e.first_name} ${e.last_name}`.trim()]),
     )
 
     // Resolve employee names for fuel card assignments
@@ -85,8 +106,9 @@ export async function GET(): Promise<NextResponse> {
           id: e.id,
           rawName: e.raw_name_in_report,
           entityCode: entityMap[e.entity_id] ?? e.entity_id,
+          currentPayrollCodeId: e.payroll_code_id,
           aiCandidateId: e.ai_match_candidate,
-          aiCandidateName: e.ai_match_candidate ? candidateMap[e.ai_match_candidate] : null,
+          aiCandidateName: e.ai_match_candidate ? (candidateMap[e.ai_match_candidate] ?? null) : null,
           aiScore: e.ai_match_score,
         })),
         payrollItems: payrollItems.map((i) => ({
@@ -101,12 +123,29 @@ export async function GET(): Promise<NextResponse> {
           cardName: c.card_name,
           vendor: c.vendor,
           currentEmployeeId: c.employee_id,
-          currentEmployeeName: c.employee_id ? empNameMap[c.employee_id] : null,
+          currentEmployeeName: c.employee_id ? (empNameMap[c.employee_id] ?? null) : null,
           currentBranchId: c.branch_id,
           businessTag: c.business_tag,
         })),
         groups: groups.map((g) => ({ id: g.id, name: g.name })),
-        branches: branches.map((b) => ({ id: b.id, name: b.name })),
+        branches: (rawBranches as {
+          id: string; name: string; is_corporate: boolean
+          is_revenue_generating: boolean; business_id: string
+        }[]).map((b) => ({
+          id: b.id,
+          name: b.name,
+          isCorporate: b.is_corporate,
+          isRevenueGenerating: b.is_revenue_generating,
+          businessCode: bizCodeMap[b.business_id] ?? 'SN',
+        })),
+        payrollCodes: rawCodes.map((pc) => ({
+          id: pc.id,
+          code: pc.code,
+          laborType: pc.labor_type,
+          branchId: pc.branch_id,
+          branchName: pc.branch_id ? (branchNameMap[pc.branch_id] ?? 'Unknown') : 'Corp / HQ',
+          entityCode: entityMap[pc.entity_id] ?? pc.entity_id,
+        })),
       },
     })
   } catch (err) {

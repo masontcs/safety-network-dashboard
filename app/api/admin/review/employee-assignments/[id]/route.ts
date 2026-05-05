@@ -16,8 +16,12 @@ export async function PATCH(
     const guard = guardAdminOnly(ctx.access.role)
     if (guard) return guard
 
-    const body = await request.json() as { action: 'confirm' | 'skip'; employeeId?: string }
-    const { action, employeeId } = body
+    const body = await request.json() as {
+      action: 'confirm' | 'skip'
+      employeeId?: string
+      payrollCodeId?: string
+    }
+    const { action, employeeId, payrollCodeId } = body
 
     if (action !== 'confirm' && action !== 'skip') {
       return NextResponse.json(
@@ -29,9 +33,8 @@ export async function PATCH(
     const supabase = createServiceClient()
 
     const update: AssignmentUpdate = { is_confirmed: true }
-    if (action === 'confirm' && employeeId) {
-      update.employee_id = employeeId
-    }
+    if (action === 'confirm' && employeeId) update.employee_id = employeeId
+    if (payrollCodeId) update.payroll_code_id = payrollCodeId
 
     const { error } = await supabase
       .from('employee_entity_assignments')

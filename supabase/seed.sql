@@ -42,6 +42,11 @@ FROM (VALUES
 JOIN businesses bus ON bus.code = b.bus_code
 ON CONFLICT (name, business_id) DO NOTHING;
 
+-- Sacramento was absorbed into Modesto effective 2026-05-05
+UPDATE branches SET is_active = false, is_revenue_generating = false
+WHERE name = 'Sacramento'
+  AND business_id = (SELECT id FROM businesses WHERE code = 'SN');
+
 -- ─────────────────────────────────────────────
 -- PAYROLL ITEM GROUPS (12)
 -- ─────────────────────────────────────────────

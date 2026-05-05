@@ -23,6 +23,7 @@ export default async function TargetsPage() {
     .from('branches')
     .select('id, name')
     .eq('is_revenue_generating', true)
+    .eq('is_active', true)
     .order('name')
 
   const branches = (branchesRaw as { id: string; name: string }[] | null) ?? []

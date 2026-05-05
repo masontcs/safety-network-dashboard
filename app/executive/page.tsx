@@ -31,7 +31,7 @@ export default async function ExecutivePage({
   }
 
   const [{ data: branchesRaw }, { data: entitiesRaw }] = await Promise.all([
-    supabase.from('branches').select('id, name').eq('is_revenue_generating', true).order('name'),
+    supabase.from('branches').select('id, name').eq('is_revenue_generating', true).eq('is_active', true).order('name'),
     supabase.from('entities').select('id, code, name').order('code'),
   ])
 

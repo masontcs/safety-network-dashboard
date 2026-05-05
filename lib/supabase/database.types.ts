@@ -32,9 +32,9 @@ export type Database = {
         Relationships: []
       }
       branches: {
-        Row: { id: string; name: string; business_id: string; is_revenue_generating: boolean; is_corporate: boolean }
-        Insert: { id?: string; name: string; business_id: string; is_revenue_generating?: boolean; is_corporate?: boolean }
-        Update: { id?: string; name?: string; business_id?: string; is_revenue_generating?: boolean; is_corporate?: boolean }
+        Row: { id: string; name: string; business_id: string; is_revenue_generating: boolean; is_corporate: boolean; is_active: boolean }
+        Insert: { id?: string; name: string; business_id: string; is_revenue_generating?: boolean; is_corporate?: boolean; is_active?: boolean }
+        Update: { id?: string; name?: string; business_id?: string; is_revenue_generating?: boolean; is_corporate?: boolean; is_active?: boolean }
         Relationships: []
       }
       payroll_item_groups: {

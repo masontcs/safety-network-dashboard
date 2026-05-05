@@ -46,6 +46,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       .select('id')
       .eq('business_id', snBusiness.id)
       .eq('is_revenue_generating', true)
+      .eq('is_active', true)
 
     if (branchErr) throw new Error(`Failed to load branches: ${branchErr.message}`)
 
