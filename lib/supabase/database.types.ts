@@ -86,9 +86,15 @@ export type Database = {
         Relationships: []
       }
       employee_entity_assignments: {
-        Row: { id: string; employee_id: string; entity_id: string; payroll_code_id: string | null; raw_name_in_report: string; is_confirmed: boolean; ai_match_score: number | null; ai_match_candidate: string | null }
-        Insert: { id?: string; employee_id: string; entity_id: string; payroll_code_id?: string | null; raw_name_in_report: string; is_confirmed?: boolean; ai_match_score?: number | null; ai_match_candidate?: string | null }
-        Update: { id?: string; employee_id?: string; entity_id?: string; payroll_code_id?: string | null; raw_name_in_report?: string; is_confirmed?: boolean; ai_match_score?: number | null; ai_match_candidate?: string | null }
+        Row: { id: string; employee_id: string; entity_id: string; payroll_code_id: string | null; raw_name_in_report: string; is_confirmed: boolean; ai_match_score: number | null; ai_match_candidate: string | null; effective_from: string; effective_to: string | null }
+        Insert: { id?: string; employee_id: string; entity_id: string; payroll_code_id?: string | null; raw_name_in_report: string; is_confirmed?: boolean; ai_match_score?: number | null; ai_match_candidate?: string | null; effective_from?: string; effective_to?: string | null }
+        Update: { id?: string; employee_id?: string; entity_id?: string; payroll_code_id?: string | null; raw_name_in_report?: string; is_confirmed?: boolean; ai_match_score?: number | null; ai_match_candidate?: string | null; effective_from?: string; effective_to?: string | null }
+        Relationships: []
+      }
+      employee_branch_transfers: {
+        Row: { id: string; employee_id: string; from_payroll_code_id: string; to_payroll_code_id: string; effective_date: string; created_at: string; created_by: string | null; notes: string | null }
+        Insert: { id?: string; employee_id: string; from_payroll_code_id: string; to_payroll_code_id: string; effective_date: string; created_at?: string; created_by?: string | null; notes?: string | null }
+        Update: { id?: string; employee_id?: string; from_payroll_code_id?: string; to_payroll_code_id?: string; effective_date?: string; created_at?: string; created_by?: string | null; notes?: string | null }
         Relationships: []
       }
       fuel_card_assignments: {

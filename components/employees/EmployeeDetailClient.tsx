@@ -66,6 +66,48 @@ interface DetailData {
   fuelHistory: FuelRow[]
 }
 
+interface TransferRecord {
+  id: string
+  effectiveDate: string
+  createdAt: string
+  notes: string | null
+  fromPayrollCodeId: string
+  toPayrollCodeId: string
+  fromCode: string
+  toCode: string
+  fromBranchName: string | null
+  toBranchName: string | null
+  entityCode: string
+}
+
+interface AssignmentPeriod {
+  id: string
+  entityCode: string
+  entityName: string
+  payrollCode: string
+  laborType: LaborType
+  branchName: string | null
+  effectiveFrom: string
+  effectiveTo: string | null
+  payrollCodeId: string | null
+}
+
+interface TransferPayrollCode {
+  id: string
+  code: string
+  laborType: LaborType
+  branchId: string | null
+  branchName: string
+  entityCode: string
+  entityId: string
+}
+
+interface TransferData {
+  transfers: TransferRecord[]
+  assignments: AssignmentPeriod[]
+  payrollCodes: TransferPayrollCode[]
+}
+
 interface Props {
   employeeId: string
   role: Role
@@ -124,6 +166,17 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
   const [vendorFilter, setVendorFilter] = useState<'all' | 'interstate' | 'flyers'>('all')
   const [dateFilter, setDateFilter] = useState<'all' | '90d' | '1y'>('all')
 
+  // Branch transfer state (admin + executive only)
+  const [transferData, setTransferData] = useState<TransferData | null>(null)
+  const [showTransferForm, setShowTransferForm] = useState(false)
+  const [transferCodeId, setTransferCodeId] = useState('')
+  const [transferDate, setTransferDate] = useState('')
+  const [transferNotes, setTransferNotes] = useState('')
+  const [transferConfirm, setTransferConfirm] = useState('')
+  const [submittingTransfer, setSubmittingTransfer] = useState(false)
+  const [transferError, setTransferError] = useState<string | null>(null)
+  const [revertingId, setRevertingId] = useState<string | null>(null)
+
   const load = useCallback(() => {
     setLoading(true)
     setError(null)
@@ -138,6 +191,17 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
   }, [employeeId])
 
   useEffect(() => { load() }, [load])
+
+  const loadTransfers = useCallback(() => {
+    fetch(`/api/employees/${employeeId}/transfers`)
+      .then((r) => r.json())
+      .then((json) => { if (json.success) setTransferData(json.data as TransferData) })
+      .catch(() => {/* non-critical */})
+  }, [employeeId])
+
+  useEffect(() => {
+    if (role === 'admin' || role === 'executive') loadTransfers()
+  }, [role, loadTransfers])
 
   // ── Derived payroll data ──────────────────────────────────────────────────
 
@@ -275,6 +339,54 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
       setNameError(e instanceof Error ? e.message : 'Save failed')
     } finally {
       setSavingName(false)
+    }
+  }
+
+  // ── Transfer handlers ─────────────────────────────────────────────────────
+
+  async function submitTransfer() {
+    setTransferError(null)
+    setSubmittingTransfer(true)
+    try {
+      const res = await fetch(`/api/employees/${employeeId}/transfers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toPayrollCodeId: transferCodeId,
+          effectiveDate: transferDate,
+          notes: transferNotes || undefined,
+        }),
+      })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error ?? 'Transfer failed')
+      setShowTransferForm(false)
+      setTransferCodeId('')
+      setTransferDate('')
+      setTransferNotes('')
+      setTransferConfirm('')
+      loadTransfers()
+      load()
+    } catch (e) {
+      setTransferError(e instanceof Error ? e.message : 'Transfer failed')
+    } finally {
+      setSubmittingTransfer(false)
+    }
+  }
+
+  async function revertTransfer(transferId: string) {
+    setRevertingId(transferId)
+    try {
+      const res = await fetch(`/api/employees/${employeeId}/transfers/${transferId}`, {
+        method: 'DELETE',
+      })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error ?? 'Revert failed')
+      loadTransfers()
+      load()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Revert failed')
+    } finally {
+      setRevertingId(null)
     }
   }
 
@@ -558,6 +670,276 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
               ))}
             </div>
           </div>
+        </>
+      )}
+
+      {/* ── Branch History section (admin + executive) ── */}
+      {(role === 'admin' || role === 'executive') && transferData && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 12 }}>
+            <SectionHeader style={{ margin: 0 }}>Branch History</SectionHeader>
+            {isAdmin && !showTransferForm && (
+              <button
+                onClick={() => { setShowTransferForm(true); setTransferError(null) }}
+                style={{
+                  background: '#2a2a2a',
+                  color: '#cccccc',
+                  border: '1px solid #333333',
+                  borderRadius: 8,
+                  padding: '6px 14px',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                Transfer Branch
+              </button>
+            )}
+          </div>
+
+          {/* Assignment period timeline grouped by entity */}
+          {(() => {
+            const byEntity: Record<string, AssignmentPeriod[]> = {}
+            for (const a of transferData.assignments) {
+              if (!byEntity[a.entityCode]) byEntity[a.entityCode] = []
+              byEntity[a.entityCode].push(a)
+            }
+            return Object.entries(byEntity).map(([entityCode, periods]) => (
+              <div key={entityCode} style={{ ...cardStyle, marginBottom: 8 }}>
+                <p style={cardLabelStyle}>{entityCode}</p>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      {['Branch', 'Code', 'Type', 'From', 'To'].map((h) => (
+                        <th key={h} style={thStyle}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {periods.map((a, i) => (
+                      <tr key={a.id} style={{ borderTop: '1px solid #2a2a2a' }}>
+                        <td style={{ ...tdStyle, color: '#ff6b00' }}>{a.branchName ?? '—'}</td>
+                        <td style={tdStyle}>{a.payrollCode}</td>
+                        <td style={{ ...tdStyle, color: '#888888' }}>{formatLaborType(a.laborType)}</td>
+                        <td style={{ ...tdStyle, color: a.effectiveFrom === '1900-01-01' ? '#555555' : '#cccccc' }}>
+                          {a.effectiveFrom === '1900-01-01' ? 'Original' : formatPeriod(a.effectiveFrom)}
+                        </td>
+                        <td style={tdStyle}>
+                          {a.effectiveTo ? (
+                            formatPeriod(a.effectiveTo)
+                          ) : (
+                            <span style={{ color: '#4caf50', fontSize: 11 }}>Current</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))
+          })()}
+
+          {/* Transfer log */}
+          {transferData.transfers.length > 0 && (
+            <div style={{ ...cardStyle, marginBottom: 8 }}>
+              <p style={cardLabelStyle}>Transfer Log</p>
+              {transferData.transfers.map((t, i) => (
+                <div
+                  key={t.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    padding: '10px 0',
+                    borderTop: '1px solid #2a2a2a',
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, color: '#cccccc' }}>
+                      <span style={{ color: '#cc4444' }}>{t.fromBranchName ?? t.fromCode}</span>
+                      {' → '}
+                      <span style={{ color: '#ff6b00' }}>{t.toBranchName ?? t.toCode}</span>
+                      <span style={{ color: '#555555', marginLeft: 8 }}>({t.entityCode})</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#666666', marginTop: 3 }}>
+                      Effective {formatPeriod(t.effectiveDate)}
+                      {t.notes && <span style={{ color: '#555555' }}> · {t.notes}</span>}
+                    </div>
+                  </div>
+                  {isAdmin && i === 0 && (
+                    <button
+                      onClick={() => revertTransfer(t.id)}
+                      disabled={revertingId === t.id}
+                      style={{
+                        background: '#3a1a1a',
+                        color: '#cc4444',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '4px 10px',
+                        fontSize: 11,
+                        cursor: revertingId === t.id ? 'not-allowed' : 'pointer',
+                        opacity: revertingId === t.id ? 0.6 : 1,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {revertingId === t.id ? 'Reverting…' : 'Revert'}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Transfer form */}
+          {isAdmin && showTransferForm && (() => {
+            const codesByBranch = transferData.payrollCodes.reduce<Record<string, TransferPayrollCode[]>>((acc, pc) => {
+              if (!acc[pc.branchName]) acc[pc.branchName] = []
+              acc[pc.branchName].push(pc)
+              return acc
+            }, {})
+            const selectedCode = transferData.payrollCodes.find((c) => c.id === transferCodeId)
+            const selectedBranchName = selectedCode?.branchName ?? ''
+            const expectedName = data.employee.displayName
+            const nameMatch = transferConfirm.trim().toLowerCase() === expectedName.trim().toLowerCase()
+            const canSubmit = !!transferCodeId && !!transferDate && nameMatch && !submittingTransfer
+
+            return (
+              <div style={{ ...cardStyle, border: '1px solid #333333', marginBottom: 8 }}>
+                <p style={{ ...cardLabelStyle, marginBottom: 16 }}>Transfer Branch</p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {/* Payroll code selector */}
+                  <div>
+                    <label style={{ fontSize: 11, color: '#888888', display: 'block', marginBottom: 4 }}>
+                      NEW PAYROLL CODE
+                    </label>
+                    <select
+                      value={transferCodeId}
+                      onChange={(e) => setTransferCodeId(e.target.value)}
+                      style={{ ...selectStyle, width: '100%', maxWidth: 400 }}
+                    >
+                      <option value="">— select payroll code —</option>
+                      {Object.entries(codesByBranch).sort(([a], [b]) => a.localeCompare(b)).map(([branchName, codes]) => (
+                        <optgroup key={branchName} label={branchName}>
+                          {codes.map((pc) => (
+                            <option key={pc.id} value={pc.id}>
+                              {pc.code} ({pc.entityCode} / {pc.laborType})
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Effective date */}
+                  <div>
+                    <label style={{ fontSize: 11, color: '#888888', display: 'block', marginBottom: 4 }}>
+                      EFFECTIVE DATE (must be a Saturday)
+                    </label>
+                    <input
+                      type="date"
+                      value={transferDate}
+                      onChange={(e) => setTransferDate(e.target.value)}
+                      style={{ ...selectStyle, width: 180 }}
+                    />
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label style={{ fontSize: 11, color: '#888888', display: 'block', marginBottom: 4 }}>
+                      NOTES (optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={transferNotes}
+                      onChange={(e) => setTransferNotes(e.target.value)}
+                      placeholder="Reason for transfer…"
+                      style={{ ...selectStyle, width: '100%', maxWidth: 400 }}
+                    />
+                  </div>
+
+                  {/* Warning */}
+                  {transferCodeId && transferDate && (
+                    <div style={{
+                      background: '#2a1a0a',
+                      border: '1px solid #cc5500',
+                      borderRadius: 8,
+                      padding: '10px 14px',
+                      fontSize: 12,
+                      color: '#ff9944',
+                      lineHeight: 1.5,
+                    }}>
+                      This will reassign all payroll and fuel transactions from{' '}
+                      <strong>{formatPeriod(transferDate)}</strong> onward to{' '}
+                      <strong>{selectedBranchName}</strong>. Transactions before this date will remain under the current branch. This cannot be undone without contacting an administrator.
+                    </div>
+                  )}
+
+                  {/* Name confirmation */}
+                  <div>
+                    <label style={{ fontSize: 11, color: '#888888', display: 'block', marginBottom: 4 }}>
+                      TYPE &ldquo;{expectedName.toUpperCase()}&rdquo; TO CONFIRM
+                    </label>
+                    <input
+                      type="text"
+                      value={transferConfirm}
+                      onChange={(e) => setTransferConfirm(e.target.value)}
+                      placeholder={expectedName}
+                      style={{
+                        ...selectStyle,
+                        width: '100%',
+                        maxWidth: 300,
+                        borderColor: transferConfirm && !nameMatch ? '#cc4444' : '#333333',
+                      }}
+                    />
+                  </div>
+
+                  {transferError && (
+                    <p style={{ color: '#cc4444', fontSize: 12, margin: 0 }}>{transferError}</p>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={submitTransfer}
+                      disabled={!canSubmit}
+                      style={{
+                        background: canSubmit ? '#ff6b00' : '#2a2a2a',
+                        color: canSubmit ? '#ffffff' : '#555555',
+                        border: 'none',
+                        borderRadius: 8,
+                        padding: '7px 18px',
+                        fontSize: 13,
+                        cursor: canSubmit ? 'pointer' : 'not-allowed',
+                      }}
+                    >
+                      {submittingTransfer ? 'Transferring…' : 'Transfer Employee'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowTransferForm(false)
+                        setTransferCodeId('')
+                        setTransferDate('')
+                        setTransferNotes('')
+                        setTransferConfirm('')
+                        setTransferError(null)
+                      }}
+                      style={{
+                        background: '#2a2a2a',
+                        color: '#cccccc',
+                        border: 'none',
+                        borderRadius: 8,
+                        padding: '7px 18px',
+                        fontSize: 13,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
         </>
       )}
 

@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 5, 2026 — Session: Sacramento→Modesto branch merge + is_active audit + review queue branch/code selectors fixed
+## Last updated: May 5, 2026 — Session: Sacramento→Modesto merge + review queue fixes + employee branch transfer history
 
 ---
 
@@ -101,6 +101,18 @@ Every branch selector query now filters `is_active = true` so Sacramento never a
 - `app/api/allocation/summary/route.ts` — added `eq('is_active', true)`
 - `lib/supabase/database.types.ts` — added `is_active` to branches Row/Insert/Update
 - `manager/page.tsx` and `district/page.tsx` were already correct
+
+### Employee Branch Transfer History (May 5, 2026)
+- Migration `20260505000002_employee_branch_transfers.sql` applied to production
+- New `employee_branch_transfers` table: records from/to payroll codes, effective_date, notes, created_by
+- `employee_entity_assignments` gains `effective_from` (date NOT NULL, default '1900-01-01') and `effective_to` (date nullable)
+- Dropped `UNIQUE(raw_name_in_report, entity_id)` — replaced with partial unique index `WHERE effective_to IS NULL`
+- All existing assignments set to `effective_from = '1900-01-01'`, `effective_to = NULL`
+- `GET /api/employees/[id]/transfers` — admin + executive: returns transfer log, all assignment periods, available payroll codes
+- `POST /api/employees/[id]/transfers` — admin only: validates Saturday, validates different branch, closes old assignment, opens new one, reassigns payroll + fuel transactions retroactively, updates fuel card assignments
+- `DELETE /api/employees/[id]/transfers/[transferId]` — admin only: reverts if employee hasn't been transferred again since
+- `detail/route.ts` updated to filter assignments to `effective_to IS NULL` (active only)
+- `EmployeeDetailClient` gets "Branch History" section: assignment periods timeline grouped by entity, transfer log with revert button (most recent only), inline Transfer Branch form with payroll code dropdown + Saturday date picker + name confirmation
 
 ### Review Queue — Branch & Payroll Code Selectors Fixed
 **Fuel card assignment dropdown:**

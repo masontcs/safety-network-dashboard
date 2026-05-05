@@ -83,6 +83,7 @@ export async function GET(
       .from('employee_entity_assignments')
       .select('entity_id, payroll_code_id, raw_name_in_report, entities(code, name), payroll_codes(code, labor_type, branch_id, branches(name))')
       .eq('employee_id', employeeId)
+      .is('effective_to', null)
 
     if (assignErr) throw new Error(`Failed to load assignments: ${assignErr.message}`)
 
