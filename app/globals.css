@@ -1,0 +1,266 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.skeleton {
+  background: #2a2a2a;
+  border-radius: 4px;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* ─────────────────────────────────────────────
+   Base
+───────────────────────────────────────────── */
+body {
+  background: #111111;
+  color: #ffffff;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* ─────────────────────────────────────────────
+   Card
+───────────────────────────────────────────── */
+.card {
+  background: #1e1e1e;
+  border-radius: 12px;
+  border: 1px solid #2a2a2a;
+  padding: 16px;
+}
+
+/* ─────────────────────────────────────────────
+   Metric display
+───────────────────────────────────────────── */
+.metric-label {
+  font-size: 11px;
+  color: #888888;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+  font-weight: 400;
+}
+
+.metric-sub-label {
+  font-size: 11px;
+  color: #666666;
+}
+
+.metric-value {
+  font-size: 26px;
+  font-weight: 500;
+  color: #ffffff;
+  line-height: 1.1;
+}
+
+/* ─────────────────────────────────────────────
+   Delta indicators
+───────────────────────────────────────────── */
+.delta-up {
+  font-size: 11px;
+  color: #ff6b00;
+}
+
+.delta-down {
+  font-size: 11px;
+  color: #cc4444;
+}
+
+/* ─────────────────────────────────────────────
+   Branch names (always orange — primary nav element)
+───────────────────────────────────────────── */
+.branch-name {
+  color: #ff6b00;
+}
+
+/* ─────────────────────────────────────────────
+   Top nav bar
+───────────────────────────────────────────── */
+.top-nav {
+  background: #1a1a1a;
+  border-bottom: 1px solid #2a2a2a;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+}
+
+.nav-item {
+  font-size: 13px;
+  color: #999999;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav-item:hover {
+  color: #ffffff;
+}
+
+.nav-item-active {
+  background: #ff6b00;
+  color: #ffffff;
+}
+
+/* ─────────────────────────────────────────────
+   Sidebar
+───────────────────────────────────────────── */
+.sidebar {
+  width: 48px;
+  background: #1a1a1a;
+  border-right: 1px solid #2a2a2a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  gap: 4px;
+}
+
+.sidebar-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: #666666;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidebar-icon:hover {
+  background: #2a2a2a;
+  color: #ff6b00;
+}
+
+.sidebar-icon-active {
+  background: #ff6b00;
+  color: #ffffff;
+}
+
+/* ─────────────────────────────────────────────
+   Status pills
+───────────────────────────────────────────── */
+.pill-paid {
+  background: #1a3a1a;
+  color: #4caf50;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.pill-pending {
+  background: #3a2a1a;
+  color: #ff9800;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.pill-overdue {
+  background: #3a1a1a;
+  color: #cc4444;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* ─────────────────────────────────────────────
+   Tables
+───────────────────────────────────────────── */
+.table-header {
+  font-size: 11px;
+  font-weight: 400;
+  color: #666666;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.table-body {
+  font-size: 12px;
+  font-weight: 400;
+  color: #cccccc;
+}
+
+/* ─────────────────────────────────────────────
+   Legal name (employee detail page only)
+───────────────────────────────────────────── */
+.legal-name {
+  font-size: 11px;
+  color: #555555;
+}
+
+/* ─────────────────────────────────────────────
+   Icon button
+───────────────────────────────────────────── */
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  background: #2a2a2a;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff6b00;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s;
+}
+
+.icon-btn:hover {
+  background: #333333;
+}
+
+/* ─────────────────────────────────────────────
+   Orange CTA button
+───────────────────────────────────────────── */
+.btn-primary {
+  background: #ff6b00;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-primary:hover {
+  background: #cc5500;
+}
+
+/* ─────────────────────────────────────────────
+   Date / filter pill
+───────────────────────────────────────────── */
+.filter-pill {
+  background: #2a2a2a;
+  border: 1px solid #333333;
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: #cccccc;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.filter-pill:hover {
+  border-color: #ff6b00;
+}
+
+.filter-pill-active {
+  border-color: #ff6b00;
+  color: #ff6b00;
+}
