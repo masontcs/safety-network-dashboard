@@ -38,3 +38,6 @@ next-env.d.ts
 
 # claude code session files
 .claude/
+
+# supabase CLI local state (contains org/project IDs)
+supabase/.temp/
