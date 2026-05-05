@@ -37,10 +37,9 @@ export default function LoginPage() {
       justifyContent: 'center',
     }}>
       <div className="card" style={{ width: 360 }}>
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff', marginBottom: 4 }}>
-            Safety Network
-          </div>
+        <div style={{ marginBottom: 24, textAlign: 'center' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="Safety Network" style={{ height: 52, width: 'auto', marginBottom: 12 }} />
           <div className="metric-label">Operations Dashboard</div>
         </div>
 

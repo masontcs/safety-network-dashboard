@@ -20,9 +20,8 @@ export default function TopNav({ branchName, userName }: TopNavProps) {
   return (
     <header className="top-nav" style={{ justifyContent: 'space-between' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span style={{ fontSize: 13, fontWeight: 500, color: '#ffffff' }}>
-          Safety Network
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo.png" alt="Safety Network" style={{ height: 24, width: 'auto' }} />
         {branchName && (
           <>
             <span style={{ color: '#333333' }}>/</span>
