@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
 import type { Role } from '@/lib/supabase/database.types'
+import AnimatedDotGrid from '@/components/landing/AnimatedDotGrid'
 
 const DASHBOARD_ROUTES: Record<Role, string> = {
   admin:            '/admin',
@@ -26,27 +27,28 @@ export default async function RootPage() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: '#111111',
-        backgroundImage: 'radial-gradient(circle, #1e1e1e 1px, transparent 1px)',
-        backgroundSize: '28px 28px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-        fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
-        padding: '0 24px',
-      }}
-    >
+    <>
+      <AnimatedDotGrid />
+      <div
+        style={{
+          minHeight: '100vh',
+          background: '#111111',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative',
+          zIndex: 1,
+          fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
+          padding: '0 24px',
+        }}
+      >
       <div style={{ textAlign: 'center', maxWidth: 560 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/safety_network_logo.png"
           alt="Safety Network"
-          style={{ width: 200, height: 'auto', marginBottom: 44 }}
+          style={{ display: 'block', width: 240, height: 'auto', margin: '0 auto 24px' }}
         />
 
         <h1
@@ -124,5 +126,6 @@ export default async function RootPage() {
         © 2026 Safety Network Inc. — Confidential&nbsp;&nbsp;|&nbsp;&nbsp;Internal Use Only
       </div>
     </div>
+    </>
   )
 }
