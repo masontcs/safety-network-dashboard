@@ -43,10 +43,11 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const { vendor, dateRangeStart, dateRangeEnd, transactions, newCardNames, warnings } = parsed.data
 
-    // 6. Duplicate check — reject if an existing import's date range overlaps
+    // 6. Duplicate check — reject if same vendor already has an overlapping date range
     const { data: existing } = await supabase
       .from('fuel_imports')
       .select('id, date_range_start, date_range_end')
+      .eq('vendor', vendor)
       .lte('date_range_start', dateRangeEnd)
       .gte('date_range_end', dateRangeStart)
       .limit(1)
@@ -56,10 +57,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json(
         {
           success: false,
-          error: `Fuel already imported for ${existing.date_range_start} – ${existing.date_range_end}`,
+          error: `${vendor} fuel already imported for ${existing.date_range_start} – ${existing.date_range_end}`,
           code: 'DUPLICATE',
           conflict: {
             importId: existing.id,
+            vendor,
             dateRangeStart: existing.date_range_start,
             dateRangeEnd: existing.date_range_end,
           },
