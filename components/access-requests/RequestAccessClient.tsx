@@ -6,6 +6,7 @@ import Link from 'next/link'
 interface Branch {
   id: string
   name: string
+  is_revenue_generating: boolean
 }
 
 const ROLE_OPTIONS = [
@@ -197,9 +198,16 @@ export default function RequestAccessClient({ branches }: { branches: Branch[] }
                 style={{ ...inputStyle, cursor: 'pointer', color: form.branchId ? '#ffffff' : '#555555' }}
               >
                 <option value="" disabled>Select your branch</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
+                <optgroup label="— Operations —">
+                  {branches.filter((b) => b.is_revenue_generating).map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="— Corporate —">
+                  {branches.filter((b) => !b.is_revenue_generating).map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </optgroup>
               </select>
             </div>
 

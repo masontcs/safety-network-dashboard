@@ -5,12 +5,11 @@ export default async function RequestAccessPage() {
   const supabase = createServiceClient()
   const { data } = await supabase
     .from('branches')
-    .select('id, name')
+    .select('id, name, is_revenue_generating')
     .eq('is_active', true)
-    .eq('is_revenue_generating', true)
     .order('name')
 
-  const branches = (data as { id: string; name: string }[] | null) ?? []
+  const branches = (data as { id: string; name: string; is_revenue_generating: boolean }[] | null) ?? []
 
   return <RequestAccessClient branches={branches} />
 }

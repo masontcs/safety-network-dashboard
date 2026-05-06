@@ -19,15 +19,14 @@ export async function GET(): Promise<NextResponse> {
         .order('created_at', { ascending: false }),
       supabase
         .from('branches')
-        .select('id, name')
+        .select('id, name, is_revenue_generating')
         .eq('is_active', true)
-        .eq('is_revenue_generating', true)
         .order('name'),
     ])
 
     if (requestsRes.error) throw new Error(requestsRes.error.message)
 
-    const branches = (branchesRes.data ?? []) as { id: string; name: string }[]
+    const branches = (branchesRes.data ?? []) as { id: string; name: string; is_revenue_generating: boolean }[]
     const branchMap = Object.fromEntries(branches.map((b) => [b.id, b.name]))
 
     const requests = (requestsRes.data ?? []).map((r) => ({

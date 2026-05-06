@@ -6,6 +6,7 @@ import Skeleton from '@/components/ui/Skeleton'
 interface Branch {
   id: string
   name: string
+  is_revenue_generating: boolean
 }
 
 interface AccessRequest {
@@ -376,9 +377,16 @@ export default function AccessRequestsClient() {
                       Branch
                     </label>
                     <select value={actionBranchId} onChange={(e) => setActionBranchId(e.target.value)} style={selectStyle}>
-                      {branches.map((b) => (
-                        <option key={b.id} value={b.id}>{b.name}</option>
-                      ))}
+                      <optgroup label="— Operations —">
+                        {branches.filter((b) => b.is_revenue_generating).map((b) => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="— Corporate —">
+                        {branches.filter((b) => !b.is_revenue_generating).map((b) => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                      </optgroup>
                     </select>
                   </div>
 
