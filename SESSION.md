@@ -104,7 +104,24 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ---
 
-## 3c. RECENT CHANGES (May 5, 2026)
+## 3c. RECENT CHANGES (May 6, 2026) — Admin Dashboard Redesign
+
+### Admin Dashboard Redesign
+- `app/admin/page.tsx` — now fetches + passes `fiscalMonths` (sorted newest first); removed `initialWeek`/`initialView` searchParams
+- **New: `app/api/admin/overview/route.ts`** — single admin-only endpoint returning all dashboard data for a date range: totals, byPeriod (per-Saturday), byBranch (revenue/payroll/fuel/GP with revenueByPeriod sparkline data). Paginated to avoid 1000-row cap.
+- **New: `components/targets/FiscalMonthVarianceRow.tsx`** — fetches monthly targets for selected fiscal month, shows monthly revenue target vs actuals
+- `components/dashboard/AdminDashboard.tsx` — **complete rewrite**:
+  - Replaced week navigator + MTD/YTD toggle with fiscal month dropdown (most recent first) + YTD toggle button
+  - Defaults to most recent fiscal month containing imported data (via `/api/periods/available`)
+  - Top metric cards show full fiscal month (or YTD) totals with date range subtitle
+  - **Weekly bar chart** (Recharts grouped bars): Revenue (orange), Payroll (gray), Fuel (dark red) per week; click bar → Selected Week Panel with exact metrics + dismiss button; YTD mode shows monthly aggregates instead
+  - **Branch Performance Card Grid** (3×2): all 6 active branches always shown; branch name in orange, revenue/payroll/fuel/GP/GP%; GP% color-coded (green ≥20%, yellow 10-20%, red <10%); mini SVG sparkline per branch; "No data" overlay for empty branches
+  - Removed: side cards (Fuel Efficiency, Payroll Allocation, Data Import), Waterfall chart, TrendLineChart, DateRangePicker
+  - Revenue by Branch table updated to use fiscal month/YTD range
+
+---
+
+## 3d. RECENT CHANGES (May 5, 2026)
 
 ### Sacramento → Modesto Branch Merge
 

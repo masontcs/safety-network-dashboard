@@ -5,17 +5,10 @@ import type { Database, Role } from '@/lib/supabase/database.types'
 import DashboardShell from '@/components/layout/DashboardShell'
 import AdminDashboard from '@/components/dashboard/AdminDashboard'
 
-export default async function AdminPage({
-  searchParams,
-}: {
-  searchParams: { week?: string; view?: string }
-}) {
+export default async function AdminPage() {
   const supabase = createServerComponentClient<Database>({ cookies })
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const { data: profileRaw } = await supabase
@@ -25,25 +18,30 @@ export default async function AdminPage({
     .single()
 
   const profile = profileRaw as { role: Role; display_name: string } | null
-
   if (!profile || profile.role !== 'admin') redirect('/login')
 
-  // Fetch all SN revenue-generating branches to resolve branch names client-side
-  const { data: branchesRaw } = await supabase
-    .from('branches')
-    .select('id, name')
-    .eq('is_revenue_generating', true)
-    .eq('is_active', true)
-    .order('name')
+  const [branchesRes, fiscalMonthsRes] = await Promise.all([
+    supabase
+      .from('branches')
+      .select('id, name')
+      .eq('is_revenue_generating', true)
+      .eq('is_active', true)
+      .order('name'),
+    supabase
+      .from('fiscal_months')
+      .select('id, name, year, start_date, end_date')
+      .order('year', { ascending: false })
+      .order('start_date', { ascending: false }),
+  ])
 
-  const branches = (branchesRaw as { id: string; name: string }[] | null) ?? []
-
-  const initialView = (searchParams.view === 'mtd' || searchParams.view === 'ytd') ? searchParams.view : 'weekly'
-  const initialWeek = searchParams.week ?? null
+  const branches = (branchesRes.data as { id: string; name: string }[] | null) ?? []
+  const fiscalMonths = (fiscalMonthsRes.data as {
+    id: string; name: string; year: number; start_date: string; end_date: string
+  }[] | null) ?? []
 
   return (
     <DashboardShell role="admin" userName={profile.display_name}>
-      <AdminDashboard branches={branches} initialWeek={initialWeek} initialView={initialView} />
+      <AdminDashboard branches={branches} fiscalMonths={fiscalMonths} />
     </DashboardShell>
   )
 }
