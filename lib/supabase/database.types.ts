@@ -146,9 +146,9 @@ export type Database = {
         Relationships: []
       }
       branch_targets: {
-        Row: { id: string; branch_id: string; period_type: string; target_date: string; revenue_target: number | null; profit_pct_target: number | null; created_at: string; updated_at: string }
-        Insert: { id?: string; branch_id: string; period_type: string; target_date: string; revenue_target?: number | null; profit_pct_target?: number | null; created_at?: string; updated_at?: string }
-        Update: { id?: string; branch_id?: string; period_type?: string; target_date?: string; revenue_target?: number | null; profit_pct_target?: number | null; updated_at?: string }
+        Row: { id: string; branch_id: string; fiscal_month_id: string; revenue_target: number | null; profit_pct_target: number | null; created_at: string; updated_by: string | null }
+        Insert: { id?: string; branch_id: string; fiscal_month_id: string; revenue_target?: number | null; profit_pct_target?: number | null; created_at?: string; updated_by?: string | null }
+        Update: { id?: string; branch_id?: string; fiscal_month_id?: string; revenue_target?: number | null; profit_pct_target?: number | null; updated_by?: string | null }
         Relationships: []
       }
     }

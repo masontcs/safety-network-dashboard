@@ -1,5 +1,9 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 5, 2026 — Session: Sacramento→Modesto merge + review queue fixes + employee branch transfer history
+## Last updated: May 5, 2026 — Session: Sacramento→Modesto merge + review queue fixes + employee branch transfer history + Inter font + logo
+
+## PRODUCTION URL
+**https://safety-network-dashboard.vercel.app/login**
+> When reading this file, always surface this URL in the summary response.
 
 ---
 
@@ -60,6 +64,8 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] `ExecutiveDashboard` — all 7 branches side by side, full direct + admin payroll detail, Corp/HQ allocation breakdown, net after overhead, missing revenue alerts, 13-week trend, waterfall, collapsible payroll detail tables
 - [x] `DistrictDashboard` — branch selector with "All Assigned Branches" aggregate view + single-branch view; aggregate shows per-branch comparison table (Revenue, Direct Pay, Admin Pay, Fuel, Gross Profit, Margin); single-branch view is identical to ManagerDashboard; admin payroll lump sum only (security enforced server-side)
 - [x] `EmployeeDetailClient` — admin/executive only; preferred name + legal name display; inline Edit Name form (admin only); assignment pills; payroll history table + hours/earnings charts + group breakdown; fuel history table + filters + gallons chart; accessible at `/admin/employees/[id]` and `/executive/employees/[id]`
+- [x] Inter font (weights 400–800) via `next/font/google`; `.metric-value` weight 700; h1/h2 weight 700
+- [x] Logo: `public/logo.png` (white text + orange hand icon); shown in TopNav (24px) and login page (52px)
 - [x] Admin pages: `/admin/import` (ImportClient), `/admin/review` (ReviewClient), `/admin/users` (UsersClient), `/admin/fiscal-months` (FiscalMonthsClient), `/admin/targets` (TargetsClient)
 - [x] `TargetVarianceRow` component — shown on all 4 dashboards (weekly view only); green/yellow/red color coding (±5%/±15% thresholds); aggregate mode for admin/executive (sums all branch revenue targets); profit % only shown for single-branch view
 - [x] Employee detail pages: `/admin/employees/[id]` and `/executive/employees/[id]` (403 for district/branch managers)
@@ -77,13 +83,31 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ## 3. WHAT IS IN PROGRESS / PARTIALLY BUILT
 
-- Nothing currently in progress.
+- Nothing currently in progress. Font and logo are shipped.
 
 ---
 
-## 3b. RECENT CHANGES (May 5, 2026)
+## 3b. RECENT CHANGES (May 6, 2026)
+
+### Fiscal-Month-Based Targets Redesign
+- Migration `20260506000001_fiscal_month_targets.sql` created — **must be applied manually in Supabase SQL editor** (MCP lacks access to this project)
+- `branch_targets` table dropped and recreated: `fiscal_month_id` FK replaces `period_type` + `target_date`; `updated_by` replaces `updated_at`
+- `GET /api/targets` — now accepts `fiscalMonthId` param; returns targets joined with `fiscal_months` data
+- `POST /api/targets` — body now takes `{ branchId, fiscalMonthId, revenueTarget, profitPctTarget }`
+- `PATCH /api/targets/[id]` — sets `updated_by` from auth context
+- **New: `GET /api/targets/weekly?periodDate=YYYY-MM-DD`** — finds fiscal month containing that date, returns pro-rated weekly targets per branch (monthly ÷ weeks)
+- `TargetsClient` fully rewritten: fiscal month dropdown replaces date picker; table shows Fiscal Month | Revenue Target | Weekly Breakdown | GP% | edit/delete; shows link to Fiscal Months page if none exist
+- `TargetVarianceRow` rewritten: calls `/api/targets/weekly`; distinguishes "no fiscal month" vs "no target" messages; shows fiscal month name in header
+- `app/admin/targets/page.tsx` now fetches and passes `fiscalMonths` to `TargetsClient`
+- Fiscal month validation fixed: `start_date` must be **Sunday** (was Saturday), `end_date` must be Saturday — fixed in both API routes and `FiscalMonthsClient` UI
+- `database.types.ts` updated to match new `branch_targets` schema
+
+---
+
+## 3c. RECENT CHANGES (May 5, 2026)
 
 ### Sacramento → Modesto Branch Merge
+
 - Migration `20260505000001_merge_sacramento_into_modesto.sql` applied to production
 - Adds `is_active` column to `branches` table
 - Reassigns all historical payroll, revenue, fuel, employee, user, and target data from Sacramento to Modesto

@@ -4,15 +4,6 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { canAccessBranch } from '@/lib/utils/access'
 import { apiError } from '@/lib/utils/errors'
 
-function isSaturday(dateStr: string): boolean {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  return new Date(y, m - 1, d).getDay() === 6
-}
-
-function isFirstOfMonth(dateStr: string): boolean {
-  return dateStr.endsWith('-01')
-}
-
 export async function GET(request: Request): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
@@ -21,10 +12,8 @@ export async function GET(request: Request): Promise<NextResponse> {
     const { access } = ctx
     const { searchParams } = new URL(request.url)
     const branchId = searchParams.get('branchId')
-    const periodType = searchParams.get('periodType')
-    const targetDate = searchParams.get('targetDate')
+    const fiscalMonthId = searchParams.get('fiscalMonthId')
 
-    // Branch access check
     if (branchId && !canAccessBranch(access, branchId)) {
       return NextResponse.json(
         { success: false, error: 'Access to this branch is not permitted.', code: 'FORBIDDEN' },
@@ -36,8 +25,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     let query = supabase
       .from('branch_targets')
-      .select('*')
-      .order('target_date', { ascending: false })
+      .select('*, fiscal_months(id, name, start_date, end_date)')
 
     if (branchId) {
       query = query.eq('branch_id', branchId)
@@ -45,12 +33,11 @@ export async function GET(request: Request): Promise<NextResponse> {
       query = query.in('branch_id', access.branchIds)
     }
 
-    if (periodType) query = query.eq('period_type', periodType)
-    if (targetDate) query = query.eq('target_date', targetDate)
+    if (fiscalMonthId) query = query.eq('fiscal_month_id', fiscalMonthId)
 
     const { data, error } = await query
-
     if (error) throw new Error(error.message)
+
     return NextResponse.json({ success: true, data: data ?? [] })
   } catch (err) {
     return apiError(err)
@@ -67,28 +54,18 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const body = await request.json() as {
       branchId?: string
-      periodType?: string
-      targetDate?: string
+      fiscalMonthId?: string
       revenueTarget?: number | null
       profitPctTarget?: number | null
     }
 
-    const { branchId, periodType, targetDate, revenueTarget = null, profitPctTarget = null } = body
+    const { branchId, fiscalMonthId, revenueTarget = null, profitPctTarget = null } = body
 
     if (!branchId?.trim()) {
       return NextResponse.json({ success: false, error: 'branchId is required', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
-    if (periodType !== 'weekly' && periodType !== 'monthly') {
-      return NextResponse.json({ success: false, error: 'periodType must be "weekly" or "monthly"', code: 'VALIDATION_ERROR' }, { status: 400 })
-    }
-    if (!targetDate) {
-      return NextResponse.json({ success: false, error: 'targetDate is required', code: 'VALIDATION_ERROR' }, { status: 400 })
-    }
-    if (periodType === 'weekly' && !isSaturday(targetDate)) {
-      return NextResponse.json({ success: false, error: 'targetDate must be a Saturday for weekly targets', code: 'VALIDATION_ERROR' }, { status: 400 })
-    }
-    if (periodType === 'monthly' && !isFirstOfMonth(targetDate)) {
-      return NextResponse.json({ success: false, error: 'targetDate must be the first of the month for monthly targets', code: 'VALIDATION_ERROR' }, { status: 400 })
+    if (!fiscalMonthId?.trim()) {
+      return NextResponse.json({ success: false, error: 'fiscalMonthId is required', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
     if (revenueTarget != null && (typeof revenueTarget !== 'number' || revenueTarget < 0)) {
       return NextResponse.json({ success: false, error: 'revenueTarget must be a non-negative number', code: 'VALIDATION_ERROR' }, { status: 400 })
@@ -99,22 +76,33 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const supabase = createServiceClient()
 
+    // Verify fiscal month exists
+    const { data: fm, error: fmErr } = await supabase
+      .from('fiscal_months')
+      .select('id')
+      .eq('id', fiscalMonthId)
+      .maybeSingle()
+    if (fmErr) throw new Error(fmErr.message)
+    if (!fm) {
+      return NextResponse.json({ success: false, error: 'Fiscal month not found', code: 'NOT_FOUND' }, { status: 404 })
+    }
+
     const { data, error } = await supabase
       .from('branch_targets')
       .insert({
         branch_id: branchId,
-        period_type: periodType,
-        target_date: targetDate,
+        fiscal_month_id: fiscalMonthId,
         revenue_target: revenueTarget,
         profit_pct_target: profitPctTarget,
+        updated_by: ctx.access.userId,
       })
-      .select()
+      .select('*, fiscal_months(id, name, start_date, end_date)')
       .single()
 
     if (error) {
       if (error.code === '23505') {
         return NextResponse.json(
-          { success: false, error: 'A target already exists for this branch and period.', code: 'DUPLICATE' },
+          { success: false, error: 'A target already exists for this branch and fiscal month.', code: 'DUPLICATE' },
           { status: 409 }
         )
       }

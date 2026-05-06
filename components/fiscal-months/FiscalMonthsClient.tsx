@@ -15,6 +15,12 @@ interface FiscalMonth {
 
 const BLANK_FORM = { name: '', year: new Date().getFullYear(), start_date: '', end_date: '', sort_order: 0, is_active: true }
 
+function isSundayStr(dateStr: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d).getDay() === 0
+}
+
 function isSaturdayStr(dateStr: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false
   const [y, m, d] = dateStr.split('-').map(Number)
@@ -71,8 +77,8 @@ function FormRow({
           {field('start_date', 'date', '', 130)}
           <span style={{ color: '#555555', fontSize: 11 }}>→</span>
           {field('end_date', 'date', '', 130)}
-          {value.start_date && !isSaturdayStr(value.start_date) && (
-            <span style={{ color: '#cc4444', fontSize: 10 }}>start not Sat</span>
+          {value.start_date && !isSundayStr(value.start_date) && (
+            <span style={{ color: '#cc4444', fontSize: 10 }}>start not Sun</span>
           )}
           {value.end_date && !isSaturdayStr(value.end_date) && (
             <span style={{ color: '#cc4444', fontSize: 10 }}>end not Sat</span>
@@ -156,7 +162,7 @@ export default function FiscalMonthsClient() {
     if (!form.year || form.year < 2000) return 'Year must be a valid year.'
     if (!form.start_date) return 'Start date is required.'
     if (!form.end_date) return 'End date is required.'
-    if (!isSaturdayStr(form.start_date)) return 'Start date must be a Saturday.'
+    if (!isSundayStr(form.start_date)) return 'Start date must be a Sunday.'
     if (!isSaturdayStr(form.end_date)) return 'End date must be a Saturday.'
     if (form.end_date <= form.start_date) return 'End date must be after start date.'
     return null

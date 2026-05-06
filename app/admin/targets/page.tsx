@@ -19,18 +19,26 @@ export default async function TargetsPage() {
   const profile = profileRaw as { role: Role; display_name: string } | null
   if (!profile || profile.role !== 'admin') redirect('/admin')
 
-  const { data: branchesRaw } = await supabase
-    .from('branches')
-    .select('id, name')
-    .eq('is_revenue_generating', true)
-    .eq('is_active', true)
-    .order('name')
+  const [branchesRes, fiscalMonthsRes] = await Promise.all([
+    supabase
+      .from('branches')
+      .select('id, name')
+      .eq('is_revenue_generating', true)
+      .eq('is_active', true)
+      .order('name'),
+    supabase
+      .from('fiscal_months')
+      .select('id, name, year, start_date, end_date')
+      .order('year', { ascending: true })
+      .order('start_date', { ascending: true }),
+  ])
 
-  const branches = (branchesRaw as { id: string; name: string }[] | null) ?? []
+  const branches = (branchesRes.data as { id: string; name: string }[] | null) ?? []
+  const fiscalMonths = (fiscalMonthsRes.data as { id: string; name: string; year: number; start_date: string; end_date: string }[] | null) ?? []
 
   return (
     <DashboardShell role="admin" userName={profile.display_name}>
-      <TargetsClient branches={branches} />
+      <TargetsClient branches={branches} fiscalMonths={fiscalMonths} />
     </DashboardShell>
   )
 }

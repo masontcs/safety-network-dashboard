@@ -6,6 +6,11 @@ import type { Database } from '@/lib/supabase/database.types'
 
 type FiscalMonthUpdate = Database['public']['Tables']['fiscal_months']['Update']
 
+function isSunday(dateStr: string): boolean {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d).getDay() === 0
+}
+
 function isSaturday(dateStr: string): boolean {
   const [y, m, d] = dateStr.split('-').map(Number)
   return new Date(y, m - 1, d).getDay() === 6
@@ -35,8 +40,8 @@ export async function PATCH(
     if (name !== undefined && !name.trim()) {
       return NextResponse.json({ success: false, error: 'name cannot be empty', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
-    if (start_date !== undefined && !isSaturday(start_date)) {
-      return NextResponse.json({ success: false, error: 'start_date must be a Saturday', code: 'VALIDATION_ERROR' }, { status: 400 })
+    if (start_date !== undefined && !isSunday(start_date)) {
+      return NextResponse.json({ success: false, error: 'start_date must be a Sunday', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
     if (end_date !== undefined && !isSaturday(end_date)) {
       return NextResponse.json({ success: false, error: 'end_date must be a Saturday', code: 'VALIDATION_ERROR' }, { status: 400 })

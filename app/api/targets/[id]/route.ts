@@ -31,7 +31,7 @@ export async function PATCH(
     const supabase = createServiceClient()
 
     const updates = {
-      updated_at: new Date().toISOString(),
+      updated_by: ctx.access.userId,
       ...('revenueTarget' in body ? { revenue_target: revenueTarget ?? null } : {}),
       ...('profitPctTarget' in body ? { profit_pct_target: profitPctTarget ?? null } : {}),
     }
@@ -40,7 +40,7 @@ export async function PATCH(
       .from('branch_targets')
       .update(updates)
       .eq('id', params.id)
-      .select()
+      .select('*, fiscal_months(id, name, start_date, end_date)')
       .single()
 
     if (error || !data) {

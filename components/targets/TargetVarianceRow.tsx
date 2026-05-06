@@ -3,15 +3,21 @@
 import { useState, useEffect } from 'react'
 import { formatCurrency, formatPercent } from '@/lib/utils/format'
 
-interface Target {
-  revenue_target: number | null
+interface WeeklyTarget {
+  branch_id: string
+  weekly_revenue_target: number | null
   profit_pct_target: number | null
 }
 
+interface WeeklyData {
+  fiscal_month_name: string
+  fiscal_month_id: string
+  weeks_in_month: number
+  targets: WeeklyTarget[]
+}
+
 interface Props {
-  // Single-branch mode: provide branchId
   branchId?: string | null
-  // Multi-branch aggregate mode: provide branchIds (admin/exec)
   branchIds?: string[] | null
   periodDate: string
   view: string
@@ -98,6 +104,12 @@ function VarianceMetric({
   )
 }
 
+type LoadState =
+  | { status: 'loading' }
+  | { status: 'no_fiscal_month' }
+  | { status: 'no_target'; fiscalMonthName: string }
+  | { status: 'ready'; revenueTarget: number | null; profitPctTarget: number | null; fiscalMonthName: string; isAggregate: boolean }
+
 export default function TargetVarianceRow({
   branchId,
   branchIds,
@@ -106,80 +118,76 @@ export default function TargetVarianceRow({
   actualRevenue,
   actualGrossProfitPct,
 }: Props) {
-  const [revenueTarget, setRevenueTarget] = useState<number | null>(null)
-  const [profitPctTarget, setProfitPctTarget] = useState<number | null>(null)
-  const [noTarget, setNoTarget] = useState(false)
-  const [loaded, setLoaded] = useState(false)
+  const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' })
 
   const effectiveBranchId = branchId ?? null
   const effectiveBranchIds = branchIds ?? null
   const isAggregate = effectiveBranchId === null && effectiveBranchIds !== null && effectiveBranchIds.length > 0
 
   useEffect(() => {
-    if (view !== 'weekly') {
-      setLoaded(true)
-      return
-    }
+    if (view !== 'weekly') return
+    if (!effectiveBranchId && !isAggregate) return
 
-    // Need at least one branch identifier
-    if (!effectiveBranchId && !isAggregate) {
-      setLoaded(true)
-      return
-    }
+    setLoadState({ status: 'loading' })
 
-    setLoaded(false)
+    fetch(`/api/targets/weekly?periodDate=${periodDate}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (!json.success) throw new Error(json.error)
 
-    if (isAggregate) {
-      // Fetch all targets for the period and sum revenue targets
-      const params = new URLSearchParams({ periodType: 'weekly', targetDate: periodDate })
-      fetch(`/api/targets?${params}`)
-        .then((r) => r.json())
-        .then((json) => {
-          if (!json.success || json.data.length === 0) {
-            setNoTarget(true)
-            setRevenueTarget(null)
-            setProfitPctTarget(null)
+        const weeklyData = json.data as WeeklyData | null
+
+        if (!weeklyData) {
+          setLoadState({ status: 'no_fiscal_month' })
+          return
+        }
+
+        const allTargets = weeklyData.targets
+
+        if (isAggregate) {
+          // Filter to accessible branches and sum revenue targets
+          const relevantTargets = effectiveBranchIds
+            ? allTargets.filter((t) => effectiveBranchIds.includes(t.branch_id))
+            : allTargets
+
+          if (relevantTargets.length === 0) {
+            setLoadState({ status: 'no_target', fiscalMonthName: weeklyData.fiscal_month_name })
             return
           }
-          const targets = json.data as Target[]
-          const totalRev = targets.reduce((s: number, t: Target) => s + (t.revenue_target ?? 0), 0)
-          setRevenueTarget(totalRev > 0 ? totalRev : null)
-          setProfitPctTarget(null) // Profit % not meaningful as aggregate sum
-          setNoTarget(totalRev === 0)
-        })
-        .catch(() => {
-          setNoTarget(true)
-          setRevenueTarget(null)
-        })
-        .finally(() => setLoaded(true))
-    } else {
-      fetch(`/api/targets?branchId=${effectiveBranchId}&periodType=weekly&targetDate=${periodDate}`)
-        .then((r) => r.json())
-        .then((json) => {
-          if (!json.success || json.data.length === 0) {
-            setNoTarget(true)
-            setRevenueTarget(null)
-            setProfitPctTarget(null)
+
+          const totalRevenue = relevantTargets.reduce((s, t) => s + (t.weekly_revenue_target ?? 0), 0)
+          setLoadState({
+            status: 'ready',
+            revenueTarget: totalRevenue > 0 ? totalRevenue : null,
+            profitPctTarget: null, // not meaningful as aggregate
+            fiscalMonthName: weeklyData.fiscal_month_name,
+            isAggregate: true,
+          })
+        } else {
+          const match = allTargets.find((t) => t.branch_id === effectiveBranchId)
+
+          if (!match) {
+            setLoadState({ status: 'no_target', fiscalMonthName: weeklyData.fiscal_month_name })
             return
           }
-          const t = json.data[0] as Target
-          setRevenueTarget(t.revenue_target)
-          setProfitPctTarget(t.profit_pct_target)
-          setNoTarget(t.revenue_target == null && t.profit_pct_target == null)
-        })
-        .catch(() => {
-          setNoTarget(true)
-          setRevenueTarget(null)
-          setProfitPctTarget(null)
-        })
-        .finally(() => setLoaded(true))
-    }
-  }, [effectiveBranchId, isAggregate, periodDate, view]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Only show for weekly view with a branch context
+          setLoadState({
+            status: 'ready',
+            revenueTarget: match.weekly_revenue_target,
+            profitPctTarget: match.profit_pct_target,
+            fiscalMonthName: weeklyData.fiscal_month_name,
+            isAggregate: false,
+          })
+        }
+      })
+      .catch(() => {
+        setLoadState({ status: 'no_fiscal_month' })
+      })
+  }, [effectiveBranchId, effectiveBranchIds, isAggregate, periodDate, view]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (view !== 'weekly') return null
   if (!effectiveBranchId && !isAggregate) return null
-  if (!loaded) return null
+  if (loadState.status === 'loading') return null
 
   return (
     <div
@@ -195,17 +203,26 @@ export default function TargetVarianceRow({
           margin: '0 0 10px 0',
           fontSize: 11,
           fontWeight: 400,
-          color: noTarget ? '#555555' : '#888888',
+          color: loadState.status === 'ready' ? '#888888' : '#555555',
           textTransform: 'uppercase',
           letterSpacing: '0.04em',
         }}
       >
         Variance vs Target
+        {loadState.status === 'ready' && (
+          <span style={{ marginLeft: 8, textTransform: 'none', fontWeight: 400, color: '#555555' }}>
+            {loadState.fiscalMonthName}
+          </span>
+        )}
       </p>
 
-      {noTarget ? (
+      {loadState.status === 'no_fiscal_month' ? (
         <p style={{ margin: 0, fontSize: 12, color: '#555555' }}>
-          No performance target configured for this period.{' '}
+          No fiscal month covers this period.
+        </p>
+      ) : loadState.status === 'no_target' ? (
+        <p style={{ margin: 0, fontSize: 12, color: '#555555' }}>
+          No performance target configured for {loadState.fiscalMonthName}.{' '}
           <a href="/admin/targets" style={{ color: '#ff6b00', textDecoration: 'none' }}>
             Set targets →
           </a>
@@ -214,14 +231,14 @@ export default function TargetVarianceRow({
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <VarianceMetric
             label="Revenue"
-            target={revenueTarget}
+            target={loadState.revenueTarget}
             actual={actualRevenue}
             format={formatCurrency}
           />
-          {!isAggregate && (
+          {!loadState.isAggregate && (
             <VarianceMetric
               label="Gross Profit %"
-              target={profitPctTarget}
+              target={loadState.profitPctTarget}
               actual={actualGrossProfitPct}
               format={(v) => formatPercent(v)}
             />
