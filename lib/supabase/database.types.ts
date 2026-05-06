@@ -163,6 +163,12 @@ export type Database = {
         Update: { id?: string; branch_id?: string; fiscal_month_id?: string; revenue_target?: number | null; profit_pct_target?: number | null; updated_by?: string | null }
         Relationships: []
       }
+      access_requests: {
+        Row: { id: string; first_name: string; last_name: string; email: string; branch_id: string | null; requested_role: string; notes: string | null; status: string; reviewed_by: string | null; reviewed_at: string | null; created_at: string }
+        Insert: { id?: string; first_name: string; last_name: string; email: string; branch_id?: string | null; requested_role: string; notes?: string | null; status?: string; reviewed_by?: string | null; reviewed_at?: string | null; created_at?: string }
+        Update: { id?: string; first_name?: string; last_name?: string; email?: string; branch_id?: string | null; requested_role?: string; notes?: string | null; status?: string; reviewed_by?: string | null; reviewed_at?: string | null }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

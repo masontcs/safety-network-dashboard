@@ -12,6 +12,9 @@ const ROLE_ROUTES: Record<Role, string> = {
   branch_manager:   '/manager',
 }
 
+// Paths that are publicly accessible without auth
+const PUBLIC_PATHS = ['/', '/login', '/request-access']
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const res = NextResponse.next()
@@ -19,8 +22,9 @@ export async function middleware(request: NextRequest) {
 
   const { data: { session } } = await supabase.auth.getSession()
 
+  // Unauthenticated: allow public paths, redirect everything else to /login
   if (!session) {
-    if (pathname === '/login') return res
+    if (PUBLIC_PATHS.includes(pathname)) return res
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
@@ -31,8 +35,8 @@ export async function middleware(request: NextRequest) {
     .single()
   const profile = data as { role: Role } | null
 
-  // Authenticated user hitting /login → send to their dashboard
-  if (pathname === '/login') {
+  // Authenticated user on a public path → redirect to their dashboard
+  if (PUBLIC_PATHS.includes(pathname)) {
     if (profile) {
       return NextResponse.redirect(new URL(ROLE_ROUTES[profile.role], request.url))
     }
@@ -53,7 +57,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/',
     '/login',
+    '/request-access',
     '/admin/:path*',
     '/executive/:path*',
     '/district/:path*',

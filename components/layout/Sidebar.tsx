@@ -1,6 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import type { Role } from '@/lib/supabase/database.types'
 
@@ -70,6 +71,13 @@ const LayersIcon = () => (
   </svg>
 )
 
+const InboxIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+    <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+  </svg>
+)
+
 const NAV_ITEMS: NavItem[] = [
   { href: '/manager',   label: 'Dashboard', icon: <GridIcon />,  roles: ['branch_manager'] },
   { href: '/district',  label: 'Dashboard', icon: <GridIcon />,  roles: ['district_manager'] },
@@ -79,7 +87,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/review',         label: 'Review',         icon: <ChartIcon />,    roles: ['admin'] },
   { href: '/admin/targets',        label: 'Targets',        icon: <TargetIcon />,   roles: ['admin'] },
   { href: '/admin/fiscal-months',    label: 'Fiscal Months',    icon: <CalendarIcon />, roles: ['admin'] },
-  { href: '/admin/fiscal-quarters', label: 'Fiscal Quarters', icon: <LayersIcon />,   roles: ['admin'] },
+  { href: '/admin/fiscal-quarters',    label: 'Fiscal Quarters',   icon: <LayersIcon />,  roles: ['admin'] },
+  { href: '/admin/access-requests',   label: 'Access Requests',   icon: <InboxIcon />,   roles: ['admin'] },
   { href: '/admin/users',          label: 'Users',          icon: <UsersIcon />,    roles: ['admin'] },
 ]
 
@@ -90,19 +99,44 @@ interface SidebarProps {
 export default function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname()
   const items = NAV_ITEMS.filter((item) => item.roles.includes(role))
+  const [pendingCount, setPendingCount] = useState(0)
+
+  useEffect(() => {
+    if (role !== 'admin') return
+    fetch('/api/admin/access-requests/pending-count')
+      .then((r) => r.json())
+      .then((json) => { if (json.success) setPendingCount(json.data.count) })
+      .catch(() => {})
+  }, [role])
 
   return (
     <aside className="sidebar">
       {items.map((item) => {
         const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+        const showBadge = item.href === '/admin/access-requests' && pendingCount > 0
         return (
           <Link
             key={item.href}
             href={item.href}
             title={item.label}
             className={`sidebar-icon${isActive ? ' sidebar-icon-active' : ''}`}
+            style={{ position: 'relative' }}
           >
             {item.icon}
+            {showBadge && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 4,
+                  right: 4,
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: '#ff6b00',
+                  border: '1.5px solid #1a1a1a',
+                }}
+              />
+            )}
           </Link>
         )
       })}
