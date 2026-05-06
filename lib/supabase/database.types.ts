@@ -145,6 +145,18 @@ export type Database = {
         Update: { id?: string; import_id?: string; fuel_card_assignment_id?: string | null; branch_id?: string | null; employee_id?: string | null; business_tag?: BusinessTag | null; vendor?: Vendor; transaction_date?: string; transaction_time?: string | null; site_name?: string | null; site_city?: string | null; site_state?: string | null; product?: string | null; gallons?: number | null; price_per_gallon?: number | null; total_pretax?: number | null; tax?: number | null; total_with_tax?: number; mpg?: number | null }
         Relationships: []
       }
+      fiscal_quarters: {
+        Row: { id: string; name: string; quarter_number: number; year: number; is_active: boolean; created_at: string }
+        Insert: { id?: string; name: string; quarter_number: number; year: number; is_active?: boolean; created_at?: string }
+        Update: { id?: string; name?: string; quarter_number?: number; year?: number; is_active?: boolean }
+        Relationships: []
+      }
+      fiscal_quarter_months: {
+        Row: { id: string; fiscal_quarter_id: string; fiscal_month_id: string; sort_order: number }
+        Insert: { id?: string; fiscal_quarter_id: string; fiscal_month_id: string; sort_order: number }
+        Update: { id?: string; fiscal_quarter_id?: string; fiscal_month_id?: string; sort_order?: number }
+        Relationships: []
+      }
       branch_targets: {
         Row: { id: string; branch_id: string; fiscal_month_id: string; revenue_target: number | null; profit_pct_target: number | null; created_at: string; updated_by: string | null }
         Insert: { id?: string; branch_id: string; fiscal_month_id: string; revenue_target?: number | null; profit_pct_target?: number | null; created_at?: string; updated_by?: string | null }

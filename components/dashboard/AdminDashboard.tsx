@@ -64,9 +64,18 @@ interface OverviewData {
   byBranch: BranchData[]
 }
 
+interface FiscalQuarter {
+  id: string
+  name: string
+  quarter_number: number
+  year: number
+  months: Array<{ id: string; name: string; start_date: string; end_date: string; sort_order: number }>
+}
+
 interface Props {
   branches: Branch[]
   fiscalMonths: FiscalMonth[]
+  fiscalQuarters: FiscalQuarter[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -346,8 +355,10 @@ function WeeklyTooltip({ active, payload, label }: any) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function AdminDashboard({ branches, fiscalMonths }: Props) {
+export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters }: Props) {
+  const [viewMode, setViewMode] = useState<'month' | 'quarter'>('month')
   const [selectedFiscalId, setSelectedFiscalId] = useState<string>('')
+  const [selectedQuarterId, setSelectedQuarterId] = useState<string>(fiscalQuarters[0]?.id ?? '')
   const [isYTD, setIsYTD] = useState(false)
   const [overviewData, setOverviewData] = useState<OverviewData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -360,8 +371,20 @@ export default function AdminDashboard({ branches, fiscalMonths }: Props) {
     [fiscalMonths, selectedFiscalId]
   )
 
+  const selectedQuarter = useMemo(
+    () => fiscalQuarters.find((q) => q.id === selectedQuarterId) ?? null,
+    [fiscalQuarters, selectedQuarterId]
+  )
+
   // Date range for the current selection
   const { startDate, endDate } = useMemo(() => {
+    if (viewMode === 'quarter' && selectedQuarter) {
+      const sorted = [...selectedQuarter.months].sort((a, b) => a.sort_order - b.sort_order)
+      return {
+        startDate: sorted[0]?.start_date ?? '',
+        endDate: sorted[sorted.length - 1]?.end_date ?? '',
+      }
+    }
     if (isYTD) {
       const year = new Date().getFullYear()
       const latest = fiscalMonths[0]
@@ -371,7 +394,7 @@ export default function AdminDashboard({ branches, fiscalMonths }: Props) {
       return { startDate: selectedFiscal.start_date, endDate: selectedFiscal.end_date }
     }
     return { startDate: '', endDate: '' }
-  }, [isYTD, selectedFiscal, fiscalMonths])
+  }, [viewMode, selectedQuarter, isYTD, selectedFiscal, fiscalMonths])
 
   // Range label for metric card subtitles
   const periodLabel = useMemo(() => {
@@ -423,11 +446,11 @@ export default function AdminDashboard({ branches, fiscalMonths }: Props) {
   const gpPct = totals?.gpPct ?? 0
   const noData = !loading && rev === 0 && pay === 0 && fuel === 0
 
-  // Weekly bar chart data — all Saturdays in fiscal month, merge with byPeriod
+  // Bar chart data — weekly bars for month/quarter, monthly bars for YTD
   const barData = useMemo(() => {
     if (!overviewData) return []
 
-    if (isYTD) {
+    if (isYTD && viewMode === 'month') {
       // Group byPeriod into fiscal months for YTD bar chart
       return fiscalMonths
         .filter((fm) => fm.start_date >= startDate && fm.end_date <= endDate)
@@ -437,13 +460,29 @@ export default function AdminDashboard({ branches, fiscalMonths }: Props) {
           )
           return {
             periodDate: fm.end_date,
-            label: fm.name.split(' ')[0], // e.g. "January"
+            label: fm.name.split(' ')[0],
             revenue: periods.reduce((s, p) => s + p.revenue, 0),
             directPayroll: periods.reduce((s, p) => s + p.directPayroll, 0),
             fuel: periods.reduce((s, p) => s + p.fuel, 0),
           }
         })
         .filter((b) => b.revenue > 0 || b.directPayroll > 0)
+    }
+
+    // Quarter mode: weekly bars across all 3 months
+    if (viewMode === 'quarter' && selectedQuarter) {
+      const sorted = [...selectedQuarter.months].sort((a, b) => a.sort_order - b.sort_order)
+      if (!sorted.length) return []
+      const weeks = getSaturdaysInRange(sorted[0].start_date, sorted[sorted.length - 1].end_date)
+      const periodMap: Record<string, PeriodData> = {}
+      for (const p of overviewData.byPeriod) periodMap[p.periodDate] = p
+      return weeks.map((sat) => ({
+        periodDate: sat,
+        label: fmtShort(sat),
+        revenue: periodMap[sat]?.revenue ?? 0,
+        directPayroll: periodMap[sat]?.directPayroll ?? 0,
+        fuel: periodMap[sat]?.fuel ?? 0,
+      }))
     }
 
     if (!selectedFiscal) return []
@@ -458,13 +497,18 @@ export default function AdminDashboard({ branches, fiscalMonths }: Props) {
       directPayroll: periodMap[sat]?.directPayroll ?? 0,
       fuel: periodMap[sat]?.fuel ?? 0,
     }))
-  }, [overviewData, isYTD, selectedFiscal, fiscalMonths, startDate, endDate])
+  }, [overviewData, isYTD, viewMode, selectedQuarter, selectedFiscal, fiscalMonths, startDate, endDate])
 
-  // Weeks for sparklines (fiscal month mode only)
+  // Weeks for sparklines
   const sparklineWeeks = useMemo(() => {
+    if (viewMode === 'quarter' && selectedQuarter) {
+      const sorted = [...selectedQuarter.months].sort((a, b) => a.sort_order - b.sort_order)
+      if (!sorted.length) return []
+      return getSaturdaysInRange(sorted[0].start_date, sorted[sorted.length - 1].end_date)
+    }
     if (!selectedFiscal) return []
     return getSaturdaysInRange(selectedFiscal.start_date, selectedFiscal.end_date)
-  }, [selectedFiscal])
+  }, [viewMode, selectedQuarter, selectedFiscal])
 
   // Branch grid: all branches from props, enriched with data
   const branchGridData = useMemo(() => {
@@ -495,7 +539,7 @@ export default function AdminDashboard({ branches, fiscalMonths }: Props) {
     [selectedWeek, barData]
   )
 
-  if (fiscalMonths.length === 0) {
+  if (fiscalMonths.length === 0 && fiscalQuarters.length === 0) {
     return (
       <div style={{ padding: 32 }}>
         <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff', marginBottom: 16 }}>Overview</div>
@@ -532,40 +576,85 @@ export default function AdminDashboard({ branches, fiscalMonths }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
         <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Overview</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <select
-            value={isYTD ? '__ytd__' : selectedFiscalId}
-            onChange={(e) => {
-              if (e.target.value === '__ytd__') {
-                setIsYTD(true)
-              } else {
-                setIsYTD(false)
-                setSelectedFiscalId(e.target.value)
-              }
-            }}
-            style={selectStyle}
-          >
-            {fiscalMonths.map((fm) => (
-              <option key={fm.id} value={fm.id}>
-                {fm.name} — {fmtShort(fm.start_date)} to {fmtShort(fm.end_date)}
-              </option>
+
+          {/* Month / Quarter toggle */}
+          <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 2, border: '1px solid #333333' }}>
+            {(['month', 'quarter'] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => {
+                  setViewMode(mode)
+                  if (mode === 'quarter') setIsYTD(false)
+                }}
+                style={{
+                  background: viewMode === mode ? '#ff6b00' : 'transparent',
+                  color: viewMode === mode ? '#ffffff' : '#888888',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '4px 12px',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontWeight: viewMode === mode ? 500 : 400,
+                  transition: 'background 0.15s',
+                }}
+              >
+                {mode === 'month' ? 'Month' : 'Quarter'}
+              </button>
             ))}
-          </select>
-          <button
-            onClick={() => setIsYTD((v) => !v)}
-            style={{
-              background: isYTD ? '#ff6b00' : '#2a2a2a',
-              color: isYTD ? '#ffffff' : '#888888',
-              border: '1px solid #333333',
-              borderRadius: 8,
-              padding: '5px 14px',
-              fontSize: 12,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontWeight: isYTD ? 500 : 400,
-            }}
-          >
-            YTD
-          </button>
+          </div>
+
+          {/* Contextual dropdown */}
+          {viewMode === 'month' ? (
+            <select
+              value={selectedFiscalId}
+              onChange={(e) => { setIsYTD(false); setSelectedFiscalId(e.target.value) }}
+              style={selectStyle}
+            >
+              {fiscalMonths.map((fm) => (
+                <option key={fm.id} value={fm.id}>
+                  {fm.name} — {fmtShort(fm.start_date)} to {fmtShort(fm.end_date)}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select
+              value={selectedQuarterId}
+              onChange={(e) => setSelectedQuarterId(e.target.value)}
+              style={selectStyle}
+              disabled={fiscalQuarters.length === 0}
+            >
+              {fiscalQuarters.length === 0 ? (
+                <option value="">No quarters defined</option>
+              ) : (
+                fiscalQuarters.map((q) => (
+                  <option key={q.id} value={q.id}>
+                    {q.name} (Q{q.quarter_number} {q.year})
+                  </option>
+                ))
+              )}
+            </select>
+          )}
+
+          {/* YTD — month mode only */}
+          {viewMode === 'month' && (
+            <button
+              onClick={() => setIsYTD((v) => !v)}
+              style={{
+                background: isYTD ? '#ff6b00' : '#2a2a2a',
+                color: isYTD ? '#ffffff' : '#888888',
+                border: '1px solid #333333',
+                borderRadius: 8,
+                padding: '5px 14px',
+                fontSize: 12,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                fontWeight: isYTD ? 500 : 400,
+              }}
+            >
+              YTD
+            </button>
+          )}
         </div>
       </div>
 
@@ -649,7 +738,7 @@ export default function AdminDashboard({ branches, fiscalMonths }: Props) {
       </div>
 
       {/* ── Variance vs target (fiscal month mode only) ── */}
-      {!isYTD && selectedFiscalId && (
+      {viewMode === 'month' && !isYTD && selectedFiscalId && (
         <FiscalMonthVarianceRow
           fiscalMonthId={selectedFiscalId}
           branchIds={branches.map((b) => b.id)}
@@ -661,10 +750,14 @@ export default function AdminDashboard({ branches, fiscalMonths }: Props) {
       {/* ── Weekly / monthly bar chart ── */}
       <div className="card">
         <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>
-          {isYTD ? 'Monthly Performance' : 'Weekly Performance'}
+          {isYTD && viewMode === 'month' ? 'Monthly Performance' : 'Weekly Performance'}
           <span style={{ marginLeft: 8, fontSize: 11, color: '#555555', fontWeight: 400 }}>
-            {isYTD ? `YTD ${new Date().getFullYear()}` : selectedFiscal?.name}
-            {!isYTD && ' · click a bar to inspect that week'}
+            {isYTD && viewMode === 'month'
+              ? `YTD ${new Date().getFullYear()}`
+              : viewMode === 'quarter'
+              ? selectedQuarter?.name
+              : selectedFiscal?.name}
+            {!(isYTD && viewMode === 'month') && ' · click a bar to inspect that week'}
           </span>
         </div>
 
@@ -700,8 +793,8 @@ export default function AdminDashboard({ branches, fiscalMonths }: Props) {
                 name="Revenue"
                 fill="#ff6b00"
                 radius={[3, 3, 0, 0]}
-                cursor={isYTD ? undefined : 'pointer'}
-                onClick={isYTD ? undefined : (entry: { periodDate: string }) => {
+                cursor={isYTD && viewMode === 'month' ? undefined : 'pointer'}
+                onClick={isYTD && viewMode === 'month' ? undefined : (entry: { periodDate: string }) => {
                   setSelectedWeek((prev) =>
                     prev === entry.periodDate ? null : entry.periodDate
                   )
@@ -711,7 +804,7 @@ export default function AdminDashboard({ branches, fiscalMonths }: Props) {
                   <Cell
                     key={entry.periodDate}
                     fill={
-                      !isYTD && selectedWeek === entry.periodDate
+                      !(isYTD && viewMode === 'month') && selectedWeek === entry.periodDate
                         ? '#ffaa44'
                         : '#ff6b00'
                     }
