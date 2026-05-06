@@ -30,10 +30,10 @@ export async function middleware(request: NextRequest) {
 
   const { data } = await supabase
     .from('user_profiles')
-    .select('role')
+    .select('role, must_change_password')
     .eq('id', session.user.id)
     .single()
-  const profile = data as { role: Role } | null
+  const profile = data as { role: Role; must_change_password: boolean } | null
 
   // Authenticated user on a public path → redirect to their dashboard
   if (PUBLIC_PATHS.includes(pathname)) {
@@ -45,6 +45,19 @@ export async function middleware(request: NextRequest) {
 
   if (!profile) {
     return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  // Force password change before anything else
+  if (profile.must_change_password) {
+    if (pathname !== '/change-password') {
+      return NextResponse.redirect(new URL('/change-password', request.url))
+    }
+    return res
+  }
+
+  // Already changed password — don't let them back to the change-password page
+  if (pathname === '/change-password') {
+    return NextResponse.redirect(new URL(ROLE_ROUTES[profile.role], request.url))
   }
 
   const correctBase = ROLE_ROUTES[profile.role]
@@ -60,6 +73,7 @@ export const config = {
     '/',
     '/login',
     '/request-access',
+    '/change-password',
     '/admin/:path*',
     '/executive/:path*',
     '/district/:path*',

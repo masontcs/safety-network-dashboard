@@ -64,6 +64,9 @@ export default function AccessRequestsClient() {
   const [modal, setModal] = useState<ModalState>(null)
   const [actionRole, setActionRole] = useState('')
   const [actionBranchId, setActionBranchId] = useState('')
+  const [tmpPassword, setTmpPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [copied, setCopied] = useState(false)
   const [actionSaving, setActionSaving] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
@@ -79,10 +82,38 @@ export default function AccessRequestsClient() {
       .finally(() => setLoading(false))
   }, [])
 
+  function generatePassword(): string {
+    const letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    const digits = '0123456789'
+    const special = '!@#$%'
+    const all = letters + digits + special
+    let pwd = letters[Math.floor(Math.random() * letters.length)]
+    pwd += digits[Math.floor(Math.random() * digits.length)]
+    pwd += special[Math.floor(Math.random() * special.length)]
+    for (let i = 3; i < 12; i++) pwd += all[Math.floor(Math.random() * all.length)]
+    return pwd.split('').sort(() => Math.random() - 0.5).join('')
+  }
+
+  function handleGenerate() {
+    const pwd = generatePassword()
+    setTmpPassword(pwd)
+    setConfirmPassword(pwd)
+    setCopied(false)
+  }
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(tmpPassword)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   function openApprove(req: AccessRequest) {
     setModal({ type: 'approve', request: req })
     setActionRole(req.requestedRole)
     setActionBranchId(req.branchId ?? (branches[0]?.id ?? ''))
+    setTmpPassword('')
+    setConfirmPassword('')
+    setCopied(false)
     setActionError(null)
   }
 
@@ -93,18 +124,23 @@ export default function AccessRequestsClient() {
 
   function closeModal() {
     setModal(null)
+    setTmpPassword('')
+    setConfirmPassword('')
+    setCopied(false)
     setActionError(null)
   }
 
   async function handleApprove() {
     if (!modal || modal.type !== 'approve') return
+    if (tmpPassword.length < 8) { setActionError('Temporary password must be at least 8 characters.'); return }
+    if (tmpPassword !== confirmPassword) { setActionError('Passwords do not match.'); return }
     setActionSaving(true)
     setActionError(null)
     try {
       const res = await fetch(`/api/admin/access-requests/${modal.request.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve', role: actionRole, branchId: actionBranchId }),
+        body: JSON.stringify({ action: 'approve', role: actionRole, branchId: actionBranchId, temporaryPassword: tmpPassword }),
       })
       const json = await res.json()
       if (!json.success) { setActionError(json.error); return }
@@ -315,7 +351,7 @@ export default function AccessRequestsClient() {
                   Approve Request
                 </div>
                 <div style={{ fontSize: 12, color: '#888888', marginBottom: 20 }}>
-                  Creating an account for {modal.request.firstName} {modal.request.lastName} will send them an invite email.
+                  Set a temporary password for {modal.request.firstName} {modal.request.lastName}. They will be required to change it on first login.
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -346,6 +382,53 @@ export default function AccessRequestsClient() {
                     </select>
                   </div>
 
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                      Temporary Password
+                    </label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input
+                        type="text"
+                        value={tmpPassword}
+                        onChange={(e) => { setTmpPassword(e.target.value); setCopied(false) }}
+                        placeholder="Min 8 characters"
+                        style={{ ...selectStyle, flex: 1, fontFamily: 'monospace', letterSpacing: '0.05em' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCopy}
+                        disabled={!tmpPassword}
+                        style={{ background: '#2a2a2a', border: '1px solid #333333', borderRadius: 6, color: copied ? '#4caf50' : '#888888', fontSize: 11, padding: '0 10px', cursor: tmpPassword ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: tmpPassword ? 1 : 0.4 }}
+                      >
+                        {copied ? 'Copied' : 'Copy'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleGenerate}
+                        style={{ background: '#2a2a2a', border: '1px solid #333333', borderRadius: 6, color: '#ff6b00', fontSize: 11, padding: '0 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+                      >
+                        Generate
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                      Confirm Password
+                    </label>
+                    <input
+                      type="text"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter password"
+                      style={{ ...selectStyle, fontFamily: 'monospace', letterSpacing: '0.05em' }}
+                    />
+                  </div>
+
+                  <div style={{ fontSize: 11, color: '#555555', lineHeight: 1.5, padding: '8px 10px', background: '#1a1a1a', borderRadius: 6, border: '1px solid #2a2a2a' }}>
+                    Share this temporary password with the user. They will be required to change it on first login.
+                  </div>
+
                   {actionError && (
                     <div style={{ fontSize: 12, color: '#cc4444', padding: '8px 10px', background: '#2a1a1a', borderRadius: 6 }}>
                       {actionError}
@@ -355,9 +438,9 @@ export default function AccessRequestsClient() {
                   <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                     <button
                       onClick={handleApprove}
-                      disabled={actionSaving || !actionRole || !actionBranchId}
+                      disabled={actionSaving || !actionRole || !actionBranchId || !tmpPassword}
                       className="btn-primary"
-                      style={{ flex: 1, opacity: actionSaving ? 0.6 : 1 }}
+                      style={{ flex: 1, opacity: (actionSaving || !tmpPassword) ? 0.6 : 1 }}
                     >
                       {actionSaving ? 'Creating Account…' : 'Create Account'}
                     </button>

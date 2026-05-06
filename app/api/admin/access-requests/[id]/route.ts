@@ -19,6 +19,7 @@ export async function PATCH(
       action: 'approve' | 'deny'
       role?: string
       branchId?: string
+      temporaryPassword?: string
     }
 
     const { action } = body
@@ -52,37 +53,47 @@ export async function PATCH(
     }
 
     // action === 'approve'
-    const { role, branchId } = body
+    const { role, branchId, temporaryPassword } = body as {
+      action: 'approve'; role?: string; branchId?: string; temporaryPassword?: string
+    }
     if (!role || !['branch_manager', 'district_manager', 'executive'].includes(role)) {
       return NextResponse.json({ success: false, error: 'A valid role is required to approve', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
     if (!branchId) {
       return NextResponse.json({ success: false, error: 'A branch is required to approve', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
+    if (!temporaryPassword || temporaryPassword.length < 8) {
+      return NextResponse.json({ success: false, error: 'A temporary password of at least 8 characters is required', code: 'VALIDATION_ERROR' }, { status: 400 })
+    }
 
     const displayName = `${req.first_name} ${req.last_name}`
 
-    // Create Supabase Auth user via invitation (sends invite email)
-    const { data: inviteData, error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(req.email)
+    // Create Supabase Auth user with a temporary password — skip email verification
+    const { data: createData, error: createErr } = await supabase.auth.admin.createUser({
+      email: req.email,
+      password: temporaryPassword,
+      email_confirm: true,
+      user_metadata: { must_change_password: true },
+    })
 
-    if (inviteErr) {
-      if (inviteErr.message?.toLowerCase().includes('already been registered') ||
-          inviteErr.message?.toLowerCase().includes('already exists')) {
+    if (createErr) {
+      if (createErr.message?.toLowerCase().includes('already been registered') ||
+          createErr.message?.toLowerCase().includes('already exists')) {
         return NextResponse.json(
           { success: false, error: `An account with ${req.email} already exists`, code: 'CONFLICT' },
           { status: 409 }
         )
       }
-      throw new Error(inviteErr.message)
+      throw new Error(createErr.message)
     }
 
-    const userId = inviteData.user?.id
+    const userId = createData.user?.id
     if (!userId) throw new Error('Failed to create auth user')
 
-    // Create user_profiles
+    // Create user_profiles with must_change_password = true
     const { error: profileErr } = await supabase
       .from('user_profiles')
-      .insert({ id: userId, role: role as Role, display_name: displayName })
+      .insert({ id: userId, role: role as Role, display_name: displayName, must_change_password: true })
 
     if (profileErr) {
       // Rollback: delete the auth user
