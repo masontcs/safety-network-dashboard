@@ -32,7 +32,6 @@ export default async function RootPage() {
       <div
         style={{
           minHeight: '100vh',
-          background: '#111111',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
