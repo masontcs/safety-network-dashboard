@@ -267,6 +267,75 @@ describe('parseRevenueFile — branch merging', () => {
     expect(result.data.records[0].totalRevenue).toBe(3850)   // (3000+300) + (500+50)
   })
 
+  it('dynamically merges any " Sales" suffix branch — Orange County Sales', () => {
+    const result = parseRevenueFile(aoa2buffer(buildRevenueAOA({
+      rows: [
+        ['Branch: Orange County'],
+        [2026, 'March', 4000, 0, 0, 4000, 400, 'SAFETY1003'],
+        ['Branch Totals', null, 4000, 0, 0, 4000, 400, null],
+        ['Branch: Orange County Sales'],
+        [2026, 'March', 800, 0, 0, 800, 80, 'SAFETY1003'],
+        ['Branch Totals', null, 800, 0, 0, 800, 80, null],
+      ],
+    })))
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.data.records).toHaveLength(1)
+    expect(result.data.records[0].branchName).toBe('Orange County')
+    expect(result.data.records[0].totalRevenue).toBe(5280)   // (4000+400) + (800+80)
+  })
+
+  it('dynamically merges any " Sales" suffix branch — Visalia Sales', () => {
+    const result = parseRevenueFile(aoa2buffer(buildRevenueAOA({
+      rows: [
+        ['Branch: Visalia'],
+        [2026, 'March', 3000, 0, 0, 3000, 300, 'SAFETY1003'],
+        ['Branch Totals', null, 3000, 0, 0, 3000, 300, null],
+        ['Branch: Visalia Sales'],
+        [2026, 'March', 600, 0, 0, 600, 60, 'SAFETY1003'],
+        ['Branch Totals', null, 600, 0, 0, 600, 60, null],
+      ],
+    })))
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.data.records).toHaveLength(1)
+    expect(result.data.records[0].branchName).toBe('Visalia')
+    expect(result.data.records[0].totalRevenue).toBe(3960)   // (3000+300) + (600+60)
+  })
+
+  it('maps Sacramento to Modesto', () => {
+    const result = parseRevenueFile(aoa2buffer(buildRevenueAOA({
+      rows: [
+        ['Branch: Modesto'],
+        [2026, 'March', 5000, 0, 0, 5000, 500, 'SAFETY1003'],
+        ['Branch Totals', null, 5000, 0, 0, 5000, 500, null],
+        ['Branch: Sacramento'],
+        [2026, 'March', 2000, 0, 0, 2000, 200, 'SAFETY1003'],
+        ['Branch Totals', null, 2000, 0, 0, 2000, 200, null],
+      ],
+    })))
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.data.records).toHaveLength(1)
+    expect(result.data.records[0].branchName).toBe('Modesto')
+    expect(result.data.records[0].totalRevenue).toBe(7700)   // (5000+500) + (2000+200)
+  })
+
+  it('maps Sacramento Sales to Modesto — strips Sales then applies merge', () => {
+    const result = parseRevenueFile(aoa2buffer(buildRevenueAOA({
+      rows: [
+        ['Branch: Sacramento Sales'],
+        [2026, 'March', 1500, 0, 0, 1500, 150, 'SAFETY1003'],
+        ['Branch Totals', null, 1500, 0, 0, 1500, 150, null],
+      ],
+    })))
+    expect(result.success).toBe(true)
+    if (!result.success) return
+    expect(result.data.records).toHaveLength(1)
+    expect(result.data.records[0].branchName).toBe('Modesto')
+    expect(result.data.records[0].totalRevenue).toBe(1650)   // 1500 + 150
+  })
+
   it('keeps distinct branch+entity combinations separate', () => {
     const result = parseRevenueFile(aoa2buffer(buildRevenueAOA({
       rows: [

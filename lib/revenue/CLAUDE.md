@@ -48,11 +48,18 @@ const ENTITY_MAP: Record<string, string> = {
 ## BRANCH NAME NORMALIZATION — HARDCODED IN PARSER
 
 ```typescript
-const BRANCH_MERGE: Record<string, string> = {
-  'Bakersfield Sales': 'Bakersfield',
-  'Fresno Sales':      'Fresno',
+function normalizeBranchName(raw: string): string {
+  // Strip " Sales" suffix (any branch can have a Sales sub-branch)
+  const withoutSales = raw.replace(/\s+sales$/i, '').trim()
+  // Update this map whenever branches merge — add old name → surviving branch name
+  const MERGED_BRANCHES: Record<string, string> = {
+    'Sacramento': 'Modesto',
+  }
+  return MERGED_BRANCHES[withoutSales] ?? withoutSales
 }
-// Apply: normalizedName = BRANCH_MERGE[rawName] ?? rawName
+// "Bakersfield Sales" → "Bakersfield" (Sales strip)
+// "Sacramento"        → "Modesto"     (merge map)
+// "Sacramento Sales"  → "Modesto"     (strip then merge)
 ```
 
 ---
@@ -127,8 +134,9 @@ type ParsedRevenueRecord = {
 - [ ] Period date is a Saturday — validate with `getDay() === 6`
 - [ ] `total_revenue` is calculated as `labor + rental + one_time_charges` (NOT from col F)
 - [ ] Sales tax is stored separately, not included in total_revenue
-- [ ] Bakersfield Sales merges into Bakersfield
-- [ ] Fresno Sales merges into Fresno
+- [ ] Any branch ending in " Sales" (case-insensitive) merges into its base name
+- [ ] Sacramento maps to Modesto (MERGED_BRANCHES map)
+- [ ] "Sacramento Sales" strips to "Sacramento" then maps to "Modesto"
 - [ ] Year Totals and Report Totals rows are skipped
 - [ ] Only data rows (year number in col A + company code in col H) are captured
 - [ ] Unknown company codes go to warnings, not errors

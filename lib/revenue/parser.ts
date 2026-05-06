@@ -12,10 +12,14 @@ const ENTITY_MAP: Record<string, string> = {
   SNTSIGN:    'STS',
 }
 
-// QuickBooks sometimes exports sub-branches that must be merged into their parent
-const BRANCH_MERGE: Record<string, string> = {
-  'Bakersfield Sales': 'Bakersfield',
-  'Fresno Sales':      'Fresno',
+// Remove " Sales" suffix and apply any branch merges.
+// Update MERGED_BRANCHES whenever branches consolidate — add old name → surviving branch name.
+function normalizeBranchName(raw: string): string {
+  const withoutSales = raw.replace(/\s+sales$/i, '').trim()
+  const MERGED_BRANCHES: Record<string, string> = {
+    'Sacramento': 'Modesto',
+  }
+  return MERGED_BRANCHES[withoutSales] ?? withoutSales
 }
 
 type Rows = (unknown | null)[][]
@@ -104,7 +108,7 @@ function extractRecords(rows: Rows, warnings: string[]): ParsedRevenueRecord[] {
     // Branch header row — reset tracking for the new section
     if (colA?.startsWith('Branch: ')) {
       const rawBranch = colA.slice('Branch: '.length).trim()
-      currentBranch = BRANCH_MERGE[rawBranch] ?? rawBranch
+      currentBranch = normalizeBranchName(rawBranch)
       lastCompanyCode = null
       continue
     }
