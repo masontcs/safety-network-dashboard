@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 6, 2026 — Session: Fiscal quarters system (DB + API + admin UI + dashboard toggle)
+## Last updated: May 6, 2026 — Session: Mobile responsive, parser fixes, temp password flow, branch dropdowns
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -16,7 +16,7 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 ## 2. WHAT IS FULLY BUILT AND WORKING
 
 ### Database (Supabase)
-- [x] 19 tables across 7 migrations (applied to production project)
+- [x] 20 tables across 9 migrations (applied to production project)
 - [x] Migration 1: reference tables (businesses, branches, entities, payroll_codes, revenue_codes, payroll_item_groups, payroll_items)
 - [x] Migration 2: user tables (user_profiles, user_branch_assignments)
 - [x] Migration 3: employee tables (employees, employee_entity_assignments, fuel_card_assignments)
@@ -24,18 +24,24 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] Migration 5: transaction tables (payroll_transactions, payroll_taxes, revenue_transactions, fuel_transactions)
 - [x] Migration 6: RLS policies on all tables
 - [x] Migration 7: fiscal_months table
-- [x] Migration 8: fiscal_quarters + fiscal_quarter_months tables (applied May 6, 2026)
+- [x] Migration 8: fiscal_quarters + fiscal_quarter_months tables
+- [x] Migration 9 (20260506000001): fiscal_month_targets redesign
+- [x] Migration 10 (20260506000002): fiscal_quarters + fiscal_quarter_months
+- [x] Migration 11 (20260506000003): access_requests table + RLS
+- [x] Migration 12 (20260506000004): backfill fuel_transaction branches
+- [x] Migration 13 (20260506000005): fuel_imports UNIQUE(vendor, date_range_start, date_range_end) constraint
+- [x] Migration 14 (20260506000006): user_profiles.must_change_password boolean NOT NULL DEFAULT false
 - [x] Seed data: 3 businesses, 3 entities, 7 branches, 12 payroll item groups, 87 payroll codes, 196 payroll items, 17 revenue codes
 
 ### File Parsers (`/lib/`)
 - [x] Payroll parser — parses QuickBooks .xlsm, splits "LAST, FIRST M" names, handles hyphenated surnames, dynamic payroll item discovery, period date calculation (subtract 1 day → Saturday)
-- [x] Revenue parser — parses .xls Invoice Summary, merges Bakersfield Sales/Fresno Sales, entity code mapping, uses END date of range
+- [x] Revenue parser — parses .xls Invoice Summary; dynamic " Sales" suffix stripping (any branch); Sacramento → Modesto merge map (MERGED_BRANCHES — easy to extend); entity code mapping; uses END date of range
 - [x] Fuel parser — Interstate (.csv) and Flyers (.xlsx), site parsing, WH tagging, calculated totals for both vendors
 
 ### API Routes (`/app/api/`)
 - [x] `POST /api/import/payroll` + `confirm-replace` — admin only, duplicate detection, AI triggers
 - [x] `POST /api/import/revenue` + `confirm-replace`
-- [x] `POST /api/import/fuel` + `confirm-replace`
+- [x] `POST /api/import/fuel` + `confirm-replace` — duplicate check scoped by vendor (Interstate and Flyers are independent)
 - [x] `GET /api/payroll/summary` — admin sum rule enforced (managers get total only, no detail)
 - [x] `GET /api/payroll/employee/[id]` — 403 for managers on admin-coded employees
 - [x] `GET /api/employees/[id]/detail` — admin/executive only; returns employee info, all payroll history (paginated, with item+group names), all fuel history (paginated)
@@ -48,6 +54,10 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] `GET|POST /api/fiscal-quarters` + `PATCH|DELETE /api/fiscal-quarters/[id]`
 - [x] `GET|POST /api/admin/users` + `[id]`
 - [x] `GET|POST /api/admin/review` + action routes for employee assignments, fuel cards, payroll items
+- [x] `GET|POST /api/admin/access-requests` — GET returns requests + all active branches (grouped); POST creates a pending request
+- [x] `PATCH /api/admin/access-requests/[id]` — approve (creates auth user with temp password, sets must_change_password=true) or deny
+- [x] `POST /api/auth/clear-must-change-password` — clears must_change_password flag for the current user after first login password change
+- [x] `GET /api/data-explorer/payroll`, `revenue`, `fuel`, `export` — admin/executive only; filter + paginate + CSV export
 
 ### AI Integration (`/lib/ai/`)
 - [x] Employee name matching (payroll + fuel imports)
@@ -59,21 +69,25 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] Zero-revenue guard, rounding with `round2()`, percentages read from DB
 
 ### Frontend
-- [x] Login page (`/login`)
-- [x] `DashboardShell` — dark sidebar + top nav, role-aware
+- [x] Landing page (`/`) — animated canvas dot grid (pulsing opacity, 28px grid desktop / sparse mobile); Safety Network logo; Sign In + Request Access CTAs; fully mobile responsive
+- [x] Login page (`/login`) — mobile responsive card
+- [x] `/change-password` — required on first login; masked fields; blocks same-as-temp password; clears flag on success; middleware enforces (cannot skip)
+- [x] `/request-access` — branch dropdown shows all active branches grouped: Operations / Corporate
+- [x] `DashboardShell` — dark sidebar (desktop) + `MobileBottomNav` (mobile); role-aware; sidebar hidden on mobile
+- [x] `MobileBottomNav` — fixed bottom nav with role-aware items; slide-up drawer for overflow admin items; 44px tap targets
 - [x] `ManagerDashboard` — fully built: weekly/MTD/YTD views, week navigator, revenue/payroll/fuel/gross profit metrics, trend line chart, waterfall chart, direct labor table, admin payroll lump sum, fuel table. YTD confirmed at $171,296.33 for Apr 25 2026.
-- [x] `AdminDashboard` — all-branches aggregate with branch selector, full allocation visible
+- [x] `AdminDashboard` — all-branches aggregate with branch selector, full allocation visible; month/quarter toggle; mobile: 2×2 metric cards, revenue-only chart, compact variance row, branch list; desktop: unchanged
 - [x] `ExecutiveDashboard` — all 7 branches side by side, full direct + admin payroll detail, Corp/HQ allocation breakdown, net after overhead, missing revenue alerts, 13-week trend, waterfall, collapsible payroll detail tables
-- [x] `DistrictDashboard` — branch selector with "All Assigned Branches" aggregate view + single-branch view; aggregate shows per-branch comparison table (Revenue, Direct Pay, Admin Pay, Fuel, Gross Profit, Margin); single-branch view is identical to ManagerDashboard; admin payroll lump sum only (security enforced server-side)
-- [x] `EmployeeDetailClient` — admin/executive only; preferred name + legal name display; inline Edit Name form (admin only); assignment pills; payroll history table + hours/earnings charts + group breakdown; fuel history table + filters + gallons chart; accessible at `/admin/employees/[id]` and `/executive/employees/[id]`
-- [x] Inter font (weights 400–800) via `next/font/google`; `.metric-value` weight 700; h1/h2 weight 700
-- [x] Logo: `public/logo.png` (white text + orange hand icon); shown in TopNav (24px) and login page (52px)
-- [x] Admin pages: `/admin/import` (ImportClient), `/admin/review` (ReviewClient), `/admin/users` (UsersClient), `/admin/fiscal-months` (FiscalMonthsClient), `/admin/targets` (TargetsClient), `/admin/fiscal-quarters` (FiscalQuartersClient)
-- [x] `TargetVarianceRow` component — shown on all 4 dashboards (weekly view only); green/yellow/red color coding (±5%/±15% thresholds); aggregate mode for admin/executive (sums all branch revenue targets); profit % only shown for single-branch view
-- [x] Employee detail pages: `/admin/employees/[id]` and `/executive/employees/[id]` (403 for district/branch managers)
-- [x] Chart components: `BarChart` (supports `formatValue` prop for non-currency axes), `TrendLineChart`, `WaterfallChart`
+- [x] `DistrictDashboard` — branch selector with "All Assigned Branches" aggregate view + single-branch view; aggregate shows per-branch comparison table; single-branch view identical to ManagerDashboard; admin payroll lump sum only
+- [x] `EmployeeDetailClient` — admin/executive only; preferred name + legal name display; inline Edit Name form; assignment pills; payroll history table + charts; fuel history table + filters; branch history + transfer form
+- [x] Admin pages: `/admin/import`, `/admin/review`, `/admin/users`, `/admin/fiscal-months`, `/admin/targets`, `/admin/fiscal-quarters`, `/admin/access-requests`, `/admin/data-explorer`
+- [x] Executive pages: `/executive/data-explorer`
+- [x] `AccessRequestsClient` — pending/reviewed tables; approve modal with temp password field (unmasked, Generate button, Copy button, confirm field, hint note); deny modal; branch dropdown grouped Operations/Corporate
+- [x] `DataExplorerClient` — filter bar (dataset, branch, entity, date range, vendor); summary metric cards per dataset; sortable paginated table (50 rows/page); CSV export
+- [x] `TargetVarianceRow` component — weekly and compact (mobile) variants; green/yellow/red thresholds
+- [x] Chart components: `BarChart`, `TrendLineChart`, `WaterfallChart`
 - [x] UI components: `MetricCard`, `Skeleton`, `StatusPill`, `BranchSelector`, `DateRangePicker`, `ThreeDotMenu`
-- [x] Middleware: protects all dashboard routes, redirects unauthenticated users
+- [x] Middleware: protects all routes; redirects unauthenticated users to /login; redirects users with must_change_password=true to /change-password regardless of path; /change-password blocked after flag cleared
 
 ### Utilities
 - [x] `lib/utils/access.ts` — `UserAccess` type, `canAccessBranch()`
@@ -89,107 +103,97 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ---
 
-## 3b. RECENT CHANGES (May 6, 2026) — Fiscal Quarters System
+## 3b. RECENT CHANGES (May 6, 2026) — This Session
+
+### Temporary Password Flow for Access Request Approval
+- `PATCH /api/admin/access-requests/[id]` — switched from `inviteUserByEmail` to `createUser` with `password`, `email_confirm: true`, `user_metadata: { must_change_password: true }`; validates `temporaryPassword` (required, min 8 chars); inserts `user_profiles` with `must_change_password: true`
+- `POST /api/auth/clear-must-change-password` — any authenticated user clears their own flag via service client
+- Migration `20260506000006_must_change_password.sql` — adds `must_change_password boolean NOT NULL DEFAULT false` to `user_profiles`; applied to production
+- `database.types.ts` — updated `user_profiles` Row/Insert/Update to include `must_change_password`
+- `AccessRequestsClient` approval modal — added unmasked Temporary Password field + Confirm Password field; Generate button (12-char, letters+digits+special, shuffled); Copy button (flashes "Copied"); note "Share this temporary password…"; client-side validation (min 8 chars, must match); sends `temporaryPassword` in request body; branch dropdown now grouped Operations/Corporate
+- `/change-password` page — centered dark card (same design as login); masked New Password + Confirm fields; rejects same-as-current (tries signInWithPassword before updateUser); calls clear-flag API on success; redirects to `/` (middleware routes to role dashboard); no way to skip
+- Middleware updated — selects `must_change_password` alongside `role`; any `must_change_password=true` session redirected to `/change-password` for all paths; `/change-password` itself redirected to role dashboard when flag is false; `/change-password` added to matcher
+
+### Branch Dropdowns — All Active Branches with Grouping
+- `/request-access` page — removed `is_revenue_generating=true` filter; now fetches all active branches with `is_revenue_generating` field; branch dropdown uses `<optgroup>` labels "— Operations —" and "— Corporate —"
+- `GET /api/admin/access-requests` — same filter removal; passes `is_revenue_generating` to client
+- `AccessRequestsClient` and `RequestAccessClient` — `Branch` interface updated; selects split into two optgroups
+
+### Fuel Import Duplicate Check Fix
+- `POST /api/import/fuel` — duplicate check now includes `.eq('vendor', vendor)` before the date overlap filters; error message and conflict payload include vendor
+- Migration `20260506000005_fuel_imports_vendor_unique_constraint.sql` — adds `UNIQUE(vendor, date_range_start, date_range_end)` to `fuel_imports`; applied to production
+
+### Revenue Branch Normalization Fix
+- `lib/revenue/parser.ts` — replaced hardcoded `BRANCH_MERGE` lookup with `normalizeBranchName()`:
+  - Strips `/ Sales$/i` suffix dynamically (any branch, not just Bakersfield/Fresno)
+  - `MERGED_BRANCHES` map handles consolidated branches: `'Sacramento' → 'Modesto'`
+  - `"Sacramento Sales"` → strip → `"Sacramento"` → merge → `"Modesto"`
+  - Add future merges by updating `MERGED_BRANCHES` — no other changes needed
+- `lib/revenue/parser.test.ts` — 4 new tests: Orange County Sales, Visalia Sales (dynamic rule), Sacramento → Modesto, Sacramento Sales → Modesto (193 total)
+- `lib/revenue/CLAUDE.md` — updated to reflect new normalization function and checklist
+
+### Fuel Card Assignment Retroactive Backfill Bug Fix
+- `PATCH /api/admin/review/fuel-cards/[id]` — now retroactively updates all historical `fuel_transactions` for the confirmed card (`fuel_card_assignment_id = id`) with branch_id, employee_id, and business_tag
+- Migration `20260506000004_backfill_fuel_transaction_branches.sql` — one-time backfill for cards confirmed before this fix; applied to production
+
+### Mobile Responsive Views
+- Landing page — stacked layout; 160px logo (240px desktop); full-width buttons (auto-width desktop); sparse dot grid (~40 dots mobile via 112px spacing)
+- Login page — full-width card with 16px horizontal padding on mobile; 120px logo on mobile
+- Admin Dashboard — mobile: 2×2 metric cards (no sparklines), revenue-only bar chart, compact variance row, branch list; desktop layout unchanged; `useIsMobile()` hook (SSR-safe, starts false)
+- `MobileBottomNav` — role-aware fixed bottom nav; slide-up overlay drawer for overflow items; 60px height; 44px tap targets; orange active / gray inactive
+- `DashboardShell` — sidebar hidden on mobile (`hidden md:flex`); bottom nav shown on mobile (`md:hidden`)
+- `globals.css` — `overflow-x: hidden` on html; `.table-scroll` helper; `.dashboard-main` bottom padding for nav
+
+### Data Explorer (built in prior session, included here for completeness)
+- `/admin/data-explorer` and `/executive/data-explorer` pages
+- `DataExplorerClient` — filter bar, summary cards, sortable paginated table (50 rows/page), CSV export
+- API routes: `GET /api/data-explorer/payroll`, `revenue`, `fuel`, `export`
+- Sidebar nav: Database icon added for both admin and executive roles
+
+---
+
+## 3c. RECENT CHANGES (May 6, 2026) — Fiscal Quarters System
 
 ### Fiscal Quarters System
-- Migration `20260506000002_fiscal_quarters.sql` applied to production — `fiscal_quarters` + `fiscal_quarter_months` tables, RLS policies (authenticated read, admin write), unique constraint on `(quarter_number, year)`, unique constraint on `fiscal_month_id` (a month belongs to at most one quarter)
-- `GET|POST /api/fiscal-quarters` — GET returns all quarters with nested 3 months (sorted by sort_order); POST validates 3 unique unassigned month IDs, inserts quarter + month assignments atomically (rolls back on failure)
-- `PATCH|DELETE /api/fiscal-quarters/[id]` — PATCH updates name/quarterNumber/year/month assignments; conflict-checks new months against other quarters; DELETE cascades to fiscal_quarter_months
-- `app/admin/fiscal-quarters/page.tsx` — server component, admin-only guard
-- `components/fiscal-quarters/FiscalQuartersClient.tsx` — full CRUD UI: table showing quarter name + month pills; add/edit form with 3 interdependent month dropdowns (options exclude already-assigned months and sibling slots); warning banner when < 3 unassigned months; delete confirm
-- `components/layout/Sidebar.tsx` — added `LayersIcon` (layers SVG) + "Fiscal Quarters" nav item for admin
-- `app/admin/page.tsx` — fetches `fiscal_quarters` with nested `fiscal_quarter_months → fiscal_months`, shapes into flat `{ id, name, quarter_number, year, months[] }` array, passes as `fiscalQuarters` prop
-- `components/dashboard/AdminDashboard.tsx` — Month/Quarter toggle buttons (pill style, orange active state); quarter dropdown replacing month dropdown in quarter mode; `selectedQuarterId` state; date range in quarter mode = first month's `start_date` → last month's `end_date`; weekly bar chart across all 3 quarter months; YTD button hidden in quarter mode; `FiscalMonthVarianceRow` hidden in quarter mode; 0 TS errors
+- Migration `20260506000002_fiscal_quarters.sql` applied to production — `fiscal_quarters` + `fiscal_quarter_months` tables, RLS policies, unique constraints
+- `GET|POST /api/fiscal-quarters` and `PATCH|DELETE /api/fiscal-quarters/[id]`
+- `FiscalQuartersClient` — full CRUD UI
+- `AdminDashboard` — Month/Quarter toggle; quarter date range = first month start → last month end
 
 ---
 
-## 3c. RECENT CHANGES (May 6, 2026)
+## 3d. RECENT CHANGES (May 6, 2026) — Fiscal-Month-Based Targets
 
 ### Fiscal-Month-Based Targets Redesign
-- Migration `20260506000001_fiscal_month_targets.sql` created — **must be applied manually in Supabase SQL editor** (MCP lacks access to this project)
-- `branch_targets` table dropped and recreated: `fiscal_month_id` FK replaces `period_type` + `target_date`; `updated_by` replaces `updated_at`
-- `GET /api/targets` — now accepts `fiscalMonthId` param; returns targets joined with `fiscal_months` data
-- `POST /api/targets` — body now takes `{ branchId, fiscalMonthId, revenueTarget, profitPctTarget }`
-- `PATCH /api/targets/[id]` — sets `updated_by` from auth context
-- **New: `GET /api/targets/weekly?periodDate=YYYY-MM-DD`** — finds fiscal month containing that date, returns pro-rated weekly targets per branch (monthly ÷ weeks)
-- `TargetsClient` fully rewritten: fiscal month dropdown replaces date picker; table shows Fiscal Month | Revenue Target | Weekly Breakdown | GP% | edit/delete; shows link to Fiscal Months page if none exist
-- `TargetVarianceRow` rewritten: calls `/api/targets/weekly`; distinguishes "no fiscal month" vs "no target" messages; shows fiscal month name in header
-- `app/admin/targets/page.tsx` now fetches and passes `fiscalMonths` to `TargetsClient`
-- Fiscal month validation fixed: `start_date` must be **Sunday** (was Saturday), `end_date` must be Saturday — fixed in both API routes and `FiscalMonthsClient` UI
-- `database.types.ts` updated to match new `branch_targets` schema
-
----
-
-## 3d. RECENT CHANGES (May 6, 2026) — Admin Dashboard Redesign
-
-### Admin Dashboard Redesign
-- `app/admin/page.tsx` — now fetches + passes `fiscalMonths` (sorted newest first); removed `initialWeek`/`initialView` searchParams
-- **New: `app/api/admin/overview/route.ts`** — single admin-only endpoint returning all dashboard data for a date range: totals, byPeriod (per-Saturday), byBranch (revenue/payroll/fuel/GP with revenueByPeriod sparkline data). Paginated to avoid 1000-row cap.
-- **New: `components/targets/FiscalMonthVarianceRow.tsx`** — fetches monthly targets for selected fiscal month, shows monthly revenue target vs actuals
-- `components/dashboard/AdminDashboard.tsx` — **complete rewrite**:
-  - Replaced week navigator + MTD/YTD toggle with fiscal month dropdown (most recent first) + YTD toggle button
-  - Defaults to most recent fiscal month containing imported data (via `/api/periods/available`)
-  - Top metric cards show full fiscal month (or YTD) totals with date range subtitle
-  - **Weekly bar chart** (Recharts grouped bars): Revenue (orange), Payroll (gray), Fuel (dark red) per week; click bar → Selected Week Panel with exact metrics + dismiss button; YTD mode shows monthly aggregates instead
-  - **Branch Performance Card Grid** (3×2): all 6 active branches always shown; branch name in orange, revenue/payroll/fuel/GP/GP%; GP% color-coded (green ≥20%, yellow 10-20%, red <10%); mini SVG sparkline per branch; "No data" overlay for empty branches
-  - Removed: side cards (Fuel Efficiency, Payroll Allocation, Data Import), Waterfall chart, TrendLineChart, DateRangePicker
-  - Revenue by Branch table updated to use fiscal month/YTD range
+- Migration `20260506000001_fiscal_month_targets.sql` — `branch_targets` table rebuilt with `fiscal_month_id` FK
+- `GET/POST /api/targets` and `PATCH /api/targets/[id]`
+- **New: `GET /api/targets/weekly?periodDate=YYYY-MM-DD`** — pro-rated weekly targets
+- `TargetsClient` fully rewritten with fiscal month dropdown
+- `TargetVarianceRow` — calls `/api/targets/weekly`; shows fiscal month name
 
 ---
 
 ## 3e. RECENT CHANGES (May 5, 2026)
 
 ### Sacramento → Modesto Branch Merge
-
 - Migration `20260505000001_merge_sacramento_into_modesto.sql` applied to production
-- Adds `is_active` column to `branches` table
-- Reassigns all historical payroll, revenue, fuel, employee, user, and target data from Sacramento to Modesto
-- Deactivates Sacramento's payroll_codes and revenue_codes (`is_active = false`)
-- Sets Sacramento branch: `is_active = false`, `is_revenue_generating = false`
-- Seed updated: Sacramento inserted as inactive for fresh installs
-- Verified: Sacramento has 0 active transactions, 0 active codes; Modesto has 16 revenue records
+- Adds `is_active` to `branches`; reassigns all Sacramento data to Modesto; deactivates Sacramento codes
+- Revenue parser: `normalizeBranchName()` maps Sacramento → Modesto (covers historical imports too)
 
-### `is_active` Audit — All Branch Queries Fixed
-Every branch selector query now filters `is_active = true` so Sacramento never appears:
-- `app/admin/page.tsx` — added `eq('is_active', true)`
-- `app/admin/targets/page.tsx` — added `eq('is_active', true)`
-- `app/executive/page.tsx` — added `eq('is_active', true)`
-- `app/api/admin/users/route.ts` — added `eq('is_active', true)` + `eq('is_revenue_generating', true)` (was unfiltered)
-- `app/api/allocation/summary/route.ts` — added `eq('is_active', true)`
-- `lib/supabase/database.types.ts` — added `is_active` to branches Row/Insert/Update
-- `manager/page.tsx` and `district/page.tsx` were already correct
-
-### Employee Branch Transfer History (May 5, 2026)
+### Employee Branch Transfer History
 - Migration `20260505000002_employee_branch_transfers.sql` applied to production
-- New `employee_branch_transfers` table: records from/to payroll codes, effective_date, notes, created_by
-- `employee_entity_assignments` gains `effective_from` (date NOT NULL, default '1900-01-01') and `effective_to` (date nullable)
-- Dropped `UNIQUE(raw_name_in_report, entity_id)` — replaced with partial unique index `WHERE effective_to IS NULL`
-- All existing assignments set to `effective_from = '1900-01-01'`, `effective_to = NULL`
-- `GET /api/employees/[id]/transfers` — admin + executive: returns transfer log, all assignment periods, available payroll codes
-- `POST /api/employees/[id]/transfers` — admin only: validates Saturday, validates different branch, closes old assignment, opens new one, reassigns payroll + fuel transactions retroactively, updates fuel card assignments
-- `DELETE /api/employees/[id]/transfers/[transferId]` — admin only: reverts if employee hasn't been transferred again since
-- `detail/route.ts` updated to filter assignments to `effective_to IS NULL` (active only)
-- `EmployeeDetailClient` gets "Branch History" section: assignment periods timeline grouped by entity, transfer log with revert button (most recent only), inline Transfer Branch form with payroll code dropdown + Saturday date picker + name confirmation
+- `employee_branch_transfers` table; `employee_entity_assignments` gets `effective_from` / `effective_to`
+- `GET/POST /api/employees/[id]/transfers`, `DELETE /api/employees/[id]/transfers/[transferId]`
+- `EmployeeDetailClient` — Branch History section with transfer log and inline transfer form
 
-### Review Queue — Branch & Payroll Code Selectors Fixed
-**Fuel card assignment dropdown:**
-- Now queries all active branches (not just revenue-generating)
-- Grouped: Operations / Corporate / Other Businesses / Tag as Business
-- "Tag as Western Highways" and "Tag as Signs" options set `business_tag` instead of `branch_id`
-- PATCH endpoint accepts `{ businessTag }` and clears `branch_id`, or accepts `{ branchId }` and clears `business_tag`
-
-**Employee assignment payroll code picker:**
-- API now fetches `payroll_code_id` on unconfirmed assignments + all active payroll codes (87, incl. Corp/HQ)
-- Each row shows a grouped payroll code dropdown (grouped by branch name)
-- On confirm, sends changed `payrollCodeId` to update `employee_entity_assignments.payroll_code_id`
-- PATCH endpoint accepts optional `payrollCodeId`
+### Review Queue Fixes
+- Fuel card assignment dropdown grouped: Operations / Corporate / Other Businesses / Tag as Business
+- Employee assignment payroll code picker grouped by branch
 
 ---
 
 ## 4. WHAT HAS NOT BEEN STARTED
 
-- ~~Employee detail page~~ — **DONE**
-- ~~Goals/targets table and settings page~~ — **DONE**
 - 13-week trend analytics (needs sufficient imported data to render)
 - Anomaly flag UI (employee payroll >3× 4-week average → tooltip warning)
 - Drill-down interactions (click payroll group → line items, click fuel total → transactions)
@@ -201,20 +205,21 @@ Every branch selector query now filters `is_active = true` so Sacramento never a
 
 ## 5. KNOWN ISSUES AND DECISIONS
 
-- **Supabase 1000-row cap:** Supabase JS client defaults to 1000 rows per query. API routes that aggregate transactions (e.g. payroll summary YTD) use `.range()` pagination or aggregate in SQL via RPC to avoid silent data truncation. Always verify large-result queries do not silently cap.
-- **next.config.js:** File uses `serverExternalPackages: ['xlsx', 'csv-parse']` to prevent Next.js from bundling Node-only packages. This was previously `experimental.serverComponentsExternalPackages` — renamed in Next.js 14.2. The current key is correct.
-- **Revenue parser multi-month fix:** The revenue file sometimes contains multiple invoice months per branch. The parser sums all months for the same branch+entity combination into a single record rather than creating one row per month.
-- **Fuel tax column calculation:** Interstate does not include a pre-tax total column — it is calculated as `gallons × price_per_gallon`. Flyers includes `TotalPrice` directly; pre-tax is back-calculated as `TotalPrice - TaxTotal`. Do not swap these formulas between vendors.
-- **Payroll column A tax row fix:** The "Total Employer Taxes and Contributions" row is identified by scanning column D (not column A). An earlier version scanned column A and missed it when row formatting shifted. Current parser scans col D correctly.
-- **`display_name` is never stored:** The `employees` table has no `display_name` column. It is always computed as `first_name || ' ' || last_name` at query time. If you find yourself writing a migration to add this column, stop.
-- **Admin payroll sum rule is a security control:** District/branch managers must never receive individual admin employee rows — not even for filtering client-side. The API returns `{ total: number }` with no detail array for these roles.
-- **`raw_name_in_report` is immutable:** Never expose a UI control that edits this field. It is the source of truth for AI matching and must reflect what QuickBooks actually exported.
+- **Supabase 1000-row cap:** Supabase JS client defaults to 1000 rows per query. API routes that aggregate transactions use `.range()` pagination or SQL aggregates via RPC. Always verify large-result queries do not silently cap.
+- **next.config.js:** Uses `serverExternalPackages: ['xlsx', 'csv-parse']` to prevent Next.js from bundling Node-only packages.
+- **Revenue parser multi-month fix:** Sums all months for the same branch+entity into one record.
+- **Fuel tax column calculation:** Interstate: `gallons × price_per_gallon`. Flyers: `TotalPrice` direct; pre-tax back-calculated as `TotalPrice - TaxTotal`. Do not swap.
+- **Payroll column A tax row fix:** "Total Employer Taxes and Contributions" identified by scanning column D (not A).
+- **`display_name` is never stored:** Always computed as `first_name || ' ' || last_name`. No stored column.
+- **Admin payroll sum rule is a security control:** District/branch managers never receive individual admin employee rows — API returns `{ total: number }` only.
+- **`raw_name_in_report` is immutable:** Never expose a UI control that edits this field.
+- **must_change_password enforcement:** Middleware gate is the primary control. The flag lives in `user_profiles`, not just auth metadata. Clearing it requires the `/api/auth/clear-must-change-password` API route (uses service client).
 
 ---
 
 ## 6. CURRENT TEST COUNT
 
-**189 tests passing, 0 failing** (as of May 4, 2026)
+**193 tests passing, 0 failing** (as of May 6, 2026)
 12 test files across parsers, allocation engine, and API access control.
 
 ```bash
@@ -226,25 +231,33 @@ npx vitest run
 ## 7. DEPLOYMENT
 
 ### Git / GitHub
-- Git repo initialized in `/Users/masondoty/Documents/sn_project`
-- Remote: GitHub (private repo — connect via `gh repo create` or manually)
+- Remote: GitHub (private repo `masontcs/safety-network-dashboard`)
 - `.gitignore` excludes: `.env.local`, `node_modules`, `.next`, `.claude/`, `supabase/.temp/`
-- Two commits on `main`: initial commit + supabase/.temp cleanup
+- Current branch: `main`
 
 ### Vercel
-- Connected to GitHub repo via Vercel dashboard
+- Connected to GitHub repo; auto-deploys on push to `main`
 - Framework: Next.js (auto-detected), build: `npm run build`
-- All four environment variables must be set in Vercel → Project Settings → Environment Variables:
-  - `NEXT_PUBLIC_SUPABASE_URL` — public, safe to expose
-  - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — public, safe to expose
-  - `SUPABASE_SERVICE_ROLE_KEY` — **mark Sensitive**
-  - `ANTHROPIC_API_KEY` — **mark Sensitive**
+- Environment variables in Vercel Project Settings:
+  - `NEXT_PUBLIC_SUPABASE_URL` — public
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — public
+  - `SUPABASE_SERVICE_ROLE_KEY` — **Sensitive**
+  - `ANTHROPIC_API_KEY` — **Sensitive**
 
 ### Production URL
 - https://safety-network-dashboard.vercel.app/login
 
-### Migrations applied to production
-- `fiscal_months`, `branch_targets`, `fiscal_quarters`, and `fiscal_quarter_months` migrations all applied and live in DB
+### All migrations applied to production (14 total)
+- `20260101000001` through `20260101000007` — core schema
+- `20260101000008` — branch_targets
+- `20260505000001` — Sacramento merge + is_active
+- `20260505000002` — employee branch transfers
+- `20260506000001` — fiscal_month_targets redesign
+- `20260506000002` — fiscal_quarters + fiscal_quarter_months
+- `20260506000003` — access_requests table
+- `20260506000004` — backfill fuel_transaction branches
+- `20260506000005` — fuel_imports vendor unique constraint
+- `20260506000006` — user_profiles.must_change_password
 
 ---
 
@@ -259,12 +272,13 @@ npm run dev
 TypeScript check (run before committing):
 ```bash
 npm run typecheck
+# or
+npx tsc --noEmit
 ```
 
 ---
 
-## 8. OPEN QUESTIONS
+## 9. OPEN QUESTIONS
 
-- **Review queue badge count:** Will show unresolved review queue item count in the top nav — loaded on page render only (no polling). Not yet implemented.
-- **Goals/Targets:** ~~Not yet implemented.~~ **DONE.** Migration applied to production May 5, 2026.
-- **Executive/Admin viewing allocation for MTD/YTD:** Allocation is always fetched for the selected periodDate (current week). For MTD/YTD views, the "Net After Overhead" card notes "overhead: current week" to clarify. Summing allocation across multiple weeks is deferred.
+- **Review queue badge count:** Unresolved review queue item count in top nav — not yet implemented.
+- **Executive/Admin allocation for MTD/YTD:** Allocation fetched for selected periodDate only. Summing allocation across multiple weeks is deferred.
