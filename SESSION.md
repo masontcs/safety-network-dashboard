@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 5, 2026 — Session: Sacramento→Modesto merge + review queue fixes + employee branch transfer history + Inter font + logo
+## Last updated: May 6, 2026 — Session: Fiscal quarters system (DB + API + admin UI + dashboard toggle)
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -24,6 +24,7 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] Migration 5: transaction tables (payroll_transactions, payroll_taxes, revenue_transactions, fuel_transactions)
 - [x] Migration 6: RLS policies on all tables
 - [x] Migration 7: fiscal_months table
+- [x] Migration 8: fiscal_quarters + fiscal_quarter_months tables (applied May 6, 2026)
 - [x] Seed data: 3 businesses, 3 entities, 7 branches, 12 payroll item groups, 87 payroll codes, 196 payroll items, 17 revenue codes
 
 ### File Parsers (`/lib/`)
@@ -44,6 +45,7 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] `GET|PATCH /api/employees` + `[id]/name` — display_name computed, raw_name never returned
 - [x] `GET /api/periods/available` + `latest`
 - [x] `GET|POST /api/fiscal-months` + `[id]`
+- [x] `GET|POST /api/fiscal-quarters` + `PATCH|DELETE /api/fiscal-quarters/[id]`
 - [x] `GET|POST /api/admin/users` + `[id]`
 - [x] `GET|POST /api/admin/review` + action routes for employee assignments, fuel cards, payroll items
 
@@ -66,7 +68,7 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] `EmployeeDetailClient` — admin/executive only; preferred name + legal name display; inline Edit Name form (admin only); assignment pills; payroll history table + hours/earnings charts + group breakdown; fuel history table + filters + gallons chart; accessible at `/admin/employees/[id]` and `/executive/employees/[id]`
 - [x] Inter font (weights 400–800) via `next/font/google`; `.metric-value` weight 700; h1/h2 weight 700
 - [x] Logo: `public/logo.png` (white text + orange hand icon); shown in TopNav (24px) and login page (52px)
-- [x] Admin pages: `/admin/import` (ImportClient), `/admin/review` (ReviewClient), `/admin/users` (UsersClient), `/admin/fiscal-months` (FiscalMonthsClient), `/admin/targets` (TargetsClient)
+- [x] Admin pages: `/admin/import` (ImportClient), `/admin/review` (ReviewClient), `/admin/users` (UsersClient), `/admin/fiscal-months` (FiscalMonthsClient), `/admin/targets` (TargetsClient), `/admin/fiscal-quarters` (FiscalQuartersClient)
 - [x] `TargetVarianceRow` component — shown on all 4 dashboards (weekly view only); green/yellow/red color coding (±5%/±15% thresholds); aggregate mode for admin/executive (sums all branch revenue targets); profit % only shown for single-branch view
 - [x] Employee detail pages: `/admin/employees/[id]` and `/executive/employees/[id]` (403 for district/branch managers)
 - [x] Chart components: `BarChart` (supports `formatValue` prop for non-currency axes), `TrendLineChart`, `WaterfallChart`
@@ -83,11 +85,25 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ## 3. WHAT IS IN PROGRESS / PARTIALLY BUILT
 
-- Nothing currently in progress. Font and logo are shipped.
+- Nothing currently in progress.
 
 ---
 
-## 3b. RECENT CHANGES (May 6, 2026)
+## 3b. RECENT CHANGES (May 6, 2026) — Fiscal Quarters System
+
+### Fiscal Quarters System
+- Migration `20260506000002_fiscal_quarters.sql` applied to production — `fiscal_quarters` + `fiscal_quarter_months` tables, RLS policies (authenticated read, admin write), unique constraint on `(quarter_number, year)`, unique constraint on `fiscal_month_id` (a month belongs to at most one quarter)
+- `GET|POST /api/fiscal-quarters` — GET returns all quarters with nested 3 months (sorted by sort_order); POST validates 3 unique unassigned month IDs, inserts quarter + month assignments atomically (rolls back on failure)
+- `PATCH|DELETE /api/fiscal-quarters/[id]` — PATCH updates name/quarterNumber/year/month assignments; conflict-checks new months against other quarters; DELETE cascades to fiscal_quarter_months
+- `app/admin/fiscal-quarters/page.tsx` — server component, admin-only guard
+- `components/fiscal-quarters/FiscalQuartersClient.tsx` — full CRUD UI: table showing quarter name + month pills; add/edit form with 3 interdependent month dropdowns (options exclude already-assigned months and sibling slots); warning banner when < 3 unassigned months; delete confirm
+- `components/layout/Sidebar.tsx` — added `LayersIcon` (layers SVG) + "Fiscal Quarters" nav item for admin
+- `app/admin/page.tsx` — fetches `fiscal_quarters` with nested `fiscal_quarter_months → fiscal_months`, shapes into flat `{ id, name, quarter_number, year, months[] }` array, passes as `fiscalQuarters` prop
+- `components/dashboard/AdminDashboard.tsx` — Month/Quarter toggle buttons (pill style, orange active state); quarter dropdown replacing month dropdown in quarter mode; `selectedQuarterId` state; date range in quarter mode = first month's `start_date` → last month's `end_date`; weekly bar chart across all 3 quarter months; YTD button hidden in quarter mode; `FiscalMonthVarianceRow` hidden in quarter mode; 0 TS errors
+
+---
+
+## 3c. RECENT CHANGES (May 6, 2026)
 
 ### Fiscal-Month-Based Targets Redesign
 - Migration `20260506000001_fiscal_month_targets.sql` created — **must be applied manually in Supabase SQL editor** (MCP lacks access to this project)
@@ -104,7 +120,7 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ---
 
-## 3c. RECENT CHANGES (May 6, 2026) — Admin Dashboard Redesign
+## 3d. RECENT CHANGES (May 6, 2026) — Admin Dashboard Redesign
 
 ### Admin Dashboard Redesign
 - `app/admin/page.tsx` — now fetches + passes `fiscalMonths` (sorted newest first); removed `initialWeek`/`initialView` searchParams
@@ -121,7 +137,7 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ---
 
-## 3d. RECENT CHANGES (May 5, 2026)
+## 3e. RECENT CHANGES (May 5, 2026)
 
 ### Sacramento → Modesto Branch Merge
 
@@ -228,7 +244,7 @@ npx vitest run
 - https://safety-network-dashboard.vercel.app/login
 
 ### Migrations applied to production
-- `fiscal_months` and `branch_targets` migrations applied and live in DB (May 5, 2026)
+- `fiscal_months`, `branch_targets`, `fiscal_quarters`, and `fiscal_quarter_months` migrations all applied and live in DB
 
 ---
 
