@@ -260,6 +260,26 @@ h1, h2 {
   transition: border-color 0.15s;
 }
 
+/* ─────────────────────────────────────────────
+   Mobile base
+───────────────────────────────────────────── */
+html {
+  overflow-x: hidden;
+}
+
+/* Tables that can't collapse scroll horizontally */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Bottom nav offset for dashboard pages on mobile */
+@media (max-width: 767px) {
+  .dashboard-main {
+    padding-bottom: 76px !important;
+  }
+}
+
 .filter-pill:hover {
   border-color: #ff6b00;
 }

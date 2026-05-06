@@ -14,6 +14,7 @@ interface Props {
   branchIds: string[]
   actualRevenue: number | null
   actualGrossProfitPct: number | null
+  compact?: boolean
 }
 
 type Status = 'green' | 'yellow' | 'red'
@@ -89,6 +90,7 @@ export default function FiscalMonthVarianceRow({
   branchIds,
   actualRevenue,
   actualGrossProfitPct,
+  compact,
 }: Props) {
   const [targets, setTargets] = useState<TargetRow[] | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -107,6 +109,48 @@ export default function FiscalMonthVarianceRow({
   }, [fiscalMonthId])
 
   if (!loaded) return null
+
+  // Compact single-line rendering for mobile
+  if (compact) {
+    const totalRevenueTarget = (targets ?? []).reduce((s, t) => s + (t.revenue_target ?? 0), 0)
+    const hasTarget = totalRevenueTarget > 0
+
+    if (!hasTarget) return null
+
+    const varAbs = actualRevenue != null ? actualRevenue - totalRevenueTarget : null
+    const varPct = varAbs != null && totalRevenueTarget > 0 ? (varAbs / totalRevenueTarget) * 100 : null
+    const sign = varAbs != null && varAbs >= 0 ? '+' : ''
+    const status = varAbs != null ? varianceStatus(actualRevenue!, totalRevenueTarget) : 'green'
+
+    return (
+      <div style={{
+        background: '#1e1e1e',
+        border: '1px solid #2a2a2a',
+        borderRadius: 8,
+        padding: '8px 12px',
+        fontSize: 12,
+        color: '#888888',
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 8,
+        alignItems: 'center',
+      }}>
+        <span style={{ textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: 10 }}>Target</span>
+        <span style={{ color: '#cccccc' }}>{formatCurrency(totalRevenueTarget)}</span>
+        <span style={{ color: '#555555' }}>|</span>
+        <span style={{ textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: 10 }}>Actual</span>
+        <span style={{ color: '#cccccc' }}>{actualRevenue != null ? formatCurrency(actualRevenue) : '—'}</span>
+        {varPct != null && (
+          <>
+            <span style={{ color: '#555555' }}>|</span>
+            <span style={{ color: STATUS_COLOR[status], fontWeight: 500 }}>
+              {sign}{varPct.toFixed(1)}%
+            </span>
+          </>
+        )}
+      </div>
+    )
+  }
 
   const fiscalMonthName = targets?.[0]?.fiscal_months?.name ?? null
 

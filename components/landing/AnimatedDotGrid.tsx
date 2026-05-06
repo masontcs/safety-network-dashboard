@@ -30,15 +30,16 @@ export default function AnimatedDotGrid() {
     let lastTs: number | null = null
 
     function buildDots(w: number, h: number) {
-      const cols = Math.ceil(w / SPACING) + 1
-      const rows = Math.ceil(h / SPACING) + 1
+      const spacing = w < 768 ? 112 : SPACING
+      const cols = Math.ceil(w / spacing) + 1
+      const rows = Math.ceil(h / spacing) + 1
       const next: Dot[] = []
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const period = MIN_PERIOD_MS + Math.random() * (MAX_PERIOD_MS - MIN_PERIOD_MS)
           next.push({
-            x: SPACING / 2 + c * SPACING,
-            y: SPACING / 2 + r * SPACING,
+            x: spacing / 2 + c * spacing,
+            y: spacing / 2 + r * spacing,
             phase: Math.random() * Math.PI * 2,
             speed: (Math.PI * 2) / period,
           })

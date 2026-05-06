@@ -30,101 +30,83 @@ export default async function RootPage() {
     <>
       <AnimatedDotGrid />
       <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          position: 'relative',
-          zIndex: 1,
-          fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
-          padding: '0 24px',
-        }}
+        className="min-h-screen flex flex-col items-center justify-center relative z-[1] px-4 md:px-6 py-8"
+        style={{ fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif' }}
       >
-      <div style={{ textAlign: 'center', maxWidth: 560 }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/safety_network_logo.png"
-          alt="Safety Network"
-          style={{ display: 'block', width: 240, height: 'auto', margin: '0 auto 24px' }}
-        />
+        <div className="text-center w-full" style={{ maxWidth: 560 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/safety_network_logo.png"
+            alt="Safety Network"
+            className="block mx-auto h-auto mb-6 w-[160px] md:w-[240px]"
+          />
 
-        <h1
+          <h1
+            className="font-extrabold text-white leading-tight mb-4 text-[28px] md:text-[38px]"
+            style={{ letterSpacing: '-0.02em' }}
+          >
+            Operations Management Portal
+          </h1>
+
+          <p
+            className="text-[14px] md:text-[16px] leading-relaxed mx-auto mb-10"
+            style={{ color: '#888888', maxWidth: 420 }}
+          >
+            Real-time visibility into payroll, revenue, and fuel across all branches
+          </p>
+
+          <div className="flex flex-col md:flex-row gap-3 justify-center">
+            <Link
+              href="/login"
+              className="w-full md:w-auto text-center"
+              style={{
+                background: '#ff6b00',
+                color: '#ffffff',
+                borderRadius: 8,
+                padding: '12px 32px',
+                fontSize: 14,
+                fontWeight: 500,
+                textDecoration: 'none',
+                display: 'block',
+                border: '1px solid #ff6b00',
+              }}
+            >
+              Sign In
+            </Link>
+            <Link
+              href="/request-access"
+              className="w-full md:w-auto text-center"
+              style={{
+                background: 'transparent',
+                color: '#ff6b00',
+                borderRadius: 8,
+                padding: '12px 32px',
+                fontSize: 14,
+                fontWeight: 500,
+                textDecoration: 'none',
+                display: 'block',
+                border: '1px solid #ff6b00',
+              }}
+            >
+              Request Access
+            </Link>
+          </div>
+        </div>
+
+        <div
+          className="text-[10px] md:text-[11px]"
           style={{
-            fontSize: 38,
-            fontWeight: 800,
-            color: '#ffffff',
-            lineHeight: 1.1,
-            letterSpacing: '-0.02em',
-            margin: '0 0 16px',
+            position: 'fixed',
+            bottom: 24,
+            left: 0,
+            right: 0,
+            textAlign: 'center',
+            color: '#555555',
           }}
         >
-          Operations Management Portal
-        </h1>
-
-        <p
-          style={{
-            fontSize: 16,
-            color: '#888888',
-            lineHeight: 1.6,
-            margin: '0 auto 40px',
-            maxWidth: 420,
-          }}
-        >
-          Real-time visibility into payroll, revenue, and fuel across all branches
-        </p>
-
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link
-            href="/login"
-            style={{
-              background: '#ff6b00',
-              color: '#ffffff',
-              borderRadius: 8,
-              padding: '12px 32px',
-              fontSize: 14,
-              fontWeight: 500,
-              textDecoration: 'none',
-              display: 'inline-block',
-              border: '1px solid #ff6b00',
-            }}
-          >
-            Sign In
-          </Link>
-          <Link
-            href="/request-access"
-            style={{
-              background: 'transparent',
-              color: '#ff6b00',
-              borderRadius: 8,
-              padding: '12px 32px',
-              fontSize: 14,
-              fontWeight: 500,
-              textDecoration: 'none',
-              display: 'inline-block',
-              border: '1px solid #ff6b00',
-            }}
-          >
-            Request Access
-          </Link>
+          © 2026 Safety Network Inc. — Confidential&nbsp;&nbsp;|&nbsp;&nbsp;Internal Use Only
         </div>
       </div>
-
-      <div
-        style={{
-          position: 'fixed',
-          bottom: 24,
-          left: 0,
-          right: 0,
-          textAlign: 'center',
-          fontSize: 11,
-          color: '#555555',
-        }}
-      >
-        © 2026 Safety Network Inc. — Confidential&nbsp;&nbsp;|&nbsp;&nbsp;Internal Use Only
-      </div>
-    </div>
     </>
   )
 }

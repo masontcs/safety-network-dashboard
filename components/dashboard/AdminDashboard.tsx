@@ -353,6 +353,20 @@ function WeeklyTooltip({ active, payload, label }: any) {
   )
 }
 
+// ── Mobile detection hook ─────────────────────────────────────────────────────
+
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    setIsMobile(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+  return isMobile
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters }: Props) {
@@ -538,6 +552,207 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
     () => (selectedWeek ? barData.find((b) => b.periodDate === selectedWeek) ?? null : null),
     [selectedWeek, barData]
   )
+
+  const isMobile = useIsMobile()
+
+  // ── Mobile render ────────────────────────────────────────────────────────────
+  if (isMobile) {
+    if (fiscalMonths.length === 0 && fiscalQuarters.length === 0) {
+      return (
+        <div style={{ padding: 16 }}>
+          <div className="card" style={{ padding: 20 }}>
+            <p style={{ color: '#888888', fontSize: 13, margin: 0 }}>
+              No fiscal months created.{' '}
+              <a href="/admin/fiscal-months" style={{ color: '#ff6b00', textDecoration: 'none' }}>Set up →</a>
+            </p>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Period selector */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 2, border: '1px solid #333333', flexShrink: 0 }}>
+            {(['month', 'quarter'] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => { setViewMode(mode); if (mode === 'quarter') setIsYTD(false) }}
+                style={{
+                  background: viewMode === mode ? '#ff6b00' : 'transparent',
+                  color: viewMode === mode ? '#ffffff' : '#888888',
+                  border: 'none', borderRadius: 6, padding: '5px 10px',
+                  fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+                  fontWeight: viewMode === mode ? 500 : 400, minHeight: 32,
+                }}
+              >
+                {mode === 'month' ? 'Month' : 'Qtr'}
+              </button>
+            ))}
+          </div>
+          {viewMode === 'month' ? (
+            <select
+              value={selectedFiscalId}
+              onChange={(e) => { setIsYTD(false); setSelectedFiscalId(e.target.value) }}
+              style={{ ...selectStyle, flex: 1 }}
+            >
+              {fiscalMonths.map((fm) => (
+                <option key={fm.id} value={fm.id}>{fm.name}</option>
+              ))}
+            </select>
+          ) : (
+            <select
+              value={selectedQuarterId}
+              onChange={(e) => setSelectedQuarterId(e.target.value)}
+              style={{ ...selectStyle, flex: 1 }}
+              disabled={fiscalQuarters.length === 0}
+            >
+              {fiscalQuarters.map((q) => (
+                <option key={q.id} value={q.id}>{q.name} (Q{q.quarter_number})</option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {/* 2×2 metric cards — label + value only, no sparklines/progress/secondary */}
+        {loading ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {[1, 2, 3, 4].map((i) => <Skeleton key={i} height={80} borderRadius={12} />)}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ background: '#ff6b00', borderRadius: 12, padding: '12px 14px', minHeight: 80 }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Revenue</div>
+              <div style={{ fontSize: 20, fontWeight: 500, color: '#ffffff', lineHeight: 1.2 }}>{noData ? '—' : formatCurrency(rev)}</div>
+            </div>
+            <div className="card" style={{ padding: '12px 14px', minHeight: 80 }}>
+              <div className="metric-label" style={{ marginBottom: 6 }}>Fuel</div>
+              <div style={{ fontSize: 20, fontWeight: 500, color: '#ffffff', lineHeight: 1.2 }}>{noData ? '—' : formatCurrency(fuel)}</div>
+            </div>
+            <div className="card" style={{ padding: '12px 14px', minHeight: 80 }}>
+              <div className="metric-label" style={{ marginBottom: 6 }}>Payroll</div>
+              <div style={{ fontSize: 20, fontWeight: 500, color: '#ffffff', lineHeight: 1.2 }}>{noData ? '—' : formatCurrency(pay)}</div>
+            </div>
+            <div className="card" style={{ padding: '12px 14px', minHeight: 80 }}>
+              <div className="metric-label" style={{ marginBottom: 6 }}>Net Profit</div>
+              <div style={{ fontSize: 20, fontWeight: 500, color: noData ? '#888888' : gp >= 0 ? '#ffffff' : '#cc4444', lineHeight: 1.2 }}>
+                {noData ? '—' : formatCurrency(gp)}
+              </div>
+              {!noData && (
+                <div style={{ fontSize: 11, color: gp >= 0 ? '#ff6b00' : '#cc4444', marginTop: 2 }}>{gpPct.toFixed(1)}% margin</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Variance — compact single line */}
+        {viewMode === 'month' && !isYTD && selectedFiscalId && (
+          <FiscalMonthVarianceRow
+            fiscalMonthId={selectedFiscalId}
+            branchIds={branches.map((b) => b.id)}
+            actualRevenue={noData ? null : rev}
+            actualGrossProfitPct={noData ? null : gpPct}
+            compact
+          />
+        )}
+
+        {/* Bar chart — revenue bars only */}
+        <div className="card">
+          <div style={{ fontSize: 13, fontWeight: 500, color: '#ffffff', marginBottom: 10 }}>
+            {isYTD ? 'Monthly Performance' : 'Weekly Performance'}
+          </div>
+          {loading ? (
+            <Skeleton height={160} />
+          ) : barData.length === 0 ? (
+            <EmptyState message="No data for this period." />
+          ) : (
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={barData} barCategoryGap="30%" margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
+                <XAxis dataKey="label" tick={{ fill: '#555555', fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#555555', fontSize: 9 }} axisLine={false} tickLine={false} width={40}
+                  tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
+                <Tooltip content={<WeeklyTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                <Bar
+                  dataKey="revenue"
+                  name="Revenue"
+                  fill="#ff6b00"
+                  radius={[3, 3, 0, 0]}
+                  cursor={isYTD && viewMode === 'month' ? undefined : 'pointer'}
+                  onClick={isYTD && viewMode === 'month' ? undefined : (entry: { periodDate: string }) => {
+                    setSelectedWeek((prev) => prev === entry.periodDate ? null : entry.periodDate)
+                  }}
+                >
+                  {barData.map((entry) => (
+                    <Cell
+                      key={entry.periodDate}
+                      fill={!(isYTD && viewMode === 'month') && selectedWeek === entry.periodDate ? '#ffaa44' : '#ff6b00'}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Selected week panel */}
+        {selectedWeek && selectedWeekData && (
+          <SelectedWeekPanel periodDate={selectedWeek} data={selectedWeekData} onDismiss={() => setSelectedWeek(null)} />
+        )}
+
+        {/* Branch performance — single column list, no sparklines */}
+        <div className="card" style={{ padding: 0 }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #2a2a2a', fontSize: 13, fontWeight: 500, color: '#ffffff' }}>
+            Branch Performance
+          </div>
+          {loading ? (
+            <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[1, 2, 3].map((i) => <Skeleton key={i} height={44} />)}
+            </div>
+          ) : (
+            branchGridData.map(({ branch, data }) => {
+              const bRev = data?.revenue ?? 0
+              const bGpPct = data?.gpPct ?? 0
+              const bNoData = bRev === 0 && (data?.directPayroll ?? 0) === 0 && (data?.fuel ?? 0) === 0
+              return (
+                <div
+                  key={branch.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '12px 16px',
+                    borderBottom: '1px solid #2a2a2a',
+                    minHeight: 44,
+                  }}
+                >
+                  <span style={{ fontSize: 14, fontWeight: 500, color: '#ff6b00' }}>{branch.name}</span>
+                  {bNoData ? (
+                    <span style={{ fontSize: 12, color: '#555555' }}>No data</span>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <span style={{ fontSize: 13, color: '#cccccc' }}>{formatCurrency(bRev)}</span>
+                      <span style={{
+                        fontSize: 12, fontWeight: 500,
+                        color: gpColor(bGpPct),
+                        background: `${gpColor(bGpPct)}1a`,
+                        borderRadius: 4, padding: '2px 7px',
+                      }}>
+                        {bGpPct.toFixed(1)}%
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )
+            })
+          )}
+        </div>
+        {/* Revenue by branch table: hidden on mobile (branch list above replaces it) */}
+      </div>
+    )
+  }
+  // ── (End of mobile render path) ───────────────────────────────────────────────
 
   if (fiscalMonths.length === 0 && fiscalQuarters.length === 0) {
     return (

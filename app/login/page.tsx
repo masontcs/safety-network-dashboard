@@ -29,17 +29,17 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{
+    <div className="px-4 md:px-0" style={{
       minHeight: '100vh',
       background: '#111111',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
     }}>
-      <div className="card" style={{ width: 360 }}>
+      <div className="card w-full md:w-[360px]">
         <div style={{ marginBottom: 24, textAlign: 'center' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Safety Network" style={{ height: 52, width: 'auto', marginBottom: 12 }} />
+          <img src="/logo.png" alt="Safety Network" className="block mx-auto w-[120px] md:w-auto md:h-[52px] h-auto mb-3" />
           <div className="metric-label">Operations Dashboard</div>
         </div>
 
