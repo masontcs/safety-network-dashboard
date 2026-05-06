@@ -18,7 +18,7 @@ export async function PATCH(
     const body = await request.json() as {
       action: 'approve' | 'deny'
       role?: string
-      branchId?: string
+      branchIds?: string[]
       temporaryPassword?: string
     }
 
@@ -53,14 +53,14 @@ export async function PATCH(
     }
 
     // action === 'approve'
-    const { role, branchId, temporaryPassword } = body as {
-      action: 'approve'; role?: string; branchId?: string; temporaryPassword?: string
+    const { role, branchIds, temporaryPassword } = body as {
+      action: 'approve'; role?: string; branchIds?: string[]; temporaryPassword?: string
     }
     if (!role || !['branch_manager', 'district_manager', 'executive'].includes(role)) {
       return NextResponse.json({ success: false, error: 'A valid role is required to approve', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
-    if (!branchId) {
-      return NextResponse.json({ success: false, error: 'A branch is required to approve', code: 'VALIDATION_ERROR' }, { status: 400 })
+    if (!branchIds || branchIds.length === 0) {
+      return NextResponse.json({ success: false, error: 'At least one branch is required to approve', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
     if (!temporaryPassword || temporaryPassword.length < 8) {
       return NextResponse.json({ success: false, error: 'A temporary password of at least 8 characters is required', code: 'VALIDATION_ERROR' }, { status: 400 })
@@ -104,7 +104,7 @@ export async function PATCH(
     // Create user_branch_assignments
     const { error: assignErr } = await supabase
       .from('user_branch_assignments')
-      .insert({ user_id: userId, branch_id: branchId })
+      .insert(branchIds.map((branch_id) => ({ user_id: userId, branch_id })))
 
     if (assignErr) {
       // Rollback: delete profile and auth user

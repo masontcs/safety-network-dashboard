@@ -2,12 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import Skeleton from '@/components/ui/Skeleton'
+import BranchMultiSelect from '@/components/ui/BranchMultiSelect'
+import type { SelectableBranch } from '@/components/ui/BranchMultiSelect'
 
-interface Branch {
-  id: string
-  name: string
-  is_revenue_generating: boolean
-}
+type Branch = SelectableBranch
 
 interface AccessRequest {
   id: string
@@ -64,7 +62,7 @@ export default function AccessRequestsClient() {
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [modal, setModal] = useState<ModalState>(null)
   const [actionRole, setActionRole] = useState('')
-  const [actionBranchId, setActionBranchId] = useState('')
+  const [actionBranchIds, setActionBranchIds] = useState<string[]>([])
   const [tmpPassword, setTmpPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [copied, setCopied] = useState(false)
@@ -111,7 +109,7 @@ export default function AccessRequestsClient() {
   function openApprove(req: AccessRequest) {
     setModal({ type: 'approve', request: req })
     setActionRole(req.requestedRole)
-    setActionBranchId(req.branchId ?? (branches[0]?.id ?? ''))
+    setActionBranchIds(req.branchId ? [req.branchId] : [])
     setTmpPassword('')
     setConfirmPassword('')
     setCopied(false)
@@ -125,6 +123,7 @@ export default function AccessRequestsClient() {
 
   function closeModal() {
     setModal(null)
+    setActionBranchIds([])
     setTmpPassword('')
     setConfirmPassword('')
     setCopied(false)
@@ -133,6 +132,7 @@ export default function AccessRequestsClient() {
 
   async function handleApprove() {
     if (!modal || modal.type !== 'approve') return
+    if (actionBranchIds.length === 0) { setActionError('At least one branch is required.'); return }
     if (tmpPassword.length < 8) { setActionError('Temporary password must be at least 8 characters.'); return }
     if (tmpPassword !== confirmPassword) { setActionError('Passwords do not match.'); return }
     setActionSaving(true)
@@ -141,7 +141,7 @@ export default function AccessRequestsClient() {
       const res = await fetch(`/api/admin/access-requests/${modal.request.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve', role: actionRole, branchId: actionBranchId, temporaryPassword: tmpPassword }),
+        body: JSON.stringify({ action: 'approve', role: actionRole, branchIds: actionBranchIds, temporaryPassword: tmpPassword }),
       })
       const json = await res.json()
       if (!json.success) { setActionError(json.error); return }
@@ -343,7 +343,9 @@ export default function AccessRequestsClient() {
               borderRadius: 12,
               padding: 28,
               width: '100%',
-              maxWidth: 420,
+              maxWidth: 480,
+              maxHeight: '90vh',
+              overflowY: 'auto',
             }}
           >
             {modal.type === 'approve' ? (
@@ -374,20 +376,14 @@ export default function AccessRequestsClient() {
 
                   <div>
                     <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
-                      Branch
+                      Branches
                     </label>
-                    <select value={actionBranchId} onChange={(e) => setActionBranchId(e.target.value)} style={selectStyle}>
-                      <optgroup label="— Operations —">
-                        {branches.filter((b) => b.is_revenue_generating).map((b) => (
-                          <option key={b.id} value={b.id}>{b.name}</option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="— Corporate —">
-                        {branches.filter((b) => !b.is_revenue_generating).map((b) => (
-                          <option key={b.id} value={b.id}>{b.name}</option>
-                        ))}
-                      </optgroup>
-                    </select>
+                    <BranchMultiSelect
+                      branches={branches}
+                      selectedIds={actionBranchIds}
+                      onChange={setActionBranchIds}
+                      role={actionRole}
+                    />
                   </div>
 
                   <div>
@@ -446,9 +442,9 @@ export default function AccessRequestsClient() {
                   <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                     <button
                       onClick={handleApprove}
-                      disabled={actionSaving || !actionRole || !actionBranchId || !tmpPassword}
+                      disabled={actionSaving || !actionRole || actionBranchIds.length === 0 || !tmpPassword}
                       className="btn-primary"
-                      style={{ flex: 1, opacity: (actionSaving || !tmpPassword) ? 0.6 : 1 }}
+                      style={{ flex: 1, opacity: (actionSaving || actionBranchIds.length === 0 || !tmpPassword) ? 0.6 : 1 }}
                     >
                       {actionSaving ? 'Creating Account…' : 'Create Account'}
                     </button>

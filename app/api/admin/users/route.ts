@@ -4,6 +4,8 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/utils/errors'
 import type { Role } from '@/lib/supabase/database.types'
 
+const VALID_ROLES: Role[] = ['admin', 'executive', 'district_manager', 'branch_manager']
+
 export async function GET(): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
@@ -16,7 +18,7 @@ export async function GET(): Promise<NextResponse> {
     const [profilesRes, assignmentsRes, branchesRes, authRes] = await Promise.all([
       supabase.from('user_profiles').select('id, role, display_name'),
       supabase.from('user_branch_assignments').select('user_id, branch_id'),
-      supabase.from('branches').select('id, name').eq('is_active', true).eq('is_revenue_generating', true).order('name'),
+      supabase.from('branches').select('id, name, is_revenue_generating').eq('is_active', true).order('name'),
       supabase.auth.admin.listUsers(),
     ])
 
@@ -24,8 +26,7 @@ export async function GET(): Promise<NextResponse> {
     if (assignmentsRes.error) throw new Error(assignmentsRes.error.message)
 
     const profiles = (profilesRes.data ?? []) as { id: string; role: Role; display_name: string }[]
-    const assignments = assignmentsRes.data ?? []
-    const branches = branchesRes.data ?? []
+    const branches = (branchesRes.data ?? []) as { id: string; name: string; is_revenue_generating: boolean }[]
     const authUsers = authRes.data?.users ?? []
 
     const emailMap = Object.fromEntries(authUsers.map((u) => [u.id, u.email ?? '']))
@@ -47,13 +48,88 @@ export async function GET(): Promise<NextResponse> {
       branchIds: branchMap[p.id] ?? [],
     }))
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        users,
-        branches: (branches as { id: string; name: string }[]).map((b) => ({ id: b.id, name: b.name })),
-      },
+    return NextResponse.json({ success: true, data: { users, branches } })
+  } catch (err) {
+    return apiError(err)
+  }
+}
+
+export async function POST(request: Request): Promise<NextResponse> {
+  try {
+    const ctx = await getAccessContext()
+    if (!ctx.ok) return ctx.response
+    const guard = guardAdminOnly(ctx.access.role)
+    if (guard) return guard
+
+    const body = await request.json() as {
+      displayName?: string
+      email?: string
+      role?: Role
+      branchIds?: string[]
+      temporaryPassword?: string
+    }
+    const { displayName, email, role, branchIds, temporaryPassword } = body
+
+    if (!displayName?.trim()) {
+      return NextResponse.json({ success: false, error: 'Display name is required', code: 'VALIDATION_ERROR' }, { status: 400 })
+    }
+    if (!email?.trim()) {
+      return NextResponse.json({ success: false, error: 'Email is required', code: 'VALIDATION_ERROR' }, { status: 400 })
+    }
+    if (!role || !VALID_ROLES.includes(role)) {
+      return NextResponse.json({ success: false, error: 'A valid role is required', code: 'VALIDATION_ERROR' }, { status: 400 })
+    }
+    if (!temporaryPassword || temporaryPassword.length < 8) {
+      return NextResponse.json({ success: false, error: 'A temporary password of at least 8 characters is required', code: 'VALIDATION_ERROR' }, { status: 400 })
+    }
+
+    const ids = branchIds ?? []
+
+    const supabase = createServiceClient()
+
+    const { data: createData, error: createErr } = await supabase.auth.admin.createUser({
+      email: email.trim(),
+      password: temporaryPassword,
+      email_confirm: true,
+      user_metadata: { must_change_password: true },
     })
+
+    if (createErr) {
+      if (createErr.message?.toLowerCase().includes('already been registered') ||
+          createErr.message?.toLowerCase().includes('already exists')) {
+        return NextResponse.json(
+          { success: false, error: `An account with ${email} already exists`, code: 'CONFLICT' },
+          { status: 409 },
+        )
+      }
+      throw new Error(createErr.message)
+    }
+
+    const userId = createData.user?.id
+    if (!userId) throw new Error('Failed to create auth user')
+
+    const { error: profileErr } = await supabase
+      .from('user_profiles')
+      .insert({ id: userId, role, display_name: displayName.trim(), must_change_password: true })
+
+    if (profileErr) {
+      await supabase.auth.admin.deleteUser(userId)
+      throw new Error(profileErr.message)
+    }
+
+    if (ids.length > 0) {
+      const { error: assignErr } = await supabase
+        .from('user_branch_assignments')
+        .insert(ids.map((branch_id) => ({ user_id: userId, branch_id })))
+
+      if (assignErr) {
+        await supabase.from('user_profiles').delete().eq('id', userId)
+        await supabase.auth.admin.deleteUser(userId)
+        throw new Error(assignErr.message)
+      }
+    }
+
+    return NextResponse.json({ success: true, data: { userId } }, { status: 201 })
   } catch (err) {
     return apiError(err)
   }
