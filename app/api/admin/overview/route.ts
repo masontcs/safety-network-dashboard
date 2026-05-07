@@ -393,6 +393,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const allBranchIds = new Set([
       ...Object.keys(bRevenue),
       ...Object.keys(bPayroll),
+      ...Object.keys(bAdminPayroll),
       ...Object.keys(bFuel),
     ])
 

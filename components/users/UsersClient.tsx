@@ -84,6 +84,14 @@ export default function UsersClient() {
   const [resetError, setResetError] = useState<string | null>(null)
   const [resetSuccess, setResetSuccess] = useState(false)
 
+  // Test accounts state
+  type TestAccount = { email: string; displayName: string; role: string; exists: boolean }
+  const [testAccounts, setTestAccounts] = useState<TestAccount[]>([])
+  const [testLoading, setTestLoading] = useState(true)
+  const [testCreating, setTestCreating] = useState(false)
+  const [testDeleting, setTestDeleting] = useState(false)
+  const [testMsg, setTestMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
   // Create modal state
   const [showCreate, setShowCreate] = useState(false)
   const [createName, setCreateName] = useState('')
@@ -110,6 +118,57 @@ export default function UsersClient() {
       .catch((err: Error) => setFetchError(err.message))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    fetch('/api/admin/test-accounts')
+      .then((r) => r.json())
+      .then((json) => { if (json.success) setTestAccounts(json.data.accounts) })
+      .catch(() => {})
+      .finally(() => setTestLoading(false))
+  }, [])
+
+  async function handleCreateTestAccounts() {
+    setTestCreating(true)
+    setTestMsg(null)
+    try {
+      const res = await fetch('/api/admin/test-accounts', { method: 'POST' })
+      const json = await res.json()
+      if (!json.success) { setTestMsg({ type: 'error', text: json.error }); return }
+      const { created, skipped } = json.data as { created: string[]; skipped: string[] }
+      const parts = []
+      if (created.length) parts.push(`Created: ${created.length}`)
+      if (skipped.length) parts.push(`Already existed: ${skipped.length}`)
+      setTestMsg({ type: 'success', text: parts.join(' · ') || 'Done' })
+      const refresh = await fetch('/api/admin/test-accounts').then((r) => r.json())
+      if (refresh.success) setTestAccounts(refresh.data.accounts)
+      const usersRefresh = await fetch('/api/admin/users').then((r) => r.json())
+      if (usersRefresh.success) setUsers(usersRefresh.data.users)
+    } catch {
+      setTestMsg({ type: 'error', text: 'Network error — please try again.' })
+    } finally {
+      setTestCreating(false)
+    }
+  }
+
+  async function handleDeleteTestAccounts() {
+    if (!confirm('Delete all three test accounts? This cannot be undone.')) return
+    setTestDeleting(true)
+    setTestMsg(null)
+    try {
+      const res = await fetch('/api/admin/test-accounts', { method: 'DELETE' })
+      const json = await res.json()
+      if (!json.success) { setTestMsg({ type: 'error', text: json.error }); return }
+      setTestMsg({ type: 'success', text: `Deleted ${json.data.deleted.length} account(s).` })
+      const refresh = await fetch('/api/admin/test-accounts').then((r) => r.json())
+      if (refresh.success) setTestAccounts(refresh.data.accounts)
+      const usersRefresh = await fetch('/api/admin/users').then((r) => r.json())
+      if (usersRefresh.success) setUsers(usersRefresh.data.users)
+    } catch {
+      setTestMsg({ type: 'error', text: 'Network error — please try again.' })
+    } finally {
+      setTestDeleting(false)
+    }
+  }
 
   // ── Edit handlers ──────────────────────────────────────────────────────────
 
@@ -399,6 +458,91 @@ export default function UsersClient() {
               </tbody>
             </table>
           )}
+        </div>
+
+        {/* ── Test Accounts ────────────────────────────────────────────────── */}
+        <div className="card" style={{ border: '1px solid #3a2a1a' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff' }}>Test Accounts</div>
+                <span style={{ fontSize: 10, fontWeight: 600, color: '#ff9800', background: '#3a2a1a', border: '1px solid #5a3a1a', padding: '1px 7px', borderRadius: 4, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                  Development / Testing Only
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: '#666666' }}>
+                Pre-configured accounts for testing each role. Password: <span style={{ fontFamily: 'monospace', color: '#888888' }}>TestPass2026!</span>
+              </div>
+            </div>
+          </div>
+
+          {testLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[1, 2, 3].map((i) => <div key={i} className="skeleton" style={{ height: 36, borderRadius: 6 }} />)}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+              {testAccounts.map((a) => (
+                <div key={a.email} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 10px', background: '#1a1a1a', borderRadius: 6 }}>
+                  <div style={{
+                    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                    background: a.exists ? '#4caf50' : '#444444',
+                  }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 12, color: '#cccccc' }}>{a.displayName}</span>
+                    <span style={{ fontSize: 11, color: '#555555', marginLeft: 8 }}>{a.email}</span>
+                  </div>
+                  <span style={{ fontSize: 11, color: '#666666', flexShrink: 0 }}>{a.role.replace('_', ' ')}</span>
+                  <span style={{ fontSize: 11, color: a.exists ? '#4caf50' : '#555555', flexShrink: 0 }}>
+                    {a.exists ? 'Active' : 'Not created'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {testMsg && (
+            <div style={{ fontSize: 12, color: testMsg.type === 'success' ? '#4caf50' : '#cc4444', padding: '8px 10px', background: testMsg.type === 'success' ? '#1a2a1a' : '#2a1a1a', borderRadius: 6, marginBottom: 12 }}>
+              {testMsg.text}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={handleCreateTestAccounts}
+              disabled={testCreating || testDeleting}
+              style={{
+                background: '#2a2a2a',
+                border: '1px solid #3a3a3a',
+                borderRadius: 8,
+                color: '#cccccc',
+                fontSize: 13,
+                padding: '7px 16px',
+                cursor: (testCreating || testDeleting) ? 'default' : 'pointer',
+                fontFamily: 'inherit',
+                opacity: (testCreating || testDeleting) ? 0.6 : 1,
+              }}
+            >
+              {testCreating ? 'Creating…' : 'Create Test Accounts'}
+            </button>
+            <button
+              onClick={handleDeleteTestAccounts}
+              disabled={testCreating || testDeleting || testAccounts.every((a) => !a.exists)}
+              style={{
+                background: 'transparent',
+                border: '1px solid #3a1a1a',
+                borderRadius: 8,
+                color: '#cc4444',
+                fontSize: 13,
+                padding: '7px 16px',
+                cursor: (testCreating || testDeleting || testAccounts.every((a) => !a.exists)) ? 'default' : 'pointer',
+                fontFamily: 'inherit',
+                opacity: (testCreating || testDeleting || testAccounts.every((a) => !a.exists)) ? 0.4 : 1,
+              }}
+            >
+              {testDeleting ? 'Deleting…' : 'Delete Test Accounts'}
+            </button>
+          </div>
         </div>
       </div>
 
