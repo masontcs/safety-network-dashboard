@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 7, 2026 — Session: Employer taxes surfaced everywhere + system audit fixes
+## Last updated: May 7, 2026 — Session: Employee allocation system
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -32,6 +32,7 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] Migration 13 (20260506000005): fuel_imports UNIQUE(vendor, date_range_start, date_range_end) constraint
 - [x] Migration 14 (20260506000006): user_profiles.must_change_password boolean NOT NULL DEFAULT false
 - [x] Migration 15 (20260507000001): corrects period_date year bug — updates payroll_transactions, payroll_taxes, payroll_imports where EXTRACT(year) < 100 to add 2000 years
+- [x] Migration 16 (20260507000002): employee_allocations + employee_allocation_overrides tables — percentage splits, effective dates, status workflow, RLS, indexes
 - [x] Seed data: 3 businesses, 3 entities, 7 branches, 12 payroll item groups, 87 payroll codes, 196 payroll items, 17 revenue codes
 
 ### File Parsers (`/lib/`)
@@ -62,6 +63,15 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] `GET /api/payroll/hours-by-week`, `direct-labor-detail`, `overtime-summary` — `.limit(50000)` applied to payroll_transactions queries
 - [x] `GET /api/employees/[id]/detail` — returns `taxHistory: [{ periodDate, amount }]`
 - [x] `GET /api/periods/years` — returns available calendar years with imported data
+- [x] `GET /api/employees/[id]/allocations` — returns default allocations + weekly overrides (last 52) for an employee
+- [x] `POST /api/employees/[id]/allocations` — admin-only; validates splits sum to 100, effectiveFrom is Saturday; closes previous open allocation, inserts new group auto-approved
+- [x] `PATCH /api/employees/[id]/allocations/[allocationId]` — approve or deny entire group atomically (by employee_id + effective_from)
+- [x] `DELETE /api/employees/[id]/allocations/[allocationId]` — pending-only delete; blocks deleting approved allocations
+- [x] `POST /api/employees/[id]/allocation-overrides` — admin-only; weekly override, upserts by (employee_id, period_date, branch_id)
+- [x] `PATCH /api/employees/[id]/allocation-overrides/[overrideId]` — approve or deny entire period group atomically
+- [x] `GET /api/admin/allocations` — returns pendingAllocations, pendingOverrides, activeAllocations with displayName + branchName
+- [x] `GET /api/admin/allocations/pending-count` — sum of pending allocations + overrides (used for sidebar badge)
+- [x] `GET /api/branches` — all active branches (used for allocation form dropdowns)
 
 ### AI Integration (`/lib/ai/`)
 - [x] Employee name matching (payroll + fuel imports)
@@ -71,6 +81,8 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 ### Allocation Engine (`/lib/allocation/`)
 - [x] Corp (100% to SN) and HQ (78.13% SN / 18.52% WH / 3.35% Signs) allocation math
 - [x] Zero-revenue guard, rounding with `round2()`, percentages read from DB
+- [x] `lib/allocation/employee-allocation.ts` — pure resolution logic: `resolveEmployeeAllocation` (priority: approved override > approved active default > 100% home branch), `validateSplitTotal` (±0.01 tolerance), `isSaturday`
+- [x] All 6 financial routes now apply per-employee allocation splits: admin/overview, payroll/summary, fuel/summary, payroll/hours-by-week, payroll/direct-labor-detail, fuel/top-consumers
 
 ### Frontend
 - [x] Landing page (`/`) — animated canvas dot grid (pulsing opacity, 28px grid desktop / sparse mobile); Safety Network logo; Sign In + Request Access CTAs; fully mobile responsive
@@ -86,7 +98,12 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] `BranchPerformanceCard` (`components/ui/BranchPerformanceCard.tsx`) — shared card with 3-line Recharts LineChart (Revenue #ff6b00, Payroll #888888, Fuel #cc4444); dots, hover tooltip, right-aligned legend; used in Admin and District branch lists
 - [x] `EmployeeListClient` (`components/employees/EmployeeListClient.tsx`) — debounced search, filter bar (branch, entity, labor type), sortable table, pagination, status/entity pills, skeleton loading; all roles with proper scope
 - [x] `EmployeeDetailClient` — all roles with branch-access guard; preferred name + legal name display; inline Edit Name form; assignment pills; payroll history table + charts (with per-period employer tax rows in `#cc4444`); "Employer Taxes" summary card; weekly employer taxes bar chart; Rate History table (25/page); Fuel Cost per Week + Gallons charts; fuel transaction table with $/Gal column; branch history + transfer form
-- [x] Admin pages: `/admin/import`, `/admin/review`, `/admin/users`, `/admin/employees`, `/admin/fiscal-months`, `/admin/targets`, `/admin/fiscal-quarters`, `/admin/access-requests`, `/admin/data-explorer`
+- [x] `EmployeeDetailClient` — Branch Allocation section (admin only): shows active default allocations table + weekly overrides (last 52 weeks); "+ Set Allocation" form with multi-branch splits, percentage inputs, effective-from date, notes; auto-closes previous open allocation on save
+- [x] `AllocationsClient` (`components/allocations/AllocationsClient.tsx`) — Pending and Active tabs; Pending tab: two sub-tables (Default Allocations, Weekly Overrides) with Approve/Deny buttons; Active tab: currently open approved allocations
+- [x] `/admin/allocations` page — admin-only server component wrapping `AllocationsClient`
+- [x] `ReviewClient` — 4th section "Pending Allocations" added; fetches from `/api/admin/allocations` on mount; inline Approve/Deny for both allocations and overrides; `totalPending` now includes allocation counts
+- [x] `Sidebar` — Allocations nav item (SplitIcon) added for admin role; orange dot badge when `allocationCount > 0`; fetches `/api/admin/allocations/pending-count` in parallel with access-requests count
+- [x] Admin pages: `/admin/import`, `/admin/review`, `/admin/users`, `/admin/employees`, `/admin/fiscal-months`, `/admin/targets`, `/admin/fiscal-quarters`, `/admin/access-requests`, `/admin/data-explorer`, `/admin/allocations`
 - [x] Executive pages: `/executive/data-explorer`, `/executive/employees`
 - [x] Manager/District employee pages: `/manager/employees/[id]`, `/district/employees/[id]` — detail view scoped to direct labor in assigned branches
 - [x] `AccessRequestsClient` — pending/reviewed tables; approve modal with temp password field (unmasked, Generate button, Copy button, confirm field, hint note); deny modal; branch dropdown grouped Operations/Corporate
@@ -110,7 +127,38 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ---
 
-## 3a. RECENT CHANGES (May 7, 2026) — Audit fixes + employer taxes
+## 3a. RECENT CHANGES (May 7, 2026) — Employee allocation system
+
+### Employee Allocation System
+Full end-to-end split of an employee's payroll and fuel costs across multiple branches by percentage for reporting purposes. Underlying transactions are never modified — allocation is a pure reporting layer.
+
+**Resolution priority:** approved weekly override > approved active default > 100% home branch (payroll code's branch_id for payroll; fuel_transaction.branch_id for fuel)
+
+**Database (Migration 16):**
+- `employee_allocations`: default recurring split (employee_id, branch_id, percentage, effective_from/to, status)
+- `employee_allocation_overrides`: one-off weekly split (employee_id, period_date, branch_id, percentage, status)
+- Status workflow: pending → approved | denied
+- Approval is atomic per group (all rows sharing the same employee_id + effective_from / period_date)
+- UNIQUE constraints: (employee_id, branch_id, effective_from) and (employee_id, period_date, branch_id)
+
+**Pure logic library (`lib/allocation/employee-allocation.ts`):**
+- `resolveEmployeeAllocation(employeeId, periodDate, homeBranchId, overrides, defaults) → BranchSplit[]`
+- `validateSplitTotal(splits) → boolean` — ±0.01 tolerance
+- `isSaturday(dateStr) → boolean`
+- 13 tests covering all edge cases: pending ignored, date range filtering, override priority, wrong period, wrong employee
+
+**Financial route changes (6 routes):**
+- All 6 routes now fetch `employee_allocations` and `employee_allocation_overrides` after collecting employee IDs
+- Per-transaction: `resolveEmployeeAllocation` returns splits → amount multiplied by percentage and attributed to each target branch
+- For branchId-filtered requests: only the portion allocated to that branch is included
+- Payroll routes: removed branchId filter from payroll_codes query (allocation handles redistribution); kept manager access scoped by access.branchIds
+- Fuel routes: employee-linked transactions use allocation; card-linked (no employee_id) use branch_id as-is
+
+**Commit:** `1df30e7`
+
+---
+
+## 3b. RECENT CHANGES (May 7, 2026) — Audit fixes + employer taxes
 
 ### Employer Taxes Surfaced Everywhere
 - `app/api/admin/overview/route.ts` — fetches `payroll_taxes` with full pagination; attributes taxes to branches via `employee_entity_assignments → payroll_codes → branch_id`; `gp = rev - pay - tax - fuel`; `totals.employerTaxes` added
@@ -130,7 +178,7 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ---
 
-## 3b. RECENT CHANGES (May 6–7, 2026) — Employee list, clickable names, Executive toggle, BranchPerformanceCard, review queue
+## 3c. RECENT CHANGES (May 6–7, 2026) — Employee list, clickable names, Executive toggle, BranchPerformanceCard, review queue
 
 ### Employee List Pages + Clickable Names in Dashboards
 - `GET /api/employees` rewritten — rich filtering (search, branchId, entityCode, laborType), sorting, pagination; admin/executive get full list, managers scoped to assigned branches
@@ -160,7 +208,7 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ---
 
-## 3c. RECENT CHANGES (May 6, 2026) — Manager/District Fiscal Month Selector
+## 3d. RECENT CHANGES (May 6, 2026) — Manager/District Fiscal Month Selector
 
 ### Manager and District Dashboard — Fiscal Month Selector
 
@@ -199,7 +247,7 @@ Both `ManagerDashboard` and `DistrictDashboard` were fully rewritten to match th
 
 ---
 
-## 3d. RECENT CHANGES (May 6, 2026) — Misc fixes (temp password, branch dropdowns, fuel dupe, revenue parser, mobile)
+## 3e. RECENT CHANGES (May 6, 2026) — Misc fixes (temp password, branch dropdowns, fuel dupe, revenue parser, mobile)
 
 ### Temporary Password Flow for Access Request Approval
 - `PATCH /api/admin/access-requests/[id]` — switched from `inviteUserByEmail` to `createUser` with `password`, `email_confirm: true`, `user_metadata: { must_change_password: true }`; validates `temporaryPassword` (required, min 8 chars); inserts `user_profiles` with `must_change_password: true`
@@ -248,7 +296,7 @@ Both `ManagerDashboard` and `DistrictDashboard` were fully rewritten to match th
 
 ---
 
-## 3e. RECENT CHANGES (May 6, 2026) — Fiscal quarters
+## 3f. RECENT CHANGES (May 6, 2026) — Fiscal quarters
 
 ### Fiscal Quarters System
 - Migration `20260506000002_fiscal_quarters.sql` applied to production — `fiscal_quarters` + `fiscal_quarter_months` tables, RLS policies, unique constraints
@@ -258,7 +306,7 @@ Both `ManagerDashboard` and `DistrictDashboard` were fully rewritten to match th
 
 ---
 
-## 3f. RECENT CHANGES (May 6, 2026) — Fiscal month targets
+## 3g. RECENT CHANGES (May 6, 2026) — Fiscal month targets
 
 ### Fiscal-Month-Based Targets Redesign
 - Migration `20260506000001_fiscal_month_targets.sql` — `branch_targets` table rebuilt with `fiscal_month_id` FK
@@ -269,7 +317,7 @@ Both `ManagerDashboard` and `DistrictDashboard` were fully rewritten to match th
 
 ---
 
-## 3g. RECENT CHANGES (May 5, 2026) — Sacramento merge + employee transfers
+## 3h. RECENT CHANGES (May 5, 2026) — Sacramento merge + employee transfers
 
 ### Sacramento → Modesto Branch Merge
 - Migration `20260505000001_merge_sacramento_into_modesto.sql` applied to production
@@ -315,8 +363,8 @@ Both `ManagerDashboard` and `DistrictDashboard` were fully rewritten to match th
 
 ## 6. CURRENT TEST COUNT
 
-**194 tests passing, 0 failing** (as of May 7, 2026)
-12 test files across parsers, allocation engine, and API access control.
+**209 tests passing, 0 failing** (as of May 7, 2026)
+13 test files across parsers, allocation engine, and API access control.
 
 ```bash
 npx vitest run
