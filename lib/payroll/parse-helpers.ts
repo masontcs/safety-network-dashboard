@@ -42,6 +42,12 @@ export function extractPeriodDate(rows: Rows): string {
     throw new ParseError(`Could not parse date "${dateStr}". Expected format like "Mar 29, 2026".`)
   }
 
+  if (parsed.getFullYear() < 2000) {
+    throw new ParseError(
+      `Invalid year in "${dateStr}". Expected 4-digit year (e.g. 2026), got ${parsed.getFullYear()}. Check the QuickBooks export settings.`
+    )
+  }
+
   const periodDate = subDays(parsed, 1)
 
   if (getDay(periodDate) !== 6) {

@@ -43,7 +43,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       query = query.in('branch_id', access.branchIds)
     }
 
-    const { data: transactions, error } = await query
+    const { data: transactions, error } = await query.limit(50000)
     if (error) throw new Error(`Failed to query revenue: ${error.message}`)
 
     const rows = transactions ?? []

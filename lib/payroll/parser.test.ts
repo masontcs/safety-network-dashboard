@@ -106,6 +106,14 @@ describe('extractPeriodDate', () => {
     expect(caught).toBeInstanceOf(ParseError)
     expect((caught as ParseError).detail).toMatch(/not a Saturday/i)
   })
+
+  it('throws on 2-digit year with a clear message', () => {
+    let caught: unknown
+    try { extractPeriodDate(makeRows('Week of Mar 8, 26')) } catch (e) { caught = e }
+    expect(caught).toBeInstanceOf(ParseError)
+    expect((caught as ParseError).detail).toMatch(/4-digit year/i)
+    expect((caught as ParseError).detail).toMatch(/26/)
+  })
 })
 
 // ─── parsePayrollFile ──────────────────────────────────────────────────────

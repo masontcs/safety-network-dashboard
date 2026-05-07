@@ -68,7 +68,8 @@ export async function GET(request: Request): Promise<NextResponse> {
         .select('employee_id, payroll_code_id, hours, amount, payroll_item_id, employees(first_name, last_name)')
         .in('payroll_code_id', codeIds)
         .gte('period_date', startDate)
-        .lte('period_date', endDate),
+        .lte('period_date', endDate)
+        .limit(50000),
       supabase
         .from('payroll_items')
         .select('id, payroll_item_groups(name)'),

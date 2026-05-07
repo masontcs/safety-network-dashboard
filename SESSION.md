@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 6, 2026 — Session: Fiscal month selector on Manager and District dashboards
+## Last updated: May 7, 2026 — Session: Employer taxes surfaced everywhere + system audit fixes
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -31,10 +31,11 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] Migration 12 (20260506000004): backfill fuel_transaction branches
 - [x] Migration 13 (20260506000005): fuel_imports UNIQUE(vendor, date_range_start, date_range_end) constraint
 - [x] Migration 14 (20260506000006): user_profiles.must_change_password boolean NOT NULL DEFAULT false
+- [x] Migration 15 (20260507000001): corrects period_date year bug — updates payroll_transactions, payroll_taxes, payroll_imports where EXTRACT(year) < 100 to add 2000 years
 - [x] Seed data: 3 businesses, 3 entities, 7 branches, 12 payroll item groups, 87 payroll codes, 196 payroll items, 17 revenue codes
 
 ### File Parsers (`/lib/`)
-- [x] Payroll parser — parses QuickBooks .xlsm, splits "LAST, FIRST M" names, handles hyphenated surnames, dynamic payroll item discovery, period date calculation (subtract 1 day → Saturday)
+- [x] Payroll parser — parses QuickBooks .xlsm, splits "LAST, FIRST M" names, handles hyphenated surnames, dynamic payroll item discovery, period date calculation (subtract 1 day → Saturday); rejects 2-digit years with a clear ParseError
 - [x] Revenue parser — parses .xls Invoice Summary; dynamic " Sales" suffix stripping (any branch); Sacramento → Modesto merge map (MERGED_BRANCHES — easy to extend); entity code mapping; uses END date of range
 - [x] Fuel parser — Interstate (.csv) and Flyers (.xlsx), site parsing, WH tagging, calculated totals for both vendors
 
@@ -45,8 +46,8 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] `GET /api/payroll/summary` — admin sum rule enforced (managers get total only, no detail)
 - [x] `GET /api/payroll/employee/[id]` — 403 for managers on admin-coded employees
 - [x] `GET /api/employees/[id]/detail` — admin/executive only; returns employee info, all payroll history (paginated, with item+group names), all fuel history (paginated)
-- [x] `GET /api/revenue/summary`
-- [x] `GET /api/fuel/summary`
+- [x] `GET /api/revenue/summary` — `.limit(50000)` applied
+- [x] `GET /api/fuel/summary` — paginated with PAGE_SIZE loop
 - [x] `GET /api/allocation/summary` — exec/admin only
 - [x] `GET|PATCH /api/employees` + `[id]/name` — display_name computed, raw_name never returned
 - [x] `GET /api/periods/available` + `latest`
@@ -58,6 +59,9 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] `PATCH /api/admin/access-requests/[id]` — approve (creates auth user with temp password, sets must_change_password=true) or deny
 - [x] `POST /api/auth/clear-must-change-password` — clears must_change_password flag for the current user after first login password change
 - [x] `GET /api/data-explorer/payroll`, `revenue`, `fuel`, `export` — admin/executive only; filter + paginate + CSV export
+- [x] `GET /api/payroll/hours-by-week`, `direct-labor-detail`, `overtime-summary` — `.limit(50000)` applied to payroll_transactions queries
+- [x] `GET /api/employees/[id]/detail` — returns `taxHistory: [{ periodDate, amount }]`
+- [x] `GET /api/periods/years` — returns available calendar years with imported data
 
 ### AI Integration (`/lib/ai/`)
 - [x] Employee name matching (payroll + fuel imports)
@@ -76,10 +80,10 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] `DashboardShell` — dark sidebar (desktop) + `MobileBottomNav` (mobile); role-aware; sidebar hidden on mobile
 - [x] `MobileBottomNav` — fixed bottom nav with role-aware items; slide-up drawer for overflow admin items; 44px tap targets
 - [x] `ManagerDashboard` — fiscal month dropdown + YTD button; defaults to most recent fiscal month with data; weekly bar chart (Revenue/Payroll/Fuel grouped bars) with click-to-inspect direct labor panel; payroll breakdown card (Direct/Admin/Taxes stacked bar); Revenue Breakdown table (Labor/Rental/One-Time/Total by week); mobile 2×2 metric grid + revenue-only chart
-- [x] `AdminDashboard` — all-branches aggregate with branch selector, full allocation visible; month/quarter toggle; mobile: 2×2 metric cards, revenue-only chart, compact variance row, branch list; desktop: unchanged
+- [x] `AdminDashboard` — all-branches aggregate with branch selector, full allocation visible; month/quarter/year toggle (year mode uses `/api/periods/years`); Direct Payroll card shows wages + employer taxes breakdown; mobile: 2×2 metric cards, revenue-only chart, compact variance row, branch list; desktop: unchanged
 - [x] `ExecutiveDashboard` — all 7 branches side by side, full direct + admin payroll detail, Corp/HQ allocation breakdown, net after overhead, missing revenue alerts, 13-week trend, waterfall, collapsible payroll detail tables
 - [x] `DistrictDashboard` — fiscal month dropdown + YTD button + branch selector; aggregate = branch comparison cards + district totals table; single branch = manager-style layout (bar chart, payroll breakdown card, revenue breakdown table); mobile branch list or revenue table per mode
-- [x] `EmployeeDetailClient` — admin/executive only; preferred name + legal name display; inline Edit Name form; assignment pills; payroll history table + charts; fuel history table + filters; branch history + transfer form
+- [x] `EmployeeDetailClient` — admin/executive only; preferred name + legal name display; inline Edit Name form; assignment pills; payroll history table + charts (with per-period employer tax rows in `#cc4444`); "Employer Taxes" summary card; weekly employer taxes bar chart; fuel history table + filters; branch history + transfer form
 - [x] Admin pages: `/admin/import`, `/admin/review`, `/admin/users`, `/admin/fiscal-months`, `/admin/targets`, `/admin/fiscal-quarters`, `/admin/access-requests`, `/admin/data-explorer`
 - [x] Executive pages: `/executive/data-explorer`
 - [x] `AccessRequestsClient` — pending/reviewed tables; approve modal with temp password field (unmasked, Generate button, Copy button, confirm field, hint note); deny modal; branch dropdown grouped Operations/Corporate
@@ -103,7 +107,27 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ---
 
-## 3a. RECENT CHANGES (May 6, 2026) — This Session
+## 3a. RECENT CHANGES (May 7, 2026) — This Session
+
+### Employer Taxes Surfaced Everywhere
+- `app/api/admin/overview/route.ts` — fetches `payroll_taxes` with full pagination; attributes taxes to branches via `employee_entity_assignments → payroll_codes → branch_id`; `gp = rev - pay - tax - fuel`; `totals.employerTaxes` added
+- `app/api/payroll/summary/route.ts` — taxes scoped to employees with transactions in the period; returns `taxes.total` via `applyPayrollSumRule`
+- `app/api/employees/[id]/detail/route.ts` — fetches `payroll_taxes` for the employee; response includes `taxHistory: [{ periodDate, amount }]`
+- `AdminDashboard` — Direct Payroll card shows combined wages + employer taxes with breakdown sub-line; year view mode added (uses `/api/periods/years`); `grossProfit` includes employer taxes
+- `ExecutiveDashboard` — `totalPayroll = directTotal + adminTotal + employerTaxes`; `grossProfit = rev - totalPayroll - fuel`
+- `DistrictDashboard` — per-branch GP includes `tax` prop; district totals table correct
+- `ManagerDashboard` — already correct: `totalPayroll = totalDirect + totalAdmin + totalTax`; confirmed by audit
+- `EmployeeDetailClient` — "Employer Taxes" 5th summary card; weekly employer taxes bar chart (`#cc4444`); per-period tax rows injected inline after last transaction row for that period
+
+### System Audit Fixes
+- **Date parser 2-digit year (critical):** `lib/payroll/parse-helpers.ts` — after parsing, validates `parsed.getFullYear() >= 2000`; throws `ParseError` with clear message including the bad year. Test added: `"Week of Mar 8, 26"` throws with `/4-digit year/i` in `.detail`.
+- **Migration `20260507000001`:** corrects existing `period_date` values stored as year 26 CE in `payroll_transactions`, `payroll_taxes`, and `payroll_imports` (adds 2000 years where EXTRACT(year) < 100). Applied to production.
+- **1000-row cap fixes:** `.limit(50000)` added to `revenue/summary`, `payroll/direct-labor-detail`, `payroll/hours-by-week`, `payroll/overtime-summary`
+- **Manager dashboard GP verified correct** — taxes already included via `taxTotal` accumulation
+
+---
+
+## 3d. RECENT CHANGES (May 6, 2026) — Manager/District Fiscal Month Selector
 
 ### Manager and District Dashboard — Fiscal Month Selector
 
@@ -142,7 +166,7 @@ Both `ManagerDashboard` and `DistrictDashboard` were fully rewritten to match th
 
 ---
 
-## 3b. RECENT CHANGES (May 6, 2026) — Prior This Session
+## 3b. RECENT CHANGES (May 6, 2026) — Misc Fixes
 
 ### Temporary Password Flow for Access Request Approval
 - `PATCH /api/admin/access-requests/[id]` — switched from `inviteUserByEmail` to `createUser` with `password`, `email_confirm: true`, `user_metadata: { must_change_password: true }`; validates `temporaryPassword` (required, min 8 chars); inserts `user_profiles` with `must_change_password: true`
@@ -191,7 +215,7 @@ Both `ManagerDashboard` and `DistrictDashboard` were fully rewritten to match th
 
 ---
 
-## 3c. RECENT CHANGES (May 6, 2026) — Fiscal Quarters System
+## 3e. RECENT CHANGES (May 6, 2026) — Fiscal Quarters System
 
 ### Fiscal Quarters System
 - Migration `20260506000002_fiscal_quarters.sql` applied to production — `fiscal_quarters` + `fiscal_quarter_months` tables, RLS policies, unique constraints
@@ -201,7 +225,7 @@ Both `ManagerDashboard` and `DistrictDashboard` were fully rewritten to match th
 
 ---
 
-## 3d. RECENT CHANGES (May 6, 2026) — Fiscal-Month-Based Targets
+## 3f. RECENT CHANGES (May 6, 2026) — Fiscal-Month-Based Targets
 
 ### Fiscal-Month-Based Targets Redesign
 - Migration `20260506000001_fiscal_month_targets.sql` — `branch_targets` table rebuilt with `fiscal_month_id` FK
@@ -212,7 +236,7 @@ Both `ManagerDashboard` and `DistrictDashboard` were fully rewritten to match th
 
 ---
 
-## 3e. RECENT CHANGES (May 5, 2026)
+## 3g. RECENT CHANGES (May 5, 2026)
 
 ### Sacramento → Modesto Branch Merge
 - Migration `20260505000001_merge_sacramento_into_modesto.sql` applied to production
@@ -244,7 +268,7 @@ Both `ManagerDashboard` and `DistrictDashboard` were fully rewritten to match th
 
 ## 5. KNOWN ISSUES AND DECISIONS
 
-- **Supabase 1000-row cap:** Supabase JS client defaults to 1000 rows per query. API routes that aggregate transactions use `.range()` pagination or SQL aggregates via RPC. Always verify large-result queries do not silently cap.
+- **Supabase 1000-row cap:** Supabase JS client defaults to 1000 rows per query. Routes that aggregate transactions use either `.range()` pagination loops (admin/overview, fuel/summary) or `.limit(50000)` (revenue/summary, payroll/hours-by-week, payroll/direct-labor-detail, payroll/overtime-summary). Always verify large-result queries don't silently cap when adding new routes.
 - **next.config.js:** Uses `serverExternalPackages: ['xlsx', 'csv-parse']` to prevent Next.js from bundling Node-only packages.
 - **Revenue parser multi-month fix:** Sums all months for the same branch+entity into one record.
 - **Fuel tax column calculation:** Interstate: `gallons × price_per_gallon`. Flyers: `TotalPrice` direct; pre-tax back-calculated as `TotalPrice - TaxTotal`. Do not swap.
@@ -258,7 +282,7 @@ Both `ManagerDashboard` and `DistrictDashboard` were fully rewritten to match th
 
 ## 6. CURRENT TEST COUNT
 
-**193 tests passing, 0 failing** (as of May 6, 2026)
+**194 tests passing, 0 failing** (as of May 7, 2026)
 12 test files across parsers, allocation engine, and API access control.
 
 ```bash
@@ -286,7 +310,7 @@ npx vitest run
 ### Production URL
 - https://safety-network-dashboard.vercel.app/login
 
-### All migrations applied to production (14 total)
+### All migrations applied to production (17 total)
 - `20260101000001` through `20260101000007` — core schema
 - `20260101000008` — branch_targets
 - `20260505000001` — Sacramento merge + is_active
@@ -297,6 +321,7 @@ npx vitest run
 - `20260506000004` — backfill fuel_transaction branches
 - `20260506000005` — fuel_imports vendor unique constraint
 - `20260506000006` — user_profiles.must_change_password
+- `20260507000001` — fix period_date year bug (year 26 CE → 2026)
 
 ---
 
