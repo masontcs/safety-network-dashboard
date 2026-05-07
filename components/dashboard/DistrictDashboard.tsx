@@ -310,7 +310,7 @@ function BranchComparisonCard({ name, rev, direct, admin, tax, fuel, trendData }
       fuel={fuel}
       gp={gp}
       gpPct={gpPct}
-      noData={rev === 0 && direct === 0 && fuel === 0}
+      noData={rev === 0 && direct === 0 && admin === 0 && fuel === 0}
       trendData={trendData}
     />
   )
@@ -1118,7 +1118,7 @@ export default function DistrictDashboard({ branches, initialBranch }: Props) {
                 const bFuel = fuelByBranch[b.id] ?? 0
                 const bGP = bRev - bDirect - bAdmin - bFuel
                 const bGPPct = bRev > 0 ? (bGP / bRev) * 100 : 0
-                const bNoData = bRev === 0 && bDirect === 0 && bFuel === 0
+                const bNoData = bRev === 0 && bDirect === 0 && bAdmin === 0 && bFuel === 0
                 return (
                   <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #2a2a2a', minHeight: 44 }}>
                     <span style={{ fontSize: 13, fontWeight: 500, color: '#ff6b00' }}>{b.name}</span>

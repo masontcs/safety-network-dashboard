@@ -671,7 +671,7 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
             branchGridData.map(({ branch, data }) => {
               const bRev = data?.revenue ?? 0
               const bGpPct = data?.gpPct ?? 0
-              const bNoData = bRev === 0 && (data?.directPayroll ?? 0) === 0 && (data?.fuel ?? 0) === 0
+              const bNoData = bRev === 0 && (data?.directPayroll ?? 0) === 0 && (data?.adminPayroll ?? 0) === 0 && (data?.fuel ?? 0) === 0
               return (
                 <div
                   key={branch.id}
@@ -1051,11 +1051,11 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
                 key={branch.id}
                 name={branch.name}
                 rev={data?.revenue ?? 0}
-                payroll={data?.directPayroll ?? 0}
+                payroll={(data?.directPayroll ?? 0) + (data?.adminPayroll ?? 0) + (data?.employerTaxes ?? 0)}
                 fuel={data?.fuel ?? 0}
                 gp={data?.grossProfit ?? 0}
                 gpPct={data?.gpPct ?? 0}
-                noData={!data || (data.revenue === 0 && data.directPayroll === 0 && data.fuel === 0)}
+                noData={!data || (data.revenue === 0 && data.directPayroll === 0 && (data.adminPayroll ?? 0) === 0 && data.fuel === 0)}
                 trendData={trendData}
               />
             ))}
