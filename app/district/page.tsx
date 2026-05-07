@@ -8,7 +8,7 @@ import DistrictDashboard from '@/components/dashboard/DistrictDashboard'
 export default async function DistrictPage({
   searchParams,
 }: {
-  searchParams: { week?: string; view?: string; branch?: string }
+  searchParams: { branch?: string }
 }) {
   const supabase = createServerComponentClient<Database>({ cookies })
 
@@ -61,17 +61,12 @@ export default async function DistrictPage({
     entityId: entityByBranch[b.id] ?? '',
   }))
 
-  const initialView =
-    searchParams.view === 'mtd' || searchParams.view === 'ytd' ? searchParams.view : 'weekly'
-  const initialWeek = searchParams.week ?? null
   const initialBranch = searchParams.branch ?? 'all'
 
   return (
     <DashboardShell role="district_manager" userName={profile.display_name}>
       <DistrictDashboard
         branches={branches}
-        initialWeek={initialWeek}
-        initialView={initialView}
         initialBranch={initialBranch}
       />
     </DashboardShell>

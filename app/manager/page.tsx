@@ -5,11 +5,7 @@ import type { Database, Role } from '@/lib/supabase/database.types'
 import DashboardShell from '@/components/layout/DashboardShell'
 import ManagerDashboard from '@/components/dashboard/ManagerDashboard'
 
-export default async function ManagerPage({
-  searchParams,
-}: {
-  searchParams: { week?: string; view?: string }
-}) {
+export default async function ManagerPage() {
   const supabase = createServerComponentClient<Database>({ cookies })
 
   const {
@@ -58,9 +54,6 @@ export default async function ManagerPage({
   const payrollCode = codeRaw as { entity_id: string } | null
   const entityId = payrollCode?.entity_id ?? ''
 
-  const initialView = (searchParams.view === 'mtd' || searchParams.view === 'ytd') ? searchParams.view : 'weekly'
-  const initialWeek = searchParams.week ?? null
-
   return (
     <DashboardShell
       role="branch_manager"
@@ -70,8 +63,6 @@ export default async function ManagerPage({
       <ManagerDashboard
         branchId={branchId}
         entityId={entityId}
-        initialWeek={initialWeek}
-        initialView={initialView}
       />
     </DashboardShell>
   )
