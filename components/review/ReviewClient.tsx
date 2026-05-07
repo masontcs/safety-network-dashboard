@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Skeleton from '@/components/ui/Skeleton'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -52,6 +52,12 @@ interface PayrollCode {
   entityCode: string
 }
 
+interface Employee {
+  id: string
+  displayName: string
+  entityAssignments: Array<{ entityCode: string; branchName: string; laborType: string }>
+}
+
 interface ReviewData {
   employeeAssignments: EmpAssignment[]
   payrollItems: PayrollItem[]
@@ -59,6 +65,22 @@ interface ReviewData {
   groups: Group[]
   branches: Branch[]
   payrollCodes: PayrollCode[]
+  employees: Employee[]
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmtLaborType(lt: string): string {
+  const map: Record<string, string> = {
+    direct: 'Direct',
+    admin_hourly: 'Admin Hr',
+    admin_salary: 'Admin Sal',
+    corp_hourly: 'Corp Hr',
+    corp_salary: 'Corp Sal',
+    hq_hourly: 'HQ Hr',
+    hq_salary: 'HQ Sal',
+  }
+  return map[lt] ?? lt
 }
 
 // ─── Section header ───────────────────────────────────────────────────────────
@@ -150,133 +172,458 @@ const selectStyle: React.CSSProperties = {
   fontFamily: 'inherit',
 }
 
-// ─── Employee Matches section ──────────────────────────────────────────────────
+const inputStyle: React.CSSProperties = {
+  background: '#2a2a2a',
+  border: '1px solid #333333',
+  borderRadius: 6,
+  padding: '5px 10px',
+  fontSize: 12,
+  color: '#cccccc',
+  fontFamily: 'inherit',
+  outline: 'none',
+  width: 300,
+}
 
-function EmployeeMatchesSection({
-  items,
-  payrollCodes,
+const LABOR_TYPES: Array<{ value: string; label: string }> = [
+  { value: 'direct', label: 'Direct' },
+  { value: 'admin_hourly', label: 'Admin Hourly' },
+  { value: 'admin_salary', label: 'Admin Salary' },
+  { value: 'corp_hourly', label: 'Corp Hourly' },
+  { value: 'corp_salary', label: 'Corp Salary' },
+  { value: 'hq_hourly', label: 'HQ Hourly' },
+  { value: 'hq_salary', label: 'HQ Salary' },
+]
+
+// ─── Employee Match Row ───────────────────────────────────────────────────────
+
+function EmployeeMatchRow({
+  item,
+  branches,
+  employees,
   onDismiss,
 }: {
-  items: EmpAssignment[]
-  payrollCodes: PayrollCode[]
+  item: EmpAssignment
+  branches: Branch[]
+  employees: Employee[]
   onDismiss: (id: string) => void
 }) {
-  const [busy, setBusy] = useState<string | null>(null)
-  const [selectedCode, setSelectedCode] = useState<Record<string, string>>({})
+  const [linkMode, setLinkMode] = useState(false)
+  const [branchId, setBranchId] = useState('')
+  const [laborType, setLaborType] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
+  const [overrideBranchId, setOverrideBranchId] = useState('')
+  const [overrideLaborType, setOverrideLaborType] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [confirmError, setConfirmError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+  const searchRef = useRef<HTMLDivElement>(null)
 
-  // Group payroll codes by branch name for the dropdown
-  const codesByBranch = payrollCodes.reduce<Record<string, PayrollCode[]>>((acc, pc) => {
-    const key = pc.branchName
-    if (!acc[key]) acc[key] = []
-    acc[key].push(pc)
-    return acc
-  }, {})
-  const branchGroups = Object.keys(codesByBranch).sort()
+  const snOperations = branches.filter((b) => b.isRevenueGenerating && b.businessCode === 'SN')
+  const snCorporate = branches.filter((b) => b.isCorporate && b.businessCode === 'SN')
 
-  async function handleAction(item: EmpAssignment, action: 'confirm' | 'skip') {
-    setBusy(item.id)
+  // Does the selected existing employee already have an assignment for this entity?
+  const existingEntityAssignment = selectedEmployee?.entityAssignments.find(
+    (ea) => ea.entityCode === item.entityCode,
+  ) ?? null
+
+  const needsOverride = linkMode && selectedEmployee !== null && existingEntityAssignment === null
+
+  const filteredEmployees = searchQuery.length >= 2
+    ? employees.filter((e) =>
+        e.displayName.toLowerCase().includes(searchQuery.toLowerCase()),
+      )
+    : []
+
+  const isValid = (() => {
+    if (linkMode) {
+      if (!selectedEmployee) return false
+      if (needsOverride && (!overrideBranchId || !overrideLaborType)) return false
+      return true
+    }
+    return !!(branchId && laborType)
+  })()
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleOutside(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutside)
+    return () => document.removeEventListener('mousedown', handleOutside)
+  }, [])
+
+  function resetLinkState() {
+    setSelectedEmployee(null)
+    setSearchQuery('')
+    setSearchOpen(false)
+    setOverrideBranchId('')
+    setOverrideLaborType('')
+  }
+
+  async function handleConfirm() {
+    if (!isValid || busy) return
+    setBusy(true)
+    setConfirmError(null)
     try {
-      const body: Record<string, unknown> = { action }
-      if (action === 'confirm' && item.aiCandidateId) body.employeeId = item.aiCandidateId
-      const chosenCode = selectedCode[item.id]
-      if (chosenCode && chosenCode !== item.currentPayrollCodeId) {
-        body.payrollCodeId = chosenCode
+      const body: Record<string, unknown> = {}
+      if (linkMode) {
+        body.mode = 'link_existing'
+        body.existingEmployeeId = selectedEmployee!.id
+        if (needsOverride) {
+          body.branchId = overrideBranchId
+          body.laborType = overrideLaborType
+        }
+      } else {
+        body.mode = 'new_employee'
+        body.branchId = branchId
+        body.laborType = laborType
       }
       const res = await fetch(`/api/admin/review/employee-assignments/${item.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      if (res.ok) onDismiss(item.id)
+      const json = await res.json() as { success: boolean; error?: string }
+      if (!res.ok || !json.success) {
+        setConfirmError(json.error ?? 'Failed to save')
+        return
+      }
+      setSaved(true)
+      setTimeout(() => onDismiss(item.id), 700)
     } finally {
-      setBusy(null)
+      setBusy(false)
     }
   }
 
+  async function handleSkip() {
+    if (busy) return
+    setBusy(true)
+    try {
+      await fetch(`/api/admin/review/employee-assignments/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'skip' }),
+      })
+      onDismiss(item.id)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div style={{ padding: '14px 0', borderTop: '1px solid #2a2a2a' }}>
+      {/* Import name */}
+      <div style={{ fontSize: 12, color: '#cccccc', marginBottom: 4 }}>
+        Import name:{' '}
+        <span style={{ color: '#ffffff', fontWeight: 500 }}>&ldquo;{item.rawName}&rdquo;</span>{' '}
+        <span style={{ color: '#555555' }}>({item.entityCode})</span>
+      </div>
+
+      {/* AI suggestion */}
+      {item.aiCandidateName ? (
+        <div style={{ fontSize: 12, color: '#888888', marginBottom: 10 }}>
+          AI suggestion:{' '}
+          <span style={{ color: '#ff6b00' }}>{item.aiCandidateName}</span>
+          {item.aiScore !== null && (
+            <span style={{ color: '#555555' }}> [{Math.round(item.aiScore)}%]</span>
+          )}
+        </div>
+      ) : (
+        <div style={{ fontSize: 12, color: '#555555', marginBottom: 10 }}>
+          No AI match suggestion
+        </div>
+      )}
+
+      {/* Link to existing checkbox */}
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 12,
+          color: '#cccccc',
+          cursor: 'pointer',
+          marginBottom: 12,
+          userSelect: 'none',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={linkMode}
+          onChange={(e) => {
+            setLinkMode(e.target.checked)
+            resetLinkState()
+            setBranchId('')
+            setLaborType('')
+            setConfirmError(null)
+          }}
+          style={{ accentColor: '#ff6b00' }}
+        />
+        Link to existing employee
+      </label>
+
+      {/* New employee fields */}
+      {!linkMode && (
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, color: '#666666', marginBottom: 4 }}>Branch</div>
+            <select
+              value={branchId}
+              onChange={(e) => setBranchId(e.target.value)}
+              style={selectStyle}
+            >
+              <option value="">— select branch —</option>
+              {snOperations.length > 0 && (
+                <optgroup label="Operations">
+                  {snOperations.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </optgroup>
+              )}
+              {snCorporate.length > 0 && (
+                <optgroup label="Corporate">
+                  {snCorporate.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: '#666666', marginBottom: 4 }}>Labor Type</div>
+            <select
+              value={laborType}
+              onChange={(e) => setLaborType(e.target.value)}
+              style={selectStyle}
+            >
+              <option value="">— select type —</option>
+              {LABOR_TYPES.map((lt) => (
+                <option key={lt.value} value={lt.value}>{lt.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Link existing fields */}
+      {linkMode && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: '#666666', marginBottom: 4 }}>Search employee</div>
+          <div ref={searchRef} style={{ position: 'relative', display: 'inline-block' }}>
+            <input
+              type="text"
+              value={selectedEmployee ? selectedEmployee.displayName : searchQuery}
+              onChange={(e) => {
+                if (selectedEmployee) {
+                  setSelectedEmployee(null)
+                  setOverrideBranchId('')
+                  setOverrideLaborType('')
+                }
+                setSearchQuery(e.target.value)
+                setSearchOpen(true)
+              }}
+              onFocus={() => setSearchOpen(true)}
+              placeholder="Type to search by name…"
+              style={inputStyle}
+            />
+
+            {/* Results dropdown */}
+            {searchOpen && !selectedEmployee && searchQuery.length >= 2 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  minWidth: '100%',
+                  background: '#2a2a2a',
+                  border: '1px solid #333333',
+                  borderRadius: 6,
+                  marginTop: 2,
+                  maxHeight: 220,
+                  overflowY: 'auto',
+                  zIndex: 20,
+                }}
+              >
+                {filteredEmployees.length === 0 ? (
+                  <div style={{ padding: '8px 12px', fontSize: 12, color: '#555555' }}>
+                    No employees found
+                  </div>
+                ) : (
+                  filteredEmployees.map((emp) => (
+                    <button
+                      key={emp.id}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setSelectedEmployee(emp)
+                        setSearchQuery('')
+                        setSearchOpen(false)
+                        setOverrideBranchId('')
+                        setOverrideLaborType('')
+                      }}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        textAlign: 'left',
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: '1px solid #333333',
+                        padding: '8px 12px',
+                        fontSize: 12,
+                        color: '#cccccc',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      <span style={{ color: '#ffffff', fontWeight: 500 }}>{emp.displayName}</span>
+                      {emp.entityAssignments.length > 0 && (
+                        <span style={{ color: '#666666', marginLeft: 8, fontSize: 11 }}>
+                          {emp.entityAssignments
+                            .map((ea) => `${ea.entityCode}: ${ea.branchName} ${fmtLaborType(ea.laborType)}`)
+                            .join(', ')}
+                        </span>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Clear selected employee */}
+          {selectedEmployee && (
+            <button
+              onClick={resetLinkState}
+              style={{
+                marginLeft: 8,
+                background: 'none',
+                border: 'none',
+                color: '#666666',
+                fontSize: 11,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              ✕ clear
+            </button>
+          )}
+
+          {/* Selected employee's existing assignments */}
+          {selectedEmployee && existingEntityAssignment && (
+            <div style={{ marginTop: 6, fontSize: 11, color: '#888888' }}>
+              Existing {item.entityCode} assignment:{' '}
+              <span style={{ color: '#ff6b00' }}>
+                {existingEntityAssignment.branchName} · {fmtLaborType(existingEntityAssignment.laborType)}
+              </span>
+            </div>
+          )}
+
+          {/* Override dropdowns if employee has no assignment for this entity */}
+          {needsOverride && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 11, color: '#888888', marginBottom: 6 }}>
+                {selectedEmployee.displayName} has no {item.entityCode} assignment yet — set one:
+              </div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: 11, color: '#666666', marginBottom: 4 }}>Branch</div>
+                  <select
+                    value={overrideBranchId}
+                    onChange={(e) => setOverrideBranchId(e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="">— select branch —</option>
+                    {snOperations.length > 0 && (
+                      <optgroup label="Operations">
+                        {snOperations.map((b) => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {snCorporate.length > 0 && (
+                      <optgroup label="Corporate">
+                        {snCorporate.map((b) => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: '#666666', marginBottom: 4 }}>Labor Type</div>
+                  <select
+                    value={overrideLaborType}
+                    onChange={(e) => setOverrideLaborType(e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="">— select type —</option>
+                    {LABOR_TYPES.map((lt) => (
+                      <option key={lt.value} value={lt.value}>{lt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Inline error */}
+      {confirmError && (
+        <div style={{ fontSize: 12, color: '#cc4444', marginBottom: 8 }}>{confirmError}</div>
+      )}
+
+      {/* Saved flash */}
+      {saved && (
+        <div style={{ fontSize: 12, color: '#4caf50', marginBottom: 8 }}>Saved</div>
+      )}
+
+      {/* Actions */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+        <ActionBtn label="Skip" disabled={busy || saved} onClick={handleSkip} />
+        <ActionBtn
+          label="Confirm"
+          variant="primary"
+          disabled={!isValid || busy || saved}
+          onClick={handleConfirm}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ─── Employee Matches section ──────────────────────────────────────────────────
+
+function EmployeeMatchesSection({
+  items,
+  branches,
+  employees,
+  onDismiss,
+}: {
+  items: EmpAssignment[]
+  branches: Branch[]
+  employees: Employee[]
+  onDismiss: (id: string) => void
+}) {
   return (
     <div className="card">
       <SectionHeader title="Employee Matches" count={items.length} />
       {items.length === 0 ? (
         <EmptyQueue message="No pending employee matches." />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-          {items.map((item, i) => {
-            const currentCode = selectedCode[item.id] ?? item.currentPayrollCodeId ?? ''
-            return (
-              <div
-                key={item.id}
-                style={{
-                  padding: '12px 0',
-                  borderTop: i === 0 ? '1px solid #2a2a2a' : '1px solid #2a2a2a',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, color: '#cccccc' }}>
-                    Import name:{' '}
-                    <span style={{ color: '#ffffff', fontWeight: 500 }}>
-                      &ldquo;{item.rawName}&rdquo;
-                    </span>{' '}
-                    <span style={{ color: '#555555' }}>({item.entityCode})</span>
-                  </div>
-                  {item.aiCandidateName ? (
-                    <div style={{ fontSize: 12, color: '#888888', marginTop: 3 }}>
-                      Suggested match:{' '}
-                      <span style={{ color: '#ff6b00' }}>{item.aiCandidateName}</span>
-                      {item.aiScore !== null && (
-                        <span style={{ color: '#555555' }}>
-                          {' '}[{Math.round(item.aiScore)}%]
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: 12, color: '#555555', marginTop: 3 }}>
-                      No AI match suggestion
-                    </div>
-                  )}
-                  <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 11, color: '#666666' }}>Payroll code:</span>
-                    <select
-                      value={currentCode}
-                      onChange={(e) =>
-                        setSelectedCode((s) => ({ ...s, [item.id]: e.target.value }))
-                      }
-                      style={{ ...selectStyle, fontSize: 11 }}
-                    >
-                      <option value="">— select payroll code —</option>
-                      {branchGroups.map((branchName) => (
-                        <optgroup key={branchName} label={branchName}>
-                          {codesByBranch[branchName].map((pc) => (
-                            <option key={pc.id} value={pc.id}>
-                              {pc.code} ({pc.entityCode} / {pc.laborType})
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexShrink: 0, paddingTop: 2 }}>
-                  {item.aiCandidateName && (
-                    <ActionBtn
-                      label="Confirm Match"
-                      variant="primary"
-                      disabled={busy === item.id}
-                      onClick={() => handleAction(item, 'confirm')}
-                    />
-                  )}
-                  <ActionBtn
-                    label="Skip"
-                    disabled={busy === item.id}
-                    onClick={() => handleAction(item, 'skip')}
-                  />
-                </div>
-              </div>
-            )
-          })}
+        <div>
+          {items.map((item) => (
+            <EmployeeMatchRow
+              key={item.id}
+              item={item}
+              branches={branches}
+              employees={employees}
+              onDismiss={onDismiss}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -320,7 +667,7 @@ function PayrollItemsSection({
         <EmptyQueue message="No unconfirmed payroll items." />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {items.map((item, i) => {
+          {items.map((item) => {
             const chosenGroupId = selected[item.id] ?? item.currentGroupId
             return (
               <div
@@ -380,10 +727,6 @@ function PayrollItemsSection({
 }
 
 // ─── Unassigned Fuel Cards section ────────────────────────────────────────────
-
-// Select value encoding:
-//   UUID string      → assign to branch (set branch_id, clear business_tag)
-//   "tag:xxx"        → set business_tag, clear branch_id
 
 function FuelCardsSection({
   cards,
@@ -517,7 +860,7 @@ export default function ReviewClient() {
   useEffect(() => {
     fetch('/api/admin/review')
       .then((r) => r.json())
-      .then((json) => {
+      .then((json: { success: boolean; data: ReviewData; error?: string }) => {
         if (!json.success) throw new Error(json.error)
         setData(json.data)
       })
@@ -568,7 +911,8 @@ export default function ReviewClient() {
         <>
           <EmployeeMatchesSection
             items={data.employeeAssignments}
-            payrollCodes={data.payrollCodes}
+            branches={data.branches}
+            employees={data.employees}
             onDismiss={(id) => dismiss('employeeAssignments', id)}
           />
           <PayrollItemsSection

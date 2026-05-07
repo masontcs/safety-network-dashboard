@@ -13,7 +13,7 @@ export async function GET(): Promise<NextResponse> {
     const supabase = createServiceClient()
 
     // Fetch all queues + reference data in parallel
-    const [empRes, itemRes, cardRes, groupRes, branchRes, codeRes, bizRes] = await Promise.all([
+    const [empRes, itemRes, cardRes, groupRes, branchRes, codeRes, bizRes, allEmpRes] = await Promise.all([
       supabase
         .from('employee_entity_assignments')
         .select('id, raw_name_in_report, ai_match_score, ai_match_candidate, entity_id, payroll_code_id')
@@ -38,6 +38,7 @@ export async function GET(): Promise<NextResponse> {
         .eq('is_active', true)
         .order('code'),
       supabase.from('businesses').select('id, code'),
+      supabase.from('employees').select('id, first_name, last_name').eq('is_active', true).order('last_name'),
     ])
 
     if (empRes.error) throw new Error(empRes.error.message)
@@ -51,6 +52,7 @@ export async function GET(): Promise<NextResponse> {
     const rawBranches = branchRes.data ?? []
     const rawCodes = codeRes.data ?? []
     const businesses = bizRes.data ?? []
+    const allEmployees = (allEmpRes.data ?? []) as { id: string; first_name: string; last_name: string }[]
 
     const bizCodeMap = Object.fromEntries(
       (businesses as { id: string; code: string }[]).map((b) => [b.id, b.code]),
@@ -99,6 +101,30 @@ export async function GET(): Promise<NextResponse> {
       (empNames ?? []).map((e) => [e.id, `${e.first_name} ${e.last_name}`.trim()]),
     )
 
+    // Build employee entity assignment pills for the searchable dropdown
+    const allEmpIds = allEmployees.map((e) => e.id)
+    const { data: confirmedAssignments } = await supabase
+      .from('employee_entity_assignments')
+      .select('employee_id, entity_id, payroll_code_id')
+      .eq('is_confirmed', true)
+      .in('employee_id', allEmpIds.length > 0 ? allEmpIds : ['__none__'])
+
+    const codeDetailMap = Object.fromEntries(
+      rawCodes.map((pc) => [pc.id, { laborType: pc.labor_type, branchId: pc.branch_id }]),
+    )
+
+    const empEntityMap: Record<string, Array<{ entityCode: string; branchName: string; laborType: string }>> = {}
+    for (const ea of confirmedAssignments ?? []) {
+      if (!empEntityMap[ea.employee_id]) empEntityMap[ea.employee_id] = []
+      const codeDetail = ea.payroll_code_id ? codeDetailMap[ea.payroll_code_id] : null
+      const entityCode = entityMap[ea.entity_id] ?? ea.entity_id
+      const branchName = codeDetail?.branchId ? (branchNameMap[codeDetail.branchId] ?? 'Unknown') : 'Corp/HQ'
+      const laborType = codeDetail?.laborType ?? 'unknown'
+      if (!empEntityMap[ea.employee_id].some((x) => x.entityCode === entityCode)) {
+        empEntityMap[ea.employee_id].push({ entityCode, branchName, laborType })
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -145,6 +171,11 @@ export async function GET(): Promise<NextResponse> {
           branchId: pc.branch_id,
           branchName: pc.branch_id ? (branchNameMap[pc.branch_id] ?? 'Unknown') : 'Corp / HQ',
           entityCode: entityMap[pc.entity_id] ?? pc.entity_id,
+        })),
+        employees: allEmployees.map((e) => ({
+          id: e.id,
+          displayName: `${e.first_name} ${e.last_name}`.trim(),
+          entityAssignments: empEntityMap[e.id] ?? [],
         })),
       },
     })
