@@ -6,6 +6,11 @@ import type { PayrollLineItem } from '@/lib/api/payroll-shape'
 import type { LaborType } from '@/lib/supabase/database.types'
 import { canAccessBranch } from '@/lib/utils/access'
 import { apiError } from '@/lib/utils/errors'
+import { resolveEmployeeAllocation, type AllocationOverride, type EmployeeAllocation } from '@/lib/allocation/employee-allocation'
+
+function r2(v: number): number {
+  return Math.round(v * 100) / 100
+}
 
 export async function GET(request: Request): Promise<NextResponse> {
   try {
@@ -34,15 +39,14 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     const supabase = createServiceClient()
 
-    // Step 1: find direct labor payroll_code IDs for the requested branch(es)
+    // Step 1: find ALL direct labor payroll_code IDs (allocation may redistribute across branches)
     let codesQuery = supabase
       .from('payroll_codes')
       .select('id')
       .eq('labor_type', 'direct' as LaborType)
 
-    if (branchId) {
-      codesQuery = codesQuery.eq('branch_id', branchId)
-    } else if (access.branchIds !== null) {
+    // Keep manager access scoped to assigned branches at the code level
+    if (access.branchIds !== null) {
       codesQuery = codesQuery.in('branch_id', access.branchIds)
     }
 
@@ -51,7 +55,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     const directCodeIds = (directCodes ?? []).map((c) => c.id)
 
-    // Step 2: query direct labor transactions for those codes
+    // Step 2: query all direct labor transactions, then apply allocation splits
     type PayrollTxnRow = {
       employee_id: string
       amount: number
@@ -61,27 +65,84 @@ export async function GET(request: Request): Promise<NextResponse> {
       payroll_codes: { labor_type: LaborType; branch_id: string | null } | null
     }
 
-    const directItems: PayrollLineItem[] = []
+    let rawTxnData: PayrollTxnRow[] = []
     if (directCodeIds.length > 0) {
       const { data: rawTxns, error: txnErr } = await supabase
         .from('payroll_transactions')
         .select('employee_id, amount, hours, rate, employees(first_name, last_name), payroll_codes(labor_type, branch_id)')
         .in('payroll_code_id', directCodeIds)
         .eq('period_date', periodDate)
+        .limit(50000)
 
       if (txnErr) throw new Error(`Failed to query direct labor: ${txnErr.message}`)
+      rawTxnData = (rawTxns ?? []) as PayrollTxnRow[]
+    }
 
-      for (const t of (rawTxns ?? []) as PayrollTxnRow[]) {
-        if (!t.employees || !t.payroll_codes) continue
+    // Fetch employee allocation data for all employees in this period
+    const txnEmpIds = [...new Set(rawTxnData.map((t) => t.employee_id))]
+    const empDefaults: Record<string, EmployeeAllocation[]> = {}
+    const empOverrides: Record<string, AllocationOverride[]> = {}
+
+    if (txnEmpIds.length > 0) {
+      const [defaultsRes, overridesRes] = await Promise.all([
+        supabase
+          .from('employee_allocations')
+          .select('employee_id, branch_id, percentage, effective_from, effective_to, status')
+          .in('employee_id', txnEmpIds)
+          .eq('status', 'approved')
+          .lte('effective_from', periodDate),
+        supabase
+          .from('employee_allocation_overrides')
+          .select('employee_id, period_date, branch_id, percentage, status')
+          .in('employee_id', txnEmpIds)
+          .eq('status', 'approved')
+          .eq('period_date', periodDate),
+      ])
+      for (const d of (defaultsRes.data ?? []) as EmployeeAllocation[]) {
+        if (!empDefaults[d.employee_id]) empDefaults[d.employee_id] = []
+        empDefaults[d.employee_id].push(d)
+      }
+      for (const o of (overridesRes.data ?? []) as AllocationOverride[]) {
+        if (!empOverrides[o.employee_id]) empOverrides[o.employee_id] = []
+        empOverrides[o.employee_id].push(o)
+      }
+    }
+
+    const directItems: PayrollLineItem[] = []
+    for (const t of rawTxnData) {
+      if (!t.employees || !t.payroll_codes) continue
+      const homeBranchId = t.payroll_codes.branch_id
+      if (!homeBranchId) continue
+
+      const splits = resolveEmployeeAllocation(
+        t.employee_id, periodDate, homeBranchId,
+        empOverrides[t.employee_id] ?? [], empDefaults[t.employee_id] ?? []
+      )
+
+      if (branchId) {
+        const split = splits.find((s) => s.branchId === branchId)
+        if (!split) continue
         directItems.push({
           employeeId: t.employee_id,
           displayName: `${t.employees.first_name} ${t.employees.last_name}`.trim(),
           laborType: t.payroll_codes.labor_type,
-          amount: t.amount,
-          hours: t.hours,
+          amount: r2(t.amount * (split.percentage / 100)),
+          hours: t.hours !== null ? r2(t.hours * (split.percentage / 100)) : null,
           rate: t.rate,
-          branchId: t.payroll_codes.branch_id,
+          branchId: branchId,
         })
+      } else {
+        for (const split of splits) {
+          directItems.push({
+            employeeId: t.employee_id,
+            displayName: `${t.employees.first_name} ${t.employees.last_name}`.trim(),
+            laborType: t.payroll_codes.labor_type,
+            amount: r2(t.amount * (split.percentage / 100)),
+            hours: t.hours !== null ? r2(t.hours * (split.percentage / 100)) : null,
+            rate: t.rate,
+            branchId: split.branchId,
+          })
+        }
       }
     }
 

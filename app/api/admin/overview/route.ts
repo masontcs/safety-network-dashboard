@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/utils/errors'
+import { resolveEmployeeAllocation, type AllocationOverride, type EmployeeAllocation } from '@/lib/allocation/employee-allocation'
 
 const PAGE_SIZE = 1000
 
@@ -92,6 +93,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     // ── Fuel transactions ───────────────────────────────────────────────────
     type FuelRow = {
+      employee_id: string | null
       branch_id: string | null
       transaction_date: string
       total_with_tax: number
@@ -103,7 +105,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     while (true) {
       const { data, error } = await supabase
         .from('fuel_transactions')
-        .select('branch_id, transaction_date, total_with_tax, gallons')
+        .select('employee_id, branch_id, transaction_date, total_with_tax, gallons')
         .is('business_tag', null)
         .in('branch_id', snBranchIds)
         .gte('transaction_date', startDate)
@@ -132,7 +134,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
     const directCodeIds = Object.keys(codeIdToBranchId)
 
-    type PayRow = { payroll_code_id: string; period_date: string; amount: number }
+    type PayRow = { employee_id: string; payroll_code_id: string; period_date: string; amount: number }
     const allPayRows: PayRow[] = []
 
     if (directCodeIds.length > 0) {
@@ -140,7 +142,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       while (true) {
         const { data, error } = await supabase
           .from('payroll_transactions')
-          .select('payroll_code_id, period_date, amount')
+          .select('employee_id, payroll_code_id, period_date, amount')
           .in('payroll_code_id', directCodeIds)
           .gte('period_date', startDate)
           .lte('period_date', endDate)
@@ -191,6 +193,44 @@ export async function GET(request: Request): Promise<NextResponse> {
       }
     }
 
+    // ── Employee allocation splits ──────────────────────────────────────────
+    const allEmpIds = [
+      ...new Set([
+        ...allPayRows.map((p) => p.employee_id),
+        ...allFuelRows.map((f) => f.employee_id).filter((id): id is string => id !== null),
+        ...allTaxRows.map((t) => t.employee_id),
+      ]),
+    ]
+
+    const empDefaults: Record<string, EmployeeAllocation[]> = {}
+    const empOverrides: Record<string, AllocationOverride[]> = {}
+
+    if (allEmpIds.length > 0) {
+      const [defaultsRes, overridesRes] = await Promise.all([
+        supabase
+          .from('employee_allocations')
+          .select('employee_id, branch_id, percentage, effective_from, effective_to, status')
+          .in('employee_id', allEmpIds)
+          .eq('status', 'approved')
+          .lte('effective_from', endDate),
+        supabase
+          .from('employee_allocation_overrides')
+          .select('employee_id, period_date, branch_id, percentage, status')
+          .in('employee_id', allEmpIds)
+          .eq('status', 'approved')
+          .gte('period_date', startDate)
+          .lte('period_date', endDate),
+      ])
+      for (const d of (defaultsRes.data ?? []) as EmployeeAllocation[]) {
+        if (!empDefaults[d.employee_id]) empDefaults[d.employee_id] = []
+        empDefaults[d.employee_id].push(d)
+      }
+      for (const o of (overridesRes.data ?? []) as AllocationOverride[]) {
+        if (!empOverrides[o.employee_id]) empOverrides[o.employee_id] = []
+        empOverrides[o.employee_id].push(o)
+      }
+    }
+
     // ── Aggregate ───────────────────────────────────────────────────────────
     // period-level maps
     const periodRevenue: Record<string, number> = {}
@@ -222,30 +262,57 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
 
     for (const p of allPayRows) {
-      const bid = codeIdToBranchId[p.payroll_code_id]
-      if (!bid) continue
+      const homeBranchId = codeIdToBranchId[p.payroll_code_id]
+      if (!homeBranchId) continue
       periodPayroll[p.period_date] = (periodPayroll[p.period_date] ?? 0) + p.amount
-      bPayroll[bid] = (bPayroll[bid] ?? 0) + p.amount
-      if (!bPayByPeriod[bid]) bPayByPeriod[bid] = {}
-      bPayByPeriod[bid][p.period_date] = (bPayByPeriod[bid][p.period_date] ?? 0) + p.amount
+      const splits = resolveEmployeeAllocation(
+        p.employee_id, p.period_date, homeBranchId,
+        empOverrides[p.employee_id] ?? [], empDefaults[p.employee_id] ?? []
+      )
+      for (const split of splits) {
+        const portion = r2(p.amount * (split.percentage / 100))
+        bPayroll[split.branchId] = (bPayroll[split.branchId] ?? 0) + portion
+        if (!bPayByPeriod[split.branchId]) bPayByPeriod[split.branchId] = {}
+        bPayByPeriod[split.branchId][p.period_date] = (bPayByPeriod[split.branchId][p.period_date] ?? 0) + portion
+      }
     }
 
     let totalGallons = 0
     for (const f of allFuelRows) {
-      if (!f.branch_id) continue
       const sat = toSaturdayOfWeek(f.transaction_date)
       periodFuel[sat] = (periodFuel[sat] ?? 0) + f.total_with_tax
-      bFuel[f.branch_id] = (bFuel[f.branch_id] ?? 0) + f.total_with_tax
-      if (!bFuelByPeriod[f.branch_id]) bFuelByPeriod[f.branch_id] = {}
-      bFuelByPeriod[f.branch_id][sat] = (bFuelByPeriod[f.branch_id][sat] ?? 0) + f.total_with_tax
       if (f.gallons) totalGallons += f.gallons
+
+      if (f.employee_id && f.branch_id) {
+        const splits = resolveEmployeeAllocation(
+          f.employee_id, sat, f.branch_id,
+          empOverrides[f.employee_id] ?? [], empDefaults[f.employee_id] ?? []
+        )
+        for (const split of splits) {
+          const portion = r2(f.total_with_tax * (split.percentage / 100))
+          bFuel[split.branchId] = (bFuel[split.branchId] ?? 0) + portion
+          if (!bFuelByPeriod[split.branchId]) bFuelByPeriod[split.branchId] = {}
+          bFuelByPeriod[split.branchId][sat] = (bFuelByPeriod[split.branchId][sat] ?? 0) + portion
+        }
+      } else if (f.branch_id) {
+        bFuel[f.branch_id] = (bFuel[f.branch_id] ?? 0) + f.total_with_tax
+        if (!bFuelByPeriod[f.branch_id]) bFuelByPeriod[f.branch_id] = {}
+        bFuelByPeriod[f.branch_id][sat] = (bFuelByPeriod[f.branch_id][sat] ?? 0) + f.total_with_tax
+      }
     }
 
     for (const t of allTaxRows) {
-      const branchId = empEntityBranch[`${t.employee_id}:${t.entity_id}`]
-      if (!branchId || !snBranchIds.includes(branchId)) continue
+      const homeBranchId = empEntityBranch[`${t.employee_id}:${t.entity_id}`]
+      if (!homeBranchId || !snBranchIds.includes(homeBranchId)) continue
       periodTax[t.period_date] = (periodTax[t.period_date] ?? 0) + t.amount
-      bTax[branchId] = (bTax[branchId] ?? 0) + t.amount
+      const splits = resolveEmployeeAllocation(
+        t.employee_id, t.period_date, homeBranchId,
+        empOverrides[t.employee_id] ?? [], empDefaults[t.employee_id] ?? []
+      )
+      for (const split of splits) {
+        const portion = r2(t.amount * (split.percentage / 100))
+        bTax[split.branchId] = (bTax[split.branchId] ?? 0) + portion
+      }
     }
 
     // byPeriod — union of all period keys that appear in any dataset

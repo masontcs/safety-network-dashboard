@@ -58,6 +58,31 @@ interface Employee {
   entityAssignments: Array<{ entityCode: string; branchName: string; laborType: string }>
 }
 
+interface PendingAllocation {
+  id: string
+  employee_id: string
+  branch_id: string
+  percentage: number
+  effective_from: string
+  effective_to: string | null
+  status: string
+  notes: string | null
+  displayName: string
+  branchName: string
+}
+
+interface PendingOverride {
+  id: string
+  employee_id: string
+  period_date: string
+  branch_id: string
+  percentage: number
+  status: string
+  notes: string | null
+  displayName: string
+  branchName: string
+}
+
 interface ReviewData {
   employeeAssignments: EmpAssignment[]
   payrollItems: PayrollItem[]
@@ -856,6 +881,9 @@ export default function ReviewClient() {
   const [data, setData] = useState<ReviewData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [pendingAllocs, setPendingAllocs] = useState<PendingAllocation[]>([])
+  const [pendingOverrides, setPendingOverrides] = useState<PendingOverride[]>([])
+  const [allocActioning, setAllocActioning] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/review')
@@ -866,6 +894,16 @@ export default function ReviewClient() {
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false))
+
+    fetch('/api/admin/allocations')
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success) {
+          setPendingAllocs(json.data.pendingAllocations ?? [])
+          setPendingOverrides(json.data.pendingOverrides ?? [])
+        }
+      })
+      .catch(() => {/* non-critical */})
   }, [])
 
   function dismiss(type: keyof ReviewData, id: string) {
@@ -880,8 +918,23 @@ export default function ReviewClient() {
     })
   }
 
+  const actOnAllocation = async (empId: string, id: string, status: 'approved' | 'denied', type: 'alloc' | 'override') => {
+    setAllocActioning(id)
+    const path = type === 'alloc'
+      ? `/api/employees/${empId}/allocations/${id}`
+      : `/api/employees/${empId}/allocation-overrides/${id}`
+    await fetch(path, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    })
+    if (type === 'alloc') setPendingAllocs((prev) => prev.filter((a) => a.id !== id))
+    else setPendingOverrides((prev) => prev.filter((o) => o.id !== id))
+    setAllocActioning(null)
+  }
+
   const totalPending = data
-    ? data.employeeAssignments.length + data.payrollItems.length + data.fuelCards.length
+    ? data.employeeAssignments.length + data.payrollItems.length + data.fuelCards.length + pendingAllocs.length + pendingOverrides.length
     : 0
 
   return (
@@ -925,6 +978,59 @@ export default function ReviewClient() {
             branches={data.branches}
             onDismiss={(id) => dismiss('fuelCards', id)}
           />
+          {(pendingAllocs.length > 0 || pendingOverrides.length > 0) && (
+            <div className="card">
+              <SectionHeader title="Pending Allocations" count={pendingAllocs.length + pendingOverrides.length} />
+              {pendingAllocs.length > 0 && (
+                <>
+                  <p style={{ color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Default Allocations</p>
+                  {pendingAllocs.map((a) => (
+                    <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #2a2a2a' }}>
+                      <div>
+                        <span style={{ color: '#ff6b00', fontSize: 13, fontWeight: 500 }}>{a.displayName}</span>
+                        <span style={{ color: '#888', fontSize: 12, marginLeft: 8 }}>{a.branchName} — {a.percentage}% from {a.effective_from}</span>
+                        {a.notes && <p style={{ color: '#666', fontSize: 11, margin: '2px 0 0' }}>{a.notes}</p>}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => actOnAllocation(a.employee_id, a.id, 'approved', 'alloc')} disabled={allocActioning === a.id}
+                          style={{ background: '#1a3a1a', color: '#4caf50', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>
+                          Approve
+                        </button>
+                        <button onClick={() => actOnAllocation(a.employee_id, a.id, 'denied', 'alloc')} disabled={allocActioning === a.id}
+                          style={{ background: '#3a1a1a', color: '#cc4444', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>
+                          Deny
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+              {pendingOverrides.length > 0 && (
+                <>
+                  <p style={{ color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 12, marginBottom: 8 }}>Weekly Overrides</p>
+                  {pendingOverrides.map((o) => (
+                    <div key={o.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #2a2a2a' }}>
+                      <div>
+                        <span style={{ color: '#ff6b00', fontSize: 13, fontWeight: 500 }}>{o.displayName}</span>
+                        <span style={{ color: '#888', fontSize: 12, marginLeft: 8 }}>{o.period_date} — {o.branchName} {o.percentage}%</span>
+                        {o.notes && <p style={{ color: '#666', fontSize: 11, margin: '2px 0 0' }}>{o.notes}</p>}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => actOnAllocation(o.employee_id, o.id, 'approved', 'override')} disabled={allocActioning === o.id}
+                          style={{ background: '#1a3a1a', color: '#4caf50', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>
+                          Approve
+                        </button>
+                        <button onClick={() => actOnAllocation(o.employee_id, o.id, 'denied', 'override')} disabled={allocActioning === o.id}
+                          style={{ background: '#3a1a1a', color: '#cc4444', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>
+                          Deny
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
         </>
       ) : null}
     </div>

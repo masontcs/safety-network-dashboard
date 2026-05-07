@@ -169,6 +169,18 @@ export type Database = {
         Update: { id?: string; first_name?: string; last_name?: string; email?: string; branch_id?: string | null; requested_role?: string; notes?: string | null; status?: string; reviewed_by?: string | null; reviewed_at?: string | null }
         Relationships: []
       }
+      employee_allocations: {
+        Row: { id: string; employee_id: string; branch_id: string; percentage: number; effective_from: string; effective_to: string | null; status: string; requested_by: string | null; approved_by: string | null; notes: string | null; created_at: string }
+        Insert: { id?: string; employee_id: string; branch_id: string; percentage: number; effective_from: string; effective_to?: string | null; status?: string; requested_by?: string | null; approved_by?: string | null; notes?: string | null; created_at?: string }
+        Update: { id?: string; employee_id?: string; branch_id?: string; percentage?: number; effective_from?: string; effective_to?: string | null; status?: string; requested_by?: string | null; approved_by?: string | null; notes?: string | null }
+        Relationships: []
+      }
+      employee_allocation_overrides: {
+        Row: { id: string; employee_id: string; period_date: string; branch_id: string; percentage: number; status: string; requested_by: string | null; approved_by: string | null; notes: string | null; created_at: string }
+        Insert: { id?: string; employee_id: string; period_date: string; branch_id: string; percentage: number; status?: string; requested_by?: string | null; approved_by?: string | null; notes?: string | null; created_at?: string }
+        Update: { id?: string; employee_id?: string; period_date?: string; branch_id?: string; percentage?: number; status?: string; requested_by?: string | null; approved_by?: string | null; notes?: string | null }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

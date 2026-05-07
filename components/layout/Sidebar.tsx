@@ -93,6 +93,15 @@ const PeopleIcon = () => (
   </svg>
 )
 
+const SplitIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <path d="M16 3h5v5" />
+    <path d="M8 3H3v5" />
+    <path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3" />
+    <path d="m15 9 6-6" />
+  </svg>
+)
+
 const NAV_ITEMS: NavItem[] = [
   { href: '/manager',   label: 'Dashboard', icon: <GridIcon />,  roles: ['branch_manager'] },
   { href: '/district',  label: 'Dashboard', icon: <GridIcon />,  roles: ['district_manager'] },
@@ -107,6 +116,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/fiscal-months',    label: 'Fiscal Months',    icon: <CalendarIcon />, roles: ['admin'] },
   { href: '/admin/fiscal-quarters',    label: 'Fiscal Quarters',   icon: <LayersIcon />,  roles: ['admin'] },
   { href: '/admin/data-explorer',   label: 'Data Explorer',   icon: <DatabaseIcon />, roles: ['admin'] },
+  { href: '/admin/allocations',     label: 'Allocations',     icon: <SplitIcon />,    roles: ['admin'] },
   { href: '/admin/access-requests',   label: 'Access Requests',   icon: <InboxIcon />,   roles: ['admin'] },
   { href: '/admin/users',          label: 'Users',          icon: <UsersIcon />,    roles: ['admin'] },
 ]
@@ -118,13 +128,18 @@ interface SidebarProps {
 export default function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname()
   const items = NAV_ITEMS.filter((item) => item.roles.includes(role))
-  const [pendingCount, setPendingCount] = useState(0)
+  const [accessRequestCount, setAccessRequestCount] = useState(0)
+  const [allocationCount, setAllocationCount] = useState(0)
 
   useEffect(() => {
     if (role !== 'admin') return
     fetch('/api/admin/access-requests/pending-count')
       .then((r) => r.json())
-      .then((json) => { if (json.success) setPendingCount(json.data.count) })
+      .then((json) => { if (json.success) setAccessRequestCount(json.data.count) })
+      .catch(() => {})
+    fetch('/api/admin/allocations/pending-count')
+      .then((r) => r.json())
+      .then((json) => { if (json.success) setAllocationCount(json.data.count) })
       .catch(() => {})
   }, [role])
 
@@ -132,7 +147,9 @@ export default function Sidebar({ role }: SidebarProps) {
     <aside className="sidebar">
       {items.map((item) => {
         const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-        const showBadge = item.href === '/admin/access-requests' && pendingCount > 0
+        const showBadge =
+          (item.href === '/admin/access-requests' && accessRequestCount > 0) ||
+          (item.href === '/admin/allocations' && allocationCount > 0)
         return (
           <Link
             key={item.href}

@@ -187,6 +187,70 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
   const [transferError, setTransferError] = useState<string | null>(null)
   const [revertingId, setRevertingId] = useState<string | null>(null)
 
+  // Allocation state (admin only)
+  interface AllocationRow { id: string; branch_id: string; percentage: number; effective_from: string; effective_to: string | null; status: string; notes: string | null; branches: { name: string } | null }
+  interface OverrideRow { id: string; period_date: string; branch_id: string; percentage: number; status: string; notes: string | null; branches: { name: string } | null }
+  const [allocations, setAllocations] = useState<AllocationRow[]>([])
+  const [overrides, setOverrides] = useState<OverrideRow[]>([])
+  const [allocLoading, setAllocLoading] = useState(false)
+  const [showAllocForm, setShowAllocForm] = useState(false)
+  const [allocSplits, setAllocSplits] = useState<Array<{ branchId: string; percentage: number }>>([{ branchId: '', percentage: 100 }])
+  const [allocEffectiveFrom, setAllocEffectiveFrom] = useState('')
+  const [allocNotes, setAllocNotes] = useState('')
+  const [allocError, setAllocError] = useState<string | null>(null)
+  const [allocSaving, setAllocSaving] = useState(false)
+  const [availableBranches, setAvailableBranches] = useState<Array<{ id: string; name: string }>>([])
+
+  const loadAllocations = useCallback(() => {
+    setAllocLoading(true)
+    fetch(`/api/employees/${employeeId}/allocations`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success) {
+          setAllocations(json.data.allocations ?? [])
+          setOverrides(json.data.overrides ?? [])
+        }
+      })
+      .catch(() => {/* non-critical */})
+      .finally(() => setAllocLoading(false))
+  }, [employeeId])
+
+  useEffect(() => {
+    if (role === 'admin') {
+      loadAllocations()
+      fetch('/api/branches')
+        .then((r) => r.json())
+        .then((json) => { if (json.success) setAvailableBranches(json.data ?? []) })
+        .catch(() => {/* non-critical */})
+    }
+  }, [role, loadAllocations])
+
+  const submitAllocation = async () => {
+    setAllocError(null)
+    const total = allocSplits.reduce((s, sp) => s + Number(sp.percentage), 0)
+    if (Math.abs(total - 100) > 0.01) { setAllocError('Percentages must sum to 100'); return }
+    if (!allocEffectiveFrom) { setAllocError('Effective from date is required'); return }
+    setAllocSaving(true)
+    try {
+      const res = await fetch(`/api/employees/${employeeId}/allocations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ splits: allocSplits, effectiveFrom: allocEffectiveFrom, notes: allocNotes || undefined }),
+      })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error ?? 'Failed to save')
+      setShowAllocForm(false)
+      setAllocSplits([{ branchId: '', percentage: 100 }])
+      setAllocEffectiveFrom('')
+      setAllocNotes('')
+      loadAllocations()
+    } catch (e) {
+      setAllocError((e as Error).message)
+    } finally {
+      setAllocSaving(false)
+    }
+  }
+
   const load = useCallback(() => {
     setLoading(true)
     setError(null)
@@ -1121,6 +1185,149 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
               </div>
             )
           })()}
+        </>
+      )}
+
+      {/* ── Allocation section (admin only) ── */}
+      {isAdmin && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 32, marginBottom: 12 }}>
+            <SectionHeader style={{ margin: 0 }}>Branch Allocation</SectionHeader>
+            {!showAllocForm && (
+              <button
+                onClick={() => setShowAllocForm(true)}
+                style={{ background: '#ff6b00', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}
+              >
+                + Set Allocation
+              </button>
+            )}
+          </div>
+
+          {allocLoading ? (
+            <p style={{ color: '#888', fontSize: 13 }}>Loading…</p>
+          ) : allocations.length === 0 ? (
+            <p style={{ color: '#888888', fontSize: 13 }}>No active allocation — 100% home branch by default.</p>
+          ) : (
+            <div style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
+                    {['Branch', 'Pct', 'From', 'To', 'Status'].map((h) => (
+                      <th key={h} style={{ textAlign: 'left', padding: '8px 12px', color: '#666', fontWeight: 400, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {allocations.map((a) => (
+                    <tr key={a.id} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                      <td style={{ padding: '8px 12px', color: '#ff6b00' }}>{a.branches?.name ?? a.branch_id}</td>
+                      <td style={{ padding: '8px 12px', color: '#cccccc' }}>{a.percentage}%</td>
+                      <td style={{ padding: '8px 12px', color: '#cccccc' }}>{a.effective_from}</td>
+                      <td style={{ padding: '8px 12px', color: '#888' }}>{a.effective_to ?? '—'}</td>
+                      <td style={{ padding: '8px 12px' }}>
+                        <span style={{ background: a.status === 'approved' ? '#1a3a1a' : '#3a2a1a', color: a.status === 'approved' ? '#4caf50' : '#ff9800', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>{a.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {overrides.length > 0 && (
+            <>
+              <p style={{ color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Weekly Overrides (last 52 weeks)</p>
+              <div style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
+                      {['Period', 'Branch', 'Pct', 'Status'].map((h) => (
+                        <th key={h} style={{ textAlign: 'left', padding: '8px 12px', color: '#666', fontWeight: 400, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overrides.map((o) => (
+                      <tr key={o.id} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                        <td style={{ padding: '8px 12px', color: '#cccccc' }}>{o.period_date}</td>
+                        <td style={{ padding: '8px 12px', color: '#ff6b00' }}>{o.branches?.name ?? o.branch_id}</td>
+                        <td style={{ padding: '8px 12px', color: '#cccccc' }}>{o.percentage}%</td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <span style={{ background: o.status === 'approved' ? '#1a3a1a' : '#3a2a1a', color: o.status === 'approved' ? '#4caf50' : '#ff9800', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>{o.status}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {showAllocForm && (
+            <div style={{ background: '#1e1e1e', border: '1px solid #333', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              <p style={{ color: '#fff', fontSize: 14, fontWeight: 500, marginBottom: 12 }}>Set Default Allocation</p>
+              {allocSplits.map((sp, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                  <select
+                    value={sp.branchId}
+                    onChange={(e) => { const s = [...allocSplits]; s[i] = { ...s[i], branchId: e.target.value }; setAllocSplits(s) }}
+                    style={{ flex: 2, background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '6px 8px', fontSize: 13 }}
+                  >
+                    <option value="">Select branch…</option>
+                    {availableBranches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={sp.percentage}
+                    onChange={(e) => { const s = [...allocSplits]; s[i] = { ...s[i], percentage: Number(e.target.value) }; setAllocSplits(s) }}
+                    style={{ width: 70, background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '6px 8px', fontSize: 13 }}
+                  />
+                  <span style={{ color: '#888', fontSize: 12 }}>%</span>
+                  {allocSplits.length > 1 && (
+                    <button onClick={() => setAllocSplits(allocSplits.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#cc4444', cursor: 'pointer', fontSize: 14 }}>✕</button>
+                  )}
+                </div>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <span style={{ color: allocSplits.reduce((s, sp) => s + Number(sp.percentage), 0) === 100 ? '#4caf50' : '#cc4444', fontSize: 12 }}>
+                  Total: {allocSplits.reduce((s, sp) => s + Number(sp.percentage), 0)}%
+                </span>
+                <button onClick={() => setAllocSplits([...allocSplits, { branchId: '', percentage: 0 }])} style={{ background: 'none', border: '1px solid #333', borderRadius: 6, color: '#888', padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>
+                  + Branch
+                </button>
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 4 }}>Effective From (Saturday)</label>
+                <input
+                  type="date"
+                  value={allocEffectiveFrom}
+                  onChange={(e) => setAllocEffectiveFrom(e.target.value)}
+                  style={{ width: '100%', background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '6px 8px', fontSize: 13 }}
+                />
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 4 }}>Notes (optional)</label>
+                <input
+                  type="text"
+                  value={allocNotes}
+                  onChange={(e) => setAllocNotes(e.target.value)}
+                  placeholder="Reason for split…"
+                  style={{ width: '100%', background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '6px 8px', fontSize: 13 }}
+                />
+              </div>
+              {allocError && <p style={{ color: '#cc4444', fontSize: 12, marginBottom: 8 }}>{allocError}</p>}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={submitAllocation} disabled={allocSaving} style={{ background: '#ff6b00', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, cursor: 'pointer' }}>
+                  {allocSaving ? 'Saving…' : 'Save Allocation'}
+                </button>
+                <button onClick={() => { setShowAllocForm(false); setAllocError(null) }} style={{ background: '#2a2a2a', color: '#ccc', border: '1px solid #333', borderRadius: 8, padding: '7px 16px', fontSize: 13, cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
 

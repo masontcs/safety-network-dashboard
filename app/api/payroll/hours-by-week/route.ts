@@ -4,6 +4,11 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { canAccessBranch } from '@/lib/utils/access'
 import { apiError } from '@/lib/utils/errors'
 import type { LaborType } from '@/lib/supabase/database.types'
+import { resolveEmployeeAllocation, type AllocationOverride, type EmployeeAllocation } from '@/lib/allocation/employee-allocation'
+
+function r2(v: number): number {
+  return Math.round(v * 100) / 100
+}
 
 function classifyGroup(name: string): 'double' | 'overtime' | 'standard' {
   const n = name.toLowerCase()
@@ -39,21 +44,23 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     const supabase = createServiceClient()
 
-    // Get direct labor payroll_code IDs
+    // Get ALL direct labor payroll_code IDs (allocation redistributes across branches)
     let codesQuery = supabase
       .from('payroll_codes')
-      .select('id')
+      .select('id, branch_id')
       .eq('labor_type', 'direct' as LaborType)
 
-    if (branchId) {
-      codesQuery = codesQuery.eq('branch_id', branchId)
-    } else if (access.branchIds !== null) {
+    if (access.branchIds !== null) {
       codesQuery = codesQuery.in('branch_id', access.branchIds)
     }
 
     const { data: codes, error: codesErr } = await codesQuery
     if (codesErr) throw new Error(codesErr.message)
     const codeIds = (codes ?? []).map((c) => c.id)
+    const codeToHomeBranch: Record<string, string> = {}
+    for (const c of codes ?? []) {
+      if (c.branch_id) codeToHomeBranch[c.id] = c.branch_id
+    }
 
     if (codeIds.length === 0) {
       return NextResponse.json({ success: true, data: [] })
@@ -63,7 +70,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const [txnRes, groupsRes] = await Promise.all([
       supabase
         .from('payroll_transactions')
-        .select('period_date, hours, amount, payroll_item_id')
+        .select('employee_id, payroll_code_id, period_date, hours, amount, payroll_item_id')
         .in('payroll_code_id', codeIds)
         .gte('period_date', startDate)
         .lte('period_date', endDate)
@@ -76,6 +83,39 @@ export async function GET(request: Request): Promise<NextResponse> {
     if (txnRes.error) throw new Error(txnRes.error.message)
     if (groupsRes.error) throw new Error(groupsRes.error.message)
 
+    // Fetch employee allocations
+    type TxnRow = { employee_id: string; payroll_code_id: string; period_date: string; hours: number | null; amount: number; payroll_item_id: string | null }
+    const rawTxns = (txnRes.data ?? []) as TxnRow[]
+    const txnEmpIds = [...new Set(rawTxns.map((t) => t.employee_id))]
+    const empDefaults: Record<string, EmployeeAllocation[]> = {}
+    const empOverrides: Record<string, AllocationOverride[]> = {}
+
+    if (txnEmpIds.length > 0) {
+      const [defaultsRes, overridesRes] = await Promise.all([
+        supabase
+          .from('employee_allocations')
+          .select('employee_id, branch_id, percentage, effective_from, effective_to, status')
+          .in('employee_id', txnEmpIds)
+          .eq('status', 'approved')
+          .lte('effective_from', endDate),
+        supabase
+          .from('employee_allocation_overrides')
+          .select('employee_id, period_date, branch_id, percentage, status')
+          .in('employee_id', txnEmpIds)
+          .eq('status', 'approved')
+          .gte('period_date', startDate)
+          .lte('period_date', endDate),
+      ])
+      for (const d of (defaultsRes.data ?? []) as EmployeeAllocation[]) {
+        if (!empDefaults[d.employee_id]) empDefaults[d.employee_id] = []
+        empDefaults[d.employee_id].push(d)
+      }
+      for (const o of (overridesRes.data ?? []) as AllocationOverride[]) {
+        if (!empOverrides[o.employee_id]) empOverrides[o.employee_id] = []
+        empOverrides[o.employee_id].push(o)
+      }
+    }
+
     // Build item → group classification map
     type ItemRow = { id: string; group_id: string; payroll_item_groups: { name: string } | null }
     const itemClassMap: Record<string, 'double' | 'overtime' | 'standard'> = {}
@@ -84,22 +124,34 @@ export async function GET(request: Request): Promise<NextResponse> {
       itemClassMap[item.id] = classifyGroup(groupName)
     }
 
-    // Aggregate by period_date
+    // Aggregate by period_date, applying allocation splits
     type Week = { standardHours: number; overtimeHours: number; doubleTimeHours: number; totalDirectCost: number }
     const byWeek: Record<string, Week> = {}
 
-    type TxnRow = { period_date: string; hours: number | null; amount: number; payroll_item_id: string | null }
-    for (const t of (txnRes.data ?? []) as TxnRow[]) {
-      if (!byWeek[t.period_date]) {
-        byWeek[t.period_date] = { standardHours: 0, overtimeHours: 0, doubleTimeHours: 0, totalDirectCost: 0 }
+    for (const t of rawTxns) {
+      const homeBranchId = codeToHomeBranch[t.payroll_code_id]
+      if (!homeBranchId) continue
+
+      const splits = resolveEmployeeAllocation(
+        t.employee_id, t.period_date, homeBranchId,
+        empOverrides[t.employee_id] ?? [], empDefaults[t.employee_id] ?? []
+      )
+
+      for (const split of splits) {
+        if (branchId && split.branchId !== branchId) continue
+        const pct = split.percentage / 100
+        if (!byWeek[t.period_date]) {
+          byWeek[t.period_date] = { standardHours: 0, overtimeHours: 0, doubleTimeHours: 0, totalDirectCost: 0 }
+        }
+        const w = byWeek[t.period_date]
+        w.totalDirectCost += r2(t.amount * pct)
+        if (t.hours == null) continue
+        const scaledHours = r2(t.hours * pct)
+        const cls = t.payroll_item_id ? (itemClassMap[t.payroll_item_id] ?? 'standard') : 'standard'
+        if (cls === 'double') w.doubleTimeHours += scaledHours
+        else if (cls === 'overtime') w.overtimeHours += scaledHours
+        else w.standardHours += scaledHours
       }
-      const w = byWeek[t.period_date]
-      w.totalDirectCost += t.amount
-      if (t.hours == null) continue
-      const cls = t.payroll_item_id ? (itemClassMap[t.payroll_item_id] ?? 'standard') : 'standard'
-      if (cls === 'double') w.doubleTimeHours += t.hours
-      else if (cls === 'overtime') w.overtimeHours += t.hours
-      else w.standardHours += t.hours
     }
 
     const weeks = Object.entries(byWeek)
