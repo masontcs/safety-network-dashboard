@@ -36,6 +36,7 @@ interface PeriodData {
   periodDate: string
   revenue: number
   directPayroll: number
+  adminPayroll?: number
   employerTaxes?: number
   fuel: number
 }
@@ -47,10 +48,14 @@ interface BranchData {
   rental: number
   oneTime: number
   directPayroll: number
+  adminPayroll?: number
   employerTaxes?: number
   fuel: number
   grossProfit: number
   gpPct: number
+  corpOverhead?: number
+  hqOverhead?: number
+  netAfterAlloc?: number
   revenueByPeriod: Array<{ periodDate: string; revenue: number }>
   payrollByPeriod: Array<{ periodDate: string; payroll: number }>
   fuelByPeriod: Array<{ periodDate: string; fuel: number }>
@@ -60,11 +65,14 @@ interface OverviewData {
   totals: {
     revenue: number
     directPayroll: number
+    adminPayroll?: number
     employerTaxes?: number
     fuel: number
     grossProfit: number
     gpPct: number
     totalGallons: number
+    corpOverhead?: number
+    hqOverhead?: number
   }
   byPeriod: PeriodData[]
   byBranch: BranchData[]
@@ -284,6 +292,7 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null)
+  const [allocationOn, setAllocationOn] = useState(false)
 
   const selectedFiscal = useMemo(
     () => fiscalMonths.find((fm) => fm.id === selectedFiscalId) ?? null,
@@ -341,14 +350,17 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
     if (fiscalMonths.length > 0) doInit()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch overview data when the date range changes
+  // Fetch overview data when the date range or allocation toggle changes
   useEffect(() => {
     if (!startDate || !endDate) return
     setLoading(true)
     setError(null)
     setSelectedWeek(null)
 
-    fetch(`/api/admin/overview?startDate=${startDate}&endDate=${endDate}`)
+    const params = new URLSearchParams({ startDate, endDate })
+    if (allocationOn) params.set('allocation', 'true')
+
+    fetch(`/api/admin/overview?${params}`)
       .then((r) => r.json())
       .then((json) => {
         if (!json.success) throw new Error(json.error)
@@ -356,15 +368,22 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false))
-  }, [startDate, endDate])
+  }, [startDate, endDate, allocationOn])
 
   const totals = overviewData?.totals
   const rev = totals?.revenue ?? 0
   const pay = totals?.directPayroll ?? 0
+  const adminPayroll = totals?.adminPayroll ?? 0
   const employerTaxes = totals?.employerTaxes ?? 0
+  const totalPay = pay + adminPayroll + employerTaxes
   const fuel = totals?.fuel ?? 0
   const gp = totals?.grossProfit ?? 0
   const gpPct = totals?.gpPct ?? 0
+  const corpOverhead = totals?.corpOverhead ?? 0
+  const hqOverhead = totals?.hqOverhead ?? 0
+  const overheadTotal = corpOverhead + hqOverhead
+  const netAfterAlloc = gp - overheadTotal
+  const netAfterAllocPct = rev > 0 ? (netAfterAlloc / rev) * 100 : 0
   const noData = !loading && rev === 0 && pay === 0 && fuel === 0
 
   // Bar chart data
@@ -476,6 +495,21 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Allocation toggle — mobile */}
+        <button
+          onClick={() => setAllocationOn((v) => !v)}
+          style={{
+            alignSelf: 'flex-start',
+            background: allocationOn ? '#ff6b00' : '#2a2a2a',
+            color: allocationOn ? '#ffffff' : '#666666',
+            border: '1px solid ' + (allocationOn ? '#ff6b00' : '#333333'),
+            borderRadius: 8, padding: '4px 12px', fontSize: 11,
+            cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          {allocationOn ? 'After Allocation' : 'Pre-Allocation'}
+        </button>
+
         {/* Period selector */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 2, border: '1px solid #333333', flexShrink: 0 }}>
@@ -551,8 +585,8 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
               <div style={{ fontSize: 20, fontWeight: 500, color: '#ffffff', lineHeight: 1.2 }}>{noData ? '—' : formatCurrency(fuel)}</div>
             </div>
             <div className="card" style={{ padding: '12px 14px', minHeight: 80 }}>
-              <div className="metric-label" style={{ marginBottom: 6 }}>Payroll</div>
-              <div style={{ fontSize: 20, fontWeight: 500, color: '#ffffff', lineHeight: 1.2 }}>{noData ? '—' : formatCurrency(pay)}</div>
+              <div className="metric-label" style={{ marginBottom: 6 }}>Total Payroll</div>
+              <div style={{ fontSize: 20, fontWeight: 500, color: '#ffffff', lineHeight: 1.2 }}>{noData ? '—' : formatCurrency(totalPay)}</div>
             </div>
             <div className="card" style={{ padding: '12px 14px', minHeight: 80 }}>
               <div className="metric-label" style={{ marginBottom: 6 }}>Net Profit</div>
@@ -715,6 +749,24 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
         <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Overview</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Allocation toggle */}
+          <button
+            onClick={() => setAllocationOn((v) => !v)}
+            style={{
+              background: allocationOn ? '#ff6b00' : '#2a2a2a',
+              color: allocationOn ? '#ffffff' : '#666666',
+              border: '1px solid ' + (allocationOn ? '#ff6b00' : '#333333'),
+              borderRadius: 8,
+              padding: '4px 12px',
+              fontSize: 11,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontWeight: allocationOn ? 500 : 400,
+              letterSpacing: '0.02em',
+            }}
+          >
+            {allocationOn ? 'After Allocation' : 'Pre-Allocation'}
+          </button>
 
           {/* Month / Quarter / Year toggle */}
           <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 2, border: '1px solid #333333' }}>
@@ -834,7 +886,7 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
           <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <div className="metric-label">Direct Payroll</div>
+                <div className="metric-label">Total Payroll</div>
                 <div style={{ fontSize: 11, color: '#666666' }}>{periodLabel}</div>
               </div>
               <div style={{ width: 36, height: 36, background: '#2a2a2a', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -846,16 +898,18 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
               </div>
             </div>
             <div className="metric-value" style={{ marginTop: 8, color: noData ? '#888888' : '#ffffff' }}>
-              {noData ? '—' : formatCurrency(pay + employerTaxes)}
+              {noData ? '—' : formatCurrency(totalPay)}
             </div>
             {!noData && rev > 0 && (
               <div style={{ fontSize: 11, color: '#cc4444', marginTop: 2 }}>
-                {formatPercent(((pay + employerTaxes) / rev) * 100)} of revenue
+                {formatPercent((totalPay / rev) * 100)} of revenue
               </div>
             )}
-            {!noData && employerTaxes > 0 && (
-              <div style={{ fontSize: 10, color: '#666666', marginTop: 4 }}>
-                {formatCurrency(pay)} wages · {formatCurrency(employerTaxes)} employer taxes
+            {!noData && (
+              <div style={{ fontSize: 10, color: '#666666', marginTop: 4, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <span>Direct: {formatCurrency(pay)}</span>
+                {adminPayroll > 0 && <span>Admin (H+S): {formatCurrency(adminPayroll)}</span>}
+                {employerTaxes > 0 && <span>Taxes: {formatCurrency(employerTaxes)}</span>}
               </div>
             )}
           </div>
@@ -865,17 +919,23 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
           <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <div className="metric-label">Net Profit</div>
+                <div className="metric-label">{allocationOn ? 'Net After Allocation' : 'Net Profit'}</div>
                 <div style={{ fontSize: 11, color: '#666666' }}>{periodLabel}</div>
               </div>
-              {!noData && <DonutChart pct={gpPct} />}
+              {!noData && <DonutChart pct={allocationOn ? netAfterAllocPct : gpPct} />}
             </div>
-            <div className="metric-value" style={{ marginTop: 8, color: noData ? '#888888' : gp >= 0 ? '#ffffff' : '#cc4444' }}>
-              {noData ? '—' : formatCurrency(gp)}
+            <div className="metric-value" style={{ marginTop: 8, color: noData ? '#888888' : (allocationOn ? netAfterAlloc : gp) >= 0 ? '#ffffff' : '#cc4444' }}>
+              {noData ? '—' : formatCurrency(allocationOn ? netAfterAlloc : gp)}
             </div>
             {!noData && (
-              <div style={{ fontSize: 11, color: gp >= 0 ? '#ff6b00' : '#cc4444', marginTop: 2 }}>
-                {gp >= 0 ? '↑' : '↓'} {formatPercent(Math.abs(gpPct))} margin
+              <div style={{ fontSize: 11, color: (allocationOn ? netAfterAlloc : gp) >= 0 ? '#ff6b00' : '#cc4444', marginTop: 2 }}>
+                {(allocationOn ? netAfterAlloc : gp) >= 0 ? '↑' : '↓'} {formatPercent(Math.abs(allocationOn ? netAfterAllocPct : gpPct))} margin
+              </div>
+            )}
+            {allocationOn && !noData && overheadTotal > 0 && (
+              <div style={{ fontSize: 10, color: '#666666', marginTop: 4, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <span>Corp: {formatCurrency(corpOverhead)}</span>
+                <span>HQ: {formatCurrency(hqOverhead)}</span>
               </div>
             )}
           </div>

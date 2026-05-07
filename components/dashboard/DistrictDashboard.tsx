@@ -704,6 +704,10 @@ export default function DistrictDashboard({ branches, initialBranch }: Props) {
   const [overtimeSummary, setOvertimeSummary] = useState<OtEmployee[]>([])
   const [directLaborDetail, setDirectLaborDetail] = useState<DlRow[]>([])
 
+  // Allocation toggle
+  const [allocationOn, setAllocationOn] = useState(false)
+  const [branchAllocAlloc, setBranchAllocAlloc] = useState<number>(0)
+
   const isMobile = useIsMobile()
   const isAggregate = selectedBranchId === 'all'
 
@@ -820,6 +824,25 @@ export default function DistrictDashboard({ branches, initialBranch }: Props) {
       .finally(() => { setLoading(false); setAnalyticsLoading(false) })
   }, [selectedBranchId, startDate, endDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Fetch allocation for branches when toggle is ON
+  useEffect(() => {
+    if (!allocationOn || !endDate) {
+      setBranchAllocAlloc(0)
+      return
+    }
+    fetch(`/api/allocation/summary?periodDate=${endDate}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (!json.success || !json.data.canAllocate) return
+        const branchIds = isAggregate ? branches.map((b) => b.id) : [selectedBranchId]
+        const total = json.data.allocations
+          .filter((a: { branchId: string; totalAllocation: number }) => branchIds.includes(a.branchId))
+          .reduce((s: number, a: { totalAllocation: number }) => s + a.totalAllocation, 0)
+        setBranchAllocAlloc(total)
+      })
+      .catch(() => {})
+  }, [allocationOn, endDate, selectedBranchId, isAggregate, branches])
+
   // ── Derived metrics ───────────────────────────────────────────────────────
 
   const revenueByBranch = useMemo(() => {
@@ -853,7 +876,9 @@ export default function DistrictDashboard({ branches, initialBranch }: Props) {
   const totalTax = Object.values(payrollByBranch).reduce((s, p) => s + p.tax, 0)
   const totalPayroll = totalDirect + totalAdmin + totalTax
   const grossProfit = totalRev - totalPayroll - totalFuel
+  const netAfterAlloc = grossProfit - branchAllocAlloc
   const grossProfitPct = totalRev > 0 ? (grossProfit / totalRev) * 100 : null
+  const netAfterAllocPct = totalRev > 0 ? (netAfterAlloc / totalRev) * 100 : null
   const noData = !loading && totalRev === 0 && totalPayroll === 0 && totalFuel === 0
 
   const fuelByWeek = useMemo(() => {
@@ -979,6 +1004,21 @@ export default function DistrictDashboard({ branches, initialBranch }: Props) {
 
   const selectorBar = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      {/* Allocation toggle */}
+      <button
+        onClick={() => setAllocationOn((v) => !v)}
+        style={{
+          background: allocationOn ? '#ff6b00' : '#2a2a2a',
+          color: allocationOn ? '#ffffff' : '#666666',
+          border: '1px solid ' + (allocationOn ? '#ff6b00' : '#333333'),
+          borderRadius: 8, padding: '4px 12px', fontSize: 11,
+          cursor: 'pointer', fontFamily: 'inherit',
+          fontWeight: allocationOn ? 500 : 400,
+        }}
+      >
+        {allocationOn ? 'After Allocation' : 'Pre-Allocation'}
+      </button>
+
       <select value={selectedBranchId} onChange={(e) => setSelectedBranchId(e.target.value)} style={{ ...selectStyle, color: '#ff6b00' }}>
         <option value="all">All Assigned Branches</option>
         {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -1041,30 +1081,25 @@ export default function DistrictDashboard({ branches, initialBranch }: Props) {
               <div style={{ fontSize: 20, fontWeight: 500, color: '#ffffff' }}>{noData ? '—' : formatCurrency(totalRev)}</div>
             </div>
             <div className="card" style={{ padding: '12px 14px', minHeight: 80 }}>
-              <div className="metric-label" style={{ marginBottom: 6 }}>Direct Pay</div>
-              <div style={{ fontSize: 20, fontWeight: 500, color: '#ffffff' }}>{noData ? '—' : formatCurrency(totalDirect)}</div>
+              <div className="metric-label" style={{ marginBottom: 6 }}>Total Payroll</div>
+              <div style={{ fontSize: 20, fontWeight: 500, color: '#ffffff' }}>{noData ? '—' : formatCurrency(totalPayroll)}</div>
+              {!noData && totalAdmin > 0 && (
+                <div style={{ fontSize: 10, color: '#555555', marginTop: 2 }}>Admin: {formatCurrency(totalAdmin)} lump</div>
+              )}
             </div>
             <div className="card" style={{ padding: '12px 14px', minHeight: 80 }}>
               <div className="metric-label" style={{ marginBottom: 6 }}>Fuel Cost</div>
               <div style={{ fontSize: 20, fontWeight: 500, color: '#ffffff' }}>{noData ? '—' : formatCurrency(totalFuel)}</div>
             </div>
             <div className="card" style={{ padding: '12px 14px', minHeight: 80 }}>
-              <div className="metric-label" style={{ marginBottom: 6 }}>Gross Profit</div>
-              <div style={{ fontSize: 20, fontWeight: 500, color: noData ? '#888888' : grossProfit >= 0 ? '#ffffff' : '#cc4444' }}>
-                {noData ? '—' : formatCurrency(grossProfit)}
+              <div className="metric-label" style={{ marginBottom: 6 }}>{allocationOn ? 'Net After Alloc' : 'Gross Profit'}</div>
+              <div style={{ fontSize: 20, fontWeight: 500, color: noData ? '#888888' : (allocationOn ? netAfterAlloc : grossProfit) >= 0 ? '#ffffff' : '#cc4444' }}>
+                {noData ? '—' : formatCurrency(allocationOn ? netAfterAlloc : grossProfit)}
               </div>
-              {!noData && grossProfitPct !== null && (
-                <div style={{ fontSize: 11, color: grossProfit >= 0 ? '#ff6b00' : '#cc4444', marginTop: 2 }}>{grossProfitPct.toFixed(1)}% margin</div>
+              {!noData && (allocationOn ? netAfterAllocPct : grossProfitPct) !== null && (
+                <div style={{ fontSize: 11, color: (allocationOn ? netAfterAlloc : grossProfit) >= 0 ? '#ff6b00' : '#cc4444', marginTop: 2 }}>{(allocationOn ? netAfterAllocPct ?? 0 : grossProfitPct ?? 0).toFixed(1)}% margin</div>
               )}
             </div>
-          </div>
-        )}
-
-        {!loading && !noData && (
-          <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 11, color: '#666666', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Admin Payroll</span>
-            <span style={{ fontSize: 16, fontWeight: 500, color: '#888888' }}>{formatCurrency(totalAdmin)}</span>
-            <span style={{ fontSize: 10, color: '#555555' }}>lump sum only</span>
           </div>
         )}
 
@@ -1166,35 +1201,49 @@ export default function DistrictDashboard({ branches, initialBranch }: Props) {
           <MetricCard variant="hero" label="Total Revenue" sub={periodLabel} value={noData ? '—' : formatCurrency(totalRev)} />
         )}
         {loading ? <Skeleton height={140} borderRadius={12} /> : (
-          <MetricCard label="Direct Payroll" sub={periodLabel} value={noData ? '—' : formatCurrency(totalDirect)} delta={totalRev > 0 ? `${formatPercent((totalDirect / totalRev) * 100)} of revenue` : undefined} deltaType="down" />
+          <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
+            <div className="metric-label">Total Payroll</div>
+            <div style={{ fontSize: 11, color: '#666666' }}>{periodLabel}</div>
+            <div style={{ fontSize: 26, fontWeight: 500, color: noData ? '#888888' : '#ffffff', marginTop: 8 }}>
+              {noData ? '—' : formatCurrency(totalPayroll)}
+            </div>
+            {!noData && totalRev > 0 && (
+              <div style={{ fontSize: 11, color: '#cc4444', marginTop: 2 }}>
+                {formatPercent((totalPayroll / totalRev) * 100)} of revenue
+              </div>
+            )}
+            {!noData && (
+              <div style={{ fontSize: 10, color: '#666666', marginTop: 4, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <span>Direct: {formatCurrency(totalDirect)}</span>
+                {totalAdmin > 0 && <span>Admin (H+S): {formatCurrency(totalAdmin)} · lump sum</span>}
+                {totalTax > 0 && <span>Taxes: {formatCurrency(totalTax)}</span>}
+              </div>
+            )}
+          </div>
         )}
         {loading ? <Skeleton height={140} borderRadius={12} /> : (
           <MetricCard label="Fuel Cost" sub={periodLabel} value={noData ? '—' : formatCurrency(totalFuel)} delta={totalRev > 0 ? `${formatPercent((totalFuel / totalRev) * 100)} of revenue` : undefined} deltaType="down" />
         )}
         {loading ? <Skeleton height={140} borderRadius={12} /> : (
           <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div className="metric-label">Gross Profit</div>
+            <div className="metric-label">{allocationOn ? 'Net After Allocation' : 'Gross Profit'}</div>
             <div style={{ fontSize: 11, color: '#666666' }}>{periodLabel}</div>
-            <div style={{ fontSize: 26, fontWeight: 500, color: noData ? '#888888' : grossProfit >= 0 ? '#ffffff' : '#cc4444', marginTop: 8 }}>
-              {noData ? '—' : formatCurrency(grossProfit)}
+            <div style={{ fontSize: 26, fontWeight: 500, color: noData ? '#888888' : (allocationOn ? netAfterAlloc : grossProfit) >= 0 ? '#ffffff' : '#cc4444', marginTop: 8 }}>
+              {noData ? '—' : formatCurrency(allocationOn ? netAfterAlloc : grossProfit)}
             </div>
-            {!noData && grossProfitPct !== null && (
-              <div style={{ fontSize: 11, color: grossProfit >= 0 ? '#ff6b00' : '#cc4444', marginTop: 2 }}>
-                {grossProfit >= 0 ? '↑' : '↓'} {formatPercent(Math.abs(grossProfitPct))} margin
+            {!noData && (allocationOn ? netAfterAllocPct : grossProfitPct) !== null && (
+              <div style={{ fontSize: 11, color: (allocationOn ? netAfterAlloc : grossProfit) >= 0 ? '#ff6b00' : '#cc4444', marginTop: 2 }}>
+                {(allocationOn ? netAfterAlloc : grossProfit) >= 0 ? '↑' : '↓'} {formatPercent(Math.abs(allocationOn ? (netAfterAllocPct ?? 0) : (grossProfitPct ?? 0)))} margin
+              </div>
+            )}
+            {allocationOn && !noData && branchAllocAlloc > 0 && (
+              <div style={{ fontSize: 10, color: '#666666', marginTop: 4 }}>
+                Corp+HQ: {formatCurrency(branchAllocAlloc)} · last week
               </div>
             )}
           </div>
         )}
       </div>
-
-      {/* Admin payroll — 5th smaller card */}
-      {!loading && (
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '10px 16px' }}>
-          <span style={{ fontSize: 11, color: '#666666', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Admin Payroll</span>
-          <span style={{ fontSize: 18, fontWeight: 500, color: '#888888' }}>{noData ? '—' : formatCurrency(totalAdmin)}</span>
-          <span style={{ fontSize: 11, color: '#555555' }}>Lump sum — detail restricted to admin/executive</span>
-        </div>
-      )}
 
       {/* Variance vs target */}
       {viewMode === 'month' && selectedFiscalId && (

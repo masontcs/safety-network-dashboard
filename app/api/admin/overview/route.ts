@@ -3,6 +3,7 @@ import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/utils/errors'
 import { resolveEmployeeAllocation, type AllocationOverride, type EmployeeAllocation } from '@/lib/allocation/employee-allocation'
+import { calculateAllocations } from '@/lib/allocation'
 
 const PAGE_SIZE = 1000
 
@@ -25,7 +26,7 @@ function toSaturdayOfWeek(dateStr: string): string {
 
 function emptyResponse() {
   return {
-    totals: { revenue: 0, directPayroll: 0, employerTaxes: 0, fuel: 0, grossProfit: 0, gpPct: 0, totalGallons: 0 },
+    totals: { revenue: 0, directPayroll: 0, adminPayroll: 0, employerTaxes: 0, fuel: 0, grossProfit: 0, gpPct: 0, totalGallons: 0 },
     byPeriod: [],
     byBranch: [],
   }
@@ -42,6 +43,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const { searchParams } = new URL(request.url)
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const withAllocation = searchParams.get('allocation') === 'true'
 
     if (!startDate || !endDate) {
       return NextResponse.json(
@@ -156,6 +158,40 @@ export async function GET(request: Request): Promise<NextResponse> {
       }
     }
 
+    // ── Admin payroll transactions ──────────────────────────────────────────
+    const { data: adminCodeRows } = await supabase
+      .from('payroll_codes')
+      .select('id, branch_id')
+      .in('labor_type', ['admin_hourly', 'admin_salary'])
+
+    const adminCodeIdToBranchId: Record<string, string | null> = {}
+    for (const c of adminCodeRows ?? []) {
+      adminCodeIdToBranchId[c.id] = c.branch_id ?? null
+    }
+    const adminCodeIds = Object.keys(adminCodeIdToBranchId)
+
+    type AdminPayRow = { employee_id: string; payroll_code_id: string; period_date: string; amount: number }
+    const allAdminPayRows: AdminPayRow[] = []
+
+    if (adminCodeIds.length > 0) {
+      from = 0
+      while (true) {
+        const { data, error } = await supabase
+          .from('payroll_transactions')
+          .select('employee_id, payroll_code_id, period_date, amount')
+          .in('payroll_code_id', adminCodeIds)
+          .gte('period_date', startDate)
+          .lte('period_date', endDate)
+          .range(from, from + PAGE_SIZE - 1)
+
+        if (error) throw new Error(error.message)
+        if (!data || data.length === 0) break
+        allAdminPayRows.push(...(data as AdminPayRow[]))
+        if (data.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
+    }
+
     // ── Employer taxes ──────────────────────────────────────────────────────
     type TaxRow = { employee_id: string; entity_id: string; period_date: string; amount: number }
     const allTaxRows: TaxRow[] = []
@@ -197,6 +233,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const allEmpIds = [
       ...new Set([
         ...allPayRows.map((p) => p.employee_id),
+        ...allAdminPayRows.map((p) => p.employee_id),
         ...allFuelRows.map((f) => f.employee_id).filter((id): id is string => id !== null),
         ...allTaxRows.map((t) => t.employee_id),
       ]),
@@ -235,6 +272,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     // period-level maps
     const periodRevenue: Record<string, number> = {}
     const periodPayroll: Record<string, number> = {}
+    const periodAdminPayroll: Record<string, number> = {}
     const periodTax: Record<string, number> = {}
     const periodFuel: Record<string, number> = {}
 
@@ -244,6 +282,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const bRental: Record<string, number> = {}
     const bOneTime: Record<string, number> = {}
     const bPayroll: Record<string, number> = {}
+    const bAdminPayroll: Record<string, number> = {}
     const bTax: Record<string, number> = {}
     const bFuel: Record<string, number> = {}
     const bRevByPeriod: Record<string, Record<string, number>> = {}
@@ -274,6 +313,21 @@ export async function GET(request: Request): Promise<NextResponse> {
         bPayroll[split.branchId] = (bPayroll[split.branchId] ?? 0) + portion
         if (!bPayByPeriod[split.branchId]) bPayByPeriod[split.branchId] = {}
         bPayByPeriod[split.branchId][p.period_date] = (bPayByPeriod[split.branchId][p.period_date] ?? 0) + portion
+      }
+    }
+
+    // Admin payroll — attribute to SN branches where code's branch_id matches; rest is global-only
+    for (const p of allAdminPayRows) {
+      periodAdminPayroll[p.period_date] = (periodAdminPayroll[p.period_date] ?? 0) + p.amount
+      const homeBranchId = adminCodeIdToBranchId[p.payroll_code_id]
+      if (!homeBranchId || !snBranchIds.includes(homeBranchId)) continue
+      const splits = resolveEmployeeAllocation(
+        p.employee_id, p.period_date, homeBranchId,
+        empOverrides[p.employee_id] ?? [], empDefaults[p.employee_id] ?? []
+      )
+      for (const split of splits) {
+        const portion = r2(p.amount * (split.percentage / 100))
+        bAdminPayroll[split.branchId] = (bAdminPayroll[split.branchId] ?? 0) + portion
       }
     }
 
@@ -319,6 +373,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const allPeriods = new Set([
       ...Object.keys(periodRevenue),
       ...Object.keys(periodPayroll),
+      ...Object.keys(periodAdminPayroll),
       ...Object.keys(periodTax),
       ...Object.keys(periodFuel),
     ])
@@ -329,6 +384,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         periodDate: p,
         revenue: periodRevenue[p] ?? 0,
         directPayroll: periodPayroll[p] ?? 0,
+        adminPayroll: periodAdminPayroll[p] ?? 0,
         employerTaxes: periodTax[p] ?? 0,
         fuel: periodFuel[p] ?? 0,
       }))
@@ -343,9 +399,10 @@ export async function GET(request: Request): Promise<NextResponse> {
     const byBranch = Array.from(allBranchIds).map((bid) => {
       const rev = bRevenue[bid] ?? 0
       const pay = bPayroll[bid] ?? 0
+      const adminPay = bAdminPayroll[bid] ?? 0
       const tax = bTax[bid] ?? 0
       const fuel = bFuel[bid] ?? 0
-      const gp = rev - pay - tax - fuel
+      const gp = rev - pay - adminPay - tax - fuel
       const gpPct = rev > 0 ? r2((gp / rev) * 100) : 0
       return {
         branchId: bid,
@@ -354,6 +411,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         rental: bRental[bid] ?? 0,
         oneTime: bOneTime[bid] ?? 0,
         directPayroll: pay,
+        adminPayroll: adminPay,
         employerTaxes: tax,
         fuel,
         grossProfit: gp,
@@ -371,26 +429,105 @@ export async function GET(request: Request): Promise<NextResponse> {
     })
 
     const totalRevenue = byBranch.reduce((s, b) => s + b.revenue, 0)
-    const totalPayroll = byBranch.reduce((s, b) => s + b.directPayroll, 0)
+    const totalDirectPayroll = byBranch.reduce((s, b) => s + b.directPayroll, 0)
+    // Admin payroll: sum from period totals (includes non-SN-branch codes)
+    const totalAdminPayroll = Object.values(periodAdminPayroll).reduce((s, v) => s + v, 0)
     const totalEmployerTaxes = byBranch.reduce((s, b) => s + b.employerTaxes, 0)
     const totalFuel = byBranch.reduce((s, b) => s + b.fuel, 0)
-    const totalGP = totalRevenue - totalPayroll - totalEmployerTaxes - totalFuel
+    const totalGP = totalRevenue - totalDirectPayroll - totalAdminPayroll - totalEmployerTaxes - totalFuel
     const totalGpPct = totalRevenue > 0 ? r2((totalGP / totalRevenue) * 100) : 0
+
+    // ── Corp/HQ allocation (only when ?allocation=true) ─────────────────────
+    type AllocBranch = { corpOverhead: number; hqOverhead: number; netAfterAlloc: number }
+    const branchAlloc: Record<string, AllocBranch> = {}
+    let totalCorpOverhead = 0
+    let totalHqOverhead = 0
+
+    if (withAllocation) {
+      const { data: snBiz } = await supabase
+        .from('businesses')
+        .select('hq_allocation_pct')
+        .eq('code', 'SN')
+        .single()
+
+      const snHqPct = snBiz?.hq_allocation_pct ?? 0.7813
+
+      // Corp payroll codes
+      const { data: corpCodeRows } = await supabase
+        .from('payroll_codes')
+        .select('id')
+        .eq('allocation_type', 'corp')
+      const corpCodeIds = (corpCodeRows ?? []).map((c) => c.id)
+
+      // HQ payroll codes
+      const { data: hqCodeRows } = await supabase
+        .from('payroll_codes')
+        .select('id')
+        .eq('allocation_type', 'hq')
+      const hqCodeIds = (hqCodeRows ?? []).map((c) => c.id)
+
+      let corpTotal = 0
+      let hqTotal = 0
+
+      if (corpCodeIds.length > 0) {
+        const { data: corpTxns } = await supabase
+          .from('payroll_transactions')
+          .select('amount')
+          .in('payroll_code_id', corpCodeIds)
+          .gte('period_date', startDate!)
+          .lte('period_date', endDate!)
+        corpTotal = (corpTxns ?? []).reduce((s, t) => s + t.amount, 0)
+      }
+
+      if (hqCodeIds.length > 0) {
+        const { data: hqTxns } = await supabase
+          .from('payroll_transactions')
+          .select('amount')
+          .in('payroll_code_id', hqCodeIds)
+          .gte('period_date', startDate!)
+          .lte('period_date', endDate!)
+        hqTotal = (hqTxns ?? []).reduce((s, t) => s + t.amount, 0)
+      }
+
+      const branchRevenues = byBranch.map((b) => ({ branchId: b.branchId, totalRevenue: b.revenue }))
+      const allocResult = calculateAllocations(branchRevenues, corpTotal, hqTotal, snHqPct)
+
+      if (allocResult.canAllocate) {
+        for (const a of allocResult.allocations) {
+          branchAlloc[a.branchId] = {
+            corpOverhead: a.corpAllocation,
+            hqOverhead: a.hqAllocation,
+            netAfterAlloc: (bRevenue[a.branchId] ?? 0) - (bPayroll[a.branchId] ?? 0) - (bAdminPayroll[a.branchId] ?? 0) - (bTax[a.branchId] ?? 0) - (bFuel[a.branchId] ?? 0) - a.totalAllocation,
+          }
+        }
+        totalCorpOverhead = allocResult.totalCorpPayroll
+        totalHqOverhead = r2(allocResult.totalHqPayroll * snHqPct)
+      }
+    }
+
+    const byBranchWithAlloc = byBranch.map((b) => ({
+      ...b,
+      ...(withAllocation && branchAlloc[b.branchId]
+        ? branchAlloc[b.branchId]
+        : { corpOverhead: 0, hqOverhead: 0, netAfterAlloc: b.grossProfit }),
+    }))
 
     return NextResponse.json({
       success: true,
       data: {
         totals: {
           revenue: totalRevenue,
-          directPayroll: totalPayroll,
+          directPayroll: totalDirectPayroll,
+          adminPayroll: totalAdminPayroll,
           employerTaxes: totalEmployerTaxes,
           fuel: totalFuel,
           grossProfit: totalGP,
           gpPct: totalGpPct,
           totalGallons,
+          ...(withAllocation && { corpOverhead: totalCorpOverhead, hqOverhead: totalHqOverhead }),
         },
         byPeriod,
-        byBranch,
+        byBranch: byBranchWithAlloc,
       },
     })
   } catch (err) {

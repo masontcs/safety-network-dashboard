@@ -205,6 +205,7 @@ export default function ExecutiveDashboard({ branches, entities }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showPayrollDetail, setShowPayrollDetail] = useState(false)
+  const [allocationOn, setAllocationOn] = useState(false)
 
   // ── Load fiscal data on mount ─────────────────────────────────────────────
   useEffect(() => {
@@ -515,6 +516,21 @@ export default function ExecutiveDashboard({ branches, entities }: Props) {
         <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Executive Overview</div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {/* Allocation toggle */}
+          <button
+            onClick={() => setAllocationOn((v) => !v)}
+            style={{
+              background: allocationOn ? '#ff6b00' : '#1e1e1e',
+              color: allocationOn ? '#ffffff' : '#666666',
+              border: '1px solid ' + (allocationOn ? '#ff6b00' : '#2a2a2a'),
+              borderRadius: 8, padding: '4px 12px', fontSize: 11,
+              cursor: 'pointer', fontFamily: 'inherit',
+              fontWeight: allocationOn ? 500 : 400,
+            }}
+          >
+            {allocationOn ? 'After Allocation' : 'Pre-Allocation'}
+          </button>
+
           {/* Mode toggle */}
           <div
             style={{
@@ -837,51 +853,51 @@ export default function ExecutiveDashboard({ branches, entities }: Props) {
           </div>
         )}
 
-        {/* Net After Allocation */}
+        {/* Gross Profit / Net After Allocation */}
         {loading ? (
           <Skeleton height={150} borderRadius={12} />
         ) : (
           <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <div className="metric-label">Net After Overhead</div>
+                <div className="metric-label">{allocationOn ? 'Net After Overhead' : 'Gross Profit'}</div>
                 <div style={{ fontSize: 11, color: '#666666' }}>
-                  {periodLabel}{viewMode !== 'month' ? ' · overhead: last week of period' : ''}
+                  {periodLabel}{allocationOn && viewMode !== 'month' ? ' · overhead: last week of period' : ''}
                 </div>
               </div>
-              {!noData && <DonutChart pct={netAfterAllocPct} />}
+              {!noData && <DonutChart pct={allocationOn ? netAfterAllocPct : gpPct} />}
             </div>
             <div
               className="metric-value"
               style={{
                 marginTop: 8,
-                color: noData ? '#888888' : netAfterAlloc >= 0 ? '#ffffff' : '#cc4444',
+                color: noData ? '#888888' : (allocationOn ? netAfterAlloc : grossProfit) >= 0 ? '#ffffff' : '#cc4444',
               }}
             >
-              {noData ? '—' : formatCurrency(netAfterAlloc)}
+              {noData ? '—' : formatCurrency(allocationOn ? netAfterAlloc : grossProfit)}
             </div>
             {!noData && (
               <div
                 style={{
                   fontSize: 11,
-                  color: netAfterAlloc >= 0 ? '#ff6b00' : '#cc4444',
+                  color: (allocationOn ? netAfterAlloc : grossProfit) >= 0 ? '#ff6b00' : '#cc4444',
                   marginTop: 2,
                 }}
               >
-                {netAfterAlloc >= 0 ? '↑' : '↓'} {formatPercent(Math.abs(netAfterAllocPct))} margin
+                {(allocationOn ? netAfterAlloc : grossProfit) >= 0 ? '↑' : '↓'} {formatPercent(Math.abs(allocationOn ? netAfterAllocPct : gpPct))} margin
               </div>
             )}
-            {!noData && overheadTotal > 0 && (
+            {allocationOn && !noData && overheadTotal > 0 && (
               <div style={{ fontSize: 11, color: '#666666', marginTop: 4 }}>
-                {formatCurrency(overheadTotal)} overhead
+                Corp: {formatCurrency(allocation?.totalCorpPayroll ?? 0)} · HQ: {formatCurrency(allocation?.snHqShare ?? 0)}
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* ── Allocation row ── */}
-      {!loading && allocation && (
+      {/* ── Allocation row — only when toggle is ON ── */}
+      {!loading && allocation && allocationOn && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
           {/* Corp Overhead */}
           <div className="card">
