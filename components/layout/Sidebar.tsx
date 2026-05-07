@@ -1,8 +1,9 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import type { Role } from '@/lib/supabase/database.types'
 
 interface NavItem {
@@ -102,6 +103,14 @@ const SplitIcon = () => (
   </svg>
 )
 
+const LogOutIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+    <polyline points="16 17 21 12 16 7"/>
+    <line x1="21" y1="12" x2="9" y2="12"/>
+  </svg>
+)
+
 const NAV_ITEMS: NavItem[] = [
   { href: '/manager',   label: 'Dashboard', icon: <GridIcon />,  roles: ['branch_manager'] },
   { href: '/district',  label: 'Dashboard', icon: <GridIcon />,  roles: ['district_manager'] },
@@ -125,9 +134,14 @@ interface SidebarProps {
   role: Role
 }
 
+const COLLAPSED_W = 48
+const EXPANDED_W = 220
+
 export default function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const items = NAV_ITEMS.filter((item) => item.roles.includes(role))
+  const [expanded, setExpanded] = useState(false)
   const [accessRequestCount, setAccessRequestCount] = useState(0)
   const [allocationCount, setAllocationCount] = useState(0)
 
@@ -143,39 +157,150 @@ export default function Sidebar({ role }: SidebarProps) {
       .catch(() => {})
   }, [role])
 
+  async function handleSignOut() {
+    const supabase = createClientComponentClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
+  const labelStyle = {
+    flex: 1,
+    fontSize: 13,
+    whiteSpace: 'nowrap' as const,
+    overflow: 'hidden' as const,
+    opacity: expanded ? 1 : 0,
+    transition: `opacity ${expanded ? '100ms' : '50ms'} ease-in-out`,
+    transitionDelay: expanded ? '100ms' : '0ms',
+  }
+
   return (
-    <aside className="sidebar">
-      {items.map((item) => {
-        const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-        const showBadge =
-          (item.href === '/admin/access-requests' && accessRequestCount > 0) ||
-          (item.href === '/admin/allocations' && allocationCount > 0)
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            title={item.label}
-            className={`sidebar-icon${isActive ? ' sidebar-icon-active' : ''}`}
-            style={{ position: 'relative' }}
-          >
-            {item.icon}
-            {showBadge && (
-              <span
-                style={{
+    <aside
+      onMouseEnter={() => setExpanded(true)}
+      onMouseLeave={() => setExpanded(false)}
+      style={{
+        width: expanded ? EXPANDED_W : COLLAPSED_W,
+        minWidth: expanded ? EXPANDED_W : COLLAPSED_W,
+        background: '#1a1a1a',
+        borderRight: '1px solid #2a2a2a',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        flexShrink: 0,
+        transition: 'width 200ms ease-in-out, min-width 200ms ease-in-out',
+        zIndex: 10,
+      }}
+    >
+      {/* Branding */}
+      <div style={{
+        height: 48,
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0 6px',
+        flexShrink: 0,
+        borderBottom: '1px solid #2a2a2a',
+        marginBottom: 8,
+      }}>
+        <div style={{
+          width: 36,
+          height: 36,
+          background: '#ff6b00',
+          borderRadius: 8,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.02em' }}>SN</span>
+        </div>
+        <span style={{
+          marginLeft: 10,
+          fontSize: 13,
+          fontWeight: 600,
+          color: '#ffffff',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          opacity: expanded ? 1 : 0,
+          transition: `opacity ${expanded ? '100ms' : '50ms'} ease-in-out`,
+          transitionDelay: expanded ? '100ms' : '0ms',
+        }}>
+          Safety Network
+        </span>
+      </div>
+
+      {/* Nav items */}
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2,
+        padding: '0 6px',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+      }}>
+        {items.map((item) => {
+          const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+          const count =
+            item.href === '/admin/access-requests' ? accessRequestCount
+            : item.href === '/admin/allocations' ? allocationCount
+            : 0
+          const showBadge = count > 0
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              title={expanded ? undefined : item.label}
+              className={`sidebar-link${isActive ? ' sidebar-link-active' : ''}`}
+              style={{ padding: '0 9px', position: 'relative' }}
+            >
+              <span style={{ flexShrink: 0, display: 'flex', width: 18 }}>
+                {item.icon}
+              </span>
+              <span style={labelStyle}>{item.label}</span>
+              {showBadge && expanded && (
+                <span style={{
+                  background: '#ff6b00',
+                  color: '#ffffff',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: '1px 5px',
+                  borderRadius: 10,
+                  minWidth: 18,
+                  textAlign: 'center',
+                  flexShrink: 0,
+                }}>
+                  {count}
+                </span>
+              )}
+              {showBadge && !expanded && (
+                <span style={{
                   position: 'absolute',
-                  top: 4,
-                  right: 4,
+                  top: 5,
+                  right: 5,
                   width: 8,
                   height: 8,
                   borderRadius: '50%',
                   background: '#ff6b00',
                   border: '1.5px solid #1a1a1a',
-                }}
-              />
-            )}
-          </Link>
-        )
-      })}
+                }} />
+              )}
+            </Link>
+          )
+        })}
+      </div>
+
+      {/* Sign out */}
+      <div style={{ padding: '8px 6px', borderTop: '1px solid #2a2a2a', flexShrink: 0 }}>
+        <button
+          onClick={handleSignOut}
+          className="sidebar-link"
+          style={{ padding: '0 9px', border: 'none', background: 'none', width: '100%', cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          <span style={{ flexShrink: 0, display: 'flex', width: 18 }}>
+            <LogOutIcon />
+          </span>
+          <span style={{ ...labelStyle, textAlign: 'left' }}>Sign Out</span>
+        </button>
+      </div>
     </aside>
   )
 }
