@@ -60,9 +60,15 @@ interface FuelRow {
   totalWithTax: number
 }
 
+interface TaxRow {
+  periodDate: string
+  amount: number
+}
+
 interface DetailData {
   employee: EmployeeData
   payrollHistory: PayrollRow[]
+  taxHistory: TaxRow[]
   fuelHistory: FuelRow[]
 }
 
@@ -301,6 +307,26 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
     if (!data) return 0
     return new Set(data.payrollHistory.map((r) => r.periodDate)).size
   }, [data])
+
+  const totalEmployerTaxes = useMemo(
+    () => data?.taxHistory.reduce((s, r) => s + r.amount, 0) ?? 0,
+    [data]
+  )
+
+  const taxByPeriod = useMemo<Record<string, number>>(() => {
+    if (!data) return {}
+    return data.taxHistory.reduce<Record<string, number>>((m, r) => {
+      m[r.periodDate] = (m[r.periodDate] ?? 0) + r.amount
+      return m
+    }, {})
+  }, [data])
+
+  const weeklyTaxes = useMemo<BarChartDataPoint[]>(() => {
+    return Object.entries(taxByPeriod)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-13)
+      .map(([date, value]) => ({ label: formatPeriod(date), value }))
+  }, [taxByPeriod])
 
   const payrollItemSummary = useMemo(() => {
     if (!data) return []
@@ -612,8 +638,9 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
       </div>
 
       {/* Summary metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
-        <SummaryCard label="Total Earnings" value={formatCurrency(totalEarnings)} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12, marginBottom: 24 }}>
+        <SummaryCard label="Gross Earnings" value={formatCurrency(totalEarnings)} />
+        <SummaryCard label="Employer Taxes" value={formatCurrency(totalEmployerTaxes)} muted={totalEmployerTaxes === 0} />
         <SummaryCard label="Total Hours" value={`${totalHours.toFixed(1)} hrs`} />
         <SummaryCard
           label="Avg Hourly Rate"
@@ -645,9 +672,20 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
               />
             </div>
             <div style={cardStyle}>
-              <p style={cardLabelStyle}>Earnings per Week (last 13)</p>
+              <p style={cardLabelStyle}>Gross Earnings per Week (last 13)</p>
               <BarChart data={weeklyEarnings} color="#ff6b00" height={130} />
             </div>
+            {weeklyTaxes.length > 0 && (
+              <div style={cardStyle}>
+                <p style={cardLabelStyle}>Employer Taxes per Week (last 13)</p>
+                <BarChart
+                  data={weeklyTaxes}
+                  color="#cc4444"
+                  height={130}
+                  formatValue={(v) => formatCurrency(v)}
+                />
+              </div>
+            )}
           </div>
 
           {/* Rate history table with pagination */}
@@ -668,25 +706,59 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                   </tr>
                 </thead>
                 <tbody>
-                  {payrollHistory
-                    .slice((payrollPage - 1) * PAYROLL_PAGE_SIZE, payrollPage * PAYROLL_PAGE_SIZE)
-                    .map((row, i) => (
-                      <tr
-                        key={i}
-                        style={{
-                          borderTop: '1px solid #2a2a2a',
-                          background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
-                        }}
-                      >
-                        <td style={tdStyle}>{formatPeriod(row.periodDate)}</td>
-                        <td style={tdStyle}>{row.itemName ?? <span style={{ color: '#555555' }}>—</span>}</td>
-                        <td style={{ ...tdStyle, color: '#888888' }}>{row.groupName ?? '—'}</td>
-                        <td style={{ ...tdStyle, color: '#888888' }}>{row.entityCode}</td>
-                        <td style={tdStyle}>{row.rate != null ? formatCurrency(row.rate) : '—'}</td>
-                        <td style={tdStyle}>{row.hours != null ? row.hours.toFixed(2) : '—'}</td>
-                        <td style={{ ...tdStyle, color: '#ff6b00' }}>{formatCurrency(row.amount)}</td>
-                      </tr>
-                    ))}
+                  {(() => {
+                    const pageRows = payrollHistory.slice(
+                      (payrollPage - 1) * PAYROLL_PAGE_SIZE,
+                      payrollPage * PAYROLL_PAGE_SIZE
+                    )
+                    const renderedPeriods = new Set<string>()
+                    const elements: React.ReactNode[] = []
+                    let rowIdx = 0
+
+                    for (const row of pageRows) {
+                      elements.push(
+                        <tr
+                          key={rowIdx}
+                          style={{
+                            borderTop: '1px solid #2a2a2a',
+                            background: rowIdx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
+                          }}
+                        >
+                          <td style={tdStyle}>{formatPeriod(row.periodDate)}</td>
+                          <td style={tdStyle}>{row.itemName ?? <span style={{ color: '#555555' }}>—</span>}</td>
+                          <td style={{ ...tdStyle, color: '#888888' }}>{row.groupName ?? '—'}</td>
+                          <td style={{ ...tdStyle, color: '#888888' }}>{row.entityCode}</td>
+                          <td style={tdStyle}>{row.rate != null ? formatCurrency(row.rate) : '—'}</td>
+                          <td style={tdStyle}>{row.hours != null ? row.hours.toFixed(2) : '—'}</td>
+                          <td style={{ ...tdStyle, color: '#ff6b00' }}>{formatCurrency(row.amount)}</td>
+                        </tr>
+                      )
+                      rowIdx++
+
+                      // Inject tax row after the last transaction for this period on this page
+                      const nextRow = pageRows[pageRows.indexOf(row) + 1]
+                      const isLastOfPeriod = !nextRow || nextRow.periodDate !== row.periodDate
+                      if (isLastOfPeriod && !renderedPeriods.has(row.periodDate)) {
+                        const taxAmt = taxByPeriod[row.periodDate]
+                        if (taxAmt != null && taxAmt > 0) {
+                          renderedPeriods.add(row.periodDate)
+                          elements.push(
+                            <tr
+                              key={`tax-${row.periodDate}`}
+                              style={{ borderTop: '1px solid #2a2a2a', background: 'rgba(204,68,68,0.04)' }}
+                            >
+                              <td style={tdStyle}>{formatPeriod(row.periodDate)}</td>
+                              <td style={{ ...tdStyle, color: '#cc4444', fontStyle: 'italic' }} colSpan={5}>
+                                Employer Taxes &amp; Contributions
+                              </td>
+                              <td style={{ ...tdStyle, color: '#cc4444' }}>{formatCurrency(taxAmt)}</td>
+                            </tr>
+                          )
+                        }
+                      }
+                    }
+                    return elements
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -1174,11 +1246,11 @@ function Pill({ children, color }: { children: React.ReactNode; color?: 'orange'
   )
 }
 
-function SummaryCard({ label, value }: { label: string; value: string }) {
+function SummaryCard({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
   return (
     <div style={cardStyle}>
       <p style={cardLabelStyle}>{label}</p>
-      <p style={{ margin: 0, fontSize: 22, fontWeight: 500, color: '#ffffff' }}>{value}</p>
+      <p style={{ margin: 0, fontSize: 22, fontWeight: 500, color: muted ? '#555555' : '#ffffff' }}>{value}</p>
     </div>
   )
 }

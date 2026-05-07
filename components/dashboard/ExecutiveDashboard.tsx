@@ -198,6 +198,7 @@ export default function ExecutiveDashboard({ branches, entities }: Props) {
   const [revData, setRevData] = useState<{ totalRevenue: number; transactions: RevTxn[] } | null>(null)
   const [directPayroll, setDirectPayroll] = useState<{ detail: PayrollLine[]; total: number } | null>(null)
   const [adminPayroll, setAdminPayroll] = useState<{ detail: PayrollLine[]; total: number } | null>(null)
+  const [employerTaxes, setEmployerTaxes] = useState<number>(0)
   const [fuelData, setFuelData] = useState<{ totalWithTax: number; totalGallons: number; transactions: FuelTxn[] } | null>(null)
   const [allocation, setAllocation] = useState<AllocationData | null>(null)
   const [trendData, setTrendData] = useState<TrendDataPoint[] | null>(null)
@@ -301,7 +302,8 @@ export default function ExecutiveDashboard({ branches, entities }: Props) {
 
         const allAdminDetail: PayrollLine[] = []
         let allAdminTotal = 0
-        for (const result of adminResults as Array<{ success: boolean; data?: { adminPayroll?: { detail?: PayrollLine[]; total?: number } } }>) {
+        let allTaxTotal = 0
+        for (const result of adminResults as Array<{ success: boolean; data?: { adminPayroll?: { detail?: PayrollLine[]; total?: number }; taxes?: { total?: number } } }>) {
           if (result.success && result.data?.adminPayroll) {
             const ap = result.data.adminPayroll
             if ('detail' in ap && Array.isArray(ap.detail)) {
@@ -309,8 +311,12 @@ export default function ExecutiveDashboard({ branches, entities }: Props) {
             }
             allAdminTotal += ap.total ?? 0
           }
+          if (result.success && result.data?.taxes) {
+            allTaxTotal += result.data.taxes.total ?? 0
+          }
         }
         setAdminPayroll({ detail: allAdminDetail, total: allAdminTotal })
+        setEmployerTaxes(allTaxTotal)
 
         setFuelData({
           totalWithTax: fuel.data.totalWithTax,
@@ -371,7 +377,7 @@ export default function ExecutiveDashboard({ branches, entities }: Props) {
   const rev = revData?.totalRevenue ?? 0
   const directTotal = directPayroll?.total ?? 0
   const adminTotal = adminPayroll?.total ?? 0
-  const totalPayroll = directTotal + adminTotal
+  const totalPayroll = directTotal + adminTotal + employerTaxes
   const fuel = fuelData?.totalWithTax ?? 0
   const grossProfit = rev - totalPayroll - fuel
   const gpPct = rev > 0 ? (grossProfit / rev) * 100 : 0
@@ -769,6 +775,11 @@ export default function ExecutiveDashboard({ branches, entities }: Props) {
                 <div style={{ fontSize: 11, color: '#666666' }}>
                   Admin: {formatCurrency(adminTotal)}
                 </div>
+                {employerTaxes > 0 && (
+                  <div style={{ fontSize: 11, color: '#666666' }}>
+                    Employer Taxes: {formatCurrency(employerTaxes)}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -1044,6 +1055,7 @@ export default function ExecutiveDashboard({ branches, entities }: Props) {
                 <div style={{ fontSize: 11, color: '#666666', marginTop: 4 }}>
                   Direct: {rev > 0 ? formatPercent((directTotal / rev) * 100) : '—'} · Admin:{' '}
                   {rev > 0 ? formatPercent((adminTotal / rev) * 100) : '—'}
+                  {employerTaxes > 0 && ` · Taxes: ${formatCurrency(employerTaxes)}`}
                 </div>
               </>
             )}

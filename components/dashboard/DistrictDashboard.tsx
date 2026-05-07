@@ -290,15 +290,16 @@ function WeeklyTrendChart({ data, loading }: {
 
 // ── BranchComparisonCard ──────────────────────────────────────────────────────
 
-function BranchComparisonCard({ name, rev, direct, admin, fuel, trendData }: {
+function BranchComparisonCard({ name, rev, direct, admin, tax, fuel, trendData }: {
   name: string
   rev: number
   direct: number
   admin: number
+  tax: number
   fuel: number
   trendData: Array<{ label: string; revenue: number; payroll: number; fuel: number }>
 }) {
-  const totalPay = direct + admin
+  const totalPay = direct + admin + tax
   const gp = rev - totalPay - fuel
   const gpPct = rev > 0 ? (gp / rev) * 100 : 0
   return (
@@ -1269,6 +1270,7 @@ export default function DistrictDashboard({ branches, initialBranch }: Props) {
                     rev={revenueByBranch[b.id] ?? 0}
                     direct={payrollByBranch[b.id]?.direct ?? 0}
                     admin={payrollByBranch[b.id]?.admin ?? 0}
+                    tax={payrollByBranch[b.id]?.tax ?? 0}
                     fuel={fuelByBranch[b.id] ?? 0}
                     trendData={branchTrendData[b.id] ?? []}
                   />
@@ -1303,8 +1305,9 @@ export default function DistrictDashboard({ branches, initialBranch }: Props) {
                       const rev = revenueByBranch[b.id] ?? 0
                       const direct = payrollByBranch[b.id]?.direct ?? 0
                       const admin = payrollByBranch[b.id]?.admin ?? 0
+                      const tax = payrollByBranch[b.id]?.tax ?? 0
                       const fuel = fuelByBranch[b.id] ?? 0
-                      const gp = rev - direct - admin - fuel
+                      const gp = rev - direct - admin - tax - fuel
                       const gpPct = rev > 0 ? (gp / rev) * 100 : null
                       return (
                         <tr key={b.id} style={{ borderTop: '1px solid #2a2a2a' }}>

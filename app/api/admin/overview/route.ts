@@ -24,7 +24,7 @@ function toSaturdayOfWeek(dateStr: string): string {
 
 function emptyResponse() {
   return {
-    totals: { revenue: 0, directPayroll: 0, fuel: 0, grossProfit: 0, gpPct: 0, totalGallons: 0 },
+    totals: { revenue: 0, directPayroll: 0, employerTaxes: 0, fuel: 0, grossProfit: 0, gpPct: 0, totalGallons: 0 },
     byPeriod: [],
     byBranch: [],
   }
@@ -154,10 +154,48 @@ export async function GET(request: Request): Promise<NextResponse> {
       }
     }
 
+    // ── Employer taxes ──────────────────────────────────────────────────────
+    type TaxRow = { employee_id: string; entity_id: string; period_date: string; amount: number }
+    const allTaxRows: TaxRow[] = []
+    from = 0
+    while (true) {
+      const { data, error } = await supabase
+        .from('payroll_taxes')
+        .select('employee_id, entity_id, period_date, amount')
+        .gte('period_date', startDate)
+        .lte('period_date', endDate)
+        .range(from, from + PAGE_SIZE - 1)
+      if (error) throw new Error(error.message)
+      if (!data || data.length === 0) break
+      allTaxRows.push(...(data as TaxRow[]))
+      if (data.length < PAGE_SIZE) break
+      from += PAGE_SIZE
+    }
+
+    // Resolve branch per tax row via employee_entity_assignments → payroll_codes
+    const taxEmpIds = [...new Set(allTaxRows.map((r) => r.employee_id))]
+    const empEntityBranch: Record<string, string | null> = {}
+
+    if (taxEmpIds.length > 0) {
+      type EeaRow = { employee_id: string; entity_id: string; payroll_codes: { branch_id: string | null } | null }
+      const { data: eeaData } = await supabase
+        .from('employee_entity_assignments')
+        .select('employee_id, entity_id, payroll_codes(branch_id)')
+        .eq('is_confirmed', true)
+        .is('effective_to', null)
+        .in('employee_id', taxEmpIds)
+
+      for (const eea of (eeaData ?? []) as unknown as EeaRow[]) {
+        const branchId = eea.payroll_codes?.branch_id ?? null
+        empEntityBranch[`${eea.employee_id}:${eea.entity_id}`] = branchId
+      }
+    }
+
     // ── Aggregate ───────────────────────────────────────────────────────────
     // period-level maps
     const periodRevenue: Record<string, number> = {}
     const periodPayroll: Record<string, number> = {}
+    const periodTax: Record<string, number> = {}
     const periodFuel: Record<string, number> = {}
 
     // branch-level maps
@@ -166,6 +204,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const bRental: Record<string, number> = {}
     const bOneTime: Record<string, number> = {}
     const bPayroll: Record<string, number> = {}
+    const bTax: Record<string, number> = {}
     const bFuel: Record<string, number> = {}
     const bRevByPeriod: Record<string, Record<string, number>> = {}
     const bPayByPeriod: Record<string, Record<string, number>> = {}
@@ -202,10 +241,18 @@ export async function GET(request: Request): Promise<NextResponse> {
       if (f.gallons) totalGallons += f.gallons
     }
 
+    for (const t of allTaxRows) {
+      const branchId = empEntityBranch[`${t.employee_id}:${t.entity_id}`]
+      if (!branchId || !snBranchIds.includes(branchId)) continue
+      periodTax[t.period_date] = (periodTax[t.period_date] ?? 0) + t.amount
+      bTax[branchId] = (bTax[branchId] ?? 0) + t.amount
+    }
+
     // byPeriod — union of all period keys that appear in any dataset
     const allPeriods = new Set([
       ...Object.keys(periodRevenue),
       ...Object.keys(periodPayroll),
+      ...Object.keys(periodTax),
       ...Object.keys(periodFuel),
     ])
 
@@ -215,6 +262,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         periodDate: p,
         revenue: periodRevenue[p] ?? 0,
         directPayroll: periodPayroll[p] ?? 0,
+        employerTaxes: periodTax[p] ?? 0,
         fuel: periodFuel[p] ?? 0,
       }))
 
@@ -228,8 +276,9 @@ export async function GET(request: Request): Promise<NextResponse> {
     const byBranch = Array.from(allBranchIds).map((bid) => {
       const rev = bRevenue[bid] ?? 0
       const pay = bPayroll[bid] ?? 0
+      const tax = bTax[bid] ?? 0
       const fuel = bFuel[bid] ?? 0
-      const gp = rev - pay - fuel
+      const gp = rev - pay - tax - fuel
       const gpPct = rev > 0 ? r2((gp / rev) * 100) : 0
       return {
         branchId: bid,
@@ -238,6 +287,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         rental: bRental[bid] ?? 0,
         oneTime: bOneTime[bid] ?? 0,
         directPayroll: pay,
+        employerTaxes: tax,
         fuel,
         grossProfit: gp,
         gpPct,
@@ -255,8 +305,9 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     const totalRevenue = byBranch.reduce((s, b) => s + b.revenue, 0)
     const totalPayroll = byBranch.reduce((s, b) => s + b.directPayroll, 0)
+    const totalEmployerTaxes = byBranch.reduce((s, b) => s + b.employerTaxes, 0)
     const totalFuel = byBranch.reduce((s, b) => s + b.fuel, 0)
-    const totalGP = totalRevenue - totalPayroll - totalFuel
+    const totalGP = totalRevenue - totalPayroll - totalEmployerTaxes - totalFuel
     const totalGpPct = totalRevenue > 0 ? r2((totalGP / totalRevenue) * 100) : 0
 
     return NextResponse.json({
@@ -265,6 +316,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         totals: {
           revenue: totalRevenue,
           directPayroll: totalPayroll,
+          employerTaxes: totalEmployerTaxes,
           fuel: totalFuel,
           grossProfit: totalGP,
           gpPct: totalGpPct,

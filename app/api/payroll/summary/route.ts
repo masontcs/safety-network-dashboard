@@ -124,13 +124,21 @@ export async function GET(request: Request): Promise<NextResponse> {
         }
       }
 
-      // Taxes
-      const { data: taxes, error: taxErr } = await supabase
+      // Taxes — scoped to employees who had transactions this period
+      // (avoids over-counting when a branchId filter is active)
+      const activeEmpIds = [
+        ...new Set([...directItems.map((i) => i.employeeId), ...adminItems.map((i) => i.employeeId)]),
+      ]
+      let taxQuery = supabase
         .from('payroll_taxes')
         .select('amount')
         .eq('entity_id', entityId)
         .eq('period_date', periodDate)
+      if (activeEmpIds.length > 0) {
+        taxQuery = taxQuery.in('employee_id', activeEmpIds)
+      }
 
+      const { data: taxes, error: taxErr } = await taxQuery
       if (taxErr) throw new Error(`Failed to query payroll taxes: ${taxErr.message}`)
       taxTotal = (taxes ?? []).reduce((s, t) => s + t.amount, 0)
     }

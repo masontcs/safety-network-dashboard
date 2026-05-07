@@ -36,6 +36,7 @@ interface PeriodData {
   periodDate: string
   revenue: number
   directPayroll: number
+  employerTaxes?: number
   fuel: number
 }
 
@@ -46,6 +47,7 @@ interface BranchData {
   rental: number
   oneTime: number
   directPayroll: number
+  employerTaxes?: number
   fuel: number
   grossProfit: number
   gpPct: number
@@ -58,6 +60,7 @@ interface OverviewData {
   totals: {
     revenue: number
     directPayroll: number
+    employerTaxes?: number
     fuel: number
     grossProfit: number
     gpPct: number
@@ -358,6 +361,7 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
   const totals = overviewData?.totals
   const rev = totals?.revenue ?? 0
   const pay = totals?.directPayroll ?? 0
+  const employerTaxes = totals?.employerTaxes ?? 0
   const fuel = totals?.fuel ?? 0
   const gp = totals?.grossProfit ?? 0
   const gpPct = totals?.gpPct ?? 0
@@ -827,20 +831,34 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
         )}
 
         {loading ? <Skeleton height={150} borderRadius={12} /> : (
-          <MetricCard
-            label="Direct Payroll"
-            sub={periodLabel}
-            value={noData ? '—' : formatCurrency(pay)}
-            delta={rev > 0 ? `${formatPercent((pay / rev) * 100)} of revenue` : undefined}
-            deltaType="down"
-            icon={
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#ff6b00" strokeWidth={2}>
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-            }
-          />
+          <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div className="metric-label">Direct Payroll</div>
+                <div style={{ fontSize: 11, color: '#666666' }}>{periodLabel}</div>
+              </div>
+              <div style={{ width: 36, height: 36, background: '#2a2a2a', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#ff6b00" strokeWidth={2}>
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </div>
+            </div>
+            <div className="metric-value" style={{ marginTop: 8, color: noData ? '#888888' : '#ffffff' }}>
+              {noData ? '—' : formatCurrency(pay + employerTaxes)}
+            </div>
+            {!noData && rev > 0 && (
+              <div style={{ fontSize: 11, color: '#cc4444', marginTop: 2 }}>
+                {formatPercent(((pay + employerTaxes) / rev) * 100)} of revenue
+              </div>
+            )}
+            {!noData && employerTaxes > 0 && (
+              <div style={{ fontSize: 10, color: '#666666', marginTop: 4 }}>
+                {formatCurrency(pay)} wages · {formatCurrency(employerTaxes)} employer taxes
+              </div>
+            )}
+          </div>
         )}
 
         {loading ? <Skeleton height={150} borderRadius={12} /> : (
