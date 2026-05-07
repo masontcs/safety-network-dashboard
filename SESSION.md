@@ -9,7 +9,7 @@
 
 ## 1. CURRENT PROJECT STATE
 
-A private, role-scoped operations dashboard for Safety Network (3 entities: INC, TCS, STS) built on Next.js 14 App Router + TypeScript, Supabase (PostgreSQL + Auth), Tailwind CSS, Recharts, and the Anthropic Claude API. The app ingests weekly payroll (.xlsm), revenue (.xls), and fuel (.csv/.xlsx) files and presents analytics dashboards locked to each user's assigned branches across four roles (admin, executive, district_manager, branch_manager). The backend is fully built and tested. The branch manager and admin dashboards are rendering with live data. The district manager and executive dashboards are stubs.
+A private, role-scoped operations dashboard for Safety Network (3 entities: INC, TCS, STS) built on Next.js 14 App Router + TypeScript, Supabase (PostgreSQL + Auth), Tailwind CSS, Recharts, and the Anthropic Claude API. The app ingests weekly payroll (.xlsm), revenue (.xls), and fuel (.csv/.xlsx) files and presents analytics dashboards locked to each user's assigned branches across four roles (admin, executive, district_manager, branch_manager). All four role dashboards are fully built and rendering with live data. The employee list + detail views are complete for all roles. The import pipeline, review queue, and all admin tools are fully operational.
 
 ---
 
@@ -54,7 +54,7 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] `GET|POST /api/fiscal-months` + `[id]`
 - [x] `GET|POST /api/fiscal-quarters` + `PATCH|DELETE /api/fiscal-quarters/[id]`
 - [x] `GET|POST /api/admin/users` + `[id]`
-- [x] `GET|POST /api/admin/review` + action routes for employee assignments, fuel cards, payroll items
+- [x] `GET|POST /api/admin/review` + action routes for employee assignments, fuel cards, payroll items; review queue returns all active employees with entity assignments for the search dropdown
 - [x] `GET|POST /api/admin/access-requests` — GET returns requests + all active branches (grouped); POST creates a pending request
 - [x] `PATCH /api/admin/access-requests/[id]` — approve (creates auth user with temp password, sets must_change_password=true) or deny
 - [x] `POST /api/auth/clear-must-change-password` — clears must_change_password flag for the current user after first login password change
@@ -81,11 +81,14 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] `MobileBottomNav` — fixed bottom nav with role-aware items; slide-up drawer for overflow admin items; 44px tap targets
 - [x] `ManagerDashboard` — fiscal month dropdown + YTD button; defaults to most recent fiscal month with data; weekly bar chart (Revenue/Payroll/Fuel grouped bars) with click-to-inspect direct labor panel; payroll breakdown card (Direct/Admin/Taxes stacked bar); Revenue Breakdown table (Labor/Rental/One-Time/Total by week); mobile 2×2 metric grid + revenue-only chart
 - [x] `AdminDashboard` — all-branches aggregate with branch selector, full allocation visible; month/quarter/year toggle (year mode uses `/api/periods/years`); Direct Payroll card shows wages + employer taxes breakdown; mobile: 2×2 metric cards, revenue-only chart, compact variance row, branch list; desktop: unchanged
-- [x] `ExecutiveDashboard` — all 7 branches side by side, full direct + admin payroll detail, Corp/HQ allocation breakdown, net after overhead, missing revenue alerts, 13-week trend, waterfall, collapsible payroll detail tables
-- [x] `DistrictDashboard` — fiscal month dropdown + YTD button + branch selector; aggregate = branch comparison cards + district totals table; single branch = manager-style layout (bar chart, payroll breakdown card, revenue breakdown table); mobile branch list or revenue table per mode
-- [x] `EmployeeDetailClient` — admin/executive only; preferred name + legal name display; inline Edit Name form; assignment pills; payroll history table + charts (with per-period employer tax rows in `#cc4444`); "Employer Taxes" summary card; weekly employer taxes bar chart; fuel history table + filters; branch history + transfer form
-- [x] Admin pages: `/admin/import`, `/admin/review`, `/admin/users`, `/admin/fiscal-months`, `/admin/targets`, `/admin/fiscal-quarters`, `/admin/access-requests`, `/admin/data-explorer`
-- [x] Executive pages: `/executive/data-explorer`
+- [x] `ExecutiveDashboard` — all 7 branches side by side, full direct + admin payroll detail, Corp/HQ allocation breakdown, net after overhead, missing revenue alerts, 13-week trend, waterfall, collapsible payroll detail tables; Month/Quarter/Year toggle; employee names clickable to detail pages
+- [x] `DistrictDashboard` — fiscal month dropdown + YTD button + branch selector; aggregate = branch comparison cards (using `BranchPerformanceCard`) + district totals table; single branch = manager-style layout (bar chart, payroll breakdown card, revenue breakdown table); employee names clickable; mobile branch list or revenue table per mode
+- [x] `BranchPerformanceCard` (`components/ui/BranchPerformanceCard.tsx`) — shared card with 3-line Recharts LineChart (Revenue #ff6b00, Payroll #888888, Fuel #cc4444); dots, hover tooltip, right-aligned legend; used in Admin and District branch lists
+- [x] `EmployeeListClient` (`components/employees/EmployeeListClient.tsx`) — debounced search, filter bar (branch, entity, labor type), sortable table, pagination, status/entity pills, skeleton loading; all roles with proper scope
+- [x] `EmployeeDetailClient` — all roles with branch-access guard; preferred name + legal name display; inline Edit Name form; assignment pills; payroll history table + charts (with per-period employer tax rows in `#cc4444`); "Employer Taxes" summary card; weekly employer taxes bar chart; Rate History table (25/page); Fuel Cost per Week + Gallons charts; fuel transaction table with $/Gal column; branch history + transfer form
+- [x] Admin pages: `/admin/import`, `/admin/review`, `/admin/users`, `/admin/employees`, `/admin/fiscal-months`, `/admin/targets`, `/admin/fiscal-quarters`, `/admin/access-requests`, `/admin/data-explorer`
+- [x] Executive pages: `/executive/data-explorer`, `/executive/employees`
+- [x] Manager/District employee pages: `/manager/employees/[id]`, `/district/employees/[id]` — detail view scoped to direct labor in assigned branches
 - [x] `AccessRequestsClient` — pending/reviewed tables; approve modal with temp password field (unmasked, Generate button, Copy button, confirm field, hint note); deny modal; branch dropdown grouped Operations/Corporate
 - [x] `DataExplorerClient` — filter bar (dataset, branch, entity, date range, vendor); summary metric cards per dataset; sortable paginated table (50 rows/page); CSV export
 - [x] `TargetVarianceRow` component — weekly and compact (mobile) variants; green/yellow/red thresholds
@@ -107,7 +110,7 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ---
 
-## 3a. RECENT CHANGES (May 7, 2026) — This Session
+## 3a. RECENT CHANGES (May 7, 2026) — Audit fixes + employer taxes
 
 ### Employer Taxes Surfaced Everywhere
 - `app/api/admin/overview/route.ts` — fetches `payroll_taxes` with full pagination; attributes taxes to branches via `employee_entity_assignments → payroll_codes → branch_id`; `gp = rev - pay - tax - fuel`; `totals.employerTaxes` added
@@ -127,7 +130,37 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ---
 
-## 3d. RECENT CHANGES (May 6, 2026) — Manager/District Fiscal Month Selector
+## 3b. RECENT CHANGES (May 6–7, 2026) — Employee list, clickable names, Executive toggle, BranchPerformanceCard, review queue
+
+### Employee List Pages + Clickable Names in Dashboards
+- `GET /api/employees` rewritten — rich filtering (search, branchId, entityCode, laborType), sorting, pagination; admin/executive get full list, managers scoped to assigned branches
+- `EmployeeListClient` — debounced search, filter bar, sortable table, pagination, status/entity pills, skeleton loading
+- `/admin/employees` and `/executive/employees` — server-component list pages
+- `/manager/employees/[id]` and `/district/employees/[id]` — detail pages; `GET /api/employees/[id]/detail` updated to allow manager roles with branch-access guard (direct labor only)
+- Employee `displayName`s in ExecutiveDashboard, ManagerDashboard, DistrictDashboard (payroll tables, direct labor panel, top consumers, OT table) are now clickable links to the detail page
+- `Sidebar` — People icon added for admin and executive roles
+- `EmployeeDetailClient` enhancements: Total Weeks replaces Fuel Cost summary card; paginated Rate History table (25/page); Payroll Items & Rate History summary table; Fuel Cost per Week bar chart alongside Gallons chart; $/Gal column in fuel table
+
+### Executive Dashboard — Month/Quarter/Year Toggle
+- Removed old weekly view navigator and `DateRangePicker`; replaced with same `[Month][Quarter][Year]` 3-button toggle used on Manager/District/Admin
+- Allocation card sub-labels now derive from `periodDate`
+
+### BranchPerformanceCard
+- New `components/ui/BranchPerformanceCard.tsx` — shared Recharts `LineChart` with 3 lines: Revenue (#ff6b00), Payroll (#888888), Fuel (#cc4444); dots, hover tooltip, right-aligned legend, 80px chart area, x-axis date labels
+- `AdminDashboard` — SVG sparkline + old BranchCard replaced with `BranchPerformanceCard`; `/api/admin/overview` extended to return `payrollByPeriod` and `fuelByPeriod` per branch
+- `DistrictDashboard` — `BranchComparisonCard` delegates to `BranchPerformanceCard`
+
+### Employee Match Review Queue Redesign
+- New assignment UI replaces raw payroll code dropdown:
+  - New employee mode: select Branch + Labor Type → server resolves payroll code
+  - Link existing mode: searchable employee dropdown with entity assignment pills; shows override Branch/Labor Type when linked employee has no assignment for the import entity
+  - Orange Confirm button (disabled until valid) + Skip on every row; inline error if no matching code exists
+- `GET /api/admin/review` — now returns all active employees with entity assignments for the search dropdown
+- `PATCH /api/admin/review/employee-assignments/[id]` — updated to accept branch + laborType and resolve payroll code server-side
+
+---
+
+## 3c. RECENT CHANGES (May 6, 2026) — Manager/District Fiscal Month Selector
 
 ### Manager and District Dashboard — Fiscal Month Selector
 
@@ -166,7 +199,7 @@ Both `ManagerDashboard` and `DistrictDashboard` were fully rewritten to match th
 
 ---
 
-## 3b. RECENT CHANGES (May 6, 2026) — Misc Fixes
+## 3d. RECENT CHANGES (May 6, 2026) — Misc fixes (temp password, branch dropdowns, fuel dupe, revenue parser, mobile)
 
 ### Temporary Password Flow for Access Request Approval
 - `PATCH /api/admin/access-requests/[id]` — switched from `inviteUserByEmail` to `createUser` with `password`, `email_confirm: true`, `user_metadata: { must_change_password: true }`; validates `temporaryPassword` (required, min 8 chars); inserts `user_profiles` with `must_change_password: true`
@@ -215,7 +248,7 @@ Both `ManagerDashboard` and `DistrictDashboard` were fully rewritten to match th
 
 ---
 
-## 3e. RECENT CHANGES (May 6, 2026) — Fiscal Quarters System
+## 3e. RECENT CHANGES (May 6, 2026) — Fiscal quarters
 
 ### Fiscal Quarters System
 - Migration `20260506000002_fiscal_quarters.sql` applied to production — `fiscal_quarters` + `fiscal_quarter_months` tables, RLS policies, unique constraints
@@ -225,7 +258,7 @@ Both `ManagerDashboard` and `DistrictDashboard` were fully rewritten to match th
 
 ---
 
-## 3f. RECENT CHANGES (May 6, 2026) — Fiscal-Month-Based Targets
+## 3f. RECENT CHANGES (May 6, 2026) — Fiscal month targets
 
 ### Fiscal-Month-Based Targets Redesign
 - Migration `20260506000001_fiscal_month_targets.sql` — `branch_targets` table rebuilt with `fiscal_month_id` FK
@@ -236,7 +269,7 @@ Both `ManagerDashboard` and `DistrictDashboard` were fully rewritten to match th
 
 ---
 
-## 3g. RECENT CHANGES (May 5, 2026)
+## 3g. RECENT CHANGES (May 5, 2026) — Sacramento merge + employee transfers
 
 ### Sacramento → Modesto Branch Merge
 - Migration `20260505000001_merge_sacramento_into_modesto.sql` applied to production
