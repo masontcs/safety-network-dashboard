@@ -168,6 +168,8 @@ export async function GET(request: Request): Promise<NextResponse> {
     const bPayroll: Record<string, number> = {}
     const bFuel: Record<string, number> = {}
     const bRevByPeriod: Record<string, Record<string, number>> = {}
+    const bPayByPeriod: Record<string, Record<string, number>> = {}
+    const bFuelByPeriod: Record<string, Record<string, number>> = {}
 
     for (const r of allRevRows) {
       const bid = r.branch_id
@@ -185,6 +187,8 @@ export async function GET(request: Request): Promise<NextResponse> {
       if (!bid) continue
       periodPayroll[p.period_date] = (periodPayroll[p.period_date] ?? 0) + p.amount
       bPayroll[bid] = (bPayroll[bid] ?? 0) + p.amount
+      if (!bPayByPeriod[bid]) bPayByPeriod[bid] = {}
+      bPayByPeriod[bid][p.period_date] = (bPayByPeriod[bid][p.period_date] ?? 0) + p.amount
     }
 
     let totalGallons = 0
@@ -193,6 +197,8 @@ export async function GET(request: Request): Promise<NextResponse> {
       const sat = toSaturdayOfWeek(f.transaction_date)
       periodFuel[sat] = (periodFuel[sat] ?? 0) + f.total_with_tax
       bFuel[f.branch_id] = (bFuel[f.branch_id] ?? 0) + f.total_with_tax
+      if (!bFuelByPeriod[f.branch_id]) bFuelByPeriod[f.branch_id] = {}
+      bFuelByPeriod[f.branch_id][sat] = (bFuelByPeriod[f.branch_id][sat] ?? 0) + f.total_with_tax
       if (f.gallons) totalGallons += f.gallons
     }
 
@@ -237,6 +243,12 @@ export async function GET(request: Request): Promise<NextResponse> {
         gpPct,
         revenueByPeriod: Object.entries(bRevByPeriod[bid] ?? {})
           .map(([periodDate, revenue]) => ({ periodDate, revenue }))
+          .sort((a, b) => (a.periodDate < b.periodDate ? -1 : 1)),
+        payrollByPeriod: Object.entries(bPayByPeriod[bid] ?? {})
+          .map(([periodDate, payroll]) => ({ periodDate, payroll }))
+          .sort((a, b) => (a.periodDate < b.periodDate ? -1 : 1)),
+        fuelByPeriod: Object.entries(bFuelByPeriod[bid] ?? {})
+          .map(([periodDate, fuel]) => ({ periodDate, fuel }))
           .sort((a, b) => (a.periodDate < b.periodDate ? -1 : 1)),
       }
     })

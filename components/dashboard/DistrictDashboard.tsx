@@ -9,6 +9,7 @@ import {
 import MetricCard from '@/components/ui/MetricCard'
 import Skeleton from '@/components/ui/Skeleton'
 import FiscalMonthVarianceRow from '@/components/targets/FiscalMonthVarianceRow'
+import BranchPerformanceCard from '@/components/ui/BranchPerformanceCard'
 import { formatCurrency, formatPercent } from '@/lib/utils/format'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -279,58 +280,17 @@ function BranchComparisonCard({ name, rev, direct, admin, fuel, trendData }: {
   const totalPay = direct + admin
   const gp = rev - totalPay - fuel
   const gpPct = rev > 0 ? (gp / rev) * 100 : 0
-  const noData = rev === 0 && direct === 0 && fuel === 0
-  const hasTrend = trendData.some((d) => d.revenue > 0 || d.payroll > 0 || d.fuel > 0)
-
   return (
-    <div className="card" style={{ position: 'relative', overflow: 'hidden' }}>
-      <div style={{ fontSize: 12, fontWeight: 500, color: '#ff6b00', marginBottom: 6 }}>{name}</div>
-      {noData ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80, fontSize: 11, color: '#555555' }}>No data</div>
-      ) : (
-        <>
-          <div style={{ fontSize: 20, fontWeight: 500, color: '#ffffff', lineHeight: 1.2, marginBottom: 6 }}>
-            {formatCurrency(rev)}
-          </div>
-          <div style={{ display: 'flex', gap: 10, marginBottom: 6 }}>
-            <div>
-              <div style={{ fontSize: 10, color: '#666666', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Payroll</div>
-              <div style={{ fontSize: 11, color: '#cccccc' }}>{formatCurrency(totalPay)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, color: '#666666', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Fuel</div>
-              <div style={{ fontSize: 11, color: '#cccccc' }}>{formatCurrency(fuel)}</div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: hasTrend ? 8 : 0 }}>
-            <span style={{ fontSize: 12, color: '#cccccc' }}>{formatCurrency(gp)} GP</span>
-            <span style={{ fontSize: 11, fontWeight: 500, color: gpColor(gpPct), background: `${gpColor(gpPct)}18`, borderRadius: 4, padding: '1px 5px' }}>
-              {gpPct.toFixed(1)}%
-            </span>
-          </div>
-          {hasTrend && (
-            <>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, fontSize: 8, color: '#666666', marginBottom: 2 }}>
-                {[['Rev', '#ff6b00'], ['Pay', '#888888'], ['Fuel', '#cc4444']].map(([label, color]) => (
-                  <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <span style={{ display: 'inline-block', width: 10, height: 1.5, background: color }} />
-                    {label}
-                  </span>
-                ))}
-              </div>
-              <ResponsiveContainer width="100%" height={60}>
-                <LineChart data={trendData} margin={{ top: 2, right: 2, left: 0, bottom: 0 }}>
-                  <Tooltip content={<TrendTooltip />} cursor={{ stroke: '#333333', strokeWidth: 1 }} />
-                  <Line dataKey="revenue" stroke="#ff6b00" strokeWidth={1.5} dot={{ r: 2, fill: '#ff6b00', strokeWidth: 0 }} activeDot={{ r: 3 }} isAnimationActive={false} />
-                  <Line dataKey="payroll" stroke="#888888" strokeWidth={1.5} dot={{ r: 2, fill: '#888888', strokeWidth: 0 }} activeDot={{ r: 3 }} isAnimationActive={false} />
-                  <Line dataKey="fuel" stroke="#cc4444" strokeWidth={1.5} dot={{ r: 2, fill: '#cc4444', strokeWidth: 0 }} activeDot={{ r: 3 }} isAnimationActive={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </>
-          )}
-        </>
-      )}
-    </div>
+    <BranchPerformanceCard
+      name={name}
+      rev={rev}
+      payroll={totalPay}
+      fuel={fuel}
+      gp={gp}
+      gpPct={gpPct}
+      noData={rev === 0 && direct === 0 && fuel === 0}
+      trendData={trendData}
+    />
   )
 }
 

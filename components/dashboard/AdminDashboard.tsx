@@ -14,6 +14,7 @@ import {
 import MetricCard from '@/components/ui/MetricCard'
 import Skeleton from '@/components/ui/Skeleton'
 import FiscalMonthVarianceRow from '@/components/targets/FiscalMonthVarianceRow'
+import BranchPerformanceCard from '@/components/ui/BranchPerformanceCard'
 import { formatCurrency, formatPercent, round2 } from '@/lib/utils/format'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -49,6 +50,8 @@ interface BranchData {
   grossProfit: number
   gpPct: number
   revenueByPeriod: Array<{ periodDate: string; revenue: number }>
+  payrollByPeriod: Array<{ periodDate: string; payroll: number }>
+  fuelByPeriod: Array<{ periodDate: string; fuel: number }>
 }
 
 interface OverviewData {
@@ -142,125 +145,12 @@ function DonutChart({ pct }: { pct: number }) {
   )
 }
 
-// ── Mini sparkline (SVG) ──────────────────────────────────────────────────────
-
-function Sparkline({ data, weeks }: { data: Array<{ periodDate: string; revenue: number }>; weeks: string[] }) {
-  const W = 120
-  const H = 32
-  const vals = weeks.map((w) => data.find((d) => d.periodDate === w)?.revenue ?? 0)
-  const max = Math.max(...vals, 1)
-
-  if (vals.every((v) => v === 0)) {
-    return <div style={{ height: H, opacity: 0.2, borderTop: '1px dashed #555555', marginTop: 8 }} />
-  }
-
-  const pts = vals.map((v, i) => {
-    const x = weeks.length === 1 ? W / 2 : (i / (weeks.length - 1)) * W
-    const y = H - (v / max) * (H - 4)
-    return `${x},${y}`
-  })
-
-  return (
-    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: 'block', marginTop: 8 }}>
-      <polyline points={pts.join(' ')} fill="none" stroke="#ff6b00" strokeWidth={1.5} />
-    </svg>
-  )
-}
-
-// ── Branch Card ───────────────────────────────────────────────────────────────
+// ── gpColor (used in SelectedWeekPanel and mobile list) ──────────────────────
 
 function gpColor(pct: number): string {
   if (pct >= 20) return '#4caf50'
   if (pct >= 10) return '#ff9800'
   return '#cc4444'
-}
-
-function BranchCard({
-  branch,
-  data,
-  weeks,
-}: {
-  branch: Branch
-  data: BranchData | null
-  weeks: string[]
-}) {
-  const rev = data?.revenue ?? 0
-  const pay = data?.directPayroll ?? 0
-  const fuel = data?.fuel ?? 0
-  const gp = data?.grossProfit ?? 0
-  const gpPct = data?.gpPct ?? 0
-  const noData = rev === 0 && pay === 0 && fuel === 0
-
-  return (
-    <div
-      className="card"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0,
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
-      <div style={{ fontSize: 12, fontWeight: 500, color: '#ff6b00', marginBottom: 8 }}>
-        {branch.name}
-      </div>
-
-      {noData ? (
-        <>
-          <div style={{ fontSize: 20, fontWeight: 500, color: '#2a2a2a', lineHeight: 1.2 }}>$0.00</div>
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'rgba(17,17,17,0.55)',
-              borderRadius: 12,
-            }}
-          >
-            <span style={{ fontSize: 11, color: '#555555', fontWeight: 400 }}>No data</span>
-          </div>
-        </>
-      ) : (
-        <>
-          <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff', lineHeight: 1.2, marginBottom: 6 }}>
-            {formatCurrency(rev)}
-          </div>
-
-          <div style={{ display: 'flex', gap: 12, marginBottom: 4 }}>
-            <div>
-              <div style={{ fontSize: 10, color: '#666666', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Payroll</div>
-              <div style={{ fontSize: 12, color: '#cccccc' }}>{formatCurrency(pay)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, color: '#666666', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Fuel</div>
-              <div style={{ fontSize: 12, color: '#cccccc' }}>{formatCurrency(fuel)}</div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 0 }}>
-            <span style={{ fontSize: 13, color: '#cccccc' }}>{formatCurrency(gp)}</span>
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 500,
-                color: gpColor(gpPct),
-                background: `${gpColor(gpPct)}18`,
-                borderRadius: 4,
-                padding: '1px 6px',
-              }}
-            >
-              {gpPct.toFixed(1)}%
-            </span>
-          </div>
-
-          <Sparkline data={data?.revenueByPeriod ?? []} weeks={weeks} />
-        </>
-      )}
-    </div>
-  )
 }
 
 // ── Selected Week Panel ───────────────────────────────────────────────────────
@@ -524,15 +414,30 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
     return getSaturdaysInRange(selectedFiscal.start_date, selectedFiscal.end_date)
   }, [viewMode, selectedQuarter, selectedFiscal])
 
-  // Branch grid: all branches from props, enriched with data
+  // Branch grid: all branches from props, enriched with data + trendData for 3-line chart
   const branchGridData = useMemo(() => {
     const dataMap: Record<string, BranchData> = {}
     for (const b of overviewData?.byBranch ?? []) dataMap[b.branchId] = b
 
     return branches
-      .map((branch) => ({ branch, data: dataMap[branch.id] ?? null }))
+      .map((branch) => {
+        const data = dataMap[branch.id] ?? null
+        const revByPeriod: Record<string, number> = {}
+        const payByPeriod: Record<string, number> = {}
+        const fuelByPeriod: Record<string, number> = {}
+        for (const r of data?.revenueByPeriod ?? []) revByPeriod[r.periodDate] = r.revenue
+        for (const p of data?.payrollByPeriod ?? []) payByPeriod[p.periodDate] = p.payroll
+        for (const f of data?.fuelByPeriod ?? []) fuelByPeriod[f.periodDate] = f.fuel
+        const trendData = sparklineWeeks.map((sat) => ({
+          label: fmtShort(sat),
+          revenue: revByPeriod[sat] ?? 0,
+          payroll: payByPeriod[sat] ?? 0,
+          fuel: fuelByPeriod[sat] ?? 0,
+        }))
+        return { branch, data, trendData }
+      })
       .sort((a, b) => (b.data?.revenue ?? 0) - (a.data?.revenue ?? 0))
-  }, [overviewData, branches])
+  }, [overviewData, branches, sparklineWeeks])
 
   // Revenue table — same as before
   const revenueByBranch = useMemo(() => {
@@ -1052,16 +957,21 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
         </div>
         {loading ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-            {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} height={150} borderRadius={12} />)}
+            {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} height={220} borderRadius={12} />)}
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-            {branchGridData.map(({ branch, data }) => (
-              <BranchCard
+            {branchGridData.map(({ branch, data, trendData }) => (
+              <BranchPerformanceCard
                 key={branch.id}
-                branch={branch}
-                data={data}
-                weeks={sparklineWeeks}
+                name={branch.name}
+                rev={data?.revenue ?? 0}
+                payroll={data?.directPayroll ?? 0}
+                fuel={data?.fuel ?? 0}
+                gp={data?.grossProfit ?? 0}
+                gpPct={data?.gpPct ?? 0}
+                noData={!data || (data.revenue === 0 && data.directPayroll === 0 && data.fuel === 0)}
+                trendData={trendData}
               />
             ))}
           </div>
