@@ -166,6 +166,10 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
   const [vendorFilter, setVendorFilter] = useState<'all' | 'interstate' | 'flyers'>('all')
   const [dateFilter, setDateFilter] = useState<'all' | '90d' | '1y'>('all')
 
+  // Payroll table pagination
+  const [payrollPage, setPayrollPage] = useState(1)
+  const PAYROLL_PAGE_SIZE = 25
+
   // Branch transfer state (admin + executive only)
   const [transferData, setTransferData] = useState<TransferData | null>(null)
   const [showTransferForm, setShowTransferForm] = useState(false)
@@ -292,6 +296,45 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
     () => filteredFuel.reduce((s, r) => s + (r.gallons ?? 0), 0),
     [filteredFuel]
   )
+
+  const totalWeeks = useMemo(() => {
+    if (!data) return 0
+    return new Set(data.payrollHistory.map((r) => r.periodDate)).size
+  }, [data])
+
+  const payrollItemSummary = useMemo(() => {
+    if (!data) return []
+    const byItem: Record<string, { itemName: string; groupName: string; rates: { rate: number | null; date: string }[]; count: number }> = {}
+    for (const row of data.payrollHistory) {
+      const key = row.itemName ?? '__none__'
+      if (!byItem[key]) byItem[key] = { itemName: row.itemName ?? 'Uncategorized', groupName: row.groupName ?? '—', rates: [], count: 0 }
+      byItem[key].rates.push({ rate: row.rate, date: row.periodDate })
+      byItem[key].count++
+    }
+    return Object.values(byItem).map((item) => {
+      const sortedRates = item.rates.filter((r) => r.rate != null).sort((a, b) => b.date.localeCompare(a.date))
+      const sortedDates = [...item.rates].sort((a, b) => b.date.localeCompare(a.date))
+      return {
+        itemName: item.itemName,
+        groupName: item.groupName,
+        mostRecentRate: sortedRates[0]?.rate ?? null,
+        lastDate: sortedDates[0]?.date ?? '',
+        occurrences: item.count,
+      }
+    }).sort((a, b) => b.occurrences - a.occurrences)
+  }, [data])
+
+  const weeklyFuelCost = useMemo<BarChartDataPoint[]>(() => {
+    const byWeek: Record<string, number> = {}
+    for (const row of filteredFuel) {
+      const bucket = toWeekBucket(row.transactionDate)
+      byWeek[bucket] = (byWeek[bucket] ?? 0) + row.totalWithTax
+    }
+    return Object.entries(byWeek)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-13)
+      .map(([date, value]) => ({ label: formatPeriod(date), value }))
+  }, [filteredFuel])
 
   // ── Edit name handlers ────────────────────────────────────────────────────
 
@@ -580,7 +623,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
               : '—'
           }
         />
-        <SummaryCard label="Fuel Cost" value={hasFuel ? formatCurrency(totalFuelCost) : '—'} />
+        <SummaryCard label="Total Weeks" value={String(totalWeeks)} />
       </div>
 
       {/* ── Payroll section ── */}
@@ -607,9 +650,14 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
             </div>
           </div>
 
-          {/* Rate history table */}
+          {/* Rate history table with pagination */}
           <div style={{ ...cardStyle, marginBottom: 12 }}>
-            <p style={{ ...cardLabelStyle, marginBottom: 12 }}>Rate History</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <p style={{ ...cardLabelStyle, margin: 0 }}>Rate History</p>
+              <span style={{ fontSize: 11, color: '#555555' }}>
+                {payrollHistory.length} transactions
+              </span>
+            </div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
@@ -620,27 +668,88 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                   </tr>
                 </thead>
                 <tbody>
-                  {payrollHistory.map((row, i) => (
-                    <tr
-                      key={i}
-                      style={{
-                        borderTop: '1px solid #2a2a2a',
-                        background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
-                      }}
-                    >
-                      <td style={tdStyle}>{formatPeriod(row.periodDate)}</td>
-                      <td style={tdStyle}>{row.itemName ?? <span style={{ color: '#555555' }}>—</span>}</td>
-                      <td style={{ ...tdStyle, color: '#888888' }}>{row.groupName ?? '—'}</td>
-                      <td style={{ ...tdStyle, color: '#888888' }}>{row.entityCode}</td>
-                      <td style={tdStyle}>{row.rate != null ? formatCurrency(row.rate) : '—'}</td>
-                      <td style={tdStyle}>{row.hours != null ? row.hours.toFixed(2) : '—'}</td>
-                      <td style={{ ...tdStyle, color: '#ff6b00' }}>{formatCurrency(row.amount)}</td>
-                    </tr>
-                  ))}
+                  {payrollHistory
+                    .slice((payrollPage - 1) * PAYROLL_PAGE_SIZE, payrollPage * PAYROLL_PAGE_SIZE)
+                    .map((row, i) => (
+                      <tr
+                        key={i}
+                        style={{
+                          borderTop: '1px solid #2a2a2a',
+                          background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
+                        }}
+                      >
+                        <td style={tdStyle}>{formatPeriod(row.periodDate)}</td>
+                        <td style={tdStyle}>{row.itemName ?? <span style={{ color: '#555555' }}>—</span>}</td>
+                        <td style={{ ...tdStyle, color: '#888888' }}>{row.groupName ?? '—'}</td>
+                        <td style={{ ...tdStyle, color: '#888888' }}>{row.entityCode}</td>
+                        <td style={tdStyle}>{row.rate != null ? formatCurrency(row.rate) : '—'}</td>
+                        <td style={tdStyle}>{row.hours != null ? row.hours.toFixed(2) : '—'}</td>
+                        <td style={{ ...tdStyle, color: '#ff6b00' }}>{formatCurrency(row.amount)}</td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
+            {/* Pagination controls */}
+            {payrollHistory.length > PAYROLL_PAGE_SIZE && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 10, borderTop: '1px solid #2a2a2a', fontSize: 12, color: '#888888' }}>
+                <span>
+                  Showing {(payrollPage - 1) * PAYROLL_PAGE_SIZE + 1}–{Math.min(payrollPage * PAYROLL_PAGE_SIZE, payrollHistory.length)} of {payrollHistory.length} transactions
+                </span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    disabled={payrollPage <= 1}
+                    onClick={() => setPayrollPage((p) => p - 1)}
+                    style={{ background: '#2a2a2a', border: 'none', borderRadius: 6, padding: '4px 10px', color: payrollPage <= 1 ? '#444444' : '#cccccc', cursor: payrollPage <= 1 ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 12 }}
+                  >
+                    ← Prev
+                  </button>
+                  <button
+                    disabled={payrollPage * PAYROLL_PAGE_SIZE >= payrollHistory.length}
+                    onClick={() => setPayrollPage((p) => p + 1)}
+                    style={{ background: '#2a2a2a', border: 'none', borderRadius: 6, padding: '4px 10px', color: payrollPage * PAYROLL_PAGE_SIZE >= payrollHistory.length ? '#444444' : '#cccccc', cursor: payrollPage * PAYROLL_PAGE_SIZE >= payrollHistory.length ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 12 }}
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Payroll Items & Rate History summary */}
+          {payrollItemSummary.length > 0 && (
+            <div style={{ ...cardStyle, marginBottom: 12 }}>
+              <p style={{ ...cardLabelStyle, marginBottom: 12 }}>Payroll Items & Rate History</p>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      {['Item Name', 'Group', 'Most Recent Rate', 'Last Date', 'Occurrences'].map((h) => (
+                        <th key={h} style={thStyle}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payrollItemSummary.map((item, i) => (
+                      <tr
+                        key={i}
+                        style={{
+                          borderTop: '1px solid #2a2a2a',
+                          background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
+                        }}
+                      >
+                        <td style={tdStyle}>{item.itemName}</td>
+                        <td style={{ ...tdStyle, color: '#888888' }}>{item.groupName}</td>
+                        <td style={tdStyle}>{item.mostRecentRate != null ? formatCurrency(item.mostRecentRate) : '—'}</td>
+                        <td style={{ ...tdStyle, color: '#888888' }}>{item.lastDate ? formatPeriod(item.lastDate) : '—'}</td>
+                        <td style={{ ...tdStyle, color: '#ff6b00' }}>{item.occurrences}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Group breakdown */}
           <div style={cardStyle}>
@@ -979,15 +1088,26 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
             <SummaryCard label="Total Cost" value={formatCurrency(totalFuelCost)} />
           </div>
 
-          {/* Gallons chart */}
-          <div style={{ ...cardStyle, marginBottom: 12 }}>
-            <p style={cardLabelStyle}>Gallons per Week (last 13)</p>
-            <BarChart
-              data={weeklyGallons}
-              color="#ff6b00"
-              height={130}
-              formatValue={(v) => `${v.toFixed(0)} gal`}
-            />
+          {/* Fuel charts — cost and gallons side by side */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div style={cardStyle}>
+              <p style={cardLabelStyle}>Fuel Cost per Week (last 13)</p>
+              <BarChart
+                data={weeklyFuelCost}
+                color="#cc4444"
+                height={130}
+                formatValue={(v) => formatCurrency(v)}
+              />
+            </div>
+            <div style={cardStyle}>
+              <p style={cardLabelStyle}>Gallons per Week (last 13)</p>
+              <BarChart
+                data={weeklyGallons}
+                color="#ff6b00"
+                height={130}
+                formatValue={(v) => `${v.toFixed(0)} gal`}
+              />
+            </div>
           </div>
 
           {/* Location history table */}
@@ -997,7 +1117,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    {['Date', 'Vendor', 'Site', 'City, State', 'Product', 'Gallons', 'Cost'].map((h) => (
+                    {['Date', 'Vendor', 'Site', 'City, State', 'Product', 'Gallons', '$/Gal', 'Cost'].map((h) => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
@@ -1019,6 +1139,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                       </td>
                       <td style={{ ...tdStyle, color: '#888888' }}>{row.product ?? '—'}</td>
                       <td style={tdStyle}>{row.gallons != null ? row.gallons.toFixed(3) : '—'}</td>
+                      <td style={{ ...tdStyle, color: '#888888' }}>{row.pricePerGallon != null ? `$${row.pricePerGallon.toFixed(3)}` : '—'}</td>
                       <td style={{ ...tdStyle, color: '#ff6b00' }}>{formatCurrency(row.totalWithTax)}</td>
                     </tr>
                   ))}

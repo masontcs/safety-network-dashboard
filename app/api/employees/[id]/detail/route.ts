@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAccessContext } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
-import { isAdminOrExecutive } from '@/lib/utils/access'
 import { apiError } from '@/lib/utils/errors'
 import type { LaborType, Vendor } from '@/lib/supabase/database.types'
 
@@ -55,16 +54,45 @@ export async function GET(
     if (!ctx.ok) return ctx.response
 
     const { access } = ctx
-
-    if (!isAdminOrExecutive(access)) {
-      return NextResponse.json(
-        { success: false, error: 'Access restricted to admin and executive roles.', code: 'FORBIDDEN' },
-        { status: 403 }
-      )
-    }
-
     const supabase = createServiceClient()
     const employeeId = params.id
+
+    // ── For manager roles: verify employee is in one of their assigned branches ──
+    if (access.branchIds !== null) {
+      // Get payroll codes for manager's assigned branches
+      const { data: allowedCodes, error: codesErr } = await supabase
+        .from('payroll_codes')
+        .select('id')
+        .in('branch_id', access.branchIds)
+
+      if (codesErr) throw new Error(`Failed to load payroll codes: ${codesErr.message}`)
+
+      const allowedCodeIds = (allowedCodes ?? []).map((c) => c.id)
+
+      if (allowedCodeIds.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Access denied.', code: 'FORBIDDEN' },
+          { status: 403 }
+        )
+      }
+
+      // Check that this employee has payroll transactions in the allowed codes
+      const { data: txnCheck, error: txnCheckErr } = await supabase
+        .from('payroll_transactions')
+        .select('id')
+        .eq('employee_id', employeeId)
+        .in('payroll_code_id', allowedCodeIds)
+        .limit(1)
+
+      if (txnCheckErr) throw new Error(`Failed to verify employee access: ${txnCheckErr.message}`)
+
+      if (!txnCheck || txnCheck.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Access denied. Employee is not in your assigned branches.', code: 'FORBIDDEN' },
+          { status: 403 }
+        )
+      }
+    }
 
     const { data: employee, error: empErr } = await supabase
       .from('employees')
@@ -94,13 +122,31 @@ export async function GET(
     const allPayrollTxns: PayrollTxnRow[] = []
     let from = 0
 
+    // For managers: only fetch direct labor transactions in their branches
+    // For admin/executive: fetch all transactions
+    let allowedPayrollCodeIds: string[] | null = null
+    if (access.branchIds !== null) {
+      const { data: pcData } = await supabase
+        .from('payroll_codes')
+        .select('id')
+        .in('branch_id', access.branchIds)
+        .eq('labor_type', 'direct')
+      allowedPayrollCodeIds = (pcData ?? []).map((c) => c.id)
+    }
+
     while (true) {
-      const { data, error } = await supabase
+      let query = supabase
         .from('payroll_transactions')
         .select('period_date, payroll_item_id, hours, rate, amount, entities(code), payroll_codes(labor_type), payroll_items(name, group_id, payroll_item_groups(name))')
         .eq('employee_id', employeeId)
         .order('period_date', { ascending: false })
         .range(from, from + PAGE_SIZE - 1)
+
+      if (allowedPayrollCodeIds !== null) {
+        query = query.in('payroll_code_id', allowedPayrollCodeIds)
+      }
+
+      const { data, error } = await query
 
       if (error) throw new Error(`Failed to load payroll transactions: ${error.message}`)
 
@@ -129,6 +175,15 @@ export async function GET(
       from += PAGE_SIZE
     }
 
+    // For manager roles: filter assignments to only show those in their branches
+    const visibleAssignments = access.branchIds !== null
+      ? assignments.filter((a) =>
+          a.payroll_codes?.branch_id != null &&
+          access.branchIds!.includes(a.payroll_codes.branch_id) &&
+          a.payroll_codes.labor_type === 'direct'
+        )
+      : assignments
+
     return NextResponse.json({
       success: true,
       data: {
@@ -138,12 +193,12 @@ export async function GET(
           lastName: employee.last_name,
           displayName: `${employee.first_name} ${employee.last_name}`.trim(),
           isActive: employee.is_active,
-          legalNames: assignments.map((a) => ({
+          legalNames: visibleAssignments.map((a) => ({
             entityCode: a.entities?.code ?? '',
             entityName: a.entities?.name ?? '',
             rawName: a.raw_name_in_report,
           })),
-          assignments: assignments.map((a) => ({
+          assignments: visibleAssignments.map((a) => ({
             entityId: a.entity_id,
             entityCode: a.entities?.code ?? '',
             entityName: a.entities?.name ?? '',

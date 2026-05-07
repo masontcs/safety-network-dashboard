@@ -15,6 +15,7 @@ import { formatCurrency, formatPercent } from '@/lib/utils/format'
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface FiscalMonth { id: string; name: string; year: number; start_date: string; end_date: string }
+interface FiscalQuarter { id: string; name: string; quarter_number: number; year: number; months: Array<{ id: string; name: string; start_date: string; end_date: string; sort_order: number }> }
 interface BranchInfo { id: string; name: string; entityId: string }
 interface RevTxn { branch_id: string; period_date: string; labor: number; rental: number; one_time_charges: number; total_revenue: number }
 interface FuelTxn { branch_id: string | null; transaction_date: string; total_with_tax: number; vendor: string }
@@ -34,6 +35,17 @@ interface Props { branches: BranchInfo[]; initialBranch: string }
 function fmtShort(dateStr: string): string {
   const [y, m, d] = dateStr.split('-').map(Number)
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(y, m - 1, d))
+}
+
+function fmtMonth(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Intl.DateTimeFormat('en-US', { month: 'short' }).format(new Date(y, m - 1, d))
+}
+
+function yearBarLabel(sat: string, prev: string | null): string {
+  const m = sat.split('-')[1]
+  const prevM = prev ? prev.split('-')[1] : null
+  return m !== prevM ? fmtMonth(sat) : ''
 }
 
 function rangeLabel(s: string, e: string): string { return `${fmtShort(s)} – ${fmtShort(e)}, ${e.split('-')[0]}` }
@@ -149,7 +161,16 @@ function SelectedWeekPanel({ periodDate, directTotal, adminTotal, taxTotal, deta
           <tbody>
             {[...detail].sort((a, b) => b.amount - a.amount).map((row) => (
               <tr key={row.employeeId} style={{ borderTop: '1px solid #2a2a2a' }}>
-                <td className="table-body" style={{ padding: '7px 8px' }}>{row.displayName}</td>
+                <td className="table-body" style={{ padding: '7px 8px' }}>
+                  <a
+                    href={`/district/employees/${row.employeeId}`}
+                    style={{ color: '#ff6b00', textDecoration: 'none' }}
+                    onMouseOver={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                    onMouseOut={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                  >
+                    {row.displayName}
+                  </a>
+                </td>
                 <td className="table-body" style={{ padding: '7px 8px', textAlign: 'right' }}>{row.hours != null ? row.hours.toFixed(1) : '—'}</td>
                 <td className="table-body" style={{ padding: '7px 8px', textAlign: 'right' }}>{row.rate != null ? formatCurrency(row.rate) : '—'}</td>
                 <td className="table-body" style={{ padding: '7px 8px', textAlign: 'right' }}>{formatCurrency(row.amount)}</td>
@@ -362,7 +383,16 @@ function FuelAnalyticsSection({ fuelByWeekClient, topConsumers, vendorTotals, fu
             <tbody>
               {(isMobile ? topConsumers.slice(0, 5) : topConsumers).map((r) => (
                 <tr key={r.employeeId} style={{ borderTop: '1px solid #2a2a2a' }}>
-                  <td className="table-body" style={{ padding: '7px 8px' }}>{r.displayName}</td>
+                  <td className="table-body" style={{ padding: '7px 8px' }}>
+                    <a
+                      href={`/district/employees/${r.employeeId}`}
+                      style={{ color: '#ff6b00', textDecoration: 'none' }}
+                      onMouseOver={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                      onMouseOut={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                    >
+                      {r.displayName}
+                    </a>
+                  </td>
                   <td className="table-body" style={{ padding: '7px 8px', textAlign: 'right' }}>{r.totalGallons.toFixed(1)}</td>
                   <td className="table-body" style={{ padding: '7px 8px', textAlign: 'right', color: '#ffffff', fontWeight: 500 }}>{formatCurrency(r.totalCost)}</td>
                   <td className="table-body" style={{ padding: '7px 8px', textAlign: 'right' }}>{r.avgPpg != null ? `$${r.avgPpg.toFixed(3)}` : '—'}</td>
@@ -539,7 +569,16 @@ function PayrollAnalyticsSection({ hoursWeekly, weeklyPayroll, saturdays, overti
             <tbody>
               {(isMobile ? overtimeSummary.slice(0, 5) : overtimeSummary).map((r) => (
                 <tr key={r.employeeId} style={{ borderTop: '1px solid #2a2a2a' }}>
-                  <td className="table-body" style={{ padding: '7px 8px' }}>{r.displayName}</td>
+                  <td className="table-body" style={{ padding: '7px 8px' }}>
+                    <a
+                      href={`/district/employees/${r.employeeId}`}
+                      style={{ color: '#ff6b00', textDecoration: 'none' }}
+                      onMouseOver={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                      onMouseOut={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                    >
+                      {r.displayName}
+                    </a>
+                  </td>
                   <td className="table-body" style={{ padding: '7px 8px', textAlign: 'right' }}>{r.regularHours.toFixed(1)}</td>
                   <td className="table-body" style={{ padding: '7px 8px', textAlign: 'right', color: '#ffaa00' }}>{r.otHours.toFixed(1)}</td>
                   <td className="table-body" style={{ padding: '7px 8px', textAlign: 'right', color: '#cc4444' }}>{r.dtHours.toFixed(1)}</td>
@@ -596,7 +635,16 @@ function PayrollAnalyticsSection({ hoursWeekly, weeklyPayroll, saturdays, overti
                     <tr><td colSpan={isMobile ? 4 : 7} style={{ padding: '16px 8px', fontSize: 12, color: '#555555', textAlign: 'center' }}>No results.</td></tr>
                   ) : pageRows.map((r, i) => (
                     <tr key={`${r.employeeId}-${r.itemName}-${i}`} style={{ borderTop: '1px solid #2a2a2a' }}>
-                      <td className="table-body" style={{ padding: '7px 8px' }}>{r.displayName}</td>
+                      <td className="table-body" style={{ padding: '7px 8px' }}>
+                        <a
+                          href={`/district/employees/${r.employeeId}`}
+                          style={{ color: '#ff6b00', textDecoration: 'none' }}
+                          onMouseOver={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                          onMouseOut={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                        >
+                          {r.displayName}
+                        </a>
+                      </td>
                       {!isMobile && <td className="table-body" style={{ padding: '7px 8px', color: '#888888' }}>{r.itemName}</td>}
                       <td className="table-body" style={{ padding: '7px 8px', textAlign: 'right' }}>{r.regularHours > 0 ? r.regularHours.toFixed(1) : '—'}</td>
                       <td className="table-body" style={{ padding: '7px 8px', textAlign: 'right', color: r.otHours > 0 ? '#ffaa00' : '#cccccc' }}>{r.otHours > 0 ? r.otHours.toFixed(1) : '—'}</td>
@@ -632,8 +680,12 @@ export default function DistrictDashboard({ branches, initialBranch }: Props) {
 
   const [selectedBranchId, setSelectedBranchId] = useState<string>(validInitialBranch)
   const [fiscalMonths, setFiscalMonths] = useState<FiscalMonth[]>([])
+  const [fiscalQuarters, setFiscalQuarters] = useState<FiscalQuarter[]>([])
+  const [viewMode, setViewMode] = useState<'month' | 'quarter' | 'year'>('month')
   const [selectedFiscalId, setSelectedFiscalId] = useState<string>('')
-  const [isYTD, setIsYTD] = useState(false)
+  const [selectedQuarterId, setSelectedQuarterId] = useState<string>('')
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
+  const [availableYears, setAvailableYears] = useState<Array<{ year: number; startDate: string; endDate: string }>>([])
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null)
 
   // Main data
@@ -658,7 +710,9 @@ export default function DistrictDashboard({ branches, initialBranch }: Props) {
     Promise.all([
       fetch('/api/fiscal-months').then((r) => r.json()),
       fetch('/api/periods/available').then((r) => r.json()),
-    ]).then(([fmJson, periodsJson]) => {
+      fetch('/api/fiscal-quarters').then((r) => r.json()),
+      fetch('/api/periods/years').then((r) => r.json()),
+    ]).then(([fmJson, periodsJson, fqJson, yearsJson]) => {
       if (!fmJson.success) return
       const fms: FiscalMonth[] = fmJson.data
       setFiscalMonths(fms)
@@ -666,19 +720,33 @@ export default function DistrictDashboard({ branches, initialBranch }: Props) {
       const mostRecent = periods[0] ?? null
       const match = mostRecent ? fms.find((fm) => fm.start_date <= mostRecent && mostRecent <= fm.end_date) : null
       setSelectedFiscalId(match?.id ?? fms[0]?.id ?? '')
+      if (fqJson.success && fqJson.data.length > 0) {
+        setFiscalQuarters(fqJson.data)
+        setSelectedQuarterId(fqJson.data[0]?.id ?? '')
+      }
+      if (yearsJson.success && yearsJson.data.length > 0) {
+        setAvailableYears(yearsJson.data)
+        setSelectedYear(yearsJson.data[0].year)
+      }
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedFiscal = useMemo(() => fiscalMonths.find((fm) => fm.id === selectedFiscalId) ?? null, [fiscalMonths, selectedFiscalId])
+  const selectedQuarter = useMemo(() => fiscalQuarters.find((q) => q.id === selectedQuarterId) ?? null, [fiscalQuarters, selectedQuarterId])
 
   const { startDate, endDate } = useMemo(() => {
-    if (isYTD) {
-      const year = new Date().getFullYear()
-      return { startDate: `${year}-01-01`, endDate: fiscalMonths[0]?.end_date ?? `${year}-12-31` }
+    if (viewMode === 'quarter' && selectedQuarter) {
+      const sorted = [...selectedQuarter.months].sort((a, b) => a.sort_order - b.sort_order)
+      return { startDate: sorted[0]?.start_date ?? '', endDate: sorted[sorted.length - 1]?.end_date ?? '' }
+    }
+    if (viewMode === 'year') {
+      const yearData = availableYears.find((y) => y.year === selectedYear)
+      if (yearData) return { startDate: yearData.startDate, endDate: yearData.endDate }
+      return { startDate: `${selectedYear}-01-01`, endDate: `${selectedYear}-12-31` }
     }
     if (selectedFiscal) return { startDate: selectedFiscal.start_date, endDate: selectedFiscal.end_date }
     return { startDate: '', endDate: '' }
-  }, [isYTD, selectedFiscal, fiscalMonths])
+  }, [viewMode, selectedQuarter, selectedFiscal, selectedYear, availableYears])
 
   const saturdays = useMemo(() => (startDate && endDate ? getSaturdaysInRange(startDate, endDate) : []), [startDate, endDate])
 
@@ -832,18 +900,18 @@ export default function DistrictDashboard({ branches, initialBranch }: Props) {
     return m
   }, [weeklyPayrollByBranch])
 
-  const barData = useMemo(() => saturdays.map((sat) => {
+  const barData = useMemo(() => saturdays.map((sat, i) => {
     const directPayroll = isAggregate
       ? Object.values(weeklyPayrollByBranch).reduce((s, bw) => s + (bw[sat]?.directTotal ?? 0), 0)
       : singleBranchWeeklyPayroll[sat]?.directTotal ?? 0
     return {
       periodDate: sat,
-      label: fmtShort(sat),
+      label: viewMode === 'year' ? yearBarLabel(sat, i > 0 ? saturdays[i - 1] : null) : fmtShort(sat),
       revenue: revByWeek[sat]?.total ?? 0,
       directPayroll,
       fuel: fuelByWeek[sat] ?? 0,
     }
-  }), [saturdays, revByWeek, fuelByWeek, isAggregate, weeklyPayrollByBranch, singleBranchWeeklyPayroll])
+  }), [saturdays, revByWeek, fuelByWeek, isAggregate, weeklyPayrollByBranch, singleBranchWeeklyPayroll, viewMode])
 
   const trendData = useMemo(() => saturdays.map((sat) => {
     const wp = isAggregate ? aggregatedWeeklyPayroll[sat] : singleBranchWeeklyPayroll[sat]
@@ -914,15 +982,44 @@ export default function DistrictDashboard({ branches, initialBranch }: Props) {
         <option value="all">All Assigned Branches</option>
         {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
       </select>
-      <select value={selectedFiscalId} onChange={(e) => { setIsYTD(false); setSelectedFiscalId(e.target.value) }} style={selectStyle}>
-        {fiscalMonths.map((fm) => <option key={fm.id} value={fm.id}>{fm.name}</option>)}
-      </select>
-      <button
-        onClick={() => setIsYTD((v) => !v)}
-        style={{ background: isYTD ? '#ff6b00' : '#2a2a2a', border: '1px solid #333333', borderRadius: 8, padding: '5px 14px', fontSize: 12, color: isYTD ? '#ffffff' : '#888888', cursor: 'pointer', fontFamily: 'inherit', fontWeight: isYTD ? 500 : 400, whiteSpace: 'nowrap' }}
-      >
-        YTD
-      </button>
+      <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 2, border: '1px solid #333333' }}>
+        {(['month', 'quarter', 'year'] as const).map((mode) => (
+          <button
+            key={mode}
+            onClick={() => setViewMode(mode)}
+            style={{
+              background: viewMode === mode ? '#ff6b00' : 'transparent',
+              color: viewMode === mode ? '#ffffff' : '#888888',
+              border: 'none', borderRadius: 6, padding: '4px 10px',
+              fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+              fontWeight: viewMode === mode ? 500 : 400,
+            }}
+          >
+            {mode === 'month' ? 'Month' : mode === 'quarter' ? 'Quarter' : 'Year'}
+          </button>
+        ))}
+      </div>
+      {viewMode === 'month' && (
+        <select value={selectedFiscalId} onChange={(e) => setSelectedFiscalId(e.target.value)} style={selectStyle}>
+          {fiscalMonths.map((fm) => <option key={fm.id} value={fm.id}>{fm.name}</option>)}
+        </select>
+      )}
+      {viewMode === 'quarter' && (
+        <select value={selectedQuarterId} onChange={(e) => setSelectedQuarterId(e.target.value)} style={selectStyle} disabled={fiscalQuarters.length === 0}>
+          {fiscalQuarters.length === 0
+            ? <option value="">No quarters defined</option>
+            : fiscalQuarters.map((q) => <option key={q.id} value={q.id}>{q.name} (Q{q.quarter_number} {q.year})</option>)
+          }
+        </select>
+      )}
+      {viewMode === 'year' && (
+        <select value={selectedYear} onChange={(e) => setSelectedYear(parseInt(e.target.value))} style={selectStyle} disabled={availableYears.length === 0}>
+          {availableYears.length === 0
+            ? <option value={selectedYear}>{selectedYear}</option>
+            : availableYears.map((y) => <option key={y.year} value={y.year}>{y.year}</option>)
+          }
+        </select>
+      )}
     </div>
   )
 
@@ -1099,7 +1196,7 @@ export default function DistrictDashboard({ branches, initialBranch }: Props) {
       )}
 
       {/* Variance vs target */}
-      {!isYTD && selectedFiscalId && (
+      {viewMode === 'month' && selectedFiscalId && (
         <FiscalMonthVarianceRow
           fiscalMonthId={selectedFiscalId}
           branchIds={isAggregate ? branches.map((b) => b.id) : [selectedBranchId]}
@@ -1108,35 +1205,40 @@ export default function DistrictDashboard({ branches, initialBranch }: Props) {
         />
       )}
 
-      {/* Weekly bar chart */}
+      {/* Bar chart */}
       <div className="card">
         <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>
-          Weekly Performance{!isAggregate ? <span style={{ fontSize: 11, color: '#555555', fontWeight: 400 }}> · click a bar to see detail</span> : ''}
+          {viewMode === 'year' ? 'Annual Performance' : 'Weekly Performance'}
+          {viewMode !== 'year' && !isAggregate && <span style={{ fontSize: 11, color: '#555555', fontWeight: 400 }}> · click a bar to see detail</span>}
         </div>
         {loading ? <Skeleton height={200} /> : barData.length === 0 ? (
           <div style={{ fontSize: 12, color: '#555555', textAlign: 'center', padding: '32px 0' }}>No data for this period.</div>
         ) : (
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={barData} barCategoryGap="25%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
-              <XAxis dataKey="label" tick={{ fill: '#555555', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#555555', fontSize: 10 }} axisLine={false} tickLine={false} width={50} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
-              <Tooltip content={<BarTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-              <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#888888', paddingTop: 8 }} />
-              <Bar
-                dataKey="revenue"
-                name="Revenue"
-                fill="#ff6b00"
-                radius={[3, 3, 0, 0]}
-                cursor={!isAggregate ? 'pointer' : undefined}
-                onClick={!isAggregate ? (entry: { periodDate: string }) => setSelectedWeek((p) => p === entry.periodDate ? null : entry.periodDate) : undefined}
-              >
-                {barData.map((e) => <Cell key={e.periodDate} fill={!isAggregate && selectedWeek === e.periodDate ? '#ffaa44' : '#ff6b00'} />)}
-              </Bar>
-              <Bar dataKey="directPayroll" name="Direct Payroll" fill="#cc4444" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="fuel" name="Fuel" fill="#7a3333" radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div style={viewMode === 'year' && barData.length > 20 ? { overflowX: 'auto' } : {}}>
+            <div style={viewMode === 'year' && barData.length > 20 ? { minWidth: barData.length * 20 } : {}}>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={barData} barCategoryGap="25%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fill: '#555555', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: '#555555', fontSize: 10 }} axisLine={false} tickLine={false} width={50} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip content={<BarTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                  <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11, color: '#888888', paddingTop: 8 }} />
+                  <Bar
+                    dataKey="revenue"
+                    name="Revenue"
+                    fill="#ff6b00"
+                    radius={[3, 3, 0, 0]}
+                    cursor={!isAggregate && viewMode !== 'year' ? 'pointer' : undefined}
+                    onClick={!isAggregate && viewMode !== 'year' ? (entry: { periodDate: string }) => setSelectedWeek((p) => p === entry.periodDate ? null : entry.periodDate) : undefined}
+                  >
+                    {barData.map((e) => <Cell key={e.periodDate} fill={!isAggregate && viewMode !== 'year' && selectedWeek === e.periodDate ? '#ffaa44' : '#ff6b00'} />)}
+                  </Bar>
+                  <Bar dataKey="directPayroll" name="Direct Payroll" fill="#cc4444" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="fuel" name="Fuel" fill="#7a3333" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         )}
       </div>
 

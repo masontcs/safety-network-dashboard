@@ -1325,7 +1325,14 @@ export default function ExecutiveDashboard({ branches, entities }: Props) {
                         return (
                           <tr key={i} style={{ borderTop: '1px solid #2a2a2a' }}>
                             <td className="table-body" style={{ padding: '7px 10px' }}>
-                              {line.displayName}
+                              <a
+                                href={`/executive/employees/${line.employeeId}`}
+                                style={{ color: '#ff6b00', textDecoration: 'none' }}
+                                onMouseOver={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                                onMouseOut={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                              >
+                                {line.displayName}
+                              </a>
                             </td>
                             <td
                               className="table-body branch-name"
@@ -1407,7 +1414,14 @@ export default function ExecutiveDashboard({ branches, entities }: Props) {
                       .map((line, i) => (
                         <tr key={i} style={{ borderTop: '1px solid #2a2a2a' }}>
                           <td className="table-body" style={{ padding: '7px 10px' }}>
-                            {line.displayName}
+                            <a
+                              href={`/executive/employees/${line.employeeId}`}
+                              style={{ color: '#ff6b00', textDecoration: 'none' }}
+                              onMouseOver={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                              onMouseOut={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                            >
+                              {line.displayName}
+                            </a>
                           </td>
                           <td className="table-body" style={{ padding: '7px 10px', color: '#888888', fontSize: 11 }}>
                             {line.laborType === 'admin_salary' ? 'Salary' : 'Hourly'}
