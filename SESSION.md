@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 6, 2026 — Session: Mobile responsive, parser fixes, temp password flow, branch dropdowns
+## Last updated: May 6, 2026 — Session: Fiscal month selector on Manager and District dashboards
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -75,10 +75,10 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] `/request-access` — branch dropdown shows all active branches grouped: Operations / Corporate
 - [x] `DashboardShell` — dark sidebar (desktop) + `MobileBottomNav` (mobile); role-aware; sidebar hidden on mobile
 - [x] `MobileBottomNav` — fixed bottom nav with role-aware items; slide-up drawer for overflow admin items; 44px tap targets
-- [x] `ManagerDashboard` — fully built: weekly/MTD/YTD views, week navigator, revenue/payroll/fuel/gross profit metrics, trend line chart, waterfall chart, direct labor table, admin payroll lump sum, fuel table. YTD confirmed at $171,296.33 for Apr 25 2026.
+- [x] `ManagerDashboard` — fiscal month dropdown + YTD button; defaults to most recent fiscal month with data; weekly bar chart (Revenue/Payroll/Fuel grouped bars) with click-to-inspect direct labor panel; payroll breakdown card (Direct/Admin/Taxes stacked bar); Revenue Breakdown table (Labor/Rental/One-Time/Total by week); mobile 2×2 metric grid + revenue-only chart
 - [x] `AdminDashboard` — all-branches aggregate with branch selector, full allocation visible; month/quarter toggle; mobile: 2×2 metric cards, revenue-only chart, compact variance row, branch list; desktop: unchanged
 - [x] `ExecutiveDashboard` — all 7 branches side by side, full direct + admin payroll detail, Corp/HQ allocation breakdown, net after overhead, missing revenue alerts, 13-week trend, waterfall, collapsible payroll detail tables
-- [x] `DistrictDashboard` — branch selector with "All Assigned Branches" aggregate view + single-branch view; aggregate shows per-branch comparison table; single-branch view identical to ManagerDashboard; admin payroll lump sum only
+- [x] `DistrictDashboard` — fiscal month dropdown + YTD button + branch selector; aggregate = branch comparison cards + district totals table; single branch = manager-style layout (bar chart, payroll breakdown card, revenue breakdown table); mobile branch list or revenue table per mode
 - [x] `EmployeeDetailClient` — admin/executive only; preferred name + legal name display; inline Edit Name form; assignment pills; payroll history table + charts; fuel history table + filters; branch history + transfer form
 - [x] Admin pages: `/admin/import`, `/admin/review`, `/admin/users`, `/admin/fiscal-months`, `/admin/targets`, `/admin/fiscal-quarters`, `/admin/access-requests`, `/admin/data-explorer`
 - [x] Executive pages: `/executive/data-explorer`
@@ -103,7 +103,46 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ---
 
-## 3b. RECENT CHANGES (May 6, 2026) — This Session
+## 3a. RECENT CHANGES (May 6, 2026) — This Session
+
+### Manager and District Dashboard — Fiscal Month Selector
+
+Both `ManagerDashboard` and `DistrictDashboard` were fully rewritten to match the AdminDashboard's fiscal month selector pattern. The old week navigator (‹ ›) and Weekly/MTD/YTD toggle are gone.
+
+**ManagerDashboard (`components/dashboard/ManagerDashboard.tsx`)**
+- Props simplified: `{ branchId, entityId }` — `initialWeek` and `initialView` removed
+- On mount: fetches `/api/fiscal-months` and `/api/periods/available` in parallel; selects the fiscal month containing the most recently imported period date; falls back to first fiscal month
+- Fiscal month dropdown + YTD button in header; selecting a fiscal month clears YTD; clicking YTD clears the dropdown highlight
+- Date range = `selectedFiscal.start_date → selectedFiscal.end_date`; YTD = `year-01-01 → latest fiscal month end`
+- Data fetch strategy: revenue and fuel fetched as date range (single call each); payroll fetched per-Saturday (N calls for N weeks in range, all in parallel via `Promise.all`)
+- Weekly bar chart (Recharts): Revenue / Direct Payroll / Fuel grouped bars; clicking a Revenue bar opens the direct labor detail panel for that week; selected bar highlighted `#ffaa44`; `SelectedWeekPanel` dismissed via ×
+- Payroll breakdown card: horizontal stacked bar (orange = Direct, gray = Admin, dark gray = Taxes); line-item breakdown with percentages
+- Revenue Breakdown table: rows = Saturdays in fiscal month, columns = Labor / Rental / One-Time / Total
+- Period Summary card: Revenue → (Payroll) → (Fuel) → Gross Profit
+- Right column: Gross Profit, Margin, Total Cost metric cards
+- Mobile: 2×2 metric cards + revenue-only bar chart + selected-week panel + revenue table
+- Removed: TrendLineChart, WaterfallChart, TargetVarianceRow, DateRangePicker, week navigator, URL sync
+
+**DistrictDashboard (`components/dashboard/DistrictDashboard.tsx`)**
+- Props simplified: `{ branches, initialBranch }` — `initialWeek` and `initialView` removed
+- Same mount logic and fiscal month selector as Manager
+- Branch selector retained (orange text); selecting a branch or fiscal month triggers a fresh data fetch
+- Aggregate mode ("All Assigned Branches"):
+  - Revenue and fuel fetched without branchId filter (API scopes to assigned branches automatically)
+  - Payroll: N branches × M weeks calls, all parallel
+  - Branch comparison cards: revenue (large), payroll + fuel (small), gross profit + GP% pill; sorted by revenue descending; "No data" overlay for empty branches
+  - District Totals table: Branch / Revenue / Direct Pay / Admin Pay / Fuel / Gross Profit / Margin; totals row
+  - Weekly bar chart shows district-wide aggregates per week (no click-to-detail in aggregate)
+- Single branch mode: identical layout to ManagerDashboard (bar chart with click detail, payroll breakdown card, revenue breakdown table, period summary, right column)
+- Mobile: 2×2 metrics + revenue chart; aggregate shows branch list with GP%, single shows revenue table
+
+**Pages updated**
+- `app/manager/page.tsx` — removed `searchParams: { week, view }` and `initialWeek`/`initialView` prop passing
+- `app/district/page.tsx` — removed `week` and `view` from searchParams; kept `branch` for initialBranch
+
+---
+
+## 3b. RECENT CHANGES (May 6, 2026) — Prior This Session
 
 ### Temporary Password Flow for Access Request Approval
 - `PATCH /api/admin/access-requests/[id]` — switched from `inviteUserByEmail` to `createUser` with `password`, `email_confirm: true`, `user_metadata: { must_change_password: true }`; validates `temporaryPassword` (required, min 8 chars); inserts `user_profiles` with `must_change_password: true`
