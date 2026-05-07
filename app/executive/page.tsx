@@ -5,11 +5,7 @@ import type { Database, Role } from '@/lib/supabase/database.types'
 import DashboardShell from '@/components/layout/DashboardShell'
 import ExecutiveDashboard from '@/components/dashboard/ExecutiveDashboard'
 
-export default async function ExecutivePage({
-  searchParams,
-}: {
-  searchParams: { week?: string; view?: string }
-}) {
+export default async function ExecutivePage() {
   const supabase = createServerComponentClient<Database>({ cookies })
 
   const {
@@ -38,17 +34,11 @@ export default async function ExecutivePage({
   const branches = (branchesRaw as { id: string; name: string }[] | null) ?? []
   const entities = (entitiesRaw as { id: string; code: string; name: string }[] | null) ?? []
 
-  const initialView =
-    searchParams.view === 'mtd' || searchParams.view === 'ytd' ? searchParams.view : 'weekly'
-  const initialWeek = searchParams.week ?? null
-
   return (
     <DashboardShell role={profile.role} userName={profile.display_name}>
       <ExecutiveDashboard
         branches={branches}
         entities={entities}
-        initialWeek={initialWeek}
-        initialView={initialView}
       />
     </DashboardShell>
   )

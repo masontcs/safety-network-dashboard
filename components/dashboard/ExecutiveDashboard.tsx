@@ -1,24 +1,17 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { format } from 'date-fns'
+import { useState, useEffect, useMemo } from 'react'
 import Skeleton from '@/components/ui/Skeleton'
-import DateRangePicker from '@/components/ui/DateRangePicker'
 import TrendLineChart, { type TrendDataPoint } from '@/components/charts/TrendLineChart'
 import WaterfallChart from '@/components/charts/WaterfallChart'
 import TargetVarianceRow from '@/components/targets/TargetVarianceRow'
 import { formatCurrency, formatPercent, round2 } from '@/lib/utils/format'
 import {
-  getDateRange,
   getTrendStart,
   formatPeriodDate,
   toISODate,
-  getMostRecentSaturday,
 } from '@/lib/utils/date'
 import type { BranchAllocation } from '@/lib/allocation'
-
-type View = 'weekly' | 'mtd' | 'ytd'
 
 interface Branch {
   id: string
@@ -75,16 +68,26 @@ interface FiscalMonth {
   end_date: string
 }
 
+interface FiscalQuarter {
+  id: string
+  name: string
+  quarter_number: number
+  year: number
+  months: Array<{ id: string; name: string; start_date: string; end_date: string; sort_order: number }>
+}
+
 interface Props {
   branches: Branch[]
   entities: Entity[]
-  initialWeek: string | null
-  initialView: string
 }
 
-function parseLocal(dateStr: string): Date {
+function fmtShort(dateStr: string): string {
   const [y, m, d] = dateStr.split('-').map(Number)
-  return new Date(y, m - 1, d)
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(y, m - 1, d))
+}
+
+function rangeLabel(s: string, e: string): string {
+  return `${fmtShort(s)} – ${fmtShort(e)}, ${e.split('-')[0]}`
 }
 
 // ─── Donut Chart ──────────────────────────────────────────────────────────────
@@ -180,20 +183,16 @@ function EmptyState({ message }: { message: string }) {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function ExecutiveDashboard({ branches, entities, initialWeek, initialView }: Props) {
-  const router = useRouter()
-
-  // ── Navigation state ──────────────────────────────────────────────────────
-  const [view, setView] = useState<View>(
-    initialView === 'mtd' || initialView === 'ytd' ? initialView : 'weekly'
-  )
-  const [availablePeriods, setAvailablePeriods] = useState<string[]>([])
-  const [periodsLoaded, setPeriodsLoaded] = useState(false)
+export default function ExecutiveDashboard({ branches, entities }: Props) {
+  // ── Period selection state ────────────────────────────────────────────────
+  const [viewMode, setViewMode] = useState<'month' | 'quarter' | 'year'>('month')
   const [fiscalMonths, setFiscalMonths] = useState<FiscalMonth[]>([])
+  const [fiscalQuarters, setFiscalQuarters] = useState<FiscalQuarter[]>([])
   const [selectedFiscalId, setSelectedFiscalId] = useState<string>('')
-  const [periodDate, setPeriodDate] = useState<string>(
-    initialWeek ?? toISODate(getMostRecentSaturday())
-  )
+  const [selectedQuarterId, setSelectedQuarterId] = useState<string>('')
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
+  const [availableYears, setAvailableYears] = useState<Array<{ year: number; startDate: string; endDate: string }>>([])
+  const [periodsLoaded, setPeriodsLoaded] = useState(false)
 
   // ── Data state ────────────────────────────────────────────────────────────
   const [revData, setRevData] = useState<{ totalRevenue: number; transactions: RevTxn[] } | null>(null)
@@ -206,21 +205,29 @@ export default function ExecutiveDashboard({ branches, entities, initialWeek, in
   const [error, setError] = useState<string | null>(null)
   const [showPayrollDetail, setShowPayrollDetail] = useState(false)
 
-  // ── Load available periods + fiscal months once ───────────────────────────
+  // ── Load fiscal data on mount ─────────────────────────────────────────────
   useEffect(() => {
     Promise.all([
-      fetch('/api/periods/available').then((r) => r.json()),
       fetch('/api/fiscal-months').then((r) => r.json()),
-    ]).then(([periodsJson, fiscalJson]) => {
-      const periods: string[] = periodsJson.success ? periodsJson.data : []
-      setAvailablePeriods(periods)
-      if (fiscalJson.success) setFiscalMonths(fiscalJson.data)
-      if (periods.length > 0) {
-        if (initialWeek && periods.includes(initialWeek)) {
-          setPeriodDate(initialWeek)
-        } else {
-          setPeriodDate(periods[0])
-        }
+      fetch('/api/periods/available').then((r) => r.json()),
+      fetch('/api/fiscal-quarters').then((r) => r.json()),
+      fetch('/api/periods/years').then((r) => r.json()),
+    ]).then(([fmJson, periodsJson, fqJson, yearsJson]) => {
+      if (fmJson.success) {
+        const fms: FiscalMonth[] = fmJson.data
+        setFiscalMonths(fms)
+        const periods: string[] = periodsJson.success ? periodsJson.data : []
+        const mostRecent = periods[0] ?? null
+        const match = mostRecent ? fms.find((fm) => fm.start_date <= mostRecent && mostRecent <= fm.end_date) : null
+        setSelectedFiscalId(match?.id ?? fms[0]?.id ?? '')
+      }
+      if (fqJson.success && fqJson.data.length > 0) {
+        setFiscalQuarters(fqJson.data)
+        setSelectedQuarterId(fqJson.data[0]?.id ?? '')
+      }
+      if (yearsJson.success && yearsJson.data.length > 0) {
+        setAvailableYears(yearsJson.data)
+        setSelectedYear(yearsJson.data[0].year)
       }
       setPeriodsLoaded(true)
     })
@@ -232,60 +239,33 @@ export default function ExecutiveDashboard({ branches, entities, initialWeek, in
     [fiscalMonths, selectedFiscalId]
   )
 
-  const { startDate, endDate } = useMemo(() => {
-    if (selectedFiscal && view === 'mtd') {
-      return { startDate: selectedFiscal.start_date, endDate: periodDate }
-    }
-    if (selectedFiscal && view === 'ytd') {
-      const yearStart = fiscalMonths
-        .filter((fm) => fm.year === selectedFiscal.year)
-        .sort((a, b) => (a.start_date < b.start_date ? -1 : 1))[0]
-      const start = yearStart ? yearStart.start_date : `${selectedFiscal.year}-01-01`
-      return { startDate: start, endDate: periodDate }
-    }
-    return getDateRange(view, periodDate)
-  }, [view, periodDate, selectedFiscal, fiscalMonths])
-
-  const trendStart = useMemo(() => getTrendStart(periodDate), [periodDate])
-
-  // ── URL sync ───────────────────────────────────────────────────────────────
-  const syncUrl = useCallback(
-    (week: string, v: View) => {
-      const params = new URLSearchParams({ week, view: v })
-      router.replace(`?${params.toString()}`, { scroll: false })
-    },
-    [router]
+  const selectedQuarter = useMemo(
+    () => fiscalQuarters.find((q) => q.id === selectedQuarterId) ?? null,
+    [fiscalQuarters, selectedQuarterId]
   )
 
-  const changeView = (v: View) => {
-    setView(v)
-    syncUrl(periodDate, v)
-  }
+  const { startDate, endDate } = useMemo(() => {
+    if (viewMode === 'quarter' && selectedQuarter) {
+      const sorted = [...selectedQuarter.months].sort((a, b) => a.sort_order - b.sort_order)
+      return { startDate: sorted[0]?.start_date ?? '', endDate: sorted[sorted.length - 1]?.end_date ?? '' }
+    }
+    if (viewMode === 'year') {
+      const yearData = availableYears.find((y) => y.year === selectedYear)
+      if (yearData) return { startDate: yearData.startDate, endDate: yearData.endDate }
+      return { startDate: `${selectedYear}-01-01`, endDate: `${selectedYear}-12-31` }
+    }
+    if (selectedFiscal) return { startDate: selectedFiscal.start_date, endDate: selectedFiscal.end_date }
+    return { startDate: '', endDate: '' }
+  }, [viewMode, selectedQuarter, selectedFiscal, selectedYear, availableYears])
 
-  const changePeriod = (week: string) => {
-    setPeriodDate(week)
-    syncUrl(week, view)
-  }
+  // Payroll and allocation use the last period date (endDate) of the selected range
+  const periodDate = endDate
 
-  // ── Week navigation ────────────────────────────────────────────────────────
-  const currentIdx = availablePeriods.indexOf(periodDate)
-  const hasPrev = currentIdx < availablePeriods.length - 1
-  const hasNext = currentIdx > 0
-
-  const goPrev = () => {
-    if (hasPrev) changePeriod(availablePeriods[currentIdx + 1])
-  }
-  const goNext = () => {
-    if (hasNext) changePeriod(availablePeriods[currentIdx - 1])
-  }
-
-  const weekLabel = periodDate
-    ? `Week ending ${format(parseLocal(periodDate), 'MMM d, yyyy')}`
-    : '—'
+  const trendStart = useMemo(() => (endDate ? getTrendStart(endDate) : ''), [endDate])
 
   // ── Fetch main metrics ────────────────────────────────────────────────────
   useEffect(() => {
-    if (!periodsLoaded) return
+    if (!periodsLoaded || !startDate || !endDate) return
     setLoading(true)
     setError(null)
 
@@ -294,7 +274,6 @@ export default function ExecutiveDashboard({ branches, entities, initialWeek, in
     const fuelParams = new URLSearchParams({ startDate, endDate })
     const allocParams = new URLSearchParams({ periodDate })
 
-    // Admin payroll: one call per entity, in parallel
     const adminCalls = entities.map((e) =>
       fetch(`/api/payroll/summary?${new URLSearchParams({ periodDate, entityId: e.id })}`).then(
         (r) => r.json()
@@ -320,7 +299,6 @@ export default function ExecutiveDashboard({ branches, entities, initialWeek, in
           total: pay.data.directLabor.total,
         })
 
-        // Combine admin payroll across all entities
         const allAdminDetail: PayrollLine[] = []
         let allAdminTotal = 0
         for (const result of adminResults as Array<{ success: boolean; data?: { adminPayroll?: { detail?: PayrollLine[]; total?: number } } }>) {
@@ -348,14 +326,14 @@ export default function ExecutiveDashboard({ branches, entities, initialWeek, in
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false))
-  }, [periodsLoaded, periodDate, startDate, endDate, entities]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [periodsLoaded, startDate, endDate, entities]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Fetch 13-week trend ───────────────────────────────────────────────────
   useEffect(() => {
-    if (!periodsLoaded) return
+    if (!periodsLoaded || !trendStart || !endDate) return
 
-    const rp = new URLSearchParams({ startDate: trendStart, endDate: periodDate })
-    const fp = new URLSearchParams({ startDate: trendStart, endDate: periodDate })
+    const rp = new URLSearchParams({ startDate: trendStart, endDate })
+    const fp = new URLSearchParams({ startDate: trendStart, endDate })
 
     Promise.all([
       fetch(`/api/revenue/summary?${rp}`).then((r) => r.json()),
@@ -387,7 +365,7 @@ export default function ExecutiveDashboard({ branches, entities, initialWeek, in
         }))
       )
     })
-  }, [periodsLoaded, periodDate, trendStart])
+  }, [periodsLoaded, trendStart, endDate])
 
   // ─── Derived metrics ──────────────────────────────────────────────────────
   const rev = revData?.totalRevenue ?? 0
@@ -483,7 +461,16 @@ export default function ExecutiveDashboard({ branches, entities, initialWeek, in
       ? round2(fuelData.totalWithTax / fuelData.totalGallons)
       : null
 
-  const periodLabel = view === 'weekly' ? weekLabel : view.toUpperCase()
+  const periodLabel =
+    viewMode === 'month' && selectedFiscal
+      ? selectedFiscal.name
+      : viewMode === 'quarter' && selectedQuarter
+      ? selectedQuarter.name
+      : viewMode === 'year'
+      ? `FY ${selectedYear}`
+      : startDate && endDate
+      ? rangeLabel(startDate, endDate)
+      : '—'
 
   if (error) {
     return (
@@ -521,68 +508,40 @@ export default function ExecutiveDashboard({ branches, entities, initialWeek, in
       >
         <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Executive Overview</div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          {/* Week navigator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {/* Mode toggle */}
           <div
             style={{
               display: 'flex',
-              alignItems: 'center',
-              gap: 6,
               background: '#1e1e1e',
-              borderRadius: 8,
-              padding: '5px 10px',
               border: '1px solid #2a2a2a',
+              borderRadius: 8,
+              overflow: 'hidden',
             }}
           >
-            <button
-              onClick={goPrev}
-              disabled={!hasPrev}
-              title="Previous week"
-              style={{
-                background: 'none',
-                border: 'none',
-                color: hasPrev ? '#cccccc' : '#3a3a3a',
-                cursor: hasPrev ? 'pointer' : 'default',
-                padding: '0 2px',
-                fontSize: 16,
-                lineHeight: 1,
-                fontFamily: 'inherit',
-              }}
-            >
-              ‹
-            </button>
-            <span
-              style={{
-                fontSize: 12,
-                color: '#cccccc',
-                userSelect: 'none',
-                whiteSpace: 'nowrap',
-                minWidth: 160,
-                textAlign: 'center',
-              }}
-            >
-              {weekLabel}
-            </span>
-            <button
-              onClick={goNext}
-              disabled={!hasNext}
-              title="Next week"
-              style={{
-                background: 'none',
-                border: 'none',
-                color: hasNext ? '#cccccc' : '#3a3a3a',
-                cursor: hasNext ? 'pointer' : 'default',
-                padding: '0 2px',
-                fontSize: 16,
-                lineHeight: 1,
-                fontFamily: 'inherit',
-              }}
-            >
-              ›
-            </button>
+            {(['month', 'quarter', 'year'] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                style={{
+                  background: viewMode === mode ? '#ff6b00' : 'transparent',
+                  color: viewMode === mode ? '#ffffff' : '#888888',
+                  border: 'none',
+                  padding: '5px 12px',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontWeight: viewMode === mode ? 500 : 400,
+                  transition: 'background 0.15s',
+                }}
+              >
+                {mode.charAt(0).toUpperCase() + mode.slice(1)}
+              </button>
+            ))}
           </div>
 
-          {(view === 'mtd' || view === 'ytd') && fiscalMonths.length > 0 && (
+          {/* Contextual dropdown */}
+          {viewMode === 'month' && fiscalMonths.length > 0 && (
             <select
               value={selectedFiscalId}
               onChange={(e) => setSelectedFiscalId(e.target.value)}
@@ -597,7 +556,6 @@ export default function ExecutiveDashboard({ branches, entities, initialWeek, in
                 cursor: 'pointer',
               }}
             >
-              <option value="">Calendar {view === 'mtd' ? 'month' : 'year'}</option>
               {fiscalMonths.map((fm) => (
                 <option key={fm.id} value={fm.id}>
                   {fm.name}
@@ -606,7 +564,51 @@ export default function ExecutiveDashboard({ branches, entities, initialWeek, in
             </select>
           )}
 
-          <DateRangePicker value={view} onChange={changeView} />
+          {viewMode === 'quarter' && fiscalQuarters.length > 0 && (
+            <select
+              value={selectedQuarterId}
+              onChange={(e) => setSelectedQuarterId(e.target.value)}
+              style={{
+                background: '#1e1e1e',
+                border: '1px solid #2a2a2a',
+                borderRadius: 8,
+                padding: '5px 10px',
+                fontSize: 12,
+                color: '#cccccc',
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+              }}
+            >
+              {fiscalQuarters.map((q) => (
+                <option key={q.id} value={q.id}>
+                  {q.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {viewMode === 'year' && availableYears.length > 0 && (
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              style={{
+                background: '#1e1e1e',
+                border: '1px solid #2a2a2a',
+                borderRadius: 8,
+                padding: '5px 10px',
+                fontSize: 12,
+                color: '#cccccc',
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+              }}
+            >
+              {availableYears.map((y) => (
+                <option key={y.year} value={y.year}>
+                  {y.year}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -833,7 +835,7 @@ export default function ExecutiveDashboard({ branches, entities, initialWeek, in
               <div>
                 <div className="metric-label">Net After Overhead</div>
                 <div style={{ fontSize: 11, color: '#666666' }}>
-                  {view === 'weekly' ? weekLabel : `${periodLabel} · overhead: current week`}
+                  {periodLabel}{viewMode !== 'month' ? ' · overhead: last week of period' : ''}
                 </div>
               </div>
               {!noData && <DonutChart pct={netAfterAllocPct} />}
@@ -874,7 +876,7 @@ export default function ExecutiveDashboard({ branches, entities, initialWeek, in
           <div className="card">
             <div className="metric-label" style={{ marginBottom: 4 }}>Corp Overhead</div>
             <div style={{ fontSize: 11, color: '#666666', marginBottom: 8 }}>
-              {view === 'weekly' ? weekLabel : 'Current week'}
+              {periodDate ? `Week of ${fmtShort(periodDate)}` : '—'}
             </div>
             {allocation.canAllocate ? (
               <>
@@ -900,7 +902,7 @@ export default function ExecutiveDashboard({ branches, entities, initialWeek, in
           <div className="card">
             <div className="metric-label" style={{ marginBottom: 4 }}>HQ Overhead (SN share)</div>
             <div style={{ fontSize: 11, color: '#666666', marginBottom: 8 }}>
-              {view === 'weekly' ? weekLabel : 'Current week'}
+              {periodDate ? `Week of ${fmtShort(periodDate)}` : '—'}
             </div>
             {allocation.canAllocate ? (
               <>
@@ -931,7 +933,7 @@ export default function ExecutiveDashboard({ branches, entities, initialWeek, in
           <div className="card">
             <div className="metric-label" style={{ marginBottom: 4 }}>Total Overhead</div>
             <div style={{ fontSize: 11, color: '#666666', marginBottom: 8 }}>
-              {view === 'weekly' ? weekLabel : 'Current week'}
+              {periodDate ? `Week of ${fmtShort(periodDate)}` : '—'}
             </div>
             {allocation.canAllocate ? (
               <>
@@ -965,7 +967,7 @@ export default function ExecutiveDashboard({ branches, entities, initialWeek, in
       <TargetVarianceRow
         branchIds={branches.map((b) => b.id)}
         periodDate={periodDate}
-        view={view}
+        view={viewMode === 'month' ? 'weekly' : 'other'}
         actualRevenue={loading ? null : rev}
         actualGrossProfitPct={loading ? null : gpPct}
       />
