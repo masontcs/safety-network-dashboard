@@ -90,6 +90,11 @@ function fmtShort(dateStr: string): string {
   )
 }
 
+function fmtMonth(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Intl.DateTimeFormat('en-US', { month: 'short' }).format(new Date(y, m - 1, d))
+}
+
 function rangeLabel(startDate: string, endDate: string): string {
   const year = endDate.split('-')[0]
   return `${fmtShort(startDate)} – ${fmtShort(endDate)}, ${year}`
@@ -110,6 +115,13 @@ function getSaturdaysInRange(startDate: string, endDate: string): string[] {
     d.setDate(d.getDate() + 7)
   }
   return saturdays
+}
+
+// For year mode: label is month abbr for first Saturday of each month, empty string otherwise
+function yearBarLabel(sat: string, prev: string | null): string {
+  const m = sat.split('-')[1]
+  const prevM = prev ? prev.split('-')[1] : null
+  return m !== prevM ? fmtMonth(sat) : ''
 }
 
 // ── Donut ─────────────────────────────────────────────────────────────────────
@@ -145,7 +157,7 @@ function DonutChart({ pct }: { pct: number }) {
   )
 }
 
-// ── gpColor (used in SelectedWeekPanel and mobile list) ──────────────────────
+// ── gpColor ───────────────────────────────────────────────────────────────────
 
 function gpColor(pct: number): string {
   if (pct >= 20) return '#4caf50'
@@ -260,16 +272,16 @@ function useIsMobile(): boolean {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters }: Props) {
-  const [viewMode, setViewMode] = useState<'month' | 'quarter'>('month')
+  const [viewMode, setViewMode] = useState<'month' | 'quarter' | 'year'>('month')
   const [selectedFiscalId, setSelectedFiscalId] = useState<string>('')
   const [selectedQuarterId, setSelectedQuarterId] = useState<string>(fiscalQuarters[0]?.id ?? '')
-  const [isYTD, setIsYTD] = useState(false)
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
+  const [availableYears, setAvailableYears] = useState<Array<{ year: number; startDate: string; endDate: string }>>([])
   const [overviewData, setOverviewData] = useState<OverviewData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedWeek, setSelectedWeek] = useState<string | null>(null)
 
-  // Find the fiscal month object for the current selection
   const selectedFiscal = useMemo(
     () => fiscalMonths.find((fm) => fm.id === selectedFiscalId) ?? null,
     [fiscalMonths, selectedFiscalId]
@@ -289,39 +301,41 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
         endDate: sorted[sorted.length - 1]?.end_date ?? '',
       }
     }
-    if (isYTD) {
-      const year = new Date().getFullYear()
-      const latest = fiscalMonths[0]
-      return { startDate: `${year}-01-01`, endDate: latest?.end_date ?? `${year}-12-31` }
+    if (viewMode === 'year') {
+      const yearData = availableYears.find((y) => y.year === selectedYear)
+      if (yearData) return { startDate: yearData.startDate, endDate: yearData.endDate }
+      return { startDate: `${selectedYear}-01-01`, endDate: `${selectedYear}-12-31` }
     }
     if (selectedFiscal) {
       return { startDate: selectedFiscal.start_date, endDate: selectedFiscal.end_date }
     }
     return { startDate: '', endDate: '' }
-  }, [viewMode, selectedQuarter, isYTD, selectedFiscal, fiscalMonths])
+  }, [viewMode, selectedQuarter, selectedFiscal, selectedYear, availableYears])
 
-  // Range label for metric card subtitles
   const periodLabel = useMemo(() => {
     if (!startDate || !endDate) return '—'
     return rangeLabel(startDate, endDate)
   }, [startDate, endDate])
 
-  // On mount: pick the most recent fiscal month that has imported data
+  // On mount: pick the most recent fiscal month and load available years
   useEffect(() => {
-    if (fiscalMonths.length === 0) return
-    fetch('/api/periods/available')
-      .then((r) => r.json())
-      .then((json) => {
-        const periods: string[] = json.success && json.data.length > 0 ? json.data : []
-        const mostRecent = periods[0] ?? null
-        const match = mostRecent
-          ? fiscalMonths.find(
-              (fm) => fm.start_date <= mostRecent && mostRecent <= fm.end_date
-            )
-          : null
-        setSelectedFiscalId(match?.id ?? fiscalMonths[0].id)
-      })
-      .catch(() => setSelectedFiscalId(fiscalMonths[0].id))
+    const doInit = async () => {
+      const [periodsJson, yearsJson] = await Promise.all([
+        fetch('/api/periods/available').then((r) => r.json()).catch(() => ({ success: false, data: [] })),
+        fetch('/api/periods/years').then((r) => r.json()).catch(() => ({ success: false, data: [] })),
+      ])
+      const periods: string[] = periodsJson.success && periodsJson.data.length > 0 ? periodsJson.data : []
+      const mostRecent = periods[0] ?? null
+      const match = mostRecent
+        ? fiscalMonths.find((fm) => fm.start_date <= mostRecent && mostRecent <= fm.end_date)
+        : null
+      setSelectedFiscalId(match?.id ?? fiscalMonths[0]?.id ?? '')
+      if (yearsJson.success && yearsJson.data.length > 0) {
+        setAvailableYears(yearsJson.data)
+        setSelectedYear(yearsJson.data[0].year)
+      }
+    }
+    if (fiscalMonths.length > 0) doInit()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch overview data when the date range changes
@@ -341,7 +355,6 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
       .finally(() => setLoading(false))
   }, [startDate, endDate])
 
-  // Totals
   const totals = overviewData?.totals
   const rev = totals?.revenue ?? 0
   const pay = totals?.directPayroll ?? 0
@@ -350,36 +363,16 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
   const gpPct = totals?.gpPct ?? 0
   const noData = !loading && rev === 0 && pay === 0 && fuel === 0
 
-  // Bar chart data — weekly bars for month/quarter, monthly bars for YTD
+  // Bar chart data
   const barData = useMemo(() => {
     if (!overviewData) return []
+    const periodMap: Record<string, PeriodData> = {}
+    for (const p of overviewData.byPeriod) periodMap[p.periodDate] = p
 
-    if (isYTD && viewMode === 'month') {
-      // Group byPeriod into fiscal months for YTD bar chart
-      return fiscalMonths
-        .filter((fm) => fm.start_date >= startDate && fm.end_date <= endDate)
-        .map((fm) => {
-          const periods = overviewData.byPeriod.filter(
-            (p) => p.periodDate >= fm.start_date && p.periodDate <= fm.end_date
-          )
-          return {
-            periodDate: fm.end_date,
-            label: fm.name.split(' ')[0],
-            revenue: periods.reduce((s, p) => s + p.revenue, 0),
-            directPayroll: periods.reduce((s, p) => s + p.directPayroll, 0),
-            fuel: periods.reduce((s, p) => s + p.fuel, 0),
-          }
-        })
-        .filter((b) => b.revenue > 0 || b.directPayroll > 0)
-    }
-
-    // Quarter mode: weekly bars across all 3 months
     if (viewMode === 'quarter' && selectedQuarter) {
       const sorted = [...selectedQuarter.months].sort((a, b) => a.sort_order - b.sort_order)
       if (!sorted.length) return []
       const weeks = getSaturdaysInRange(sorted[0].start_date, sorted[sorted.length - 1].end_date)
-      const periodMap: Record<string, PeriodData> = {}
-      for (const p of overviewData.byPeriod) periodMap[p.periodDate] = p
       return weeks.map((sat) => ({
         periodDate: sat,
         label: fmtShort(sat),
@@ -389,11 +382,19 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
       }))
     }
 
+    if (viewMode === 'year' && startDate && endDate) {
+      const weeks = getSaturdaysInRange(startDate, endDate)
+      return weeks.map((sat, i) => ({
+        periodDate: sat,
+        label: yearBarLabel(sat, i > 0 ? weeks[i - 1] : null),
+        revenue: periodMap[sat]?.revenue ?? 0,
+        directPayroll: periodMap[sat]?.directPayroll ?? 0,
+        fuel: periodMap[sat]?.fuel ?? 0,
+      }))
+    }
+
     if (!selectedFiscal) return []
     const weeks = getSaturdaysInRange(selectedFiscal.start_date, selectedFiscal.end_date)
-    const periodMap: Record<string, PeriodData> = {}
-    for (const p of overviewData.byPeriod) periodMap[p.periodDate] = p
-
     return weeks.map((sat) => ({
       periodDate: sat,
       label: fmtShort(sat),
@@ -401,20 +402,15 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
       directPayroll: periodMap[sat]?.directPayroll ?? 0,
       fuel: periodMap[sat]?.fuel ?? 0,
     }))
-  }, [overviewData, isYTD, viewMode, selectedQuarter, selectedFiscal, fiscalMonths, startDate, endDate])
+  }, [overviewData, viewMode, selectedQuarter, selectedFiscal, startDate, endDate])
 
-  // Weeks for sparklines
+  // Weeks for sparklines — always derived from startDate/endDate
   const sparklineWeeks = useMemo(() => {
-    if (viewMode === 'quarter' && selectedQuarter) {
-      const sorted = [...selectedQuarter.months].sort((a, b) => a.sort_order - b.sort_order)
-      if (!sorted.length) return []
-      return getSaturdaysInRange(sorted[0].start_date, sorted[sorted.length - 1].end_date)
-    }
-    if (!selectedFiscal) return []
-    return getSaturdaysInRange(selectedFiscal.start_date, selectedFiscal.end_date)
-  }, [viewMode, selectedQuarter, selectedFiscal])
+    if (!startDate || !endDate) return []
+    return getSaturdaysInRange(startDate, endDate)
+  }, [startDate, endDate])
 
-  // Branch grid: all branches from props, enriched with data + trendData for 3-line chart
+  // Branch grid
   const branchGridData = useMemo(() => {
     const dataMap: Record<string, BranchData> = {}
     for (const b of overviewData?.byBranch ?? []) dataMap[b.branchId] = b
@@ -439,7 +435,6 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
       .sort((a, b) => (b.data?.revenue ?? 0) - (a.data?.revenue ?? 0))
   }, [overviewData, branches, sparklineWeeks])
 
-  // Revenue table — same as before
   const revenueByBranch = useMemo(() => {
     return branchGridData
       .filter((item) => item.data && item.data.revenue > 0)
@@ -480,33 +475,34 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
         {/* Period selector */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 2, border: '1px solid #333333', flexShrink: 0 }}>
-            {(['month', 'quarter'] as const).map((mode) => (
+            {(['month', 'quarter', 'year'] as const).map((mode) => (
               <button
                 key={mode}
-                onClick={() => { setViewMode(mode); if (mode === 'quarter') setIsYTD(false) }}
+                onClick={() => setViewMode(mode)}
                 style={{
                   background: viewMode === mode ? '#ff6b00' : 'transparent',
                   color: viewMode === mode ? '#ffffff' : '#888888',
-                  border: 'none', borderRadius: 6, padding: '5px 10px',
-                  fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+                  border: 'none', borderRadius: 6, padding: '5px 8px',
+                  fontSize: 11, cursor: 'pointer', fontFamily: 'inherit',
                   fontWeight: viewMode === mode ? 500 : 400, minHeight: 32,
                 }}
               >
-                {mode === 'month' ? 'Month' : 'Qtr'}
+                {mode === 'month' ? 'Mo' : mode === 'quarter' ? 'Qtr' : 'Yr'}
               </button>
             ))}
           </div>
-          {viewMode === 'month' ? (
+          {viewMode === 'month' && (
             <select
               value={selectedFiscalId}
-              onChange={(e) => { setIsYTD(false); setSelectedFiscalId(e.target.value) }}
+              onChange={(e) => setSelectedFiscalId(e.target.value)}
               style={{ ...selectStyle, flex: 1 }}
             >
               {fiscalMonths.map((fm) => (
                 <option key={fm.id} value={fm.id}>{fm.name}</option>
               ))}
             </select>
-          ) : (
+          )}
+          {viewMode === 'quarter' && (
             <select
               value={selectedQuarterId}
               onChange={(e) => setSelectedQuarterId(e.target.value)}
@@ -518,9 +514,24 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
               ))}
             </select>
           )}
+          {viewMode === 'year' && (
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              style={{ ...selectStyle, flex: 1 }}
+              disabled={availableYears.length === 0}
+            >
+              {availableYears.length === 0
+                ? <option value={selectedYear}>{selectedYear}</option>
+                : availableYears.map((y) => (
+                    <option key={y.year} value={y.year}>{y.year}</option>
+                  ))
+              }
+            </select>
+          )}
         </div>
 
-        {/* 2×2 metric cards — label + value only, no sparklines/progress/secondary */}
+        {/* 2×2 metric cards */}
         {loading ? (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {[1, 2, 3, 4].map((i) => <Skeleton key={i} height={80} borderRadius={12} />)}
@@ -551,8 +562,8 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
           </div>
         )}
 
-        {/* Variance — compact single line */}
-        {viewMode === 'month' && !isYTD && selectedFiscalId && (
+        {/* Variance — month mode only */}
+        {viewMode === 'month' && selectedFiscalId && (
           <FiscalMonthVarianceRow
             fiscalMonthId={selectedFiscalId}
             branchIds={branches.map((b) => b.id)}
@@ -562,51 +573,54 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
           />
         )}
 
-        {/* Bar chart — revenue bars only */}
+        {/* Bar chart */}
         <div className="card">
           <div style={{ fontSize: 13, fontWeight: 500, color: '#ffffff', marginBottom: 10 }}>
-            {isYTD ? 'Monthly Performance' : 'Weekly Performance'}
+            {viewMode === 'year' ? 'Annual Performance' : 'Weekly Performance'}
           </div>
           {loading ? (
             <Skeleton height={160} />
           ) : barData.length === 0 ? (
             <EmptyState message="No data for this period." />
           ) : (
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={barData} barCategoryGap="30%" margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
-                <XAxis dataKey="label" tick={{ fill: '#555555', fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#555555', fontSize: 9 }} axisLine={false} tickLine={false} width={40}
-                  tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip content={<WeeklyTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                <Bar
-                  dataKey="revenue"
-                  name="Revenue"
-                  fill="#ff6b00"
-                  radius={[3, 3, 0, 0]}
-                  cursor={isYTD && viewMode === 'month' ? undefined : 'pointer'}
-                  onClick={isYTD && viewMode === 'month' ? undefined : (entry: { periodDate: string }) => {
-                    setSelectedWeek((prev) => prev === entry.periodDate ? null : entry.periodDate)
-                  }}
-                >
-                  {barData.map((entry) => (
-                    <Cell
-                      key={entry.periodDate}
-                      fill={!(isYTD && viewMode === 'month') && selectedWeek === entry.periodDate ? '#ffaa44' : '#ff6b00'}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <div style={viewMode === 'year' ? { overflowX: 'auto' } : {}}>
+              <div style={viewMode === 'year' ? { minWidth: Math.max(barData.length * 18, 320) } : {}}>
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={barData} barCategoryGap="30%" margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
+                    <XAxis dataKey="label" tick={{ fill: '#555555', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: '#555555', fontSize: 9 }} axisLine={false} tickLine={false} width={40}
+                      tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip content={<WeeklyTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                    <Bar
+                      dataKey="revenue"
+                      name="Revenue"
+                      fill="#ff6b00"
+                      radius={[3, 3, 0, 0]}
+                      cursor={viewMode === 'year' ? undefined : 'pointer'}
+                      onClick={viewMode === 'year' ? undefined : (entry: { periodDate: string }) => {
+                        setSelectedWeek((prev) => prev === entry.periodDate ? null : entry.periodDate)
+                      }}
+                    >
+                      {barData.map((entry) => (
+                        <Cell
+                          key={entry.periodDate}
+                          fill={viewMode !== 'year' && selectedWeek === entry.periodDate ? '#ffaa44' : '#ff6b00'}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Selected week panel */}
         {selectedWeek && selectedWeekData && (
           <SelectedWeekPanel periodDate={selectedWeek} data={selectedWeekData} onDismiss={() => setSelectedWeek(null)} />
         )}
 
-        {/* Branch performance — single column list, no sparklines */}
+        {/* Branch performance — single column list */}
         <div className="card" style={{ padding: 0 }}>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid #2a2a2a', fontSize: 13, fontWeight: 500, color: '#ffffff' }}>
             Branch Performance
@@ -653,7 +667,6 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
             })
           )}
         </div>
-        {/* Revenue by branch table: hidden on mobile (branch list above replaces it) */}
       </div>
     )
   }
@@ -689,6 +702,8 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
     )
   }
 
+  const isYearScrollable = viewMode === 'year' && barData.length > 20
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
@@ -697,15 +712,12 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
         <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Overview</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
 
-          {/* Month / Quarter toggle */}
+          {/* Month / Quarter / Year toggle */}
           <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 2, border: '1px solid #333333' }}>
-            {(['month', 'quarter'] as const).map((mode) => (
+            {(['month', 'quarter', 'year'] as const).map((mode) => (
               <button
                 key={mode}
-                onClick={() => {
-                  setViewMode(mode)
-                  if (mode === 'quarter') setIsYTD(false)
-                }}
+                onClick={() => setViewMode(mode)}
                 style={{
                   background: viewMode === mode ? '#ff6b00' : 'transparent',
                   color: viewMode === mode ? '#ffffff' : '#888888',
@@ -719,16 +731,16 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
                   transition: 'background 0.15s',
                 }}
               >
-                {mode === 'month' ? 'Month' : 'Quarter'}
+                {mode === 'month' ? 'Month' : mode === 'quarter' ? 'Quarter' : 'Year'}
               </button>
             ))}
           </div>
 
           {/* Contextual dropdown */}
-          {viewMode === 'month' ? (
+          {viewMode === 'month' && (
             <select
               value={selectedFiscalId}
-              onChange={(e) => { setIsYTD(false); setSelectedFiscalId(e.target.value) }}
+              onChange={(e) => setSelectedFiscalId(e.target.value)}
               style={selectStyle}
             >
               {fiscalMonths.map((fm) => (
@@ -737,7 +749,8 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
                 </option>
               ))}
             </select>
-          ) : (
+          )}
+          {viewMode === 'quarter' && (
             <select
               value={selectedQuarterId}
               onChange={(e) => setSelectedQuarterId(e.target.value)}
@@ -755,32 +768,26 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
               )}
             </select>
           )}
-
-          {/* YTD — month mode only */}
-          {viewMode === 'month' && (
-            <button
-              onClick={() => setIsYTD((v) => !v)}
-              style={{
-                background: isYTD ? '#ff6b00' : '#2a2a2a',
-                color: isYTD ? '#ffffff' : '#888888',
-                border: '1px solid #333333',
-                borderRadius: 8,
-                padding: '5px 14px',
-                fontSize: 12,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                fontWeight: isYTD ? 500 : 400,
-              }}
+          {viewMode === 'year' && (
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              style={selectStyle}
+              disabled={availableYears.length === 0}
             >
-              YTD
-            </button>
+              {availableYears.length === 0
+                ? <option value={selectedYear}>{selectedYear}</option>
+                : availableYears.map((y) => (
+                    <option key={y.year} value={y.year}>{y.year}</option>
+                  ))
+              }
+            </select>
           )}
         </div>
       </div>
 
       {/* ── Top metric cards ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', gap: 12 }}>
-        {/* Revenue hero */}
         {loading ? <Skeleton height={150} borderRadius={12} /> : (
           <div style={{ background: '#ff6b00', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -858,7 +865,7 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
       </div>
 
       {/* ── Variance vs target (fiscal month mode only) ── */}
-      {viewMode === 'month' && !isYTD && selectedFiscalId && (
+      {viewMode === 'month' && selectedFiscalId && (
         <FiscalMonthVarianceRow
           fiscalMonthId={selectedFiscalId}
           branchIds={branches.map((b) => b.id)}
@@ -867,17 +874,17 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
         />
       )}
 
-      {/* ── Weekly / monthly bar chart ── */}
+      {/* ── Bar chart ── */}
       <div className="card">
         <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>
-          {isYTD && viewMode === 'month' ? 'Monthly Performance' : 'Weekly Performance'}
+          {viewMode === 'year' ? 'Annual Performance' : 'Weekly Performance'}
           <span style={{ marginLeft: 8, fontSize: 11, color: '#555555', fontWeight: 400 }}>
-            {isYTD && viewMode === 'month'
-              ? `YTD ${new Date().getFullYear()}`
+            {viewMode === 'year'
+              ? String(selectedYear)
               : viewMode === 'quarter'
               ? selectedQuarter?.name
               : selectedFiscal?.name}
-            {!(isYTD && viewMode === 'month') && ' · click a bar to inspect that week'}
+            {viewMode !== 'year' && ' · click a bar to inspect that week'}
           </span>
         </div>
 
@@ -886,55 +893,55 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
         ) : barData.length === 0 ? (
           <EmptyState message="No data for this period." />
         ) : (
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart
-              data={barData}
-              barCategoryGap="25%"
-              barGap={2}
-              margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
-              <XAxis
-                dataKey="label"
-                tick={{ fill: '#555555', fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fill: '#555555', fontSize: 9 }}
-                axisLine={false}
-                tickLine={false}
-                width={48}
-                tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
-              />
-              <Tooltip content={<WeeklyTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-              <Bar
-                dataKey="revenue"
-                name="Revenue"
-                fill="#ff6b00"
-                radius={[3, 3, 0, 0]}
-                cursor={isYTD && viewMode === 'month' ? undefined : 'pointer'}
-                onClick={isYTD && viewMode === 'month' ? undefined : (entry: { periodDate: string }) => {
-                  setSelectedWeek((prev) =>
-                    prev === entry.periodDate ? null : entry.periodDate
-                  )
-                }}
-              >
-                {barData.map((entry) => (
-                  <Cell
-                    key={entry.periodDate}
-                    fill={
-                      !(isYTD && viewMode === 'month') && selectedWeek === entry.periodDate
-                        ? '#ffaa44'
-                        : '#ff6b00'
-                    }
+          <div style={isYearScrollable ? { overflowX: 'auto' } : {}}>
+            <div style={isYearScrollable ? { minWidth: barData.length * 20 } : {}}>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart
+                  data={barData}
+                  barCategoryGap="25%"
+                  barGap={2}
+                  margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fill: '#555555', fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
                   />
-                ))}
-              </Bar>
-              <Bar dataKey="directPayroll" name="Payroll" fill="#444444" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="fuel" name="Fuel" fill="#8b2a2a" radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+                  <YAxis
+                    tick={{ fill: '#555555', fontSize: 9 }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={48}
+                    tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip content={<WeeklyTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+                  <Bar
+                    dataKey="revenue"
+                    name="Revenue"
+                    fill="#ff6b00"
+                    radius={[3, 3, 0, 0]}
+                    cursor={viewMode === 'year' ? undefined : 'pointer'}
+                    onClick={viewMode === 'year' ? undefined : (entry: { periodDate: string }) => {
+                      setSelectedWeek((prev) =>
+                        prev === entry.periodDate ? null : entry.periodDate
+                      )
+                    }}
+                  >
+                    {barData.map((entry) => (
+                      <Cell
+                        key={entry.periodDate}
+                        fill={viewMode !== 'year' && selectedWeek === entry.periodDate ? '#ffaa44' : '#ff6b00'}
+                      />
+                    ))}
+                  </Bar>
+                  <Bar dataKey="directPayroll" name="Payroll" fill="#444444" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="fuel" name="Fuel" fill="#8b2a2a" radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         )}
       </div>
 
