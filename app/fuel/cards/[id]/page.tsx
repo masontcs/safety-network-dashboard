@@ -24,11 +24,11 @@ export default async function FuelCardDetailPage({
   const profile = profileRaw as { role: Role; display_name: string } | null
   if (!profile) redirect('/login')
 
-  // Load all SN branches for the assignment panel (admin needs all, others need their own)
+  // Load all active branches for the assignment panel — includes corporate
   const { data: branchesRaw } = await supabase
     .from('branches')
     .select('id, name')
-    .eq('is_revenue_generating', true)
+    .eq('is_active', true)
     .order('name')
   const branches = (branchesRaw ?? []) as { id: string; name: string }[]
 
