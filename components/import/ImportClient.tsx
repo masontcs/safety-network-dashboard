@@ -11,7 +11,7 @@ type EntityCode = 'INC' | 'TCS' | 'STS'
 type UploadState =
   | { status: 'idle' }
   | { status: 'ready'; file: File }
-  | { status: 'uploading' }
+  | { status: 'uploading'; label?: string; progress?: number }
   | { status: 'success'; lines: string[] }
   | { status: 'error'; message: string }
   | { status: 'duplicate'; conflict: { importId: string; periodDate?: string; entityCode?: string; dateRangeStart?: string; dateRangeEnd?: string }; file: File }
@@ -98,7 +98,9 @@ function DropZone({ accept, state, onFile, label, hint }: DropZoneProps) {
         </>
       )}
 
-      {state.status === 'uploading' && <UploadingState />}
+      {state.status === 'uploading' && (
+        <UploadingState label={state.label} progress={state.progress} />
+      )}
 
       {state.status === 'success' && (
         <>
@@ -148,29 +150,77 @@ function PayrollSection({ onSuccess }: { onSuccess: () => void }) {
 
     try {
       const res = await fetch('/api/import/payroll', { method: 'POST', body: form })
-      const json = await res.json()
 
-      if (res.status === 409 && json.conflict) {
-        setState({ status: 'duplicate', conflict: json.conflict, file })
-        return
-      }
-      if (!json.success) {
+      // Non-stream responses: 409 duplicate, 400 validation, 401/403 auth errors
+      const contentType = res.headers.get('content-type') ?? ''
+      if (!contentType.includes('x-ndjson')) {
+        const json = await res.json()
+        if (res.status === 409 && json.conflict) {
+          setState({ status: 'duplicate', conflict: json.conflict, file })
+          return
+        }
         setState({ status: 'error', message: json.error ?? 'Upload failed.' })
         return
       }
 
-      const d = json.data
-      const lines = [
-        `Period: ${formatPeriodDate(d.periodDate)}`,
-        `Entity: ${d.entityCode}`,
-        `${d.transactionCount} payroll transactions`,
-        d.taxCount > 0 ? `${d.taxCount} tax entries` : null,
-        d.pendingEmployeeCount > 0 ? `${d.pendingEmployeeCount} employees need review` : null,
-        d.unknownItemCount > 0 ? `${d.unknownItemCount} unknown items flagged` : null,
+      // Stream path — read NDJSON events as they arrive
+      if (!res.body) {
+        setState({ status: 'error', message: 'Streaming not supported by this browser.' })
+        return
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buf = ''
+      let finalData: Record<string, unknown> | null = null
+
+      outer: while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        const parts = buf.split('\n')
+        buf = parts.pop() ?? ''
+
+        for (const line of parts) {
+          if (!line.trim()) continue
+          try {
+            const event = JSON.parse(line) as {
+              type: string; label?: string; progress?: number
+              current?: number; total?: number
+              data?: Record<string, unknown>; error?: string
+            }
+            if (event.type === 'step') {
+              setState({ status: 'uploading', label: event.label, progress: event.progress })
+            } else if (event.type === 'done') {
+              finalData = event.data ?? null
+              break outer
+            } else if (event.type === 'error') {
+              setState({ status: 'error', message: event.error ?? 'Upload failed.' })
+              return
+            }
+          } catch {
+            // ignore malformed lines
+          }
+        }
+      }
+
+      if (!finalData) {
+        setState({ status: 'error', message: 'No response received from server.' })
+        return
+      }
+
+      const d = finalData
+      const successLines = [
+        `Period: ${formatPeriodDate(d.periodDate as string)}`,
+        `Entity: ${d.entityCode as string}`,
+        `${d.transactionCount as number} payroll transactions`,
+        (d.taxCount as number) > 0 ? `${d.taxCount as number} tax entries` : null,
+        (d.pendingEmployeeCount as number) > 0 ? `${d.pendingEmployeeCount as number} employees need review` : null,
+        (d.unknownItemCount as number) > 0 ? `${d.unknownItemCount as number} unknown items flagged` : null,
         ...((d.warnings as string[]) ?? []),
       ].filter(Boolean) as string[]
 
-      setState({ status: 'success', lines })
+      setState({ status: 'success', lines: successLines })
       onSuccess()
     } catch {
       setState({ status: 'error', message: 'Network error — please try again.' })
@@ -759,43 +809,48 @@ export default function ImportClient() {
 
 // ─── Upload progress ─────────────────────────────────────────────────────────
 
-function UploadingState() {
+function UploadingState({ label, progress }: { label?: string; progress?: number }) {
   const steps = ['Parsing file…', 'Validating data…', 'Inserting records…', 'Finalizing…']
-  const [step, setStep] = useState(0)
-  const [progress, setProgress] = useState(0)
+  const [internalStep, setInternalStep] = useState(0)
+  const [internalProgress, setInternalProgress] = useState(0)
+
+  // Only use the internal timer when the server isn't sending real progress
+  const hasRealProgress = progress !== undefined
 
   useEffect(() => {
+    if (hasRealProgress) return
     const interval = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 88) return p
-        return p + (88 - p) * 0.05
-      })
+      setInternalProgress((p) => (p >= 88 ? p : p + (88 - p) * 0.05))
     }, 100)
     return () => clearInterval(interval)
-  }, [])
+  }, [hasRealProgress])
 
   useEffect(() => {
-    const t1 = setTimeout(() => setStep(1), 2000)
-    const t2 = setTimeout(() => setStep(2), 5000)
-    const t3 = setTimeout(() => setStep(3), 9000)
+    if (hasRealProgress) return
+    const t1 = setTimeout(() => setInternalStep(1), 2000)
+    const t2 = setTimeout(() => setInternalStep(2), 5000)
+    const t3 = setTimeout(() => setInternalStep(3), 9000)
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
-  }, [])
+  }, [hasRealProgress])
+
+  const displayLabel = label ?? steps[internalStep]
+  const displayProgress = progress ?? internalProgress
 
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-      <div style={{ fontSize: 12, color: '#888888' }}>{steps[step]}</div>
+      <div style={{ fontSize: 12, color: '#888888' }}>{displayLabel}</div>
       <div style={{ width: '85%', height: 4, background: '#2a2a2a', borderRadius: 2, overflow: 'hidden' }}>
         <div
           style={{
             height: '100%',
-            width: `${progress}%`,
+            width: `${displayProgress}%`,
             background: '#ff6b00',
             borderRadius: 2,
-            transition: 'width 0.1s ease-out',
+            transition: 'width 0.3s ease-out',
           }}
         />
       </div>
-      <div style={{ fontSize: 11, color: '#555555' }}>{Math.round(progress)}%</div>
+      <div style={{ fontSize: 11, color: '#555555' }}>{Math.round(displayProgress)}%</div>
     </div>
   )
 }

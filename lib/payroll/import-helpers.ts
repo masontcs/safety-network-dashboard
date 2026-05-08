@@ -74,11 +74,20 @@ export async function resolvePayrollItems(
 export async function insertPayrollData(
   importId: string, entityId: string, periodDate: string,
   resolved: ResolvedEmployee[], parsedEmployees: ParsedEmployee[],
-  itemNameToId: Map<string, string | null>, supabase: SupabaseClient
+  itemNameToId: Map<string, string | null>, supabase: SupabaseClient,
+  onTxnProgress?: (done: number, total: number) => void
 ): Promise<{ txnCount: number; taxCount: number; pendingCount: number; unknownItemNames: string[] }> {
   const rMap = new Map(resolved.map((r) => [r.rawName, r]))
   let txnCount = 0; let taxCount = 0; let pendingCount = 0
   const unknownItemNames: string[] = []
+
+  const confirmedTxnTotal = parsedEmployees.reduce((sum, emp) => {
+    const r = rMap.get(emp.rawName)
+    if (!r || r.businessTag || r.payrollCodeId === null) return sum
+    return sum + emp.lineItems.length
+  }, 0)
+  const updateEvery = Math.max(1, Math.floor(confirmedTxnTotal / 10))
+
   for (const emp of parsedEmployees) {
     const res = rMap.get(emp.rawName)
     if (!res) continue
@@ -114,6 +123,9 @@ export async function insertPayrollData(
         })
         if (error) throw new Error(`Failed to insert payroll transaction: ${error.message}`)
         txnCount++
+        if (onTxnProgress && confirmedTxnTotal > 0 && (txnCount % updateEvery === 0 || txnCount === confirmedTxnTotal)) {
+          onTxnProgress(txnCount, confirmedTxnTotal)
+        }
       }
       if (emp.taxAmount > 0) {
         const { error } = await supabase.from('payroll_taxes').insert({

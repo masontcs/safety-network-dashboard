@@ -18,17 +18,16 @@ function isEntityCode(code: string): code is EntityCode {
   return (VALID_ENTITY_CODES as readonly string[]).includes(code)
 }
 
-export async function POST(request: Request): Promise<NextResponse> {
+export async function POST(request: Request): Promise<Response> {
   try {
-    // 1. Auth
+    // 1. Auth — must happen before stream so we can return 401/403 normally
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
 
-    // 2. Admin only
     const guard = guardAdminOnly(ctx.access.role)
     if (guard) return guard
 
-    // 3. Parse form
+    // 2. Parse form
     const form = await request.formData()
     const file = form.get('file')
     const entityCode = form.get('entityCode')
@@ -40,7 +39,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ success: false, error: 'entityCode must be INC, TCS, or STS', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
 
-    // 4. Parse file
+    // 3. Parse file (CPU-bound, fast)
     const buffer = Buffer.from(await file.arrayBuffer())
     const parsed = parsePayrollFile(buffer, entityCode)
     if (!parsed.success) {
@@ -50,51 +49,121 @@ export async function POST(request: Request): Promise<NextResponse> {
     const { periodDate, employees, payrollItems, warnings } = parsed.data
     const supabase = createServiceClient()
 
-    // 5. Lookup entity_id
+    // 4. Entity lookup
     const { data: entity, error: entityErr } = await supabase
       .from('entities').select('id').eq('code', entityCode).single()
-    if (entityErr || !entity) throw new Error(`Entity not found: ${entityCode}`)
+    if (entityErr || !entity) {
+      return NextResponse.json({ success: false, error: `Entity not found: ${entityCode}` }, { status: 400 })
+    }
 
-    // 6. Duplicate check
+    // 5. Duplicate check — return 409 before starting stream so client handles it normally
     const { data: existing } = await supabase
       .from('payroll_imports')
       .select('id')
       .eq('entity_id', entity.id)
       .eq('period_date', periodDate)
       .maybeSingle()
-    if (existing) throw new DuplicateImportError({ entityCode, periodDate, importId: existing.id })
+    if (existing) {
+      throw new DuplicateImportError({ entityCode, periodDate, importId: existing.id })
+    }
 
-    // 7. Resolve items + employees
-    const itemNameToId = await resolvePayrollItems(payrollItems, supabase)
-    const resolved = await resolveEmployees(employees, entity.id, supabase)
+    // 6. Stream the slow part: employee resolution + DB inserts
+    const encoder = new TextEncoder()
 
-    // 8. Insert import record
-    const { data: importRecord, error: importErr } = await supabase
-      .from('payroll_imports')
-      .insert({ entity_id: entity.id, period_date: periodDate, imported_by: ctx.access.userId, status: 'pending' })
-      .select('id').single()
-    if (importErr || !importRecord) throw new Error(`Failed to create payroll import: ${importErr?.message}`)
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const send = (event: Record<string, unknown>) => {
+          try {
+            controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'))
+          } catch {
+            // controller already closed
+          }
+        }
 
-    // 9. Insert transactions
-    const counts = await insertPayrollData(
-      importRecord.id, entity.id, periodDate, resolved, employees, itemNameToId, supabase
-    )
+        try {
+          send({ type: 'step', label: `Resolving ${payrollItems.length} pay items…`, progress: 20 })
+          const itemNameToId = await resolvePayrollItems(payrollItems, supabase)
 
-    // 10. Non-blocking AI
-    const newEmployees = resolved.filter((r) => r.isNew)
-    triggerAiForPayroll(newEmployees, entity.id, counts.unknownItemNames, supabase)
+          send({ type: 'step', label: `Matching ${employees.length} employees…`, progress: 38 })
+          const resolved = await resolveEmployees(employees, entity.id, supabase)
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        importId: importRecord.id,
-        periodDate,
-        entityCode,
-        transactionCount: counts.txnCount,
-        taxCount: counts.taxCount,
-        pendingEmployeeCount: counts.pendingCount,
-        unknownItemCount: counts.unknownItemNames.length,
-        warnings,
+          const newCount = resolved.filter((r) => r.isNew).length
+          const pendingCount = resolved.filter((r) => r.payrollCodeId === null && !r.businessTag).length
+
+          if (newCount > 0) {
+            send({ type: 'step', label: `${newCount} new employee${newCount > 1 ? 's' : ''} added to review queue…`, progress: 50 })
+          } else {
+            send({ type: 'step', label: 'All employees matched…', progress: 50 })
+          }
+
+          // Count confirmed transactions upfront so we can show X/Total
+          const rMap = new Map(resolved.map((r) => [r.rawName, r]))
+          const confirmedTxnTotal = employees.reduce((sum, emp) => {
+            const r = rMap.get(emp.rawName)
+            if (!r || r.businessTag || r.payrollCodeId === null) return sum
+            return sum + emp.lineItems.length
+          }, 0)
+
+          // Create import record
+          const { data: importRecord, error: importErr } = await supabase
+            .from('payroll_imports')
+            .insert({ entity_id: entity.id, period_date: periodDate, imported_by: ctx.access.userId, status: 'pending' })
+            .select('id').single()
+          if (importErr || !importRecord) throw new Error(`Failed to create payroll import: ${importErr?.message}`)
+
+          const stagedCount = pendingCount > 0 ? ` · ${pendingCount} staged` : ''
+          send({
+            type: 'step',
+            label: `Writing ${confirmedTxnTotal} transaction${confirmedTxnTotal !== 1 ? 's' : ''}${stagedCount}…`,
+            progress: 58,
+            current: 0,
+            total: confirmedTxnTotal,
+          })
+
+          const counts = await insertPayrollData(
+            importRecord.id, entity.id, periodDate, resolved, employees, itemNameToId, supabase,
+            (done, total) => {
+              const pct = 58 + Math.round((done / total) * 33)
+              send({
+                type: 'step',
+                label: `Writing transactions (${done}/${total})…`,
+                progress: pct,
+                current: done,
+                total,
+              })
+            }
+          )
+
+          // Non-blocking AI — fire and forget, don't delay the response
+          const newEmployees = resolved.filter((r) => r.isNew)
+          triggerAiForPayroll(newEmployees, entity.id, counts.unknownItemNames, supabase)
+
+          send({
+            type: 'done',
+            data: {
+              importId: importRecord.id,
+              periodDate,
+              entityCode,
+              transactionCount: counts.txnCount,
+              taxCount: counts.taxCount,
+              pendingEmployeeCount: counts.pendingCount,
+              unknownItemCount: counts.unknownItemNames.length,
+              warnings,
+            },
+          })
+        } catch (err) {
+          send({ type: 'error', error: err instanceof Error ? err.message : 'An unexpected error occurred.' })
+        } finally {
+          controller.close()
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'application/x-ndjson',
+        'Cache-Control': 'no-cache, no-transform',
+        'X-Accel-Buffering': 'no',
       },
     })
   } catch (err) {
