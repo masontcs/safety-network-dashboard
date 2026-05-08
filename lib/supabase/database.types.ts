@@ -181,6 +181,12 @@ export type Database = {
         Update: { id?: string; assignment_id?: string; import_id?: string; entity_id?: string; period_date?: string; amount?: number }
         Relationships: []
       }
+      payroll_item_staged_transactions: {
+        Row: { id: string; payroll_item_id: string; import_id: string; employee_id: string; entity_id: string; payroll_code_id: string; period_date: string; hours: number | null; rate: number | null; amount: number }
+        Insert: { id?: string; payroll_item_id: string; import_id: string; employee_id: string; entity_id: string; payroll_code_id: string; period_date: string; hours?: number | null; rate?: number | null; amount: number }
+        Update: { id?: string; payroll_item_id?: string; import_id?: string; employee_id?: string; entity_id?: string; payroll_code_id?: string; period_date?: string; hours?: number | null; rate?: number | null; amount?: number }
+        Relationships: []
+      }
       employee_allocations: {
         Row: { id: string; employee_id: string; branch_id: string; percentage: number; effective_from: string; effective_to: string | null; status: string; requested_by: string | null; approved_by: string | null; notes: string | null; created_at: string }
         Insert: { id?: string; employee_id: string; branch_id: string; percentage: number; effective_from: string; effective_to?: string | null; status?: string; requested_by?: string | null; approved_by?: string | null; notes?: string | null; created_at?: string }

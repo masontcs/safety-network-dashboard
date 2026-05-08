@@ -13,6 +13,8 @@ export type ResolvedEmployee = {
   isNew: boolean
 }
 
+type ResolvedItem = { id: string | null; isConfirmed: boolean }
+
 export async function resolveEmployees(
   parsedEmployees: ParsedEmployee[],
   entityId: string,
@@ -50,23 +52,28 @@ export async function resolveEmployees(
   return resolved
 }
 
+// Returns a map of item name → { id, isConfirmed }.
+// Existing confirmed items: isConfirmed=true.
+// Existing unconfirmed items: isConfirmed=false (already in review queue).
+// Newly created items: isConfirmed=false, added to 'Other' group pending review.
+// Creation failures: id=null, isConfirmed=false.
 export async function resolvePayrollItems(
   itemNames: string[],
   supabase: SupabaseClient
-): Promise<Map<string, string | null>> {
-  const { data: items, error } = await supabase.from('payroll_items').select('id, name')
+): Promise<Map<string, ResolvedItem>> {
+  const { data: items, error } = await supabase.from('payroll_items').select('id, name, is_confirmed')
   if (error) throw new Error(`Failed to load payroll_items: ${error.message}`)
-  const map = new Map<string, string | null>()
-  const existing = new Map((items ?? []).map((i) => [i.name, i.id]))
+  const map = new Map<string, ResolvedItem>()
+  const existing = new Map((items ?? []).map((i) => [i.name, { id: i.id, isConfirmed: i.is_confirmed }]))
   for (const name of itemNames) {
     if (existing.has(name)) { map.set(name, existing.get(name)!); continue }
     const { data: grp, error: grpErr } = await supabase
       .from('payroll_item_groups').select('id').eq('name', 'Other').maybeSingle()
     if (grpErr) throw new Error(`Failed to lookup Other group: ${grpErr.message}`)
-    if (!grp?.id) { map.set(name, null); continue }
+    if (!grp?.id) { map.set(name, { id: null, isConfirmed: false }); continue }
     const { data: ni, error: ie } = await supabase
       .from('payroll_items').insert({ name, group_id: grp.id, is_confirmed: false }).select('id').single()
-    map.set(name, ie || !ni ? null : ni.id)
+    map.set(name, ie || !ni ? { id: null, isConfirmed: false } : { id: ni.id, isConfirmed: false })
   }
   return map
 }
@@ -74,17 +81,21 @@ export async function resolvePayrollItems(
 export async function insertPayrollData(
   importId: string, entityId: string, periodDate: string,
   resolved: ResolvedEmployee[], parsedEmployees: ParsedEmployee[],
-  itemNameToId: Map<string, string | null>, supabase: SupabaseClient,
+  itemNameToId: Map<string, ResolvedItem>, supabase: SupabaseClient,
   onTxnProgress?: (done: number, total: number) => void
-): Promise<{ txnCount: number; taxCount: number; pendingCount: number; unknownItemNames: string[] }> {
+): Promise<{ txnCount: number; taxCount: number; pendingCount: number; stagedItemTxnCount: number; newItemNames: string[] }> {
   const rMap = new Map(resolved.map((r) => [r.rawName, r]))
-  let txnCount = 0; let taxCount = 0; let pendingCount = 0
-  const unknownItemNames: string[] = []
+  let txnCount = 0; let taxCount = 0; let pendingCount = 0; let stagedItemTxnCount = 0
+  const newItemNames: string[] = []
 
+  // Pre-count live transactions (excludes staged-by-item) for progress reporting
   const confirmedTxnTotal = parsedEmployees.reduce((sum, emp) => {
     const r = rMap.get(emp.rawName)
     if (!r || r.businessTag || r.payrollCodeId === null) return sum
-    return sum + emp.lineItems.length
+    return sum + emp.lineItems.filter((item) => {
+      const ri = itemNameToId.get(item.itemName)
+      return !ri || ri.isConfirmed || ri.id === null  // null goes to payroll_transactions with null item_id
+    }).length
   }, 0)
   const updateEvery = Math.max(1, Math.floor(confirmedTxnTotal / 10))
 
@@ -93,14 +104,13 @@ export async function insertPayrollData(
     if (!res) continue
     if (res.businessTag) continue
     if (res.payrollCodeId === null) {
-      // Stage transactions and taxes — deployed automatically when admin confirms this employee
+      // Employee pending — stage everything regardless of item status
       pendingCount++
       for (const item of emp.lineItems) {
-        const itemId = itemNameToId.get(item.itemName) ?? null
-        if (itemId === null && !unknownItemNames.includes(item.itemName)) unknownItemNames.push(item.itemName)
+        const ri = itemNameToId.get(item.itemName) ?? { id: null, isConfirmed: false }
         const { error } = await supabase.from('payroll_staged_transactions').insert({
           assignment_id: res.assignmentId, import_id: importId, entity_id: entityId,
-          period_date: periodDate, payroll_item_id: itemId,
+          period_date: periodDate, payroll_item_id: ri.id,
           hours: item.hours, rate: item.rate, amount: item.amount,
         })
         if (error) throw new Error(`Failed to stage transaction for "${res.rawName}": ${error.message}`)
@@ -113,18 +123,32 @@ export async function insertPayrollData(
         if (error) throw new Error(`Failed to stage tax for "${res.rawName}": ${error.message}`)
       }
     } else {
+      // Employee confirmed — insert live, but stage if item is unconfirmed
       for (const item of emp.lineItems) {
-        const itemId = itemNameToId.get(item.itemName) ?? null
-        if (itemId === null && !unknownItemNames.includes(item.itemName)) unknownItemNames.push(item.itemName)
-        const { error } = await supabase.from('payroll_transactions').insert({
-          import_id: importId, employee_id: res.employeeId, entity_id: entityId,
-          payroll_code_id: res.payrollCodeId, period_date: periodDate,
-          payroll_item_id: itemId, hours: item.hours, rate: item.rate, amount: item.amount,
-        })
-        if (error) throw new Error(`Failed to insert payroll transaction: ${error.message}`)
-        txnCount++
-        if (onTxnProgress && confirmedTxnTotal > 0 && (txnCount % updateEvery === 0 || txnCount === confirmedTxnTotal)) {
-          onTxnProgress(txnCount, confirmedTxnTotal)
+        const ri = itemNameToId.get(item.itemName) ?? { id: null, isConfirmed: true }
+        if (!ri.isConfirmed && ri.id !== null) {
+          // Stage by item — employee is confirmed, item needs review
+          const { error } = await supabase.from('payroll_item_staged_transactions').insert({
+            payroll_item_id: ri.id, import_id: importId,
+            employee_id: res.employeeId, entity_id: entityId,
+            payroll_code_id: res.payrollCodeId, period_date: periodDate,
+            hours: item.hours, rate: item.rate, amount: item.amount,
+          })
+          if (error) throw new Error(`Failed to stage item transaction for "${item.itemName}": ${error.message}`)
+          stagedItemTxnCount++
+          if (!newItemNames.includes(item.itemName)) newItemNames.push(item.itemName)
+        } else {
+          // Confirmed item or null-id fallback → insert live
+          const { error } = await supabase.from('payroll_transactions').insert({
+            import_id: importId, employee_id: res.employeeId, entity_id: entityId,
+            payroll_code_id: res.payrollCodeId, period_date: periodDate,
+            payroll_item_id: ri.id, hours: item.hours, rate: item.rate, amount: item.amount,
+          })
+          if (error) throw new Error(`Failed to insert payroll transaction: ${error.message}`)
+          txnCount++
+          if (onTxnProgress && confirmedTxnTotal > 0 && (txnCount % updateEvery === 0 || txnCount === confirmedTxnTotal)) {
+            onTxnProgress(txnCount, confirmedTxnTotal)
+          }
         }
       }
       if (emp.taxAmount > 0) {
@@ -137,20 +161,20 @@ export async function insertPayrollData(
       }
     }
   }
-  return { txnCount, taxCount, pendingCount, unknownItemNames }
+  return { txnCount, taxCount, pendingCount, stagedItemTxnCount, newItemNames }
 }
 
 export function triggerAiForPayroll(
   newEmployees: ResolvedEmployee[], entityId: string,
-  unknownItemNames: string[], supabase: SupabaseClient
+  newItemNames: string[], supabase: SupabaseClient
 ): void {
-  void runAiForPayroll(newEmployees, entityId, unknownItemNames, supabase)
+  void runAiForPayroll(newEmployees, entityId, newItemNames, supabase)
     .catch((err) => console.error('[AI] triggerAiForPayroll failed:', err))
 }
 
 async function runAiForPayroll(
   newEmployees: ResolvedEmployee[], entityId: string,
-  unknownItemNames: string[], supabase: SupabaseClient
+  newItemNames: string[], supabase: SupabaseClient
 ): Promise<void> {
   const { data: allAssignments } = await supabase.from('employee_entity_assignments')
     .select('employee_id, raw_name_in_report').eq('entity_id', entityId)
@@ -174,12 +198,12 @@ async function runAiForPayroll(
         .eq('employee_id', emp.employeeId).eq('entity_id', entityId)
     }
   }
-  if (unknownItemNames.length > 0) {
+  if (newItemNames.length > 0) {
     const { data: ei } = await supabase.from('payroll_items').select('name, group_id')
     const { data: groups } = await supabase.from('payroll_item_groups').select('id, name')
     const gMap = new Map((groups ?? []).map((g) => [g.id, g.name]))
     const ctx = (ei ?? []).map((i) => ({ name: i.name, groupName: gMap.get(i.group_id) ?? 'Other' }))
-    for (const itemName of unknownItemNames) {
+    for (const itemName of newItemNames) {
       const s = await suggestPayrollItemGroup(itemName, ctx)
       await supabase.from('payroll_items')
         .update({ ai_suggested_group: s.suggestedGroup, ai_confidence: s.confidence }).eq('name', itemName)

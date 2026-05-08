@@ -136,7 +136,7 @@ export async function POST(request: Request): Promise<Response> {
 
           // Non-blocking AI — fire and forget, don't delay the response
           const newEmployees = resolved.filter((r) => r.isNew)
-          triggerAiForPayroll(newEmployees, entity.id, counts.unknownItemNames, supabase)
+          triggerAiForPayroll(newEmployees, entity.id, counts.newItemNames, supabase)
 
           send({
             type: 'done',
@@ -147,7 +147,8 @@ export async function POST(request: Request): Promise<Response> {
               transactionCount: counts.txnCount,
               taxCount: counts.taxCount,
               pendingEmployeeCount: counts.pendingCount,
-              unknownItemCount: counts.unknownItemNames.length,
+              stagedItemTxnCount: counts.stagedItemTxnCount,
+              newItemCount: counts.newItemNames.length,
               warnings,
             },
           })

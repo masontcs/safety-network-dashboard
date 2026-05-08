@@ -130,6 +130,22 @@ function DropZone({ accept, state, onFile, label, hint }: DropZoneProps) {
   )
 }
 
+// ─── Payroll helpers ──────────────────────────────────────────────────────────
+
+function buildPayrollSuccessLines(d: Record<string, unknown>, replaced = false): string[] {
+  return [
+    `Period: ${formatPeriodDate(d.periodDate as string)}${replaced ? ' (replaced)' : ''}`,
+    `Entity: ${d.entityCode as string}`,
+    `${d.transactionCount as number} payroll transactions`,
+    (d.taxCount as number) > 0 ? `${d.taxCount as number} tax entries` : null,
+    (d.pendingEmployeeCount as number) > 0 ? `${d.pendingEmployeeCount as number} employees need review` : null,
+    (d.stagedItemTxnCount as number) > 0
+      ? `${d.stagedItemTxnCount as number} transactions staged — ${d.newItemCount as number} new item${(d.newItemCount as number) !== 1 ? 's' : ''} need review`
+      : null,
+    ...((d.warnings as string[]) ?? []),
+  ].filter(Boolean) as string[]
+}
+
 // ─── Payroll section ──────────────────────────────────────────────────────────
 
 function PayrollSection({ onSuccess }: { onSuccess: () => void }) {
@@ -209,18 +225,7 @@ function PayrollSection({ onSuccess }: { onSuccess: () => void }) {
         return
       }
 
-      const d = finalData
-      const successLines = [
-        `Period: ${formatPeriodDate(d.periodDate as string)}`,
-        `Entity: ${d.entityCode as string}`,
-        `${d.transactionCount as number} payroll transactions`,
-        (d.taxCount as number) > 0 ? `${d.taxCount as number} tax entries` : null,
-        (d.pendingEmployeeCount as number) > 0 ? `${d.pendingEmployeeCount as number} employees need review` : null,
-        (d.unknownItemCount as number) > 0 ? `${d.unknownItemCount as number} unknown items flagged` : null,
-        ...((d.warnings as string[]) ?? []),
-      ].filter(Boolean) as string[]
-
-      setState({ status: 'success', lines: successLines })
+      setState({ status: 'success', lines: buildPayrollSuccessLines(finalData) })
       onSuccess()
     } catch {
       setState({ status: 'error', message: 'Network error — please try again.' })
@@ -231,6 +236,7 @@ function PayrollSection({ onSuccess }: { onSuccess: () => void }) {
     if (state.status !== 'duplicate') return
     const { file, conflict } = state
     setConfirmLoading(true)
+    setState({ status: 'uploading' })
 
     const form = new FormData()
     form.append('file', file)
@@ -239,21 +245,61 @@ function PayrollSection({ onSuccess }: { onSuccess: () => void }) {
 
     try {
       const res = await fetch('/api/import/payroll/confirm-replace', { method: 'POST', body: form })
-      const json = await res.json()
 
-      if (!json.success) {
+      // Non-stream responses: 400/401/403/404 errors
+      const contentType = res.headers.get('content-type') ?? ''
+      if (!contentType.includes('x-ndjson')) {
+        const json = await res.json()
         setState({ status: 'error', message: json.error ?? 'Replace failed.' })
         return
       }
 
-      const d = json.data
-      const lines = [
-        `Period: ${formatPeriodDate(d.periodDate)} (replaced)`,
-        `Entity: ${d.entityCode}`,
-        `${d.transactionCount} payroll transactions`,
-        ...((d.warnings as string[]) ?? []),
-      ].filter(Boolean) as string[]
+      if (!res.body) {
+        setState({ status: 'error', message: 'Streaming not supported by this browser.' })
+        return
+      }
 
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buf = ''
+      let finalData: Record<string, unknown> | null = null
+
+      outer: while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        const parts = buf.split('\n')
+        buf = parts.pop() ?? ''
+
+        for (const line of parts) {
+          if (!line.trim()) continue
+          try {
+            const event = JSON.parse(line) as {
+              type: string; label?: string; progress?: number
+              current?: number; total?: number
+              data?: Record<string, unknown>; error?: string
+            }
+            if (event.type === 'step') {
+              setState({ status: 'uploading', label: event.label, progress: event.progress })
+            } else if (event.type === 'done') {
+              finalData = event.data ?? null
+              break outer
+            } else if (event.type === 'error') {
+              setState({ status: 'error', message: event.error ?? 'Replace failed.' })
+              return
+            }
+          } catch {
+            // ignore malformed lines
+          }
+        }
+      }
+
+      if (!finalData) {
+        setState({ status: 'error', message: 'No response received from server.' })
+        return
+      }
+
+      const lines = buildPayrollSuccessLines(finalData, true)
       setState({ status: 'success', lines })
       onSuccess()
     } catch {
