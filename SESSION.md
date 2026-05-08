@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 7, 2026 — Session: Employee allocation system
+## Last updated: May 7, 2026 — Session: Payroll consistency + dashboard fixes
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -127,7 +127,71 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ---
 
-## 3a. RECENT CHANGES (May 7, 2026) — Employee allocation system
+## 3a. RECENT CHANGES (May 7, 2026) — Payroll consistency + dashboard fixes
+
+### Animated Expand-on-Hover Sidebar
+- `components/layout/Sidebar.tsx` fully rewritten: 48px collapsed → 220px expanded on `onMouseEnter`/`onMouseLeave`; `width` + `min-width` CSS transition 200ms ease-in-out; `overflow: hidden` keeps sibling `<main>` filling the gap
+- Branding: 36×36 orange "SN" badge always visible; "Safety Network" label fades in with 100ms opacity delay when expanding
+- Nav labels: `opacity: expanded ? 1 : 0`, 100ms transition, 100ms delay on expand / instant on collapse
+- Badges: full count pill when expanded; 8px orange dot when collapsed
+- Added `LogOutIcon` + Sign Out button at bottom (calls `supabase.auth.signOut()`)
+- `app/globals.css`: replaced old `.sidebar-icon` rules with `.sidebar-link` / `.sidebar-link-active` classes matching new flex-row layout
+- **Commits:** `23a24b3`, `e77d3f5`
+
+### HQ Allocation Settings Page (`/admin/settings`)
+- `GET /api/admin/settings/hq-allocation` — fetches `hq_allocation_pct` from `businesses` for SN, WH, SIGNS; returns `{ safetyNetwork, westernHighways, signs }` as percentages
+- `PATCH /api/admin/settings/hq-allocation` — validates sum = 1.0 ± 0.0001; updates all three rows atomically with `Promise.all`
+- `components/settings/SettingsClient.tsx` — three `<input type="number">` fields; live running total; "✓ Ready to save" / "must equal exactly 100%" feedback; Save button disabled until total is valid; converts display % ↔ stored decimal
+- `app/admin/settings/page.tsx` — server component, admin-only gate
+- Sidebar: Settings gear icon added to admin nav items
+
+### Test Accounts Panel (in /admin/users)
+- `GET|POST|DELETE /api/admin/test-accounts` — manages three pre-defined test accounts: `test-executive@safetynetwork.com` (executive), `test-district@safetynetwork.com` (district_manager, Bakersfield+Fresno), `test-manager@safetynetwork.com` (branch_manager, Bakersfield); password `TestPass2026!`; `must_change_password: false`
+- POST is idempotent (skips already-existing accounts); branch IDs resolved dynamically by name; DELETE cleans up assignments → profile → auth user in sequence
+- `UsersClient` — new card with amber "Development / Testing Only" badge; per-account status dots; Create Test Accounts / Delete Test Accounts buttons; refreshes both test account list and main users list after each action
+- **Commit:** `e77d3f5`
+
+### Branch Performance Card Payroll Fixes
+- `app/api/admin/overview/route.ts` — `allBranchIds` set now includes `bAdminPayroll` keys (previously missing, causing branches with only admin payroll to be excluded from branch grid)
+- `components/dashboard/AdminDashboard.tsx` — desktop `BranchPerformanceCard`: `payroll` prop now sums `directPayroll + adminPayroll + employerTaxes` (was `directPayroll` only); `noData` check now requires all three payroll types to be zero
+- `components/dashboard/AdminDashboard.tsx` — mobile branch list: same `noData` fix
+- `components/dashboard/DistrictDashboard.tsx` — `BranchComparisonCard`: `noData` requires `admin === 0` (was missing); mobile branch list: `bNoData` requires `bAdmin === 0`
+- **Commit:** `7dcd0b5`
+
+### Removed Allocation Toggle from Manager and District Dashboards
+- Per access-control design: Corp/HQ overhead allocation is for admin and executive only
+- `ManagerDashboard`: removed `allocationOn` + `branchAllocAlloc` state, allocation fetch `useEffect`, `netAfterAlloc`/`netAfterAllocPct` derived values, toggle button from `selectorBar`, all conditional GP card labels; GP card now always shows "Gross Profit" (Revenue − Total Payroll − Fuel)
+- `DistrictDashboard`: same removals (109 lines deleted total across both files)
+- **Commit:** `160c5ed`
+
+### Systemic Payroll Consistency Fix
+Three root causes fixed, all verified with 225-test suite:
+
+**1. Sparkline tooltip $0 payroll (`app/api/admin/overview/route.ts`)**
+The API tracked `bPayByPeriod` (direct payroll per branch per period) but tracked admin payroll and taxes at the branch total level only — no per-period breakdown. Result: `payrollByPeriod` was direct-only, so the sparkline tooltip showed $0 for weeks with admin-only payroll while the card header (which summed all three) showed the correct total.
+Fix: added `bAdminPayByPeriod` and `bTaxByPeriod` per-branch per-period maps; `payrollByPeriod` now returns `direct + admin + taxes` per period per branch.
+
+**2. District/branch manager $0 admin payroll (`app/api/payroll/summary/route.ts`)**
+The route gated the entire admin payroll + tax query on `if (entityId)`. The page-level entity lookup (`payroll_codes WHERE branch_id IN (branchIds)`) can return empty string if no matching code exists. Empty string is falsy → `if (entityId)` silently skips the admin payroll query entirely.
+Fix: after reading `entityId` from the request, auto-resolve it from `payroll_codes WHERE branch_id = branchId AND is_active = true LIMIT 1` when not provided or empty. Both manager and district pages still pass `entityId` as before — this is a defensive fallback for robustness.
+
+**3. `SelectedWeekPanel` wrong gross profit (`AdminDashboard.tsx`)**
+`const pay = data?.directPayroll ?? 0` → `gp = rev - pay - fuel` — ignored admin payroll and employer taxes.
+Fix: uses `calcTotalPayroll(data)` + `calcGrossProfit(...)` from the new shared utility. Label changed from "Direct Payroll" to "Total Payroll".
+
+**New shared utility (`lib/utils/payroll-totals.ts`)**
+- `calcTotalPayroll({ directPayroll, adminPayroll?, employerTaxes? }): number` — canonical formula
+- `calcGrossProfit({ revenue, directPayroll, adminPayroll?, employerTaxes?, fuel }): number`
+- `calcGrossProfitPct(grossProfit, revenue): number` — zero-guarded
+
+**Tests (`lib/utils/payroll-totals.test.ts`)**
+16 tests covering: correct sum of all three payroll components, missing optional fields default to 0, card header === sparkline formula consistency, GP = revenue − total payroll − fuel, profit % = GP / revenue × 100, zero-revenue guard.
+
+- **Commit:** `c9ec283`
+
+---
+
+## 3b. RECENT CHANGES (May 7, 2026) — Employee allocation system
 
 ### Employee Allocation System
 Full end-to-end split of an employee's payroll and fuel costs across multiple branches by percentage for reporting purposes. Underlying transactions are never modified — allocation is a pure reporting layer.
