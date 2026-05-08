@@ -95,7 +95,7 @@ export function parsePayrollFile(
       raw: true,
     }) as Rows
 
-    const periodDate   = extractPeriodDate(rows)
+    const periodDate   = extractPeriodDate(rows, warnings)
     const payrollItems = extractPayrollItems(rows)
     const empCols      = extractEmployeeColumns(rows)
     const taxRowIndex  = findTaxRowIndex(rows)

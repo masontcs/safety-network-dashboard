@@ -107,12 +107,14 @@ describe('extractPeriodDate', () => {
     expect((caught as ParseError).detail).toMatch(/not a Saturday/i)
   })
 
-  it('throws on 2-digit year with a clear message', () => {
-    let caught: unknown
-    try { extractPeriodDate(makeRows('Week of Mar 8, 26')) } catch (e) { caught = e }
-    expect(caught).toBeInstanceOf(ParseError)
-    expect((caught as ParseError).detail).toMatch(/4-digit year/i)
-    expect((caught as ParseError).detail).toMatch(/26/)
+  it('auto-corrects 2-digit year and pushes a warning', () => {
+    // "Mar 8, 26" → year 26 CE → corrected to 2026 → subtract 1 day → 2026-03-07 (Saturday)
+    const warnings: string[] = []
+    const result = extractPeriodDate(makeRows('Week of Mar 8, 26'), warnings)
+    expect(result).toBe('2026-03-07')
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]).toMatch(/2-digit year/i)
+    expect(warnings[0]).toMatch(/2026/)
   })
 })
 

@@ -20,7 +20,7 @@ export function cellNum(rows: Rows, r: number, c: number): number | null {
 }
 
 // Row 2 (index 1): find "Week of MMM d, yyyy", subtract 1 day, validate Saturday.
-export function extractPeriodDate(rows: Rows): string {
+export function extractPeriodDate(rows: Rows, warnings?: string[]): string {
   const headerRow = (rows[1] ?? []) as unknown[]
   let weekOfText: string | null = null
 
@@ -36,16 +36,22 @@ export function extractPeriodDate(rows: Rows): string {
   if (!match) throw new ParseError('Could not parse date from "Week of" header.')
 
   const dateStr = match[1].trim()
-  const parsed  = parseDate(dateStr, 'MMM d, yyyy', new Date())
+  let parsed    = parseDate(dateStr, 'MMM d, yyyy', new Date())
 
   if (!isValid(parsed)) {
     throw new ParseError(`Could not parse date "${dateStr}". Expected format like "Mar 29, 2026".`)
   }
 
-  if (parsed.getFullYear() < 2000) {
-    throw new ParseError(
-      `Invalid year in "${dateStr}". Expected 4-digit year (e.g. 2026), got ${parsed.getFullYear()}. Check the QuickBooks export settings.`
+  // QuickBooks sometimes exports 2-digit years (e.g. "Mar 1, 26" instead of "Mar 1, 2026").
+  // Auto-correct by adding 2000 rather than blocking the import.
+  if (parsed.getFullYear() < 100) {
+    const corrected = new Date(parsed)
+    corrected.setFullYear(parsed.getFullYear() + 2000)
+    warnings?.push(
+      `Date "${dateStr}" had a 2-digit year (${parsed.getFullYear()}). ` +
+      `Auto-corrected to ${corrected.getFullYear()}. Check your QuickBooks export settings.`
     )
+    parsed = corrected
   }
 
   const periodDate = subDays(parsed, 1)
