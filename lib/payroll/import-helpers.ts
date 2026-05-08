@@ -25,7 +25,7 @@ export async function resolveEmployees(
     const { data: existing, error } = await supabase
       .from('employee_entity_assignments')
       .select('id, employee_id, payroll_code_id, is_confirmed, business_tag')
-      .eq('raw_name_in_report', emp.rawName).eq('entity_id', entityId).maybeSingle()
+      .ilike('raw_name_in_report', emp.rawName).eq('entity_id', entityId).limit(1).maybeSingle()
     if (error) throw new Error(`Failed to lookup employee "${emp.rawName}": ${error.message}`)
     if (existing) {
       resolved.push({
@@ -43,8 +43,12 @@ export async function resolveEmployees(
     // so we check all name variants to avoid creating duplicate employee records.
     const nameVariants = [...new Set([
       emp.rawName,
-      emp.rawName.replace(/\.+\s*$/, ''),   // strip trailing period(s)
-      emp.rawName.trimEnd() + '.',           // add trailing period
+      emp.rawName.toUpperCase(),
+      emp.rawName.toLowerCase(),
+      emp.rawName.replace(/\.+\s*$/, ''),
+      emp.rawName.toUpperCase().replace(/\.+\s*$/, ''),
+      emp.rawName.trimEnd() + '.',
+      emp.rawName.toUpperCase().trimEnd() + '.',
     ])]
     const { data: crossEntityAssign } = await supabase
       .from('employee_entity_assignments')

@@ -131,6 +131,77 @@ Nothing currently in progress. All 20 migrations applied to production.
 
 ---
 
+## 3a. RECENT CHANGES (May 8, 2026) — Payroll import robustness + employee/item management
+
+### Payroll Import — Name Lookup Robustness (`lib/payroll/import-helpers.ts`)
+
+**Problem 1 — duplicate row crash:** `.maybeSingle()` throws when multiple `employee_entity_assignments` rows exist for the same `(raw_name_in_report, entity_id)`. Fixed by adding `.limit(1)` before `.maybeSingle()` so the import always takes the first matching row and never crashes on duplicates.
+
+**Problem 2 — case mismatch causes repeat review queue entries:** QuickBooks changed casing between STS exports ("GUTIERREZ, SYLVIA" in one import, "Gutierrez, Sylvia" in the next). The case-sensitive `.eq()` lookup missed the existing confirmed assignment and created a new unconfirmed one — landing the employee back in the review queue on every subsequent import.
+Fix: changed entity-scoped lookup from `.eq('raw_name_in_report', ...)` to `.ilike('raw_name_in_report', ...)` (case-insensitive exact match, no wildcards).
+
+**Problem 3 — cross-entity lookup also case-sensitive:** The nameVariants array for the cross-entity dedup check now includes `.toUpperCase()` and `.toLowerCase()` variants in addition to the existing trailing-period variants.
+
+### DB Cleanup — Duplicate Assignments
+
+**Raul Minor (STS):** Two confirmed `employee_entity_assignments` rows for the same `(raw_name_in_report, entity_id)` — one pointed to Bakersfield (no transactions, spurious), one to Orange County (18 transactions, $8,704). Spurious Bakersfield row deleted.
+
+**Sylvia Gutierrez (STS):** Confirmed STS assignment stored as `"GUTIERREZ, SYLVIA"` (from prior import). Current import created a second unconfirmed row as `"Gutierrez, Sylvia"` (case mismatch). Staged 4.11 data ($8.75 + $1,099 wages, $85.12 tax) deployed to live transactions under the confirmed STFCH payroll code; spurious unconfirmed assignment deleted.
+
+### Labor Type Change — Employee Detail Page (`components/employees/EmployeeDetailClient.tsx`)
+
+Admins can now change an employee's labor type for any entity assignment directly from the employee detail page, with optional retroactive backfill.
+
+**New API route: `PATCH /api/employees/[id]/labor-type`** (admin only)
+- Body: `{ entityId, newLaborType, retroactiveFrom? }`
+- Finds the current active assignment → looks up the new payroll code (same branch + entity + new labor type) → updates `employee_entity_assignments.payroll_code_id`
+- If `retroactiveFrom` is set, batch-updates all `payroll_transactions` in that date range to the new `payroll_code_id`
+- Returns `{ updatedTransactions, newCode }`
+
+**UI in `EmployeeDetailClient`:**
+- Each assignment pill shows a "Change" button; clicking opens an inline form for that entity
+- Form: labor type select (all 7 types), radio for "From now on" vs "Retroactive", date picker when retroactive; Save/Cancel
+- Inline success/error feedback; form dismissed on success
+
+### Payroll Items Management (`/admin/payroll-items`)
+
+New admin page to manage payroll item group assignments and view spending by date range.
+
+**New API routes:**
+- `GET /api/admin/payroll-items` — all items with group name, is_confirmed, staged transaction count; accepts `?startDate=&endDate=` to add per-item spending totals for the date range
+- `PATCH /api/admin/payroll-items/[id]` — change `group_id` only (no staging deploy)
+
+**`app/admin/payroll-items/PayrollItemsClient.tsx`:**
+- Date range filter (Apply re-fetches with spending column)
+- Search, group filter, status filter (All / Confirmed / Pending)
+- Sortable columns: Name, Group, Amount
+- Inline group editing: click group label → select → Save button appears only when dirty
+- Pending items show AI-suggested group + confidence + staged transaction count
+
+**Sidebar:** "Pay Items" nav item added for admin role (TagIcon).
+
+### Fuel Dashboard — General Branch Cards Included (`app/api/fuel/top-consumers/route.ts`)
+
+General branch cards (no `employee_id`, only `branch_id`) were excluded from the top-consumers list. Fix: removed the `.not('employee_id', 'is', null)` filter. Aggregation now has two paths:
+- Employee rows → allocation splits applied as before
+- General card rows → grouped by `branch_id` as "General Card" (muted/italic in the table)
+
+`FuelDashboard.tsx` updated: `Consumer.employeeId` typed as `string | null`; general card row key uses `c.employeeId ?? 'general'`; italic + gray styling for `isGeneral` rows.
+
+### Fuel Card Assignment — Corporate Branches Visible (`app/fuel/cards/[id]/page.tsx`)
+
+Branch dropdown for card assignment was filtered to `is_revenue_generating = true`, hiding corporate branches. Changed to `is_active = true` so corporate branches appear as valid assignment targets.
+
+### Pre-Allocation Toggle Fix (`AdminDashboard.tsx`, `ExecutiveDashboard.tsx`)
+
+Corp/HQ overhead breakdown was guarded by `overheadTotal > 0` — when no corp/hq payroll had been imported, toggling the button showed no visual change. Removed that guard from both dashboards; breakdown lines now always render when `allocationOn = true`, even at $0.
+
+### DB Cleanup — Duplicate Employees (Jason Westerfield, David Rios)
+
+Both employees existed as two separate `employees` records due to the cross-entity lookup missing a case-variant or trailing-period mismatch before the import-helpers fix. Orphaned records re-pointed to the canonical employee_id; orphaned `employees` rows deleted; stranded staged data deployed to `payroll_transactions` with `business_tag = 'western_highways'`.
+
+---
+
 ## 3a. RECENT CHANGES (May 8, 2026) — Back button, sidebar active state, allocation toggle fixes
 
 ### Back Button Fix (`components/employees/EmployeeDetailClient.tsx`)
