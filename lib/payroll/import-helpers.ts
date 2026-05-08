@@ -39,11 +39,17 @@ export async function resolveEmployees(
       continue
     }
     // Before creating a new employee record, check if this person exists under any other entity.
-    // Same raw_name_in_report may appear across INC/TCS/STS for the same individual.
+    // QuickBooks sometimes adds/omits a trailing period after a middle initial (e.g. "A" vs "A."),
+    // so we check all name variants to avoid creating duplicate employee records.
+    const nameVariants = [...new Set([
+      emp.rawName,
+      emp.rawName.replace(/\.+\s*$/, ''),   // strip trailing period(s)
+      emp.rawName.trimEnd() + '.',           // add trailing period
+    ])]
     const { data: crossEntityAssign } = await supabase
       .from('employee_entity_assignments')
       .select('employee_id')
-      .eq('raw_name_in_report', emp.rawName)
+      .in('raw_name_in_report', nameVariants)
       .limit(1)
       .maybeSingle()
 
