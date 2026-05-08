@@ -30,9 +30,10 @@ interface WeekRow {
 }
 
 interface Consumer {
-  employeeId: string
+  employeeId: string | null
   displayName: string
   branchName: string
+  isGeneral: boolean
   totalGallons: number
   totalCost: number
   avgPpg: number | null
@@ -265,8 +266,8 @@ export default function FuelDashboard({ role, branchIds, branches }: Props) {
             </thead>
             <tbody>
               {consumers.map((c, i) => (
-                <tr key={`${c.employeeId}-${i}`} style={{ borderTop: '1px solid #2a2a2a' }}>
-                  <td style={{ padding: '8px 8px 8px 0', fontSize: 12, color: '#cccccc' }}>{c.displayName}</td>
+                <tr key={`${c.employeeId ?? 'general'}-${c.branchName}-${i}`} style={{ borderTop: '1px solid #2a2a2a' }}>
+                  <td style={{ padding: '8px 8px 8px 0', fontSize: 12, color: c.isGeneral ? '#888888' : '#cccccc', fontStyle: c.isGeneral ? 'italic' : 'normal' }}>{c.displayName}</td>
                   <td style={{ padding: '8px 8px 8px 0', fontSize: 12, color: '#ff6b00' }}>{c.branchName}</td>
                   <td style={{ padding: '8px 8px 8px 0', fontSize: 12, color: '#cccccc' }}>{fmtDec(c.totalGallons, 1)}</td>
                   <td style={{ padding: '8px 8px 8px 0', fontSize: 12, color: '#cccccc' }}>

@@ -41,12 +41,11 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     const supabase = createServiceClient()
 
-    // Fetch all employee-linked fuel (not branch-filtered; allocation redistributes)
+    // Fetch all SN fuel transactions — employee-linked and general branch cards
     let query = supabase
       .from('fuel_transactions')
       .select('employee_id, branch_id, transaction_date, total_with_tax, gallons, price_per_gallon, employees(first_name, last_name)')
       .is('business_tag', null)
-      .not('employee_id', 'is', null)
       .gte('transaction_date', startDate)
       .lte('transaction_date', endDate)
 
@@ -105,11 +104,13 @@ export async function GET(request: Request): Promise<NextResponse> {
     const branchNameMap: Record<string, string> = {}
     for (const b of branchRows ?? []) branchNameMap[b.id] = b.name
 
-    // Aggregate by employee, applying allocation per transaction
-    type EmpBranchKey = string
-    type EmpAgg = {
+    // Aggregate by (employee+branch) for linked rows, by branch for general card rows
+    type AggKey = string
+    type Agg = {
+      employeeId: string | null
       displayName: string
       branchId: string | null
+      isGeneral: boolean
       gallons: number
       cost: number
       txnCount: number
@@ -117,58 +118,59 @@ export async function GET(request: Request): Promise<NextResponse> {
       ppgCount: number
     }
 
-    const byEmp: Record<EmpBranchKey, EmpAgg> = {}
+    const byKey: Record<AggKey, Agg> = {}
+
+    function accumulate(key: AggKey, init: Omit<Agg, 'gallons' | 'cost' | 'txnCount' | 'ppgSum' | 'ppgCount'>, t: Row, pct = 1) {
+      if (!byKey[key]) byKey[key] = { ...init, gallons: 0, cost: 0, txnCount: 0, ppgSum: 0, ppgCount: 0 }
+      const e = byKey[key]
+      e.gallons += (t.gallons ?? 0) * pct
+      e.cost += t.total_with_tax * pct
+      e.txnCount += 1
+      if (t.price_per_gallon != null) { e.ppgSum += t.price_per_gallon; e.ppgCount += 1 }
+    }
+
     for (const t of rawRows) {
-      if (!t.employee_id || !t.employees || !t.branch_id) continue
-
-      const sat = toSaturdayOfWeek(t.transaction_date)
-      const splits = resolveEmployeeAllocation(
-        t.employee_id, sat, t.branch_id,
-        empOverrides[t.employee_id] ?? [], empDefaults[t.employee_id] ?? []
-      )
-
-      for (const split of splits) {
-        if (branchId && split.branchId !== branchId) continue
-        const pct = split.percentage / 100
-        const key = `${t.employee_id}::${split.branchId}`
-
-        if (!byEmp[key]) {
-          byEmp[key] = {
+      if (t.employee_id && t.employees && t.branch_id) {
+        // Employee-linked: apply allocation splits
+        const sat = toSaturdayOfWeek(t.transaction_date)
+        const splits = resolveEmployeeAllocation(
+          t.employee_id, sat, t.branch_id,
+          empOverrides[t.employee_id] ?? [], empDefaults[t.employee_id] ?? []
+        )
+        for (const split of splits) {
+          if (branchId && split.branchId !== branchId) continue
+          accumulate(`emp::${t.employee_id}::${split.branchId}`, {
+            employeeId: t.employee_id,
             displayName: `${t.employees.first_name} ${t.employees.last_name}`.trim(),
             branchId: split.branchId,
-            gallons: 0,
-            cost: 0,
-            txnCount: 0,
-            ppgSum: 0,
-            ppgCount: 0,
-          }
+            isGeneral: false,
+          }, t, split.percentage / 100)
         }
-        const e = byEmp[key]
-        e.gallons += (t.gallons ?? 0) * pct
-        e.cost += t.total_with_tax * pct
-        e.txnCount += 1
-        if (t.price_per_gallon != null) {
-          e.ppgSum += t.price_per_gallon
-          e.ppgCount += 1
-        }
+      } else if (!t.employee_id && t.branch_id) {
+        // General branch card: group by branch
+        if (branchId && t.branch_id !== branchId) continue
+        accumulate(`general::${t.branch_id}`, {
+          employeeId: null,
+          displayName: 'General Card',
+          branchId: t.branch_id,
+          isGeneral: true,
+        }, t)
       }
     }
 
-    const consumers = Object.entries(byEmp)
-      .map(([key, a]) => {
-        const [employeeId] = key.split('::')
-        return {
-          employeeId,
-          displayName: a.displayName,
-          branchName: a.branchId ? (branchNameMap[a.branchId] ?? '—') : '—',
-          totalGallons: Math.round(a.gallons * 100) / 100,
-          totalCost: Math.round(a.cost * 100) / 100,
-          avgPpg: a.ppgCount > 0
-            ? a.ppgSum / a.ppgCount
-            : a.gallons > 0 ? a.cost / a.gallons : null,
-          txnCount: a.txnCount,
-        }
-      })
+    const consumers = Object.values(byKey)
+      .map((a) => ({
+        employeeId: a.employeeId,
+        displayName: a.displayName,
+        branchName: a.branchId ? (branchNameMap[a.branchId] ?? '—') : '—',
+        isGeneral: a.isGeneral,
+        totalGallons: Math.round(a.gallons * 100) / 100,
+        totalCost: Math.round(a.cost * 100) / 100,
+        avgPpg: a.ppgCount > 0
+          ? a.ppgSum / a.ppgCount
+          : a.gallons > 0 ? a.cost / a.gallons : null,
+        txnCount: a.txnCount,
+      }))
       .sort((a, b) => b.totalCost - a.totalCost)
       .slice(0, limit)
 
