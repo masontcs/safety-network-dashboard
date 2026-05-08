@@ -110,6 +110,16 @@ const SettingsIcon = () => (
   </svg>
 )
 
+const FuelIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <path d="M3 22V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16" />
+    <path d="M3 22h12" />
+    <path d="M15 8h2a2 2 0 0 1 2 2v6a2 2 0 0 0 2 2h0" />
+    <path d="M19 22V12" />
+    <line x1="7" y1="10" x2="11" y2="10" />
+  </svg>
+)
+
 const LogOutIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -122,9 +132,11 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/manager',   label: 'Dashboard', icon: <GridIcon />,  roles: ['branch_manager'] },
   { href: '/district',  label: 'Dashboard', icon: <GridIcon />,  roles: ['district_manager'] },
   { href: '/executive', label: 'Dashboard', icon: <GridIcon />,  roles: ['executive'] },
+  { href: '/fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['branch_manager', 'district_manager', 'executive'] },
   { href: '/executive/data-explorer', label: 'Data Explorer', icon: <DatabaseIcon />, roles: ['executive'] },
   { href: '/executive/employees', label: 'Employees', icon: <PeopleIcon />, roles: ['executive'] },
   { href: '/admin',     label: 'Dashboard', icon: <GridIcon />,  roles: ['admin'] },
+  { href: '/fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['admin'] },
   { href: '/admin/import',         label: 'Import',         icon: <UploadIcon />,   roles: ['admin'] },
   { href: '/admin/review',         label: 'Review',         icon: <ChartIcon />,    roles: ['admin'] },
   { href: '/admin/employees',      label: 'Employees',      icon: <PeopleIcon />,   roles: ['admin'] },

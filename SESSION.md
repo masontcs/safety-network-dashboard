@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 8, 2026 — Session: WH/Signs payroll data preservation
+## Last updated: May 8, 2026 — Session: Fuel dashboard + duplicate employee fix
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -128,6 +128,65 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 ## 3. WHAT IS IN PROGRESS / PARTIALLY BUILT
 
 Nothing currently in progress. All 20 migrations applied to production.
+
+---
+
+## 3a. RECENT CHANGES (May 8, 2026) — Fuel dashboard + card list
+
+### Fuel Dashboard (`/fuel`, `/fuel/cards`, `/fuel/cards/[id]`)
+
+Full fuel analytics section accessible to all four roles (branch-scoped).
+
+**Navigation:** `FuelIcon` + "Fuel" nav item added to `Sidebar.tsx` for all roles. Admin entry appears after Dashboard; non-admin entry appears after Dashboard (before Data Explorer for executive).
+
+**New API routes:**
+- `GET /api/fuel/cards` — branch-scoped list of all `fuel_card_assignments` with joined employee display name and branch name. Non-admin/exec users see only cards whose `branch_id` is in their assigned branches.
+- `GET /api/fuel/cards/[id]` — single card detail with the last 100 transactions. Branch-access checked against card's `branch_id`; unconfirmed cards (no branch) are admin/exec only.
+
+**New pages:**
+- `app/fuel/page.tsx` + `app/fuel/FuelDashboard.tsx` — KPI cards (Total Cost, Gallons, Avg $/Gal, Unlinked Card count), weekly cost bar chart (using existing `/api/fuel/by-week`), top consumers table (using existing `/api/fuel/top-consumers`). Period filter: Month / Quarter / Year with month/quarter/year selectors. Branch filter shown for district_manager, executive, and admin.
+- `app/fuel/cards/page.tsx` + `app/fuel/cards/CardList.tsx` — table of all fuel cards with status filter tabs (All / Linked / General / Unlinked / WH/Signs), live card-name search, clickable rows.
+- `app/fuel/cards/[id]/page.tsx` + `app/fuel/cards/[id]/CardDetail.tsx` — card header with current assignment display; admin-only assignment panel with two modes:
+  - "Link to Employee" — searchable employee dropdown + optional branch selector; calls existing `PATCH /api/admin/review/fuel-cards/[id]` (no changes to that route)
+  - "Mark as General Branch Card" — branch selector only; same PATCH call with `branchId` and no `employeeId`; produces `is_confirmed = true, employee_id = null, branch_id = X` (already supported by existing schema + PATCH route)
+  - Transaction history table (last 100 rows): Date / Site / Location / Gallons / $/Gal / Total
+
+**"General branch card" concept:** Structurally already supported (`employee_id = null, branch_id = X, is_confirmed = true`). The card detail page makes this assignable via UI for the first time.
+
+---
+
+## 3b. RECENT CHANGES (May 8, 2026) — Duplicate employee fix
+
+### Root Cause
+`resolveEmployees` in `lib/payroll/import-helpers.ts` looked up assignments by `(raw_name_in_report, entity_id)`. When importing a new entity (e.g., STS) for the first time, every employee's lookup returned null → a brand-new `employees` row was created for each person, duplicating everyone.
+
+### Fix (`lib/payroll/import-helpers.ts` — `resolveEmployees`)
+After the entity-scoped lookup returns null, now performs a cross-entity lookup:
+```typescript
+const { data: crossEntityAssign } = await supabase
+  .from('employee_entity_assignments')
+  .select('employee_id')
+  .eq('raw_name_in_report', emp.rawName)
+  .limit(1)
+  .maybeSingle()
+```
+If a match is found, reuses that `employee_id` and only inserts a new `employee_entity_assignments` row for the new entity. Only creates a new `employees` row if no cross-entity match exists.
+
+### DB Cleanup (ran manually in Supabase SQL editor)
+```sql
+-- Step 1: Re-point duplicate STS assignments to correct existing employee
+UPDATE employee_entity_assignments sts_assign
+SET employee_id = correct.employee_id
+FROM (...) correct
+WHERE sts_assign.raw_name_in_report = correct.raw_name_in_report
+  AND sts_assign.employee_id IN (orphan employees);
+
+-- Step 2: Delete employees with no remaining assignments
+DELETE FROM employees
+WHERE id NOT IN (SELECT DISTINCT employee_id FROM employee_entity_assignments);
+```
+
+**Note:** The cleanup was run while some STS assignments were still in the review queue (unconfirmed). Employees assigned via "link_existing" after the cleanup may still have left orphaned placeholder records. A second run of Step 2 is likely needed after all review queue items are processed.
 
 ---
 

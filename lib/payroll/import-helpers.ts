@@ -38,16 +38,32 @@ export async function resolveEmployees(
       })
       continue
     }
-    const { data: newEmp, error: empErr } = await supabase
-      .from('employees').insert({ first_name: emp.autoFirstName, last_name: emp.autoLastName })
-      .select('id').single()
-    if (empErr || !newEmp) throw new Error(`Failed to insert employee "${emp.rawName}": ${empErr?.message}`)
+    // Before creating a new employee record, check if this person exists under any other entity.
+    // Same raw_name_in_report may appear across INC/TCS/STS for the same individual.
+    const { data: crossEntityAssign } = await supabase
+      .from('employee_entity_assignments')
+      .select('employee_id')
+      .eq('raw_name_in_report', emp.rawName)
+      .limit(1)
+      .maybeSingle()
+
+    let employeeId: string
+    if (crossEntityAssign) {
+      employeeId = crossEntityAssign.employee_id
+    } else {
+      const { data: newEmp, error: empErr } = await supabase
+        .from('employees').insert({ first_name: emp.autoFirstName, last_name: emp.autoLastName })
+        .select('id').single()
+      if (empErr || !newEmp) throw new Error(`Failed to insert employee "${emp.rawName}": ${empErr?.message}`)
+      employeeId = newEmp.id
+    }
+
     const { data: newAssign, error: assignErr } = await supabase
       .from('employee_entity_assignments')
-      .insert({ employee_id: newEmp.id, entity_id: entityId, raw_name_in_report: emp.rawName, is_confirmed: false, payroll_code_id: null })
+      .insert({ employee_id: employeeId, entity_id: entityId, raw_name_in_report: emp.rawName, is_confirmed: false, payroll_code_id: null })
       .select('id').single()
     if (assignErr || !newAssign) throw new Error(`Failed to insert assignment for "${emp.rawName}": ${assignErr?.message}`)
-    resolved.push({ rawName: emp.rawName, employeeId: newEmp.id, assignmentId: newAssign.id, payrollCodeId: null, businessTag: null, isNew: true })
+    resolved.push({ rawName: emp.rawName, employeeId, assignmentId: newAssign.id, payrollCodeId: null, businessTag: null, isNew: true })
   }
   return resolved
 }
