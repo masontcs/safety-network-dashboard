@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 8, 2026 — Session: Import progress bar + staged payroll system complete
+## Last updated: May 8, 2026 — Session: Staged payroll items + streaming confirm-replace
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -35,6 +35,7 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] Migration 16 (20260507000002): employee_allocations + employee_allocation_overrides tables — percentage splits, effective dates, status workflow, RLS, indexes
 - [x] Migration 17 (20260507000003): business_tag column on employee_entity_assignments — CHECK ('western_highways', 'signs')
 - [x] Migration 18 (20260508000001): payroll_staged_transactions + payroll_staged_taxes tables — staging layer for pending employees, CASCADE delete on assignment, RLS admin-only
+- [x] Migration 19 (20260508000002): payroll_item_staged_transactions — staging layer for confirmed employees with unconfirmed payroll items, CASCADE delete on payroll_item, index on payroll_item_id, RLS admin-only
 - [x] Seed data: 3 businesses, 3 entities, 7 branches, 12 payroll item groups, 87 payroll codes, 196 payroll items, 17 revenue codes
 
 ### File Parsers (`/lib/`)
@@ -129,7 +130,39 @@ Nothing currently in progress. All migrations applied to production.
 
 ---
 
-## 3a. RECENT CHANGES (May 8, 2026) — Import progress bar
+## 3a. RECENT CHANGES (May 8, 2026) — Staged payroll items + streaming confirm-replace
+
+### Staged Payroll Item Transactions
+
+Unknown payroll items now follow the same staging pattern as unknown employees: transactions are held in a staging table until the item is reviewed and confirmed in the review queue, at which point they deploy automatically.
+
+**Why this matters:** Previously, transactions for unconfirmed items were inserted into `payroll_transactions` with an uncategorized or null `payroll_item_id`. Now they are properly staged and only deployed once the item has the correct group assignment.
+
+**New table (`supabase/migrations/20260508000002_payroll_item_staged_transactions.sql`):**
+- `payroll_item_staged_transactions` — holds transactions for confirmed employees whose payroll item is unconfirmed; keyed by `payroll_item_id` (CASCADE delete if item deleted); indexed on `payroll_item_id`
+- RLS admin-only
+
+**`lib/payroll/import-helpers.ts`:**
+- `resolvePayrollItems` now returns `Map<string, { id: string | null; isConfirmed: boolean }>` — existing confirmed items: `isConfirmed: true`; existing unconfirmed or newly created: `isConfirmed: false`
+- `insertPayrollData`: confirmed employee + unconfirmed item (`isConfirmed: false`, `id !== null`) → inserts into `payroll_item_staged_transactions` instead of `payroll_transactions`; null-id fallback still inserts live with `payroll_item_id: null`
+- Return type gains `stagedItemTxnCount: number` and `newItemNames: string[]` (replaces the old `unknownItemNames` which only tracked null IDs; now tracks all newly staged items for AI group suggestions)
+- AI suggestion now correctly fires for newly created items (previously only fired for null-id failures)
+
+**`app/api/admin/review/payroll-items/[id]/route.ts`:**
+- On item confirmation: fetches all `payroll_item_staged_transactions` for the item, deploys them to `payroll_transactions`, deletes the staged rows; returns `deployedCount` in response
+
+### Streaming Confirm-Replace
+
+**`app/api/import/payroll/confirm-replace/route.ts`:**
+- Converted from a single blocking `NextResponse.json` response to NDJSON streaming (same pattern as the main import route)
+- Auth, validation, file parsing, import-exists check all happen before the stream starts (return normal JSON errors if they fail)
+- Stream events: "Deleting previous import…" → "Resolving X pay items…" → "Matching X employees…" → "Writing X transactions…" → "Writing transactions (N/Total)…" → done
+
+**`components/import/ImportClient.tsx`:**
+- `handleConfirmReplace`: immediately switches to `uploading` state and reads the NDJSON stream (same reader loop as `handleUpload`)
+- `buildPayrollSuccessLines` helper extracted (shared by both upload and replace paths) — surfaces `stagedItemTxnCount` in the summary: *"4 transactions staged — 1 new item needs review"*
+
+## 3b. RECENT CHANGES (May 8, 2026) — Import progress bar
 
 ### Animated Progress Bar During File Upload (`components/import/ImportClient.tsx`)
 
@@ -594,6 +627,7 @@ npx vitest run
 - `20260507000001` — fix period_date year bug (year 26 CE → 2026)
 - `20260507000003` — business_tag column on employee_entity_assignments
 - `20260508000001` — payroll_staged_transactions + payroll_staged_taxes
+- `20260508000002` — payroll_item_staged_transactions (pending manual apply in Supabase SQL editor)
 
 ---
 
