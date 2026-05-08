@@ -339,6 +339,21 @@ function EmployeeMatchRow({
     }
   }
 
+  async function handleTagBusiness(businessTag: 'western_highways' | 'signs') {
+    if (busy) return
+    setBusy(true)
+    try {
+      await fetch(`/api/admin/review/employee-assignments/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'tag_business', businessTag }),
+      })
+      onDismiss(item.id)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div style={{ padding: '14px 0', borderTop: '1px solid #2a2a2a' }}>
       {/* Import name */}
@@ -607,7 +622,9 @@ function EmployeeMatchRow({
       )}
 
       {/* Actions */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}>
+        <ActionBtn label="Tag: Western Hwy" disabled={busy || saved} onClick={() => handleTagBusiness('western_highways')} />
+        <ActionBtn label="Tag: Signs" disabled={busy || saved} onClick={() => handleTagBusiness('signs')} />
         <ActionBtn label="Skip" disabled={busy || saved} onClick={handleSkip} />
         <ActionBtn
           label="Confirm"

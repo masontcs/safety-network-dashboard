@@ -8,6 +8,7 @@ export type ResolvedEmployee = {
   rawName: string
   employeeId: string
   payrollCodeId: string | null
+  businessTag: string | null
   isNew: boolean
 }
 
@@ -20,12 +21,17 @@ export async function resolveEmployees(
   for (const emp of parsedEmployees) {
     const { data: existing, error } = await supabase
       .from('employee_entity_assignments')
-      .select('employee_id, payroll_code_id, is_confirmed')
+      .select('employee_id, payroll_code_id, is_confirmed, business_tag')
       .eq('raw_name_in_report', emp.rawName).eq('entity_id', entityId).maybeSingle()
     if (error) throw new Error(`Failed to lookup employee "${emp.rawName}": ${error.message}`)
     if (existing) {
-      resolved.push({ rawName: emp.rawName, employeeId: existing.employee_id,
-        payrollCodeId: existing.is_confirmed ? existing.payroll_code_id : null, isNew: false })
+      resolved.push({
+        rawName: emp.rawName,
+        employeeId: existing.employee_id,
+        payrollCodeId: existing.is_confirmed ? existing.payroll_code_id : null,
+        businessTag: existing.business_tag ?? null,
+        isNew: false,
+      })
       continue
     }
     const { data: newEmp, error: empErr } = await supabase
@@ -37,7 +43,7 @@ export async function resolveEmployees(
       is_confirmed: false, payroll_code_id: null,
     })
     if (assignErr) throw new Error(`Failed to insert assignment for "${emp.rawName}": ${assignErr.message}`)
-    resolved.push({ rawName: emp.rawName, employeeId: newEmp.id, payrollCodeId: null, isNew: true })
+    resolved.push({ rawName: emp.rawName, employeeId: newEmp.id, payrollCodeId: null, businessTag: null, isNew: true })
   }
   return resolved
 }
@@ -74,6 +80,7 @@ export async function insertPayrollData(
   for (const emp of parsedEmployees) {
     const res = rMap.get(emp.rawName)
     if (!res) continue
+    if (res.businessTag) continue
     if (res.payrollCodeId === null) { pendingCount++; }
     else {
       for (const item of emp.lineItems) {

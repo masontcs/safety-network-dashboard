@@ -86,9 +86,9 @@ export type Database = {
         Relationships: []
       }
       employee_entity_assignments: {
-        Row: { id: string; employee_id: string; entity_id: string; payroll_code_id: string | null; raw_name_in_report: string; is_confirmed: boolean; ai_match_score: number | null; ai_match_candidate: string | null; effective_from: string; effective_to: string | null }
-        Insert: { id?: string; employee_id: string; entity_id: string; payroll_code_id?: string | null; raw_name_in_report: string; is_confirmed?: boolean; ai_match_score?: number | null; ai_match_candidate?: string | null; effective_from?: string; effective_to?: string | null }
-        Update: { id?: string; employee_id?: string; entity_id?: string; payroll_code_id?: string | null; raw_name_in_report?: string; is_confirmed?: boolean; ai_match_score?: number | null; ai_match_candidate?: string | null; effective_from?: string; effective_to?: string | null }
+        Row: { id: string; employee_id: string; entity_id: string; payroll_code_id: string | null; raw_name_in_report: string; is_confirmed: boolean; ai_match_score: number | null; ai_match_candidate: string | null; effective_from: string; effective_to: string | null; business_tag: BusinessTag | null }
+        Insert: { id?: string; employee_id: string; entity_id: string; payroll_code_id?: string | null; raw_name_in_report: string; is_confirmed?: boolean; ai_match_score?: number | null; ai_match_candidate?: string | null; effective_from?: string; effective_to?: string | null; business_tag?: BusinessTag | null }
+        Update: { id?: string; employee_id?: string; entity_id?: string; payroll_code_id?: string | null; raw_name_in_report?: string; is_confirmed?: boolean; ai_match_score?: number | null; ai_match_candidate?: string | null; effective_from?: string; effective_to?: string | null; business_tag?: BusinessTag | null }
         Relationships: []
       }
       employee_branch_transfers: {

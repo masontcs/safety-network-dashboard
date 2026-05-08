@@ -15,16 +15,17 @@ export async function PATCH(
     if (guard) return guard
 
     const body = await request.json() as {
-      mode: 'new_employee' | 'link_existing' | 'skip'
+      mode: 'new_employee' | 'link_existing' | 'skip' | 'tag_business'
       branchId?: string
       laborType?: string
       existingEmployeeId?: string
+      businessTag?: string
     }
     const { mode } = body
 
-    if (mode !== 'new_employee' && mode !== 'link_existing' && mode !== 'skip') {
+    if (mode !== 'new_employee' && mode !== 'link_existing' && mode !== 'skip' && mode !== 'tag_business') {
       return NextResponse.json(
-        { success: false, error: 'mode must be new_employee, link_existing, or skip', code: 'VALIDATION_ERROR' },
+        { success: false, error: 'mode must be new_employee, link_existing, skip, or tag_business', code: 'VALIDATION_ERROR' },
         { status: 400 },
       )
     }
@@ -47,6 +48,23 @@ export async function PATCH(
       const { error } = await supabase
         .from('employee_entity_assignments')
         .update({ is_confirmed: true })
+        .eq('id', params.id)
+      if (error) throw new Error(error.message)
+      return NextResponse.json({ success: true })
+    }
+
+    // ── Tag as business (WH / Signs) ─────────────────────────────────────────
+    if (mode === 'tag_business') {
+      const { businessTag } = body
+      if (businessTag !== 'western_highways' && businessTag !== 'signs') {
+        return NextResponse.json(
+          { success: false, error: 'businessTag must be western_highways or signs', code: 'VALIDATION_ERROR' },
+          { status: 400 },
+        )
+      }
+      const { error } = await supabase
+        .from('employee_entity_assignments')
+        .update({ business_tag: businessTag, is_confirmed: true })
         .eq('id', params.id)
       if (error) throw new Error(error.message)
       return NextResponse.json({ success: true })

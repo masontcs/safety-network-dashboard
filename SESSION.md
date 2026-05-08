@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 7, 2026 — Session: Import history panel
+## Last updated: May 7, 2026 — Session: WH/Signs employee business tag
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -123,11 +123,41 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ## 3. WHAT IS IN PROGRESS / PARTIALLY BUILT
 
-- Nothing currently in progress.
+- **Migration `20260507000003` pending manual application:** Adds `business_tag` column to `employee_entity_assignments`. Must be applied in Supabase SQL editor before the tagging UI will function in production:
+  ```sql
+  ALTER TABLE employee_entity_assignments
+    ADD COLUMN IF NOT EXISTS business_tag text
+      CHECK (business_tag IN ('western_highways', 'signs'));
+  ```
 
 ---
 
-## 3a. RECENT CHANGES (May 7, 2026) — Import history panel
+## 3a. RECENT CHANGES (May 7, 2026) — WH/Signs employee business tag
+
+### WH/Signs Employee Business Tag Feature
+
+Employees in the import review queue can now be tagged as belonging to **Western Highways** or **Signs Fabrication** so they are permanently excluded from Safety Network reports.
+
+**Migration (`supabase/migrations/20260507000003_employee_business_tag.sql`):**
+- Adds `business_tag text CHECK ('western_highways', 'signs')` to `employee_entity_assignments`
+- **Pending manual application in Supabase SQL editor**
+
+**`lib/supabase/database.types.ts`:** `employee_entity_assignments` Row/Insert/Update updated with `business_tag: BusinessTag | null`
+
+**`lib/payroll/import-helpers.ts`:**
+- `ResolvedEmployee` type: added `businessTag: string | null` field
+- `resolveEmployees`: fetches `business_tag` from existing assignments and propagates it
+- `insertPayrollData`: skips business-tagged employees entirely — no transactions, no taxes, no `pendingCount` increment. These employees remain in the DB for future reference but never appear in SN reports.
+
+**`app/api/admin/review/employee-assignments/[id]/route.ts`:**
+- New `tag_business` mode: validates `businessTag ∈ {'western_highways', 'signs'}`, sets `business_tag` + `is_confirmed = true` on the assignment
+
+**`components/review/ReviewClient.tsx`:**
+- `EmployeeMatchRow` now has **"Tag: Western Hwy"** and **"Tag: Signs"** buttons (beside Skip and Confirm) that immediately tag and dismiss the item from the queue
+
+---
+
+## 3b. RECENT CHANGES (May 7, 2026) — Import history panel
 
 ### New API route: `GET /api/import/history`
 Admin-only. Accepts `?type=payroll|revenue|fuel`. Returns all imports sorted by period date descending.
