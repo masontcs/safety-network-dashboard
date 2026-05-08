@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 8, 2026 — Session: Fuel dashboard + duplicate employee fix
+## Last updated: May 8, 2026 — Session: Fuel dashboard + back button + sidebar + allocation toggle fixes
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -128,6 +128,23 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 ## 3. WHAT IS IN PROGRESS / PARTIALLY BUILT
 
 Nothing currently in progress. All 20 migrations applied to production.
+
+---
+
+## 3a. RECENT CHANGES (May 8, 2026) — Back button, sidebar active state, allocation toggle fixes
+
+### Back Button Fix (`components/employees/EmployeeDetailClient.tsx`)
+Both back arrow buttons (top and bottom of detail page) changed from `router.push(returnPath)` to `router.back()`. This uses browser history so the user lands back at their exact scroll position on the employee list, not the dashboard root.
+
+### Sidebar Active State Fix (`components/layout/Sidebar.tsx`)
+Added `exactMatch?: boolean` to the `NavItem` interface. All four Dashboard nav items (admin, executive, district_manager, branch_manager) now set `exactMatch: true`. The `isActive` logic now uses exact path comparison for those items instead of `startsWith`, so the Dashboard item no longer stays highlighted on sub-pages like `/admin/employees` or `/admin/review`.
+
+Also added `FuelIcon` SVG and Fuel nav items for all four roles (after Dashboard, before Data Explorer for non-admin roles).
+
+### Pre-Allocation Toggle Fix (`AdminDashboard.tsx`, `ExecutiveDashboard.tsx`)
+The Corp/HQ overhead breakdown section was guarded with `overheadTotal > 0`. When no corp/hq payroll data exists, `overheadTotal = 0`, the block never rendered, and toggling the button appeared to do nothing (no visual feedback, numbers unchanged).
+
+Fix: removed the `overheadTotal > 0` guard in both `AdminDashboard.tsx` (line 936) and `ExecutiveDashboard.tsx` (line 890). Corp and HQ breakdown lines now always render when `allocationOn = true`, even showing $0, so the user can confirm the feature is active and understand why numbers aren't changing (no corp/hq data imported yet).
 
 ---
 

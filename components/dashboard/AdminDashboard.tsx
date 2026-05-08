@@ -933,7 +933,7 @@ export default function AdminDashboard({ branches, fiscalMonths, fiscalQuarters 
                 {(allocationOn ? netAfterAlloc : gp) >= 0 ? '↑' : '↓'} {formatPercent(Math.abs(allocationOn ? netAfterAllocPct : gpPct))} margin
               </div>
             )}
-            {allocationOn && !noData && overheadTotal > 0 && (
+            {allocationOn && !noData && (
               <div style={{ fontSize: 10, color: '#666666', marginTop: 4, display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <span>Corp: {formatCurrency(corpOverhead)}</span>
                 <span>HQ: {formatCurrency(hqOverhead)}</span>

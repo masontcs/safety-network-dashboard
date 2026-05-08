@@ -11,6 +11,7 @@ interface NavItem {
   label: string
   icon: React.ReactNode
   roles: Role[]
+  exactMatch?: boolean
 }
 
 const GridIcon = () => (
@@ -129,13 +130,13 @@ const LogOutIcon = () => (
 )
 
 const NAV_ITEMS: NavItem[] = [
-  { href: '/manager',   label: 'Dashboard', icon: <GridIcon />,  roles: ['branch_manager'] },
-  { href: '/district',  label: 'Dashboard', icon: <GridIcon />,  roles: ['district_manager'] },
-  { href: '/executive', label: 'Dashboard', icon: <GridIcon />,  roles: ['executive'] },
+  { href: '/manager',   label: 'Dashboard', icon: <GridIcon />,  roles: ['branch_manager'], exactMatch: true },
+  { href: '/district',  label: 'Dashboard', icon: <GridIcon />,  roles: ['district_manager'], exactMatch: true },
+  { href: '/executive', label: 'Dashboard', icon: <GridIcon />,  roles: ['executive'], exactMatch: true },
   { href: '/fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['branch_manager', 'district_manager', 'executive'] },
   { href: '/executive/data-explorer', label: 'Data Explorer', icon: <DatabaseIcon />, roles: ['executive'] },
   { href: '/executive/employees', label: 'Employees', icon: <PeopleIcon />, roles: ['executive'] },
-  { href: '/admin',     label: 'Dashboard', icon: <GridIcon />,  roles: ['admin'] },
+  { href: '/admin',     label: 'Dashboard', icon: <GridIcon />,  roles: ['admin'], exactMatch: true },
   { href: '/fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['admin'] },
   { href: '/admin/import',         label: 'Import',         icon: <UploadIcon />,   roles: ['admin'] },
   { href: '/admin/review',         label: 'Review',         icon: <ChartIcon />,    roles: ['admin'] },
@@ -258,7 +259,9 @@ export default function Sidebar({ role }: SidebarProps) {
         overflowX: 'hidden',
       }}>
         {items.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+          const isActive = item.exactMatch
+            ? pathname === item.href
+            : pathname === item.href || pathname.startsWith(item.href + '/')
           const count =
             item.href === '/admin/access-requests' ? accessRequestCount
             : item.href === '/admin/allocations' ? allocationCount

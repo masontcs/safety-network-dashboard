@@ -540,7 +540,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
     return (
       <div style={{ padding: 24 }}>
         <button
-          onClick={() => router.push(returnPath)}
+          onClick={() => router.back()}
           style={{ color: '#888888', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', marginBottom: 16 }}
         >
           ← Back
@@ -557,7 +557,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
     <div style={{ padding: 24, maxWidth: 1100 }}>
       {/* Back */}
       <button
-        onClick={() => router.push(returnPath)}
+        onClick={() => router.back()}
         style={{
           color: '#888888',
           fontSize: 13,

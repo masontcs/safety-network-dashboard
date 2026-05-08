@@ -887,7 +887,7 @@ export default function ExecutiveDashboard({ branches, entities }: Props) {
                 {(allocationOn ? netAfterAlloc : grossProfit) >= 0 ? '↑' : '↓'} {formatPercent(Math.abs(allocationOn ? netAfterAllocPct : gpPct))} margin
               </div>
             )}
-            {allocationOn && !noData && overheadTotal > 0 && (
+            {allocationOn && !noData && (
               <div style={{ fontSize: 11, color: '#666666', marginTop: 4 }}>
                 Corp: {formatCurrency(allocation?.totalCorpPayroll ?? 0)} · HQ: {formatCurrency(allocation?.snHqShare ?? 0)}
               </div>
