@@ -287,6 +287,8 @@ export async function GET(request: Request): Promise<NextResponse> {
     const bFuel: Record<string, number> = {}
     const bRevByPeriod: Record<string, Record<string, number>> = {}
     const bPayByPeriod: Record<string, Record<string, number>> = {}
+    const bAdminPayByPeriod: Record<string, Record<string, number>> = {}
+    const bTaxByPeriod: Record<string, Record<string, number>> = {}
     const bFuelByPeriod: Record<string, Record<string, number>> = {}
 
     for (const r of allRevRows) {
@@ -328,6 +330,8 @@ export async function GET(request: Request): Promise<NextResponse> {
       for (const split of splits) {
         const portion = r2(p.amount * (split.percentage / 100))
         bAdminPayroll[split.branchId] = (bAdminPayroll[split.branchId] ?? 0) + portion
+        if (!bAdminPayByPeriod[split.branchId]) bAdminPayByPeriod[split.branchId] = {}
+        bAdminPayByPeriod[split.branchId][p.period_date] = (bAdminPayByPeriod[split.branchId][p.period_date] ?? 0) + portion
       }
     }
 
@@ -366,6 +370,8 @@ export async function GET(request: Request): Promise<NextResponse> {
       for (const split of splits) {
         const portion = r2(t.amount * (split.percentage / 100))
         bTax[split.branchId] = (bTax[split.branchId] ?? 0) + portion
+        if (!bTaxByPeriod[split.branchId]) bTaxByPeriod[split.branchId] = {}
+        bTaxByPeriod[split.branchId][t.period_date] = (bTaxByPeriod[split.branchId][t.period_date] ?? 0) + portion
       }
     }
 
@@ -420,9 +426,20 @@ export async function GET(request: Request): Promise<NextResponse> {
         revenueByPeriod: Object.entries(bRevByPeriod[bid] ?? {})
           .map(([periodDate, revenue]) => ({ periodDate, revenue }))
           .sort((a, b) => (a.periodDate < b.periodDate ? -1 : 1)),
-        payrollByPeriod: Object.entries(bPayByPeriod[bid] ?? {})
-          .map(([periodDate, payroll]) => ({ periodDate, payroll }))
-          .sort((a, b) => (a.periodDate < b.periodDate ? -1 : 1)),
+        payrollByPeriod: (() => {
+          const periods = new Set([
+            ...Object.keys(bPayByPeriod[bid] ?? {}),
+            ...Object.keys(bAdminPayByPeriod[bid] ?? {}),
+            ...Object.keys(bTaxByPeriod[bid] ?? {}),
+          ])
+          return Array.from(periods).sort().map((periodDate) => ({
+            periodDate,
+            payroll:
+              (bPayByPeriod[bid]?.[periodDate] ?? 0) +
+              (bAdminPayByPeriod[bid]?.[periodDate] ?? 0) +
+              (bTaxByPeriod[bid]?.[periodDate] ?? 0),
+          }))
+        })(),
         fuelByPeriod: Object.entries(bFuelByPeriod[bid] ?? {})
           .map(([periodDate, fuel]) => ({ periodDate, fuel }))
           .sort((a, b) => (a.periodDate < b.periodDate ? -1 : 1)),

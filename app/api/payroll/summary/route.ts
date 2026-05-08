@@ -39,6 +39,21 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     const supabase = createServiceClient()
 
+    // If entityId was not passed (or is empty), look it up from the branch's payroll codes.
+    // This ensures admin payroll and taxes are always fetched regardless of how the client
+    // constructs the URL.
+    let resolvedEntityId = entityId ?? ''
+    if (!resolvedEntityId && branchId) {
+      const { data: codeRow } = await supabase
+        .from('payroll_codes')
+        .select('entity_id')
+        .eq('branch_id', branchId)
+        .eq('is_active', true)
+        .limit(1)
+        .single()
+      resolvedEntityId = codeRow?.entity_id ?? ''
+    }
+
     // Step 1: find ALL direct labor payroll_code IDs (allocation may redistribute across branches)
     let codesQuery = supabase
       .from('payroll_codes')
@@ -146,17 +161,17 @@ export async function GET(request: Request): Promise<NextResponse> {
       }
     }
 
-    // Step 3: query admin payroll (entity-level overhead) if entityId provided
+    // Step 3: query admin payroll (entity-level overhead) if entity resolved
     const adminItems: PayrollLineItem[] = []
     let taxTotal = 0
 
-    if (entityId) {
+    if (resolvedEntityId) {
       const adminLaborTypes: LaborType[] = ['admin_hourly', 'admin_salary']
 
       const { data: adminCodes, error: adminCodesErr } = await supabase
         .from('payroll_codes')
         .select('id')
-        .eq('entity_id', entityId)
+        .eq('entity_id', resolvedEntityId)
         .in('labor_type', adminLaborTypes)
 
       if (adminCodesErr) throw new Error(`Failed to load admin codes: ${adminCodesErr.message}`)
@@ -193,7 +208,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       let taxQuery = supabase
         .from('payroll_taxes')
         .select('amount')
-        .eq('entity_id', entityId)
+        .eq('entity_id', resolvedEntityId)
         .eq('period_date', periodDate)
       if (activeEmpIds.length > 0) {
         taxQuery = taxQuery.in('employee_id', activeEmpIds)

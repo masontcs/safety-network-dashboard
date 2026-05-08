@@ -16,6 +16,7 @@ import Skeleton from '@/components/ui/Skeleton'
 import FiscalMonthVarianceRow from '@/components/targets/FiscalMonthVarianceRow'
 import BranchPerformanceCard from '@/components/ui/BranchPerformanceCard'
 import { formatCurrency, formatPercent, round2 } from '@/lib/utils/format'
+import { calcTotalPayroll, calcGrossProfit, calcGrossProfitPct } from '@/lib/utils/payroll-totals'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -188,10 +189,10 @@ function SelectedWeekPanel({
   onDismiss: () => void
 }) {
   const rev = data?.revenue ?? 0
-  const pay = data?.directPayroll ?? 0
+  const totalPay = data ? calcTotalPayroll(data) : 0
   const fuel = data?.fuel ?? 0
-  const gp = rev - pay - fuel
-  const gpPct = rev > 0 ? (gp / rev) * 100 : 0
+  const gp = calcGrossProfit({ revenue: rev, directPayroll: data?.directPayroll ?? 0, adminPayroll: data?.adminPayroll, employerTaxes: data?.employerTaxes, fuel })
+  const gpPct = calcGrossProfitPct(gp, rev)
 
   return (
     <div
@@ -231,7 +232,7 @@ function SelectedWeekPanel({
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
           {[
             { label: 'Revenue', value: formatCurrency(rev), color: '#ff6b00' },
-            { label: 'Direct Payroll', value: formatCurrency(pay), color: '#cccccc' },
+            { label: 'Total Payroll', value: formatCurrency(totalPay), color: '#cccccc' },
             { label: 'Fuel', value: formatCurrency(fuel), color: '#cc4444' },
             { label: 'Net Profit', value: formatCurrency(gp), color: gp >= 0 ? '#4caf50' : '#cc4444' },
             { label: 'Profit %', value: `${gpPct.toFixed(1)}%`, color: gpColor(gpPct) },
