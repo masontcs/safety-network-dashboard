@@ -91,10 +91,10 @@ export async function insertPayrollData(
   // Pre-count live transactions (excludes staged-by-item) for progress reporting
   const confirmedTxnTotal = parsedEmployees.reduce((sum, emp) => {
     const r = rMap.get(emp.rawName)
-    if (!r || r.businessTag || r.payrollCodeId === null) return sum
+    if (!r || r.payrollCodeId === null) return sum
     return sum + emp.lineItems.filter((item) => {
       const ri = itemNameToId.get(item.itemName)
-      return !ri || ri.isConfirmed || ri.id === null  // null goes to payroll_transactions with null item_id
+      return r.businessTag || !ri || ri.isConfirmed || ri.id === null
     }).length
   }, 0)
   const updateEvery = Math.max(1, Math.floor(confirmedTxnTotal / 10))
@@ -102,7 +102,36 @@ export async function insertPayrollData(
   for (const emp of parsedEmployees) {
     const res = rMap.get(emp.rawName)
     if (!res) continue
-    if (res.businessTag) continue
+
+    if (res.businessTag) {
+      // WH/Signs employee — store data with null payroll_code_id + business_tag so it is
+      // preserved for auditing but naturally excluded from all SN dashboard queries
+      for (const item of emp.lineItems) {
+        const ri = itemNameToId.get(item.itemName) ?? { id: null, isConfirmed: true }
+        const { error } = await supabase.from('payroll_transactions').insert({
+          import_id: importId, employee_id: res.employeeId, entity_id: entityId,
+          payroll_code_id: null, business_tag: res.businessTag as 'western_highways' | 'signs',
+          period_date: periodDate, payroll_item_id: ri.id,
+          hours: item.hours, rate: item.rate, amount: item.amount,
+        })
+        if (error) throw new Error(`Failed to insert WH/Signs transaction for "${res.rawName}": ${error.message}`)
+        txnCount++
+        if (onTxnProgress && confirmedTxnTotal > 0 && (txnCount % updateEvery === 0 || txnCount === confirmedTxnTotal)) {
+          onTxnProgress(txnCount, confirmedTxnTotal)
+        }
+      }
+      if (emp.taxAmount > 0) {
+        const { error } = await supabase.from('payroll_taxes').insert({
+          import_id: importId, employee_id: res.employeeId, entity_id: entityId,
+          business_tag: res.businessTag as 'western_highways' | 'signs',
+          period_date: periodDate, amount: emp.taxAmount,
+        })
+        if (error) throw new Error(`Failed to insert WH/Signs tax for "${res.rawName}": ${error.message}`)
+        taxCount++
+      }
+      continue
+    }
+
     if (res.payrollCodeId === null) {
       // Employee pending — stage everything regardless of item status
       pendingCount++

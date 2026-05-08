@@ -122,15 +122,15 @@ export type Database = {
         Relationships: []
       }
       payroll_transactions: {
-        Row: { id: string; import_id: string; employee_id: string; entity_id: string; payroll_code_id: string; period_date: string; payroll_item_id: string | null; hours: number | null; rate: number | null; amount: number }
-        Insert: { id?: string; import_id: string; employee_id: string; entity_id: string; payroll_code_id: string; period_date: string; payroll_item_id?: string | null; hours?: number | null; rate?: number | null; amount: number }
-        Update: { id?: string; import_id?: string; employee_id?: string; entity_id?: string; payroll_code_id?: string; period_date?: string; payroll_item_id?: string | null; hours?: number | null; rate?: number | null; amount?: number }
+        Row: { id: string; import_id: string; employee_id: string; entity_id: string; payroll_code_id: string | null; period_date: string; payroll_item_id: string | null; hours: number | null; rate: number | null; amount: number; business_tag: BusinessTag | null }
+        Insert: { id?: string; import_id: string; employee_id: string; entity_id: string; payroll_code_id?: string | null; period_date: string; payroll_item_id?: string | null; hours?: number | null; rate?: number | null; amount: number; business_tag?: BusinessTag | null }
+        Update: { id?: string; import_id?: string; employee_id?: string; entity_id?: string; payroll_code_id?: string | null; period_date?: string; payroll_item_id?: string | null; hours?: number | null; rate?: number | null; amount?: number; business_tag?: BusinessTag | null }
         Relationships: []
       }
       payroll_taxes: {
-        Row: { id: string; import_id: string; employee_id: string; entity_id: string; period_date: string; amount: number }
-        Insert: { id?: string; import_id: string; employee_id: string; entity_id: string; period_date: string; amount: number }
-        Update: { id?: string; import_id?: string; employee_id?: string; entity_id?: string; period_date?: string; amount?: number }
+        Row: { id: string; import_id: string; employee_id: string; entity_id: string; period_date: string; amount: number; business_tag: BusinessTag | null }
+        Insert: { id?: string; import_id: string; employee_id: string; entity_id: string; period_date: string; amount: number; business_tag?: BusinessTag | null }
+        Update: { id?: string; import_id?: string; employee_id?: string; entity_id?: string; period_date?: string; amount?: number; business_tag?: BusinessTag | null }
         Relationships: []
       }
       revenue_transactions: {

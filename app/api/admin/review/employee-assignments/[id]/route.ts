@@ -67,6 +67,37 @@ export async function PATCH(
         .update({ business_tag: businessTag, is_confirmed: true })
         .eq('id', params.id)
       if (error) throw new Error(error.message)
+
+      // Deploy any transactions staged before this employee was tagged.
+      // Use payroll_code_id = null + business_tag so data is stored for
+      // auditing but excluded from all SN dashboard queries.
+      const [{ data: stagedTxns }, { data: stagedTaxes }] = await Promise.all([
+        supabase.from('payroll_staged_transactions').select('*').eq('assignment_id', params.id),
+        supabase.from('payroll_staged_taxes').select('*').eq('assignment_id', params.id),
+      ])
+      for (const row of stagedTxns ?? []) {
+        const { error: txnErr } = await supabase.from('payroll_transactions').insert({
+          import_id: row.import_id, employee_id: assignment.employee_id,
+          entity_id: row.entity_id, payroll_code_id: null,
+          business_tag: businessTag, period_date: row.period_date,
+          payroll_item_id: row.payroll_item_id,
+          hours: row.hours, rate: row.rate, amount: row.amount,
+        })
+        if (txnErr) throw new Error(`Failed to deploy staged WH/Signs transaction: ${txnErr.message}`)
+      }
+      for (const row of stagedTaxes ?? []) {
+        const { error: taxErr } = await supabase.from('payroll_taxes').insert({
+          import_id: row.import_id, employee_id: assignment.employee_id,
+          entity_id: row.entity_id, business_tag: businessTag,
+          period_date: row.period_date, amount: row.amount,
+        })
+        if (taxErr) throw new Error(`Failed to deploy staged WH/Signs tax: ${taxErr.message}`)
+      }
+      await Promise.all([
+        supabase.from('payroll_staged_transactions').delete().eq('assignment_id', params.id),
+        supabase.from('payroll_staged_taxes').delete().eq('assignment_id', params.id),
+      ])
+
       return NextResponse.json({ success: true })
     }
 
