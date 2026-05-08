@@ -43,16 +43,29 @@ export default async function ManagerPage() {
 
   const branch = branchRaw as { name: string } | null
 
-  const { data: codeRaw } = await supabase
-    .from('payroll_codes')
-    .select('entity_id')
-    .eq('branch_id', branchId)
-    .eq('is_active', true)
-    .limit(1)
-    .single()
+  // Prefer admin salary codes for entity — they carry the entity that admin payroll needs.
+  const [{ data: adminCodeRaw }, { data: fallbackCodeRaw }] = await Promise.all([
+    supabase
+      .from('payroll_codes')
+      .select('entity_id')
+      .eq('branch_id', branchId)
+      .in('labor_type', ['admin_hourly', 'admin_salary'])
+      .eq('is_active', true)
+      .limit(1)
+      .single(),
+    supabase
+      .from('payroll_codes')
+      .select('entity_id')
+      .eq('branch_id', branchId)
+      .eq('is_active', true)
+      .limit(1)
+      .single(),
+  ])
 
-  const payrollCode = codeRaw as { entity_id: string } | null
-  const entityId = payrollCode?.entity_id ?? ''
+  const entityId =
+    (adminCodeRaw as { entity_id: string } | null)?.entity_id ||
+    (fallbackCodeRaw as { entity_id: string } | null)?.entity_id ||
+    ''
 
   return (
     <DashboardShell

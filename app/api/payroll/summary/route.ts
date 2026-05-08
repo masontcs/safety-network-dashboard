@@ -40,32 +40,40 @@ export async function GET(request: Request): Promise<NextResponse> {
     const supabase = createServiceClient()
 
     // If entityId was not passed (or is empty), look it up from the branch's payroll codes.
-    // This ensures admin payroll and taxes are always fetched regardless of how the client
-    // constructs the URL.
+    // Admin salary codes take priority — their entity is what the admin payroll query needs.
     let resolvedEntityId = entityId ?? ''
     if (!resolvedEntityId && branchId) {
-      const { data: codeRow } = await supabase
+      const { data: adminCodeRow } = await supabase
         .from('payroll_codes')
         .select('entity_id')
         .eq('branch_id', branchId)
+        .in('labor_type', ['admin_hourly', 'admin_salary'])
         .eq('is_active', true)
         .limit(1)
         .single()
-      resolvedEntityId = codeRow?.entity_id ?? ''
+      resolvedEntityId = adminCodeRow?.entity_id ?? ''
+
+      if (!resolvedEntityId) {
+        const { data: codeRow } = await supabase
+          .from('payroll_codes')
+          .select('entity_id')
+          .eq('branch_id', branchId)
+          .eq('is_active', true)
+          .limit(1)
+          .single()
+        resolvedEntityId = codeRow?.entity_id ?? ''
+      }
     }
 
-    // Step 1: find ALL direct labor payroll_code IDs (allocation may redistribute across branches)
-    let codesQuery = supabase
+    // Step 1: find ALL direct labor payroll_code IDs.
+    // Do NOT filter by branch here — allocation splits redistribute amounts across branches,
+    // so an employee home-based at Branch A may contribute payroll to Branch B.
+    // Branch access is enforced by the canAccessBranch check above (on the requested branchId)
+    // and by the allocation filter in Step 2 (splits.find by branchId).
+    const { data: directCodes, error: codesErr } = await supabase
       .from('payroll_codes')
       .select('id')
       .eq('labor_type', 'direct' as LaborType)
-
-    // Keep manager access scoped to assigned branches at the code level
-    if (access.branchIds !== null) {
-      codesQuery = codesQuery.in('branch_id', access.branchIds)
-    }
-
-    const { data: directCodes, error: codesErr } = await codesQuery
     if (codesErr) throw new Error(`Failed to load payroll codes: ${codesErr.message}`)
 
     const directCodeIds = (directCodes ?? []).map((c) => c.id)
@@ -161,59 +169,72 @@ export async function GET(request: Request): Promise<NextResponse> {
       }
     }
 
-    // Step 3: query admin payroll (entity-level overhead) if entity resolved
+    // Step 3: query admin payroll and employer taxes
     const adminItems: PayrollLineItem[] = []
     let taxTotal = 0
 
-    if (resolvedEntityId) {
-      const adminLaborTypes: LaborType[] = ['admin_hourly', 'admin_salary']
+    const adminLaborTypes: LaborType[] = ['admin_hourly', 'admin_salary']
+    let adminCodeIds: string[] = []
 
-      const { data: adminCodes, error: adminCodesErr } = await supabase
+    if (branchId) {
+      // Branch-scoped: fetch all active admin codes for this branch across ALL entities.
+      // Using entity_id here breaks when the resolved entity differs from the entity that
+      // actually has transactions (each branch has admin codes under multiple entities).
+      const { data: branchAdminCodes, error: adminCodesErr } = await supabase
+        .from('payroll_codes')
+        .select('id')
+        .eq('branch_id', branchId)
+        .in('labor_type', adminLaborTypes)
+        .eq('is_active', true)
+      if (adminCodesErr) throw new Error(`Failed to load admin codes: ${adminCodesErr.message}`)
+      adminCodeIds = (branchAdminCodes ?? []).map((c) => c.id)
+    } else if (resolvedEntityId) {
+      // Entity-scoped: used for admin/executive cross-branch views (no branchId filter)
+      const { data: entityAdminCodes, error: adminCodesErr } = await supabase
         .from('payroll_codes')
         .select('id')
         .eq('entity_id', resolvedEntityId)
         .in('labor_type', adminLaborTypes)
-
       if (adminCodesErr) throw new Error(`Failed to load admin codes: ${adminCodesErr.message}`)
+      adminCodeIds = (entityAdminCodes ?? []).map((c) => c.id)
+    }
 
-      const adminCodeIds = (adminCodes ?? []).map((c) => c.id)
+    if (adminCodeIds.length > 0) {
+      const { data: rawAdminTxns, error: adminErr } = await supabase
+        .from('payroll_transactions')
+        .select('employee_id, amount, hours, rate, employees(first_name, last_name), payroll_codes(labor_type)')
+        .in('payroll_code_id', adminCodeIds)
+        .eq('period_date', periodDate)
 
-      if (adminCodeIds.length > 0) {
-        const { data: rawAdminTxns, error: adminErr } = await supabase
-          .from('payroll_transactions')
-          .select('employee_id, amount, hours, rate, employees(first_name, last_name), payroll_codes(labor_type)')
-          .in('payroll_code_id', adminCodeIds)
-          .eq('period_date', periodDate)
+      if (adminErr) throw new Error(`Failed to query admin payroll: ${adminErr.message}`)
 
-        if (adminErr) throw new Error(`Failed to query admin payroll: ${adminErr.message}`)
-
-        for (const t of (rawAdminTxns ?? []) as PayrollTxnRow[]) {
-          if (!t.employees || !t.payroll_codes) continue
-          adminItems.push({
-            employeeId: t.employee_id,
-            displayName: `${t.employees.first_name} ${t.employees.last_name}`.trim(),
-            laborType: t.payroll_codes.labor_type,
-            amount: t.amount,
-            hours: t.hours,
-            rate: t.rate,
-          })
-        }
+      for (const t of (rawAdminTxns ?? []) as PayrollTxnRow[]) {
+        if (!t.employees || !t.payroll_codes) continue
+        adminItems.push({
+          employeeId: t.employee_id,
+          displayName: `${t.employees.first_name} ${t.employees.last_name}`.trim(),
+          laborType: t.payroll_codes.labor_type,
+          amount: t.amount,
+          hours: t.hours,
+          rate: t.rate,
+        })
       }
+    }
 
-      // Taxes — scoped to employees who had transactions this period
-      // (avoids over-counting when a branchId filter is active)
-      const activeEmpIds = [
-        ...new Set([...directItems.map((i) => i.employeeId), ...adminItems.map((i) => i.employeeId)]),
-      ]
+    // Taxes — scoped to employees who had transactions this period
+    const activeEmpIds = [
+      ...new Set([...directItems.map((i) => i.employeeId), ...adminItems.map((i) => i.employeeId)]),
+    ]
+    if (activeEmpIds.length > 0) {
       let taxQuery = supabase
         .from('payroll_taxes')
         .select('amount')
-        .eq('entity_id', resolvedEntityId)
         .eq('period_date', periodDate)
-      if (activeEmpIds.length > 0) {
-        taxQuery = taxQuery.in('employee_id', activeEmpIds)
+        .in('employee_id', activeEmpIds)
+      // When no branchId, scope by entity to avoid cross-entity double-counting
+      if (!branchId && resolvedEntityId) {
+        taxQuery = taxQuery.eq('entity_id', resolvedEntityId)
       }
-
       const { data: taxes, error: taxErr } = await taxQuery
       if (taxErr) throw new Error(`Failed to query payroll taxes: ${taxErr.message}`)
       taxTotal = (taxes ?? []).reduce((s, t) => s + t.amount, 0)

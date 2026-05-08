@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 7, 2026 — Session: Payroll consistency + dashboard fixes
+## Last updated: May 7, 2026 — Session: Admin payroll district/manager dashboard fix
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -127,7 +127,31 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ---
 
-## 3a. RECENT CHANGES (May 7, 2026) — Payroll consistency + dashboard fixes
+## 3a. RECENT CHANGES (May 7, 2026) — Admin payroll district/manager dashboard fix
+
+### Root cause
+Each branch has admin payroll codes under **three different entities** (INC/TCS/STS). Only one entity has actual transactions for a given import. The previous code resolved a single entity per branch from `payroll_codes` and used it to scope the admin codes query (`WHERE entity_id = resolvedEntityId`). If the resolved entity was one of the two that had no transactions, the code returned 0 results and admin payroll showed $0. No amount of "prefer admin codes" prioritization could fix this because all three entities have admin salary codes per branch — the pick was inherently arbitrary.
+
+### Fix: branch-scoped admin code lookup in `app/api/payroll/summary/route.ts`
+Step 3 now splits on whether `branchId` is present:
+- **With `branchId`:** queries admin codes by `branch_id` + `is_active` (all entities). The transaction query returns only rows with actual data regardless of entity.
+- **Without `branchId`** (admin/executive cross-branch view): continues using `entity_id` scoping as before.
+
+Tax query updated to match: when `branchId` is present, filters by `employee_id` + `period_date` only (no entity filter). When entity-scoped (no branchId), entity filter is kept to prevent cross-entity double-counting.
+
+### Supporting fixes (less critical, applied first)
+- `app/district/page.tsx` — entity resolution now queries admin salary codes first, falls back to any active code. Became less relevant after the route fix but is still cleaner.
+- `app/manager/page.tsx` — same admin-first entity resolution pattern.
+- Route auto-resolve (when `entityId` param is empty) — also prefers admin salary codes.
+
+### Verification
+- Bakersfield: $10,951.55 admin salary + $1,221.29 taxes = **$12,172.84** ✓ matches dashboard
+- Fresno: $7,728.66 admin salary + $993.06 taxes = **$8,721.72** ✓ matches dashboard
+- All data is under entity `8c0aa308` (TCS), period_date `2026-03-07`
+
+---
+
+## 3b. RECENT CHANGES (May 7, 2026) — Payroll consistency + dashboard fixes
 
 ### Animated Expand-on-Hover Sidebar
 - `components/layout/Sidebar.tsx` fully rewritten: 48px collapsed → 220px expanded on `onMouseEnter`/`onMouseLeave`; `width` + `min-width` CSS transition 200ms ease-in-out; `overflow: hidden` keeps sibling `<main>` filling the gap

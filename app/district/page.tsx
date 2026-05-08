@@ -36,9 +36,18 @@ export default async function DistrictPage({
   const branchIds = ((assignments ?? []) as { branch_id: string }[]).map((a) => a.branch_id)
   if (branchIds.length === 0) redirect('/login')
 
-  // Fetch branch details and entity mapping in parallel
-  const [{ data: branchesRaw }, { data: codeRows }] = await Promise.all([
+  // Fetch branch details and entity mapping in parallel.
+  // Admin salary codes take priority for entity resolution — they carry the entity that
+  // the admin payroll query needs. Fall back to any active code if no admin code exists.
+  const [{ data: branchesRaw }, { data: adminCodeRows }, { data: fallbackCodeRows }] = await Promise.all([
     supabase.from('branches').select('id, name').in('id', branchIds).order('name'),
+    supabase
+      .from('payroll_codes')
+      .select('branch_id, entity_id')
+      .in('branch_id', branchIds)
+      .in('labor_type', ['admin_hourly', 'admin_salary'])
+      .eq('is_active', true)
+      .not('entity_id', 'is', null),
     supabase
       .from('payroll_codes')
       .select('branch_id, entity_id')
@@ -47,9 +56,13 @@ export default async function DistrictPage({
       .not('entity_id', 'is', null),
   ])
 
-  // First entity per branch
   const entityByBranch: Record<string, string> = {}
-  for (const row of (codeRows ?? []) as { branch_id: string | null; entity_id: string | null }[]) {
+  for (const row of (adminCodeRows ?? []) as { branch_id: string | null; entity_id: string | null }[]) {
+    if (row.branch_id && row.entity_id && !entityByBranch[row.branch_id]) {
+      entityByBranch[row.branch_id] = row.entity_id
+    }
+  }
+  for (const row of (fallbackCodeRows ?? []) as { branch_id: string | null; entity_id: string | null }[]) {
     if (row.branch_id && row.entity_id && !entityByBranch[row.branch_id]) {
       entityByBranch[row.branch_id] = row.entity_id
     }
