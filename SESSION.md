@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 7, 2026 — Session: Admin payroll district/manager dashboard fix
+## Last updated: May 7, 2026 — Session: 2-digit year payroll import fix
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -127,7 +127,20 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ---
 
-## 3a. RECENT CHANGES (May 7, 2026) — Admin payroll district/manager dashboard fix
+## 3a. RECENT CHANGES (May 7, 2026) — 2-digit year payroll import fix
+
+### Problem
+QuickBooks sometimes exports dates with 2-digit years ("Week of Mar 1, 26" instead of "Mar 1, 2026"). A prior session added strict validation that threw a `ParseError` and blocked the import entirely.
+
+### Fix (`lib/payroll/parse-helpers.ts`, `lib/payroll/parser.ts`)
+`extractPeriodDate` now auto-corrects 2-digit years (getFullYear < 100) by adding 2000, then pushes a warning to the optional `warnings` array instead of throwing. The parser.ts call site passes the existing `warnings` array through so the correction message surfaces in the import response. Test updated from "expect throw" to "expect corrected date + warning."
+
+- **225 tests passing, 0 failing** (updated from prior count)
+- **Commit:** `b02025c`
+
+---
+
+## 3b. RECENT CHANGES (May 7, 2026) — Admin payroll district/manager dashboard fix
 
 ### Root cause
 Each branch has admin payroll codes under **three different entities** (INC/TCS/STS). Only one entity has actual transactions for a given import. The previous code resolved a single entity per branch from `payroll_codes` and used it to scope the admin codes query (`WHERE entity_id = resolvedEntityId`). If the resolved entity was one of the two that had no transactions, the code returned 0 results and admin payroll showed $0. No amount of "prefer admin codes" prioritization could fix this because all three entities have admin salary codes per branch — the pick was inherently arbitrary.
