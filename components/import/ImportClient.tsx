@@ -98,12 +98,7 @@ function DropZone({ accept, state, onFile, label, hint }: DropZoneProps) {
         </>
       )}
 
-      {state.status === 'uploading' && (
-        <>
-          <SpinnerIcon />
-          <div style={{ fontSize: 12, color: '#888888', marginTop: 4 }}>Uploading…</div>
-        </>
-      )}
+      {state.status === 'uploading' && <UploadingState />}
 
       {state.status === 'success' && (
         <>
@@ -762,6 +757,49 @@ export default function ImportClient() {
   )
 }
 
+// ─── Upload progress ─────────────────────────────────────────────────────────
+
+function UploadingState() {
+  const steps = ['Parsing file…', 'Validating data…', 'Inserting records…', 'Finalizing…']
+  const [step, setStep] = useState(0)
+  const [progress, setProgress] = useState(0)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setProgress((p) => {
+        if (p >= 88) return p
+        return p + (88 - p) * 0.05
+      })
+    }, 100)
+    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setStep(1), 2000)
+    const t2 = setTimeout(() => setStep(2), 5000)
+    const t3 = setTimeout(() => setStep(3), 9000)
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
+  }, [])
+
+  return (
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+      <div style={{ fontSize: 12, color: '#888888' }}>{steps[step]}</div>
+      <div style={{ width: '85%', height: 4, background: '#2a2a2a', borderRadius: 2, overflow: 'hidden' }}>
+        <div
+          style={{
+            height: '100%',
+            width: `${progress}%`,
+            background: '#ff6b00',
+            borderRadius: 2,
+            transition: 'width 0.1s ease-out',
+          }}
+        />
+      </div>
+      <div style={{ fontSize: 11, color: '#555555' }}>{Math.round(progress)}%</div>
+    </div>
+  )
+}
+
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
 function UploadIcon() {
@@ -812,11 +850,4 @@ function WarnIcon() {
   )
 }
 
-function SpinnerIcon() {
-  return (
-    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#888888" strokeWidth={2} style={{ animation: 'spin 1s linear infinite' }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
-  )
-}
+

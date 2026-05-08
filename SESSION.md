@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 8, 2026 — Session: Staged payroll transactions for pending employees
+## Last updated: May 8, 2026 — Session: Import progress bar + staged payroll system complete
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -33,6 +33,8 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] Migration 14 (20260506000006): user_profiles.must_change_password boolean NOT NULL DEFAULT false
 - [x] Migration 15 (20260507000001): corrects period_date year bug — updates payroll_transactions, payroll_taxes, payroll_imports where EXTRACT(year) < 100 to add 2000 years
 - [x] Migration 16 (20260507000002): employee_allocations + employee_allocation_overrides tables — percentage splits, effective dates, status workflow, RLS, indexes
+- [x] Migration 17 (20260507000003): business_tag column on employee_entity_assignments — CHECK ('western_highways', 'signs')
+- [x] Migration 18 (20260508000001): payroll_staged_transactions + payroll_staged_taxes tables — staging layer for pending employees, CASCADE delete on assignment, RLS admin-only
 - [x] Seed data: 3 businesses, 3 entities, 7 branches, 12 payroll item groups, 87 payroll codes, 196 payroll items, 17 revenue codes
 
 ### File Parsers (`/lib/`)
@@ -123,23 +125,26 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ## 3. WHAT IS IN PROGRESS / PARTIALLY BUILT
 
-- **Migrations pending manual application in Supabase SQL editor (zobgzhgwgduziszzevzp):**
-  - `20260507000003` — `business_tag` on `employee_entity_assignments`:
-    ```sql
-    ALTER TABLE employee_entity_assignments
-      ADD COLUMN IF NOT EXISTS business_tag text
-        CHECK (business_tag IN ('western_highways', 'signs'));
-    ```
-  - `20260508000001` — staging tables for pending payroll data (run after the above):
-    ```sql
-    CREATE TABLE payroll_staged_transactions ( ... );
-    CREATE TABLE payroll_staged_taxes ( ... );
-    ```
-    (copy the full SQL from `supabase/migrations/20260508000001_payroll_staged_transactions.sql`)
+Nothing currently in progress. All migrations applied to production.
 
 ---
 
-## 3a. RECENT CHANGES (May 8, 2026) — Staged payroll transactions for pending employees
+## 3a. RECENT CHANGES (May 8, 2026) — Import progress bar
+
+### Animated Progress Bar During File Upload (`components/import/ImportClient.tsx`)
+
+Replaced the static spinner with a meaningful progress bar that fills over time while the import runs server-side.
+
+**New `UploadingState` component:**
+- Orange (#ff6b00) progress bar fills from 0% → ~88% using an exponential deceleration curve (fast at start, slows as it approaches the limit — honest UX, never claims completion before the server responds)
+- Cycling status labels at timed intervals: **Parsing file…** (0s) → **Validating data…** (2s) → **Inserting records…** (5s) → **Finalizing…** (9s)
+- Percentage counter underneath the bar
+- Applies to all three import sections (Payroll, Revenue, Fuel) since they all share the same `DropZone` component
+- Removed the old `SpinnerIcon` function (no longer referenced)
+
+---
+
+## 3b. RECENT CHANGES (May 8, 2026) — Staged payroll transactions for pending employees
 
 ### Problem Solved
 When a payroll import encountered a new/unknown employee, their transaction and tax data was discarded. Admin confirmed them in the review queue (giving them a payroll code), but the data from the original import was already gone — requiring a full re-import.
@@ -587,6 +592,8 @@ npx vitest run
 - `20260506000005` — fuel_imports vendor unique constraint
 - `20260506000006` — user_profiles.must_change_password
 - `20260507000001` — fix period_date year bug (year 26 CE → 2026)
+- `20260507000003` — business_tag column on employee_entity_assignments
+- `20260508000001` — payroll_staged_transactions + payroll_staged_taxes
 
 ---
 
