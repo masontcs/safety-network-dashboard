@@ -27,3 +27,17 @@ CREATE TABLE payroll_staged_taxes (
 
 CREATE INDEX idx_pst_assignment   ON payroll_staged_transactions(assignment_id);
 CREATE INDEX idx_psttax_assignment ON payroll_staged_taxes(assignment_id);
+
+-- RLS: admin only via service role. No direct client access permitted.
+ALTER TABLE payroll_staged_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payroll_staged_taxes        ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "admin_staged_txn" ON payroll_staged_transactions
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "admin_staged_tax" ON payroll_staged_taxes
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role = 'admin')
+  );
