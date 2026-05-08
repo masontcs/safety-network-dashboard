@@ -169,6 +169,18 @@ export type Database = {
         Update: { id?: string; first_name?: string; last_name?: string; email?: string; branch_id?: string | null; requested_role?: string; notes?: string | null; status?: string; reviewed_by?: string | null; reviewed_at?: string | null }
         Relationships: []
       }
+      payroll_staged_transactions: {
+        Row: { id: string; assignment_id: string; import_id: string; entity_id: string; period_date: string; payroll_item_id: string | null; hours: number | null; rate: number | null; amount: number }
+        Insert: { id?: string; assignment_id: string; import_id: string; entity_id: string; period_date: string; payroll_item_id?: string | null; hours?: number | null; rate?: number | null; amount: number }
+        Update: { id?: string; assignment_id?: string; import_id?: string; entity_id?: string; period_date?: string; payroll_item_id?: string | null; hours?: number | null; rate?: number | null; amount?: number }
+        Relationships: []
+      }
+      payroll_staged_taxes: {
+        Row: { id: string; assignment_id: string; import_id: string; entity_id: string; period_date: string; amount: number }
+        Insert: { id?: string; assignment_id: string; import_id: string; entity_id: string; period_date: string; amount: number }
+        Update: { id?: string; assignment_id?: string; import_id?: string; entity_id?: string; period_date?: string; amount?: number }
+        Relationships: []
+      }
       employee_allocations: {
         Row: { id: string; employee_id: string; branch_id: string; percentage: number; effective_from: string; effective_to: string | null; status: string; requested_by: string | null; approved_by: string | null; notes: string | null; created_at: string }
         Insert: { id?: string; employee_id: string; branch_id: string; percentage: number; effective_from: string; effective_to?: string | null; status?: string; requested_by?: string | null; approved_by?: string | null; notes?: string | null; created_at?: string }

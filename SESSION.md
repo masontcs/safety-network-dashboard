@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 7, 2026 — Session: WH/Signs employee business tag
+## Last updated: May 8, 2026 — Session: Staged payroll transactions for pending employees
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -123,16 +123,54 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ## 3. WHAT IS IN PROGRESS / PARTIALLY BUILT
 
-- **Migration `20260507000003` pending manual application:** Adds `business_tag` column to `employee_entity_assignments`. Must be applied in Supabase SQL editor before the tagging UI will function in production:
-  ```sql
-  ALTER TABLE employee_entity_assignments
-    ADD COLUMN IF NOT EXISTS business_tag text
-      CHECK (business_tag IN ('western_highways', 'signs'));
-  ```
+- **Migrations pending manual application in Supabase SQL editor (zobgzhgwgduziszzevzp):**
+  - `20260507000003` — `business_tag` on `employee_entity_assignments`:
+    ```sql
+    ALTER TABLE employee_entity_assignments
+      ADD COLUMN IF NOT EXISTS business_tag text
+        CHECK (business_tag IN ('western_highways', 'signs'));
+    ```
+  - `20260508000001` — staging tables for pending payroll data (run after the above):
+    ```sql
+    CREATE TABLE payroll_staged_transactions ( ... );
+    CREATE TABLE payroll_staged_taxes ( ... );
+    ```
+    (copy the full SQL from `supabase/migrations/20260508000001_payroll_staged_transactions.sql`)
 
 ---
 
-## 3a. RECENT CHANGES (May 7, 2026) — WH/Signs employee business tag
+## 3a. RECENT CHANGES (May 8, 2026) — Staged payroll transactions for pending employees
+
+### Problem Solved
+When a payroll import encountered a new/unknown employee, their transaction and tax data was discarded. Admin confirmed them in the review queue (giving them a payroll code), but the data from the original import was already gone — requiring a full re-import.
+
+### Fix: Staging System
+
+**New tables (`supabase/migrations/20260508000001_payroll_staged_transactions.sql`):**
+- `payroll_staged_transactions` — holds line items for pending employees, keyed by `assignment_id`
+- `payroll_staged_taxes` — holds tax amounts for pending employees
+- Both cascade-delete if the assignment is deleted
+- Indexed on `assignment_id` for fast lookup at confirmation time
+
+**`lib/payroll/import-helpers.ts`:**
+- `ResolvedEmployee` gains `assignmentId: string` (the `employee_entity_assignments.id`)
+- `resolveEmployees` now selects `id` from existing assignments and uses `.select('id').single()` on new inserts to return the assignment ID
+- `insertPayrollData`: pending employees (`payrollCodeId === null`) now have all line items written to `payroll_staged_transactions` and taxes to `payroll_staged_taxes` instead of being discarded. The `pendingCount` still increments so the review queue badge updates correctly.
+
+**`app/api/admin/review/employee-assignments/[id]/route.ts`:**
+- New `deployStaged(employeeId, entityId, payrollCodeId)` helper: fetches all staged rows for the assignment, inserts them into `payroll_transactions` / `payroll_taxes` with the confirmed `employee_id` and `payroll_code_id`, then deletes the staged rows.
+- `new_employee` mode: calls `deployStaged` after confirming the assignment
+- `link_existing` mode: calls `deployStaged` with `existingEmployeeId` (the final employee_id) so data lands under the right person even if the import created a placeholder record
+
+### Result
+Import once → pending employees are staged → confirm in review queue → data deploys automatically. Re-importing to capture new employees is no longer necessary.
+
+### Note on existing data
+The Feb 2026 imports (4 weeks, imported 2026-05-08) have no staged data — they were imported before this fix. Direct employees from those imports still need one re-import to populate their transactions. After that, future imports will stage correctly.
+
+---
+
+## 3b. RECENT CHANGES (May 7, 2026) — WH/Signs employee business tag
 
 ### WH/Signs Employee Business Tag Feature
 

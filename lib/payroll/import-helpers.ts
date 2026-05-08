@@ -7,6 +7,7 @@ type SupabaseClient = ReturnType<typeof createServiceClient>
 export type ResolvedEmployee = {
   rawName: string
   employeeId: string
+  assignmentId: string
   payrollCodeId: string | null
   businessTag: string | null
   isNew: boolean
@@ -21,13 +22,14 @@ export async function resolveEmployees(
   for (const emp of parsedEmployees) {
     const { data: existing, error } = await supabase
       .from('employee_entity_assignments')
-      .select('employee_id, payroll_code_id, is_confirmed, business_tag')
+      .select('id, employee_id, payroll_code_id, is_confirmed, business_tag')
       .eq('raw_name_in_report', emp.rawName).eq('entity_id', entityId).maybeSingle()
     if (error) throw new Error(`Failed to lookup employee "${emp.rawName}": ${error.message}`)
     if (existing) {
       resolved.push({
         rawName: emp.rawName,
         employeeId: existing.employee_id,
+        assignmentId: existing.id,
         payrollCodeId: existing.is_confirmed ? existing.payroll_code_id : null,
         businessTag: existing.business_tag ?? null,
         isNew: false,
@@ -38,12 +40,12 @@ export async function resolveEmployees(
       .from('employees').insert({ first_name: emp.autoFirstName, last_name: emp.autoLastName })
       .select('id').single()
     if (empErr || !newEmp) throw new Error(`Failed to insert employee "${emp.rawName}": ${empErr?.message}`)
-    const { error: assignErr } = await supabase.from('employee_entity_assignments').insert({
-      employee_id: newEmp.id, entity_id: entityId, raw_name_in_report: emp.rawName,
-      is_confirmed: false, payroll_code_id: null,
-    })
-    if (assignErr) throw new Error(`Failed to insert assignment for "${emp.rawName}": ${assignErr.message}`)
-    resolved.push({ rawName: emp.rawName, employeeId: newEmp.id, payrollCodeId: null, businessTag: null, isNew: true })
+    const { data: newAssign, error: assignErr } = await supabase
+      .from('employee_entity_assignments')
+      .insert({ employee_id: newEmp.id, entity_id: entityId, raw_name_in_report: emp.rawName, is_confirmed: false, payroll_code_id: null })
+      .select('id').single()
+    if (assignErr || !newAssign) throw new Error(`Failed to insert assignment for "${emp.rawName}": ${assignErr?.message}`)
+    resolved.push({ rawName: emp.rawName, employeeId: newEmp.id, assignmentId: newAssign.id, payrollCodeId: null, businessTag: null, isNew: true })
   }
   return resolved
 }
@@ -81,8 +83,27 @@ export async function insertPayrollData(
     const res = rMap.get(emp.rawName)
     if (!res) continue
     if (res.businessTag) continue
-    if (res.payrollCodeId === null) { pendingCount++; }
-    else {
+    if (res.payrollCodeId === null) {
+      // Stage transactions and taxes — deployed automatically when admin confirms this employee
+      pendingCount++
+      for (const item of emp.lineItems) {
+        const itemId = itemNameToId.get(item.itemName) ?? null
+        if (itemId === null && !unknownItemNames.includes(item.itemName)) unknownItemNames.push(item.itemName)
+        const { error } = await supabase.from('payroll_staged_transactions').insert({
+          assignment_id: res.assignmentId, import_id: importId, entity_id: entityId,
+          period_date: periodDate, payroll_item_id: itemId,
+          hours: item.hours, rate: item.rate, amount: item.amount,
+        })
+        if (error) throw new Error(`Failed to stage transaction for "${res.rawName}": ${error.message}`)
+      }
+      if (emp.taxAmount > 0) {
+        const { error } = await supabase.from('payroll_staged_taxes').insert({
+          assignment_id: res.assignmentId, import_id: importId, entity_id: entityId,
+          period_date: periodDate, amount: emp.taxAmount,
+        })
+        if (error) throw new Error(`Failed to stage tax for "${res.rawName}": ${error.message}`)
+      }
+    } else {
       for (const item of emp.lineItems) {
         const itemId = itemNameToId.get(item.itemName) ?? null
         if (itemId === null && !unknownItemNames.includes(item.itemName)) unknownItemNames.push(item.itemName)
@@ -94,14 +115,14 @@ export async function insertPayrollData(
         if (error) throw new Error(`Failed to insert payroll transaction: ${error.message}`)
         txnCount++
       }
-    }
-    if (emp.taxAmount > 0) {
-      const { error } = await supabase.from('payroll_taxes').insert({
-        import_id: importId, employee_id: res.employeeId, entity_id: entityId,
-        period_date: periodDate, amount: emp.taxAmount,
-      })
-      if (error) throw new Error(`Failed to insert payroll tax: ${error.message}`)
-      taxCount++
+      if (emp.taxAmount > 0) {
+        const { error } = await supabase.from('payroll_taxes').insert({
+          import_id: importId, employee_id: res.employeeId, entity_id: entityId,
+          period_date: periodDate, amount: emp.taxAmount,
+        })
+        if (error) throw new Error(`Failed to insert payroll tax: ${error.message}`)
+        taxCount++
+      }
     }
   }
   return { txnCount, taxCount, pendingCount, unknownItemNames }

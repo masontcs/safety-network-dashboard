@@ -70,6 +70,46 @@ export async function PATCH(
       return NextResponse.json({ success: true })
     }
 
+    // ── Deploy staged data for this assignment into live tables ──────────────
+    async function deployStaged(employeeId: string, entityId: string, payrollCodeId: string): Promise<void> {
+      const [{ data: stagedTxns }, { data: stagedTaxes }] = await Promise.all([
+        supabase.from('payroll_staged_transactions').select('*').eq('assignment_id', params.id),
+        supabase.from('payroll_staged_taxes').select('*').eq('assignment_id', params.id),
+      ])
+
+      for (const row of stagedTxns ?? []) {
+        const { error } = await supabase.from('payroll_transactions').insert({
+          import_id: row.import_id,
+          employee_id: employeeId,
+          entity_id: entityId,
+          payroll_code_id: payrollCodeId,
+          period_date: row.period_date,
+          payroll_item_id: row.payroll_item_id,
+          hours: row.hours,
+          rate: row.rate,
+          amount: row.amount,
+        })
+        if (error) throw new Error(`Failed to deploy staged transaction: ${error.message}`)
+      }
+
+      for (const row of stagedTaxes ?? []) {
+        const { error } = await supabase.from('payroll_taxes').insert({
+          import_id: row.import_id,
+          employee_id: employeeId,
+          entity_id: entityId,
+          period_date: row.period_date,
+          amount: row.amount,
+        })
+        if (error) throw new Error(`Failed to deploy staged tax: ${error.message}`)
+      }
+
+      // Clean up staging rows
+      await Promise.all([
+        supabase.from('payroll_staged_transactions').delete().eq('assignment_id', params.id),
+        supabase.from('payroll_staged_taxes').delete().eq('assignment_id', params.id),
+      ])
+    }
+
     // ── Shared helper: resolve payroll code by entity + branch + labor type ──
     async function resolveCode(entityId: string, branchId: string, laborType: string): Promise<string | null> {
       const { data } = await supabase
@@ -119,6 +159,7 @@ export async function PATCH(
         .update({ payroll_code_id: codeId, is_confirmed: true })
         .eq('id', params.id)
       if (error) throw new Error(error.message)
+      await deployStaged(assignment.employee_id, assignment.entity_id, codeId)
       return NextResponse.json({ success: true })
     }
 
@@ -166,6 +207,8 @@ export async function PATCH(
         .update({ employee_id: existingEmployeeId, payroll_code_id: payrollCodeId, is_confirmed: true })
         .eq('id', params.id)
       if (error) throw new Error(error.message)
+      // Deploy under the final employee_id (existingEmployeeId), not the placeholder created at import
+      await deployStaged(existingEmployeeId, assignment.entity_id, payrollCodeId)
       return NextResponse.json({ success: true })
     }
 
