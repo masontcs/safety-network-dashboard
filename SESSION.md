@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 7, 2026 — Session: 2-digit year payroll import fix
+## Last updated: May 7, 2026 — Session: Import history panel
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -127,7 +127,22 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ---
 
-## 3a. RECENT CHANGES (May 7, 2026) — 2-digit year payroll import fix
+## 3a. RECENT CHANGES (May 7, 2026) — Import history panel
+
+### New API route: `GET /api/import/history`
+Admin-only. Accepts `?type=payroll|revenue|fuel`. Returns all imports sorted by period date descending.
+- **Payroll:** resolves `entity_id` → entity code (INC/TCS/STS) via `entities` table; returns `{ id, periodDate, entityCode, importedAt, status }`
+- **Revenue:** returns `{ id, periodDate, importedAt, status }`
+- **Fuel:** returns `{ id, vendor, dateRangeStart, dateRangeEnd, importedAt, status }`
+
+### Import History panel (`components/import/ImportClient.tsx`)
+New card below the three upload sections with **Payroll / Revenue / Fuel** tab switcher. Switching tabs fetches that type's history on demand. After each successful upload the panel auto-switches to the relevant tab and refreshes so the new import is immediately visible. Each tab shows a table with columns appropriate to the data type (entity pill for payroll, vendor pill for fuel).
+
+- **Commit:** `f172700`
+
+---
+
+## 3b. RECENT CHANGES (May 7, 2026) — 2-digit year payroll import fix
 
 ### Problem
 QuickBooks sometimes exports dates with 2-digit years ("Week of Mar 1, 26" instead of "Mar 1, 2026"). A prior session added strict validation that threw a `ParseError` and blocked the import entirely.
