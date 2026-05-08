@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 8, 2026 — Session: Staged payroll items + streaming confirm-replace
+## Last updated: May 8, 2026 — Session: WH/Signs payroll data preservation
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -36,6 +36,7 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 - [x] Migration 17 (20260507000003): business_tag column on employee_entity_assignments — CHECK ('western_highways', 'signs')
 - [x] Migration 18 (20260508000001): payroll_staged_transactions + payroll_staged_taxes tables — staging layer for pending employees, CASCADE delete on assignment, RLS admin-only
 - [x] Migration 19 (20260508000002): payroll_item_staged_transactions — staging layer for confirmed employees with unconfirmed payroll items, CASCADE delete on payroll_item, index on payroll_item_id, RLS admin-only
+- [x] Migration 20 (20260508000003): payroll_transactions gets business_tag + payroll_code_id made nullable; payroll_taxes gets business_tag — enables WH/Signs data storage
 - [x] Seed data: 3 businesses, 3 entities, 7 branches, 12 payroll item groups, 87 payroll codes, 196 payroll items, 17 revenue codes
 
 ### File Parsers (`/lib/`)
@@ -130,7 +131,34 @@ Nothing currently in progress. All migrations applied to production.
 
 ---
 
-## 3a. RECENT CHANGES (May 8, 2026) — Staged payroll items + streaming confirm-replace
+## 3a. RECENT CHANGES (May 8, 2026) — WH/Signs payroll data preservation
+
+### Problem Fixed
+WH/Signs employees showed $0 on their employee detail pages because `insertPayrollData` had `if (res.businessTag) continue` — silently dropping all their transactions and taxes. Additionally, if an employee was staged before being tagged in the review queue, `tag_business` mode never deployed that staged data, leaving it orphaned.
+
+### Fix
+
+**`lib/payroll/import-helpers.ts`:**
+- Removed `if (res.businessTag) continue`
+- Added WH/Signs branch: inserts transactions into `payroll_transactions` with `payroll_code_id = null` and `business_tag = res.businessTag`; inserts taxes into `payroll_taxes` with `business_tag` set
+- SN dashboards are unaffected — all existing queries filter `WHERE payroll_code_id IN (specific SN codes)`, so null-code WH/Signs rows are naturally excluded
+
+**`app/api/admin/review/employee-assignments/[id]/route.ts`:**
+- `tag_business` mode now deploys any staged transactions/taxes for the employee (with `payroll_code_id = null, business_tag`) before clearing the staging rows — data that accumulated before tagging is no longer lost
+
+**`lib/supabase/database.types.ts`:**
+- `payroll_transactions.payroll_code_id`: `string` → `string | null`
+- `payroll_transactions`: added `business_tag: BusinessTag | null`
+- `payroll_taxes`: added `business_tag: BusinessTag | null`
+
+**Migration (`supabase/migrations/20260508000003_wh_signs_payroll_storage.sql`):**
+- `ALTER TABLE payroll_transactions ADD COLUMN business_tag …, ALTER COLUMN payroll_code_id DROP NOT NULL`
+- `ALTER TABLE payroll_taxes ADD COLUMN business_tag …`
+- **Pending manual apply in Supabase SQL editor**
+
+---
+
+## 3b. RECENT CHANGES (May 8, 2026) — Staged payroll items + streaming confirm-replace
 
 ### Staged Payroll Item Transactions
 
@@ -628,6 +656,7 @@ npx vitest run
 - `20260507000003` — business_tag column on employee_entity_assignments
 - `20260508000001` — payroll_staged_transactions + payroll_staged_taxes
 - `20260508000002` — payroll_item_staged_transactions (pending manual apply in Supabase SQL editor)
+- `20260508000003` — business_tag on payroll_transactions/taxes; payroll_code_id nullable (pending manual apply)
 
 ---
 
