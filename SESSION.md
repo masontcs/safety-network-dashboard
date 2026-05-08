@@ -127,7 +127,7 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 
 ## 3. WHAT IS IN PROGRESS / PARTIALLY BUILT
 
-Nothing currently in progress. All migrations applied to production.
+Nothing currently in progress. All 20 migrations applied to production.
 
 ---
 
@@ -154,7 +154,7 @@ WH/Signs employees showed $0 on their employee detail pages because `insertPayro
 **Migration (`supabase/migrations/20260508000003_wh_signs_payroll_storage.sql`):**
 - `ALTER TABLE payroll_transactions ADD COLUMN business_tag …, ALTER COLUMN payroll_code_id DROP NOT NULL`
 - `ALTER TABLE payroll_taxes ADD COLUMN business_tag …`
-- **Pending manual apply in Supabase SQL editor**
+- Applied to production
 
 ---
 
@@ -655,8 +655,8 @@ npx vitest run
 - `20260507000001` — fix period_date year bug (year 26 CE → 2026)
 - `20260507000003` — business_tag column on employee_entity_assignments
 - `20260508000001` — payroll_staged_transactions + payroll_staged_taxes
-- `20260508000002` — payroll_item_staged_transactions (pending manual apply in Supabase SQL editor)
-- `20260508000003` — business_tag on payroll_transactions/taxes; payroll_code_id nullable (pending manual apply)
+- `20260508000002` — payroll_item_staged_transactions
+- `20260508000003` — business_tag on payroll_transactions/taxes; payroll_code_id nullable
 
 ---
 
