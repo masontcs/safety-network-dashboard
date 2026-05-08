@@ -111,6 +111,13 @@ const SettingsIcon = () => (
   </svg>
 )
 
+const TagIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+    <line x1="7" y1="7" x2="7.01" y2="7" />
+  </svg>
+)
+
 const FuelIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
     <path d="M3 22V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16" />
@@ -140,6 +147,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['admin'] },
   { href: '/admin/import',         label: 'Import',         icon: <UploadIcon />,   roles: ['admin'] },
   { href: '/admin/review',         label: 'Review',         icon: <ChartIcon />,    roles: ['admin'] },
+  { href: '/admin/payroll-items',  label: 'Pay Items',      icon: <TagIcon />,      roles: ['admin'] },
   { href: '/admin/employees',      label: 'Employees',      icon: <PeopleIcon />,   roles: ['admin'] },
   { href: '/admin/targets',        label: 'Targets',        icon: <TargetIcon />,   roles: ['admin'] },
   { href: '/admin/fiscal-months',    label: 'Fiscal Months',    icon: <CalendarIcon />, roles: ['admin'] },
