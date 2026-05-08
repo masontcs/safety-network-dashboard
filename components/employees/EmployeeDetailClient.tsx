@@ -201,6 +201,15 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
   const [allocSaving, setAllocSaving] = useState(false)
   const [availableBranches, setAvailableBranches] = useState<Array<{ id: string; name: string }>>([])
 
+  // Labor type change state (admin only)
+  const [changingLaborFor, setChangingLaborFor] = useState<string | null>(null) // entityId
+  const [ltNewType, setLtNewType] = useState<LaborType>('direct')
+  const [ltRetroactive, setLtRetroactive] = useState(false)
+  const [ltRetroFrom, setLtRetroFrom] = useState('')
+  const [ltSaving, setLtSaving] = useState(false)
+  const [ltError, setLtError] = useState<string | null>(null)
+  const [ltSuccess, setLtSuccess] = useState<string | null>(null)
+
   const loadAllocations = useCallback(() => {
     setAllocLoading(true)
     fetch(`/api/employees/${employeeId}/allocations`)
@@ -688,16 +697,132 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
       </div>
 
       {/* Assignment pills */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 24 }}>
+      <div style={{ marginBottom: 24 }}>
         {employee.assignments.map((a, i) => (
-          <span key={i} style={{ display: 'flex', gap: 4 }}>
-            {a.branchName && (
-              <Pill color="orange">{a.branchName}</Pill>
+          <div key={i} style={{ marginBottom: changingLaborFor === a.entityId ? 12 : 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              {a.branchName && <Pill color="orange">{a.branchName}</Pill>}
+              <Pill>{a.entityCode}</Pill>
+              <Pill>{a.payrollCode}</Pill>
+              <Pill>{formatLaborType(a.laborType)}</Pill>
+              {isAdmin && changingLaborFor !== a.entityId && (
+                <button
+                  onClick={() => {
+                    setChangingLaborFor(a.entityId)
+                    setLtNewType(a.laborType)
+                    setLtRetroactive(false)
+                    setLtRetroFrom('')
+                    setLtError(null)
+                    setLtSuccess(null)
+                  }}
+                  style={{ background: 'none', border: '1px solid #333333', borderRadius: 6, padding: '2px 10px', fontSize: 11, color: '#888888', cursor: 'pointer' }}
+                >
+                  Change
+                </button>
+              )}
+            </div>
+
+            {/* Inline change form */}
+            {isAdmin && changingLaborFor === a.entityId && (
+              <div style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 10, padding: 16, marginTop: 8, maxWidth: 420 }}>
+                <div style={{ fontSize: 11, color: '#888888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
+                  Change Labor Type — {a.entityCode}
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, color: '#666666', marginBottom: 6 }}>New labor type</div>
+                  <select
+                    value={ltNewType}
+                    onChange={(e) => setLtNewType(e.target.value as LaborType)}
+                    style={ltInputStyle}
+                  >
+                    {(['direct', 'admin_hourly', 'admin_salary', 'corp_hourly', 'corp_salary', 'hq_hourly', 'hq_salary'] as LaborType[]).map((lt) => (
+                      <option key={lt} value={lt}>{formatLaborType(lt)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, color: '#666666', marginBottom: 8 }}>Effective</div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#cccccc', marginBottom: 6, cursor: 'pointer' }}>
+                    <input type="radio" checked={!ltRetroactive} onChange={() => setLtRetroactive(false)} />
+                    Going forward only — future imports use the new type
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#cccccc', cursor: 'pointer' }}>
+                    <input type="radio" checked={ltRetroactive} onChange={() => setLtRetroactive(true)} />
+                    Retroactive from date
+                  </label>
+                  {ltRetroactive && (
+                    <div style={{ marginTop: 8, marginLeft: 22 }}>
+                      <input
+                        type="date"
+                        value={ltRetroFrom}
+                        onChange={(e) => setLtRetroFrom(e.target.value)}
+                        style={ltInputStyle}
+                      />
+                      <div style={{ fontSize: 11, color: '#cc4444', marginTop: 6 }}>
+                        All historical transactions from this date onward will be re-attributed to the new code.
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {ltError && <div style={{ fontSize: 12, color: '#cc4444', marginBottom: 10 }}>{ltError}</div>}
+                {ltSuccess && <div style={{ fontSize: 12, color: '#4caf50', marginBottom: 10 }}>{ltSuccess}</div>}
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    disabled={ltSaving || ltNewType === a.laborType}
+                    onClick={async () => {
+                      if (ltRetroactive && !ltRetroFrom) { setLtError('Select a retroactive start date'); return }
+                      setLtSaving(true)
+                      setLtError(null)
+                      setLtSuccess(null)
+                      try {
+                        const res = await fetch(`/api/employees/${employeeId}/labor-type`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            entityId: a.entityId,
+                            newLaborType: ltNewType,
+                            retroactiveFrom: ltRetroactive ? ltRetroFrom : undefined,
+                          }),
+                        })
+                        const json = await res.json()
+                        if (!json.success) throw new Error(json.error ?? 'Failed to save')
+                        const msg = ltRetroactive
+                          ? `Updated. ${json.data.updatedTransactions} historical transaction${json.data.updatedTransactions !== 1 ? 's' : ''} re-attributed.`
+                          : 'Updated. Future imports will use the new labor type.'
+                        setLtSuccess(msg)
+                        setChangingLaborFor(null)
+                        load()
+                      } catch (e) {
+                        setLtError((e as Error).message)
+                      } finally {
+                        setLtSaving(false)
+                      }
+                    }}
+                    style={{
+                      background: ltNewType === a.laborType ? '#2a2a2a' : '#ff6b00',
+                      color: ltNewType === a.laborType ? '#555555' : '#ffffff',
+                      border: 'none', borderRadius: 8, padding: '7px 16px',
+                      fontSize: 12, fontWeight: 500,
+                      cursor: ltSaving || ltNewType === a.laborType ? 'not-allowed' : 'pointer',
+                      opacity: ltSaving ? 0.6 : 1,
+                    }}
+                  >
+                    {ltSaving ? 'Saving…' : 'Save Change'}
+                  </button>
+                  <button
+                    onClick={() => { setChangingLaborFor(null); setLtError(null); setLtSuccess(null) }}
+                    style={{ background: 'none', border: '1px solid #333333', borderRadius: 8, padding: '7px 16px', fontSize: 12, color: '#888888', cursor: 'pointer' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             )}
-            <Pill>{a.entityCode}</Pill>
-            <Pill>{a.payrollCode}</Pill>
-            <Pill>{formatLaborType(a.laborType)}</Pill>
-          </span>
+          </div>
         ))}
       </div>
 
@@ -1517,6 +1642,18 @@ const tdStyle: React.CSSProperties = {
   color: '#cccccc',
   padding: '8px 16px 8px 0',
   whiteSpace: 'nowrap',
+}
+
+const ltInputStyle: React.CSSProperties = {
+  width: '100%',
+  background: '#2a2a2a',
+  border: '1px solid #333333',
+  borderRadius: 8,
+  color: '#cccccc',
+  fontSize: 12,
+  padding: '6px 10px',
+  outline: 'none',
+  boxSizing: 'border-box',
 }
 
 const selectStyle: React.CSSProperties = {
