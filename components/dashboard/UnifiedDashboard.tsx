@@ -318,13 +318,10 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
   }
 
   return (
-    <div style={{ padding: '20px 24px', maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
       {/* ── Header row ─────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Dashboard</div>
-          {userName && <div style={{ fontSize: 12, color: '#888888', marginTop: 2 }}>{userName}</div>}
-        </div>
+        <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Dashboard</div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {/* Allocation toggle — admin/exec only */}

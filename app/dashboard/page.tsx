@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import UnifiedDashboard from '@/components/dashboard/UnifiedDashboard'
+import DashboardShell from '@/components/layout/DashboardShell'
 import type { Role } from '@/lib/supabase/database.types'
 
 export default async function DashboardPage() {
@@ -51,12 +52,14 @@ export default async function DashboardPage() {
   }))
 
   return (
-    <UnifiedDashboard
-      role={role}
-      userName={userName}
-      userBranchIds={userBranchIds}
-      branches={branches}
-      fiscalMonths={fiscalMonths}
-    />
+    <DashboardShell role={role} userName={userName}>
+      <UnifiedDashboard
+        role={role}
+        userName={userName}
+        userBranchIds={userBranchIds}
+        branches={branches}
+        fiscalMonths={fiscalMonths}
+      />
+    </DashboardShell>
   )
 }
