@@ -5,15 +5,19 @@ import type { Database } from '@/lib/supabase/database.types'
 
 type Role = Database['public']['Tables']['user_profiles']['Row']['role']
 
-const ROLE_ROUTES: Record<Role, string> = {
-  admin:            '/admin',
-  executive:        '/executive',
-  district_manager: '/district',
-  branch_manager:   '/manager',
-}
+// After login, all roles land on /dashboard
+const DASHBOARD = '/dashboard'
 
 // Paths that are publicly accessible without auth
 const PUBLIC_PATHS = ['/', '/login', '/request-access']
+
+// Role-specific path prefixes that each role is allowed to access
+const ROLE_ALLOWED_PREFIXES: Record<Role, string[]> = {
+  admin:            ['/dashboard', '/admin', '/fuel'],
+  executive:        ['/dashboard', '/executive', '/fuel'],
+  district_manager: ['/dashboard', '/district', '/fuel'],
+  branch_manager:   ['/dashboard', '/manager', '/fuel'],
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -35,12 +39,9 @@ export async function middleware(request: NextRequest) {
     .single()
   const profile = data as { role: Role; must_change_password: boolean } | null
 
-  // Authenticated user on a public path → redirect to their dashboard
+  // Authenticated user on a public path → redirect to dashboard
   if (PUBLIC_PATHS.includes(pathname)) {
-    if (profile) {
-      return NextResponse.redirect(new URL(ROLE_ROUTES[profile.role], request.url))
-    }
-    return res
+    return NextResponse.redirect(new URL(DASHBOARD, request.url))
   }
 
   if (!profile) {
@@ -57,12 +58,14 @@ export async function middleware(request: NextRequest) {
 
   // Already changed password — don't let them back to the change-password page
   if (pathname === '/change-password') {
-    return NextResponse.redirect(new URL(ROLE_ROUTES[profile.role], request.url))
+    return NextResponse.redirect(new URL(DASHBOARD, request.url))
   }
 
-  const correctBase = ROLE_ROUTES[profile.role]
-  if (!pathname.startsWith(correctBase)) {
-    return NextResponse.redirect(new URL(correctBase, request.url))
+  // Block cross-role access (individual server pages do their own role checks,
+  // but this prevents a branch_manager from even reaching /admin/import etc.)
+  const allowed = ROLE_ALLOWED_PREFIXES[profile.role]
+  if (!allowed.some((prefix) => pathname.startsWith(prefix))) {
+    return NextResponse.redirect(new URL(DASHBOARD, request.url))
   }
 
   return res
@@ -74,9 +77,11 @@ export const config = {
     '/login',
     '/request-access',
     '/change-password',
+    '/dashboard/:path*',
     '/admin/:path*',
     '/executive/:path*',
     '/district/:path*',
     '/manager/:path*',
+    '/fuel/:path*',
   ],
 }

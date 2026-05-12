@@ -456,10 +456,12 @@ export async function GET(request: Request): Promise<NextResponse> {
     const totalGpPct = totalRevenue > 0 ? r2((totalGP / totalRevenue) * 100) : 0
 
     // ── Corp/HQ allocation (only when ?allocation=true) ─────────────────────
-    type AllocBranch = { corpOverhead: number; hqOverhead: number; netAfterAlloc: number }
+    type AllocBranch = { corpOverhead: number; hqOverhead: number; allocatedFuel: number; netAfterAlloc: number }
     const branchAlloc: Record<string, AllocBranch> = {}
     let totalCorpOverhead = 0
     let totalHqOverhead = 0
+
+    let totalAllocatedFuel = 0
 
     if (withAllocation) {
       const { data: snBiz } = await supabase
@@ -470,14 +472,14 @@ export async function GET(request: Request): Promise<NextResponse> {
 
       const snHqPct = snBiz?.hq_allocation_pct ?? 0.7813
 
-      // Corp payroll codes
+      // Corp payroll codes + employee IDs for fuel lookup
       const { data: corpCodeRows } = await supabase
         .from('payroll_codes')
         .select('id')
         .eq('allocation_type', 'corp')
       const corpCodeIds = (corpCodeRows ?? []).map((c) => c.id)
 
-      // HQ payroll codes
+      // HQ payroll codes + employee IDs for fuel lookup
       const { data: hqCodeRows } = await supabase
         .from('payroll_codes')
         .select('id')
@@ -507,15 +509,44 @@ export async function GET(request: Request): Promise<NextResponse> {
         hqTotal = (hqTxns ?? []).reduce((s, t) => s + t.amount, 0)
       }
 
+      // Corp/HQ employee fuel — identify corp/hq employees from payroll transactions in this period,
+      // then sum their fuel transactions
+      const allCorpHqCodeIds = [...corpCodeIds, ...hqCodeIds]
+      let corpHqFuelTotal = 0
+      if (allCorpHqCodeIds.length > 0) {
+        const { data: corpHqPayTxns } = await supabase
+          .from('payroll_transactions')
+          .select('employee_id')
+          .in('payroll_code_id', allCorpHqCodeIds)
+          .gte('period_date', startDate!)
+          .lte('period_date', endDate!)
+        const corpHqEmpIds = [...new Set((corpHqPayTxns ?? []).map((t) => t.employee_id))]
+        if (corpHqEmpIds.length > 0) {
+          const { data: corpHqFuelTxns } = await supabase
+            .from('fuel_transactions')
+            .select('total_with_tax')
+            .in('employee_id', corpHqEmpIds)
+            .is('business_tag', null)
+            .gte('transaction_date', startDate!)
+            .lte('transaction_date', endDate!)
+          corpHqFuelTotal = (corpHqFuelTxns ?? []).reduce((s, t) => s + t.total_with_tax, 0)
+        }
+      }
+
       const branchRevenues = byBranch.map((b) => ({ branchId: b.branchId, totalRevenue: b.revenue }))
       const allocResult = calculateAllocations(branchRevenues, corpTotal, hqTotal, snHqPct)
 
       if (allocResult.canAllocate) {
+        totalAllocatedFuel = r2(corpHqFuelTotal)
         for (const a of allocResult.allocations) {
+          // Distribute corp/hq fuel to branches by same revenue share used for payroll
+          const revShare = (bRevenue[a.branchId] ?? 0) / (allocResult.totalSnRevenue)
+          const branchAllocFuel = r2(corpHqFuelTotal * revShare)
           branchAlloc[a.branchId] = {
             corpOverhead: a.corpAllocation,
             hqOverhead: a.hqAllocation,
-            netAfterAlloc: (bRevenue[a.branchId] ?? 0) - (bPayroll[a.branchId] ?? 0) - (bAdminPayroll[a.branchId] ?? 0) - (bTax[a.branchId] ?? 0) - (bFuel[a.branchId] ?? 0) - a.totalAllocation,
+            allocatedFuel: branchAllocFuel,
+            netAfterAlloc: (bRevenue[a.branchId] ?? 0) - (bPayroll[a.branchId] ?? 0) - (bAdminPayroll[a.branchId] ?? 0) - (bTax[a.branchId] ?? 0) - (bFuel[a.branchId] ?? 0) - a.totalAllocation - branchAllocFuel,
           }
         }
         totalCorpOverhead = allocResult.totalCorpPayroll
@@ -527,7 +558,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       ...b,
       ...(withAllocation && branchAlloc[b.branchId]
         ? branchAlloc[b.branchId]
-        : { corpOverhead: 0, hqOverhead: 0, netAfterAlloc: b.grossProfit }),
+        : { corpOverhead: 0, hqOverhead: 0, allocatedFuel: 0, netAfterAlloc: b.grossProfit }),
     }))
 
     return NextResponse.json({
@@ -542,7 +573,7 @@ export async function GET(request: Request): Promise<NextResponse> {
           grossProfit: totalGP,
           gpPct: totalGpPct,
           totalGallons,
-          ...(withAllocation && { corpOverhead: totalCorpOverhead, hqOverhead: totalHqOverhead }),
+          ...(withAllocation && { corpOverhead: totalCorpOverhead, hqOverhead: totalHqOverhead, allocatedFuel: totalAllocatedFuel }),
         },
         byPeriod,
         byBranch: byBranchWithAlloc,

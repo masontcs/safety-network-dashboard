@@ -137,13 +137,11 @@ const LogOutIcon = () => (
 )
 
 const NAV_ITEMS: NavItem[] = [
-  { href: '/manager',   label: 'Dashboard', icon: <GridIcon />,  roles: ['branch_manager'], exactMatch: true },
-  { href: '/district',  label: 'Dashboard', icon: <GridIcon />,  roles: ['district_manager'], exactMatch: true },
-  { href: '/executive', label: 'Dashboard', icon: <GridIcon />,  roles: ['executive'], exactMatch: true },
+  { href: '/dashboard', label: 'Dashboard', icon: <GridIcon />,  roles: ['branch_manager', 'district_manager', 'executive', 'admin'], exactMatch: true },
   { href: '/fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['branch_manager', 'district_manager', 'executive'] },
   { href: '/executive/data-explorer', label: 'Data Explorer', icon: <DatabaseIcon />, roles: ['executive'] },
   { href: '/executive/employees', label: 'Employees', icon: <PeopleIcon />, roles: ['executive'] },
-  { href: '/admin',     label: 'Dashboard', icon: <GridIcon />,  roles: ['admin'], exactMatch: true },
+  { href: '/fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['admin'] },
   { href: '/fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['admin'] },
   { href: '/admin/import',         label: 'Import',         icon: <UploadIcon />,   roles: ['admin'] },
   { href: '/admin/review',         label: 'Review',         icon: <ChartIcon />,    roles: ['admin'] },
