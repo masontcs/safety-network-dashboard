@@ -1,19 +1,29 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Role } from '@/lib/supabase/database.types'
 import MetricCard from '@/components/ui/MetricCard'
 import BarChart from '@/components/charts/BarChart'
 import type { BarChartDataPoint } from '@/components/charts/BarChart'
 
+type FiscalMonth = {
+  id: string
+  name: string
+  year: number
+  startDate: string
+  endDate: string
+  sortOrder: number
+}
+
 interface Props {
   role: Role
   branchIds: string[] | null
   branches: Array<{ id: string; name: string }>
+  fiscalMonths: FiscalMonth[]
 }
 
-type Period = 'month' | 'quarter' | 'year'
+type ViewMode = 'month' | 'year'
 
 interface FuelSummary {
   totalWithTax: number
@@ -47,26 +57,6 @@ interface FuelCard {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-function getPeriodDates(period: Period, year: number, month: number, quarter: number): { startDate: string; endDate: string } {
-  if (period === 'month') {
-    const lastDay = new Date(year, month, 0).getDate()
-    return {
-      startDate: `${year}-${String(month).padStart(2, '0')}-01`,
-      endDate: `${year}-${String(month).padStart(2, '0')}-${lastDay}`,
-    }
-  }
-  if (period === 'quarter') {
-    const startMonth = (quarter - 1) * 3 + 1
-    const endMonth = quarter * 3
-    const lastDay = new Date(year, endMonth, 0).getDate()
-    return {
-      startDate: `${year}-${String(startMonth).padStart(2, '0')}-01`,
-      endDate: `${year}-${String(endMonth).padStart(2, '0')}-${lastDay}`,
-    }
-  }
-  return { startDate: `${year}-01-01`, endDate: `${year}-12-31` }
-}
-
 function fmt(n: number): string {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
@@ -80,27 +70,48 @@ function shortDate(iso: string): string {
   return `${MONTHS[parseInt(m) - 1]} ${parseInt(d)}`
 }
 
-export default function FuelDashboard({ role, branchIds, branches }: Props) {
+export default function FuelDashboard({ role, branchIds, branches, fiscalMonths }: Props) {
   const router = useRouter()
-  const now = new Date()
-  const [period, setPeriod] = useState<Period>('month')
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth() + 1)
-  const [quarter, setQuarter] = useState(Math.ceil((now.getMonth() + 1) / 3))
+
+  // ── Period selection ──────────────────────────────────────────────────────
+  const [viewMode, setViewMode] = useState<ViewMode>('month')
+
+  const sortedMonths = useMemo(
+    () => [...fiscalMonths].sort((a, b) => a.year !== b.year ? a.year - b.year : a.sortOrder - b.sortOrder),
+    [fiscalMonths]
+  )
+  const latestMonth = sortedMonths[sortedMonths.length - 1]
+  const [selectedMonthId, setSelectedMonthId] = useState<string>(latestMonth?.id ?? '')
+  const availableYears = useMemo(() => [...new Set(sortedMonths.map((m) => m.year))].sort(), [sortedMonths])
+  const [selectedYear, setSelectedYear] = useState<number>(latestMonth?.year ?? new Date().getFullYear())
+
+  const { startDate, endDate } = useMemo(() => {
+    if (viewMode === 'month') {
+      const m = sortedMonths.find((m) => m.id === selectedMonthId)
+      return m ? { startDate: m.startDate, endDate: m.endDate } : { startDate: '', endDate: '' }
+    }
+    // Year: span from first to last fiscal month in the selected year
+    const inYear = sortedMonths.filter((m) => m.year === selectedYear)
+    if (inYear.length === 0) return { startDate: '', endDate: '' }
+    return { startDate: inYear[0].startDate, endDate: inYear[inYear.length - 1].endDate }
+  }, [viewMode, selectedMonthId, selectedYear, sortedMonths])
+
+  // ── Branch filter ─────────────────────────────────────────────────────────
   const [selectedBranchId, setSelectedBranchId] = useState<string>('')
 
+  const branchParam = selectedBranchId ? `&branchId=${selectedBranchId}`
+    : (branchIds?.length === 1 ? `&branchId=${branchIds[0]}` : '')
+
+  // ── Data ──────────────────────────────────────────────────────────────────
   const [summary, setSummary] = useState<FuelSummary | null>(null)
   const [weeks, setWeeks] = useState<WeekRow[]>([])
   const [consumers, setConsumers] = useState<Consumer[]>([])
   const [unlinkedCount, setUnlinkedCount] = useState(0)
   const [loading, setLoading] = useState(true)
 
-  const branchParam = selectedBranchId ? `&branchId=${selectedBranchId}`
-    : (branchIds?.length === 1 ? `&branchId=${branchIds[0]}` : '')
-
   const load = useCallback(async () => {
+    if (!startDate || !endDate) return
     setLoading(true)
-    const { startDate, endDate } = getPeriodDates(period, year, month, quarter)
     const base = `startDate=${startDate}&endDate=${endDate}${branchParam}`
 
     const [sumRes, weekRes, topRes, cardsRes] = await Promise.all([
@@ -117,7 +128,7 @@ export default function FuelDashboard({ role, branchIds, branches }: Props) {
       setUnlinkedCount((cardsRes.data as FuelCard[]).filter((c) => !c.isConfirmed).length)
     }
     setLoading(false)
-  }, [period, year, month, quarter, branchParam])
+  }, [startDate, endDate, branchParam])
 
   useEffect(() => { void load() }, [load])
 
@@ -130,7 +141,6 @@ export default function FuelDashboard({ role, branchIds, branches }: Props) {
     ? summary.totalWithTax / summary.totalGallons
     : null
 
-  const yearOptions = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i)
   const showBranchFilter = (role === 'admin' || role === 'executive' || role === 'district_manager') && branches.length > 1
 
   const pill = (label: string, active: boolean, onClick: () => void) => (
@@ -161,40 +171,57 @@ export default function FuelDashboard({ role, branchIds, branches }: Props) {
         {pill('Cards', false, () => router.push('/fuel/cards'))}
       </div>
 
-      {/* Filters */}
+      {/* Period + branch filters */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 20 }}>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {(['month', 'quarter', 'year'] as Period[]).map((p) =>
-            pill(p.charAt(0).toUpperCase() + p.slice(1), period === p, () => setPeriod(p))
-          )}
+        {/* Month / Year toggle */}
+        <div style={{ display: 'flex', gap: 4, background: '#2a2a2a', borderRadius: 8, padding: 3 }}>
+          {(['month', 'year'] as ViewMode[]).map((v) => (
+            <button
+              key={v}
+              onClick={() => setViewMode(v)}
+              style={{
+                padding: '4px 12px',
+                borderRadius: 6,
+                border: 'none',
+                background: viewMode === v ? '#ff6b00' : 'transparent',
+                color: viewMode === v ? '#ffffff' : '#888888',
+                fontSize: 12,
+                cursor: 'pointer',
+                textTransform: 'capitalize',
+              }}
+            >
+              {v}
+            </button>
+          ))}
         </div>
 
-        {period === 'month' && (
-          <>
-            <select value={month} onChange={(e) => setMonth(Number(e.target.value))} style={selectStyle}>
-              {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-            </select>
-            <select value={year} onChange={(e) => setYear(Number(e.target.value))} style={selectStyle}>
-              {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </>
-        )}
-        {period === 'quarter' && (
-          <>
-            <select value={quarter} onChange={(e) => setQuarter(Number(e.target.value))} style={selectStyle}>
-              {[1, 2, 3, 4].map((q) => <option key={q} value={q}>Q{q}</option>)}
-            </select>
-            <select value={year} onChange={(e) => setYear(Number(e.target.value))} style={selectStyle}>
-              {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </>
-        )}
-        {period === 'year' && (
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))} style={selectStyle}>
-            {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
+        {/* Fiscal month dropdown */}
+        {viewMode === 'month' && (
+          <select
+            value={selectedMonthId}
+            onChange={(e) => setSelectedMonthId(e.target.value)}
+            style={selectStyle}
+          >
+            {[...sortedMonths].reverse().map((m) => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
           </select>
         )}
 
+        {/* Year dropdown */}
+        {viewMode === 'year' && (
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            style={selectStyle}
+          >
+            {[...availableYears].reverse().map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Branch filter */}
         {showBranchFilter && (
           <select
             value={selectedBranchId}
