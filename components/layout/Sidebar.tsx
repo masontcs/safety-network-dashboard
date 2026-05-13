@@ -264,18 +264,31 @@ export default function Sidebar({ role }: SidebarProps) {
         overflowX: 'hidden',
       }}>
         {items.map((item) => {
+          const [hrefPath] = item.href.split('?')
           const isActive = item.exactMatch
-            ? pathname === item.href
-            : pathname === item.href || pathname.startsWith(item.href + '/')
+            ? pathname === hrefPath
+            : pathname === hrefPath || pathname.startsWith(hrefPath + '/')
           const count =
             item.href === '/admin/access-requests' ? accessRequestCount
             : item.href === '/admin/allocations' ? allocationCount
             : 0
           const showBadge = count > 0
+
+          function handleClick(e: React.MouseEvent) {
+            const qs = item.href.split('?')[1]
+            if (!qs) return
+            const tab = new URLSearchParams(qs).get('tab')
+            if (tab && pathname === '/dashboard') {
+              e.preventDefault()
+              window.dispatchEvent(new CustomEvent('sn:tab', { detail: tab }))
+            }
+          }
+
           return (
             <Link
-              key={item.href}
+              key={item.href + item.label}
               href={item.href}
+              onClick={handleClick}
               title={expanded ? undefined : item.label}
               className={`sidebar-link${isActive ? ' sidebar-link-active' : ''}`}
               style={{ padding: '0 9px', position: 'relative' }}

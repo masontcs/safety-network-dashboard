@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useSearchParams } from 'next/navigation'
 import type { Role } from '@/lib/supabase/database.types'
 import OverviewTab from './tabs/OverviewTab'
 import RevenueTab from './tabs/RevenueTab'
@@ -375,17 +374,22 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
   // ── Allocation toggle ────────────────────────────────────────────────────────
   const [allocationOn, setAllocationOn] = useState<boolean>(false)
 
-  // ── Active tab — initialised from ?tab= query param ────────────────────────
-  const searchParams = useSearchParams()
-  const [activeTab, setActiveTab] = useState<Tab>(() => {
-    const t = searchParams.get('tab')
-    return (t && VALID_TABS.includes(t as Tab) ? t : 'overview') as Tab
-  })
+  // ── Active tab ──────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<Tab>('overview')
 
   useEffect(() => {
-    const t = searchParams.get('tab')
+    // Read initial tab from URL on mount (e.g. arriving via /dashboard?tab=fuel)
+    const t = new URLSearchParams(window.location.search).get('tab')
     if (t && VALID_TABS.includes(t as Tab)) setActiveTab(t as Tab)
-  }, [searchParams])
+
+    // Listen for in-page tab switches dispatched by the sidebar
+    function onTabSwitch(e: Event) {
+      const tab = (e as CustomEvent<string>).detail as Tab
+      if (VALID_TABS.includes(tab)) setActiveTab(tab)
+    }
+    window.addEventListener('sn:tab', onTabSwitch)
+    return () => window.removeEventListener('sn:tab', onTabSwitch)
+  }, [])
 
   // ── Data ────────────────────────────────────────────────────────────────────
   const [data, setData] = useState<DashboardData>({
