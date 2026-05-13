@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 import { createServerClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import UnifiedDashboard from '@/components/dashboard/UnifiedDashboard'
@@ -65,13 +66,15 @@ export default async function DashboardPage() {
 
   return (
     <DashboardShell role={role} userName={userName}>
-      <UnifiedDashboard
-        role={role}
-        userName={userName}
-        userBranchIds={userBranchIds}
-        branches={branches}
-        fiscalMonths={fiscalMonths}
-      />
+      <Suspense>
+        <UnifiedDashboard
+          role={role}
+          userName={userName}
+          userBranchIds={userBranchIds}
+          branches={branches}
+          fiscalMonths={fiscalMonths}
+        />
+      </Suspense>
     </DashboardShell>
   )
 }

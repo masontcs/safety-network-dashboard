@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import type { Role } from '@/lib/supabase/database.types'
 import OverviewTab from './tabs/OverviewTab'
 import RevenueTab from './tabs/RevenueTab'
@@ -351,6 +352,8 @@ function DashboardSkeleton() {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+const VALID_TABS: Tab[] = ['overview', 'revenue', 'payroll', 'fuel', 'profits']
+
 export default function UnifiedDashboard({ role, userName, userBranchIds, branches, fiscalMonths }: Props) {
   const canSeeAllocation = role === 'admin' || role === 'executive'
   const isMultiBranch = userBranchIds === null || userBranchIds.length > 1
@@ -372,8 +375,17 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
   // ── Allocation toggle ────────────────────────────────────────────────────────
   const [allocationOn, setAllocationOn] = useState<boolean>(false)
 
-  // ── Active tab ──────────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<Tab>('overview')
+  // ── Active tab — initialised from ?tab= query param ────────────────────────
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const t = searchParams.get('tab')
+    return (t && VALID_TABS.includes(t as Tab) ? t : 'overview') as Tab
+  })
+
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t && VALID_TABS.includes(t as Tab)) setActiveTab(t as Tab)
+  }, [searchParams])
 
   // ── Data ────────────────────────────────────────────────────────────────────
   const [data, setData] = useState<DashboardData>({
