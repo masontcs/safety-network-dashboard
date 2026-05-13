@@ -1,17 +1,35 @@
-import { createServerComponentClient, createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { createServerClient as createSSRServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import type { Database } from './database.types'
 
-// For Server Components (reads session from cookies — anon key, RLS enforced)
+// For Server Components and Route Handlers (session from cookies — anon key, RLS enforced)
 export function createServerClient() {
-  return createServerComponentClient<Database>({ cookies })
+  const cookieStore = cookies()
+  return createSSRServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // Called from a Server Component — cookie writes are a no-op
+          }
+        },
+      },
+    }
+  )
 }
 
-// For Route Handlers (API routes that need the user's session via cookies)
-export function createRouteClient() {
-  return createRouteHandlerClient<Database>({ cookies })
-}
+// Alias kept for backwards compatibility with existing route handler imports
+export const createRouteClient = createServerClient
 
 // For API routes that need to bypass RLS (service role — SERVER ONLY, never NEXT_PUBLIC_)
 export function createServiceClient() {

@@ -5,10 +5,10 @@ import type { Role } from '@/lib/supabase/database.types'
 import AnimatedDotGrid from '@/components/landing/AnimatedDotGrid'
 
 const DASHBOARD_ROUTES: Record<Role, string> = {
-  admin:            '/admin',
-  executive:        '/executive',
-  district_manager: '/district',
-  branch_manager:   '/manager',
+  admin:            '/dashboard',
+  executive:        '/dashboard',
+  district_manager: '/dashboard',
+  branch_manager:   '/dashboard',
 }
 
 export default async function RootPage() {

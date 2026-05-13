@@ -75,23 +75,26 @@ export async function PATCH(
         supabase.from('payroll_staged_transactions').select('*').eq('assignment_id', params.id),
         supabase.from('payroll_staged_taxes').select('*').eq('assignment_id', params.id),
       ])
-      for (const row of stagedTxns ?? []) {
-        const { error: txnErr } = await supabase.from('payroll_transactions').insert({
+      const bTag = businessTag as 'western_highways' | 'signs'
+      if ((stagedTxns ?? []).length > 0) {
+        const txnRows = (stagedTxns ?? []).map((row) => ({
           import_id: row.import_id, employee_id: assignment.employee_id,
           entity_id: row.entity_id, payroll_code_id: null,
-          business_tag: businessTag, period_date: row.period_date,
+          business_tag: bTag, period_date: row.period_date,
           payroll_item_id: row.payroll_item_id,
           hours: row.hours, rate: row.rate, amount: row.amount,
-        })
-        if (txnErr) throw new Error(`Failed to deploy staged WH/Signs transaction: ${txnErr.message}`)
+        }))
+        const { error: txnErr } = await supabase.from('payroll_transactions').insert(txnRows)
+        if (txnErr) throw new Error(`Failed to deploy staged WH/Signs transactions: ${txnErr.message}`)
       }
-      for (const row of stagedTaxes ?? []) {
-        const { error: taxErr } = await supabase.from('payroll_taxes').insert({
+      if ((stagedTaxes ?? []).length > 0) {
+        const taxRows = (stagedTaxes ?? []).map((row) => ({
           import_id: row.import_id, employee_id: assignment.employee_id,
-          entity_id: row.entity_id, business_tag: businessTag,
+          entity_id: row.entity_id, business_tag: bTag,
           period_date: row.period_date, amount: row.amount,
-        })
-        if (taxErr) throw new Error(`Failed to deploy staged WH/Signs tax: ${taxErr.message}`)
+        }))
+        const { error: taxErr } = await supabase.from('payroll_taxes').insert(taxRows)
+        if (taxErr) throw new Error(`Failed to deploy staged WH/Signs taxes: ${taxErr.message}`)
       }
       await Promise.all([
         supabase.from('payroll_staged_transactions').delete().eq('assignment_id', params.id),
@@ -108,8 +111,8 @@ export async function PATCH(
         supabase.from('payroll_staged_taxes').select('*').eq('assignment_id', params.id),
       ])
 
-      for (const row of stagedTxns ?? []) {
-        const { error } = await supabase.from('payroll_transactions').insert({
+      if ((stagedTxns ?? []).length > 0) {
+        const txnRows = (stagedTxns ?? []).map((row) => ({
           import_id: row.import_id,
           employee_id: employeeId,
           entity_id: entityId,
@@ -119,19 +122,21 @@ export async function PATCH(
           hours: row.hours,
           rate: row.rate,
           amount: row.amount,
-        })
-        if (error) throw new Error(`Failed to deploy staged transaction: ${error.message}`)
+        }))
+        const { error } = await supabase.from('payroll_transactions').insert(txnRows)
+        if (error) throw new Error(`Failed to deploy staged transactions: ${error.message}`)
       }
 
-      for (const row of stagedTaxes ?? []) {
-        const { error } = await supabase.from('payroll_taxes').insert({
+      if ((stagedTaxes ?? []).length > 0) {
+        const taxRows = (stagedTaxes ?? []).map((row) => ({
           import_id: row.import_id,
           employee_id: employeeId,
           entity_id: entityId,
           period_date: row.period_date,
           amount: row.amount,
-        })
-        if (error) throw new Error(`Failed to deploy staged tax: ${error.message}`)
+        }))
+        const { error } = await supabase.from('payroll_taxes').insert(taxRows)
+        if (error) throw new Error(`Failed to deploy staged taxes: ${error.message}`)
       }
 
       // Clean up staging rows
@@ -233,12 +238,21 @@ export async function PATCH(
         payrollCodeId = resolved
       }
 
-      const { error } = await supabase
-        .from('employee_entity_assignments')
-        .update({ employee_id: existingEmployeeId, payroll_code_id: payrollCodeId, is_confirmed: true })
-        .eq('id', params.id)
-      if (error) throw new Error(error.message)
-      // Deploy under the final employee_id (existingEmployeeId), not the placeholder created at import
+      if (priorAssignment) {
+        // A confirmed row already exists — delete this unconfirmed staging row to avoid duplicates
+        const { error } = await supabase
+          .from('employee_entity_assignments')
+          .delete()
+          .eq('id', params.id)
+        if (error) throw new Error(error.message)
+      } else {
+        const { error } = await supabase
+          .from('employee_entity_assignments')
+          .update({ employee_id: existingEmployeeId, payroll_code_id: payrollCodeId, is_confirmed: true })
+          .eq('id', params.id)
+        if (error) throw new Error(error.message)
+      }
+      // Deploy staged transactions under the final employee_id
       await deployStaged(existingEmployeeId, assignment.entity_id, payrollCodeId)
       return NextResponse.json({ success: true })
     }

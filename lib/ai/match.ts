@@ -3,6 +3,7 @@ import { VALID_GROUPS, buildMatchEmployeePrompt, buildSuggestGroupPrompt } from 
 import type { ValidGroup } from './prompts'
 
 const MODEL = 'claude-sonnet-4-20250514'
+const anthropic = new Anthropic()
 
 export type MatchResult = {
   candidateName: string
@@ -41,10 +42,9 @@ export async function matchEmployeeName(
   existingEmployees: Array<{ displayName: string; knownRawNames: string[] }>
 ): Promise<MatchResult[]> {
   try {
-    const client = new Anthropic()
     const prompt = buildMatchEmployeePrompt(rawName, existingEmployees)
 
-    const message = await client.messages.create({
+    const message = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 1000,
       messages: [{ role: 'user', content: prompt }],
@@ -71,10 +71,9 @@ export async function suggestPayrollItemGroup(
   existingItems: Array<{ name: string; groupName: string }>
 ): Promise<GroupSuggestion> {
   try {
-    const client = new Anthropic()
     const prompt = buildSuggestGroupPrompt(itemName, existingItems)
 
-    const message = await client.messages.create({
+    const message = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 500,
       messages: [{ role: 'user', content: prompt }],

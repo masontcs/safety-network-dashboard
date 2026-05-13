@@ -29,7 +29,7 @@ export class ParseError extends AppError {
 
 export class AuthError extends AppError {
   constructor() {
-    super('You are not authorized to perform this action.', 'UNAUTHORIZED', 403)
+    super('You are not authorized to perform this action.', 'FORBIDDEN', 403)
   }
 }
 

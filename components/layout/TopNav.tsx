@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createBrowserClient } from '@/lib/supabase/client'
 
 interface TopNavProps {
   branchName?: string
@@ -12,7 +12,7 @@ export default function TopNav({ branchName, userName }: TopNavProps) {
   const router = useRouter()
 
   async function handleSignOut() {
-    const supabase = createClientComponentClient()
+    const supabase = createBrowserClient()
     await supabase.auth.signOut()
     router.push('/login')
   }

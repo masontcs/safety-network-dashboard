@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { canAccessBranch } from '@/lib/utils/access'
 import { apiError } from '@/lib/utils/errors'
 import { resolveEmployeeAllocation, type AllocationOverride, type EmployeeAllocation } from '@/lib/allocation/employee-allocation'
+import { isValidDate } from '@/lib/utils/date'
 
 function toSaturdayOfWeek(dateStr: string): string {
   const [y, m, d] = dateStr.split('-').map(Number)
@@ -28,6 +29,12 @@ export async function GET(request: Request): Promise<NextResponse> {
     if (!startDate || !endDate) {
       return NextResponse.json(
         { success: false, error: 'startDate and endDate are required', code: 'VALIDATION_ERROR' },
+        { status: 400 },
+      )
+    }
+    if (!isValidDate(startDate) || !isValidDate(endDate)) {
+      return NextResponse.json(
+        { success: false, error: 'startDate and endDate must be valid dates (YYYY-MM-DD)', code: 'VALIDATION_ERROR' },
         { status: 400 },
       )
     }

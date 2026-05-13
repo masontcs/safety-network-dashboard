@@ -7,6 +7,7 @@ import type { LaborType } from '@/lib/supabase/database.types'
 import { canAccessBranch } from '@/lib/utils/access'
 import { apiError } from '@/lib/utils/errors'
 import { resolveEmployeeAllocation, type AllocationOverride, type EmployeeAllocation } from '@/lib/allocation/employee-allocation'
+import { isValidDate } from '@/lib/utils/date'
 
 function r2(v: number): number {
   return Math.round(v * 100) / 100
@@ -26,6 +27,12 @@ export async function GET(request: Request): Promise<NextResponse> {
     if (!periodDate) {
       return NextResponse.json(
         { success: false, error: 'periodDate is required', code: 'VALIDATION_ERROR' },
+        { status: 400 }
+      )
+    }
+    if (!isValidDate(periodDate)) {
+      return NextResponse.json(
+        { success: false, error: 'periodDate must be a valid date (YYYY-MM-DD)', code: 'VALIDATION_ERROR' },
         { status: 400 }
       )
     }
@@ -231,6 +238,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         .select('amount')
         .eq('period_date', periodDate)
         .in('employee_id', activeEmpIds)
+        .is('business_tag', null)
       // When no branchId, scope by entity to avoid cross-entity double-counting
       if (!branchId && resolvedEntityId) {
         taxQuery = taxQuery.eq('entity_id', resolvedEntityId)

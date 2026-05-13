@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAccessContext } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/utils/errors'
+import { isValidDate } from '@/lib/utils/date'
 
 function weeksInFiscalMonth(startDate: string, endDate: string): number {
   const [sy, sm, sd] = startDate.split('-').map(Number)
@@ -21,7 +22,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const { searchParams } = new URL(request.url)
     const periodDate = searchParams.get('periodDate')
 
-    if (!periodDate || !/^\d{4}-\d{2}-\d{2}$/.test(periodDate)) {
+    if (!periodDate || !isValidDate(periodDate)) {
       return NextResponse.json(
         { success: false, error: 'periodDate is required (YYYY-MM-DD)', code: 'VALIDATION_ERROR' },
         { status: 400 }

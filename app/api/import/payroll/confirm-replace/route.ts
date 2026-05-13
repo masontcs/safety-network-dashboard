@@ -81,21 +81,17 @@ export async function POST(request: Request): Promise<Response> {
         }
 
         try {
-          send({ type: 'step', label: 'Deleting previous import…', progress: 15 })
-          const { error: delErr } = await supabase.from('payroll_imports').delete().eq('id', replaceImportId)
-          if (delErr) throw new Error(`Failed to delete old import: ${delErr.message}`)
-
-          send({ type: 'step', label: `Resolving ${payrollItems.length} pay items…`, progress: 28 })
+          send({ type: 'step', label: `Resolving ${payrollItems.length} pay items…`, progress: 20 })
           const itemNameToId = await resolvePayrollItems(payrollItems, supabase)
 
-          send({ type: 'step', label: `Matching ${employees.length} employees…`, progress: 44 })
+          send({ type: 'step', label: `Matching ${employees.length} employees…`, progress: 38 })
           const resolved = await resolveEmployees(employees, entity.id, supabase)
 
           const newCount = resolved.filter((r) => r.isNew).length
           if (newCount > 0) {
-            send({ type: 'step', label: `${newCount} new employee${newCount > 1 ? 's' : ''} added to review queue…`, progress: 54 })
+            send({ type: 'step', label: `${newCount} new employee${newCount > 1 ? 's' : ''} added to review queue…`, progress: 50 })
           } else {
-            send({ type: 'step', label: 'All employees matched…', progress: 54 })
+            send({ type: 'step', label: 'All employees matched…', progress: 50 })
           }
 
           const rMap = new Map(resolved.map((r) => [r.rawName, r]))
@@ -108,52 +104,64 @@ export async function POST(request: Request): Promise<Response> {
             }).length
           }, 0)
 
+          // Create new import FIRST — only delete old after new data is fully committed
           const { data: importRecord, error: importErr } = await supabase
             .from('payroll_imports')
             .insert({ entity_id: entity.id, period_date: periodDate, imported_by: ctx.access.userId, status: 'pending' })
             .select('id').single()
           if (importErr || !importRecord) throw new Error(`Failed to create payroll import: ${importErr?.message}`)
 
-          const stagedNote = ''
-          send({
-            type: 'step',
-            label: `Writing ${confirmedTxnTotal} transaction${confirmedTxnTotal !== 1 ? 's' : ''}${stagedNote}…`,
-            progress: 60,
-            current: 0,
-            total: confirmedTxnTotal,
-          })
+          const newImportId = importRecord.id
+          try {
+            send({
+              type: 'step',
+              label: `Writing ${confirmedTxnTotal} transaction${confirmedTxnTotal !== 1 ? 's' : ''}…`,
+              progress: 60,
+              current: 0,
+              total: confirmedTxnTotal,
+            })
 
-          const counts = await insertPayrollData(
-            importRecord.id, entity.id, periodDate, resolved, employees, itemNameToId, supabase,
-            (done, total) => {
-              const pct = 60 + Math.round((done / total) * 32)
-              send({
-                type: 'step',
-                label: `Writing transactions (${done}/${total})…`,
-                progress: pct,
-                current: done,
-                total,
-              })
-            }
-          )
+            const counts = await insertPayrollData(
+              importRecord.id, entity.id, periodDate, resolved, employees, itemNameToId, supabase,
+              (done, total) => {
+                const pct = 60 + Math.round((done / total) * 30)
+                send({
+                  type: 'step',
+                  label: `Writing transactions (${done}/${total})…`,
+                  progress: pct,
+                  current: done,
+                  total,
+                })
+              }
+            )
 
-          const newEmployees = resolved.filter((r) => r.isNew)
-          triggerAiForPayroll(newEmployees, entity.id, counts.newItemNames, supabase)
+            // New data fully committed — now safe to remove the old import
+            send({ type: 'step', label: 'Removing previous import…', progress: 92 })
+            const { error: delErr } = await supabase.from('payroll_imports').delete().eq('id', replaceImportId)
+            if (delErr) throw new Error(`Failed to remove old import: ${delErr.message}`)
 
-          send({
-            type: 'done',
-            data: {
-              importId: importRecord.id,
-              periodDate,
-              entityCode,
-              transactionCount: counts.txnCount,
-              taxCount: counts.taxCount,
-              pendingEmployeeCount: counts.pendingCount,
-              stagedItemTxnCount: counts.stagedItemTxnCount,
-              newItemCount: counts.newItemNames.length,
-              warnings,
-            },
-          })
+            const newEmployees = resolved.filter((r) => r.isNew)
+            triggerAiForPayroll(newEmployees, entity.id, counts.newItemNames, supabase)
+
+            send({
+              type: 'done',
+              data: {
+                importId: importRecord.id,
+                periodDate,
+                entityCode,
+                transactionCount: counts.txnCount,
+                taxCount: counts.taxCount,
+                pendingEmployeeCount: counts.pendingCount,
+                stagedItemTxnCount: counts.stagedItemTxnCount,
+                newItemCount: counts.newItemNames.length,
+                warnings,
+              },
+            })
+          } catch (err) {
+            // Roll back the partially-written new import so the old data remains intact
+            try { await supabase.from('payroll_imports').delete().eq('id', newImportId) } catch { /* ignore cleanup failure */ }
+            throw err
+          }
         } catch (err) {
           send({ type: 'error', error: err instanceof Error ? err.message : 'An unexpected error occurred.' })
         } finally {

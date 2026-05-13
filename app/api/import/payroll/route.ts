@@ -39,6 +39,11 @@ export async function POST(request: Request): Promise<Response> {
       return NextResponse.json({ success: false, error: 'entityCode must be INC, TCS, or STS', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
 
+    const MAX_FILE_SIZE = 10 * 1024 * 1024
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ success: false, error: 'File too large (max 10MB)', code: 'FILE_TOO_LARGE' }, { status: 413 })
+    }
+
     // 3. Parse file (CPU-bound, fast)
     const buffer = Buffer.from(await file.arrayBuffer())
     const parsed = parsePayrollFile(buffer, entityCode)

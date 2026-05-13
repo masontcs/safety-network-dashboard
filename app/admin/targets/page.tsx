@@ -1,12 +1,11 @@
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createServerClient } from '@/lib/supabase/server'
 import type { Database, Role } from '@/lib/supabase/database.types'
 import DashboardShell from '@/components/layout/DashboardShell'
 import TargetsClient from '@/components/targets/TargetsClient'
 
 export default async function TargetsPage() {
-  const supabase = createServerComponentClient<Database>({ cookies })
+  const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 

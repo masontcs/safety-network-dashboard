@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createBrowserClient } from '@/lib/supabase/client'
 import type { Role } from '@/lib/supabase/database.types'
 
 interface NavItem {
@@ -185,7 +185,7 @@ export default function Sidebar({ role }: SidebarProps) {
   }, [role])
 
   async function handleSignOut() {
-    const supabase = createClientComponentClient()
+    const supabase = createBrowserClient()
     await supabase.auth.signOut()
     router.push('/login')
   }

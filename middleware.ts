@@ -1,4 +1,4 @@
-import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import type { Database } from '@/lib/supabase/database.types'
@@ -21,13 +21,32 @@ const ROLE_ALLOWED_PREFIXES: Record<Role, string[]> = {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const res = NextResponse.next()
-  const supabase = createMiddlewareClient<Database>({ req: request, res })
+  let res = NextResponse.next({ request: { headers: request.headers } })
 
-  const { data: { session } } = await supabase.auth.getSession()
+  const supabase = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          res = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            res.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
+  // getUser() validates the token server-side — safe against forged session cookies
+  const { data: { user } } = await supabase.auth.getUser()
 
   // Unauthenticated: allow public paths, redirect everything else to /login
-  if (!session) {
+  if (!user) {
     if (PUBLIC_PATHS.includes(pathname)) return res
     return NextResponse.redirect(new URL('/login', request.url))
   }
@@ -35,7 +54,7 @@ export async function middleware(request: NextRequest) {
   const { data } = await supabase
     .from('user_profiles')
     .select('role, must_change_password')
-    .eq('id', session.user.id)
+    .eq('id', user.id)
     .single()
   const profile = data as { role: Role; must_change_password: boolean } | null
 

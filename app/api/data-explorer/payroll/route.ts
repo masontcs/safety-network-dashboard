@@ -77,6 +77,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     let taxQ = supabase
       .from('payroll_taxes')
       .select('amount')
+      .is('business_tag', null)
       .gte('period_date', startDate)
       .lte('period_date', endDate)
       .limit(10000)

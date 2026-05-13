@@ -22,10 +22,11 @@ export async function resolveEmployees(
 ): Promise<ResolvedEmployee[]> {
   const resolved: ResolvedEmployee[] = []
   for (const emp of parsedEmployees) {
+    const escapedName = emp.rawName.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
     const { data: existing, error } = await supabase
       .from('employee_entity_assignments')
       .select('id, employee_id, payroll_code_id, is_confirmed, business_tag')
-      .ilike('raw_name_in_report', emp.rawName).eq('entity_id', entityId).limit(1).maybeSingle()
+      .ilike('raw_name_in_report', escapedName).eq('entity_id', entityId).limit(1).maybeSingle()
     if (error) throw new Error(`Failed to lookup employee "${emp.rawName}": ${error.message}`)
     if (existing) {
       resolved.push({
