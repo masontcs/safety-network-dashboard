@@ -71,6 +71,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         .is('business_tag', null)
         .gte('transaction_date', startDate)
         .lte('transaction_date', endDate)
+        .order('transaction_date')
         .range(from, from + PAGE_SIZE - 1)
 
       // Fetch all accessible rows; allocation handles branch distribution

@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 8, 2026 — Session: Fuel dashboard + back button + sidebar + allocation toggle fixes
+## Last updated: May 13, 2026 — Session: Weekly chart accuracy + month dropdown fixes
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -128,6 +128,31 @@ A private, role-scoped operations dashboard for Safety Network (3 entities: INC,
 ## 3. WHAT IS IN PROGRESS / PARTIALLY BUILT
 
 Nothing currently in progress. All 20 migrations applied to production.
+
+---
+
+## 3a. RECENT CHANGES (May 13, 2026) — Weekly chart accuracy + month dropdown fixes
+
+### Critical: Pagination ORDER BY Bug in Weekly Chart (`app/api/admin/overview/route.ts`)
+
+**Root cause:** All five paginated transaction queries in `admin/overview/route.ts` used `.range()` without `.order()`. PostgreSQL returns rows in physical heap order (often grouped by index key like `payroll_code_id`) when no ORDER BY is given. With 1000-row pages, adjacent pages could contain rows from completely different weeks — causing the per-week `byPeriod` buckets to be scrambled. Monthly totals (KPI cards) were always correct because all rows were fetched. Only the per-week breakdown in the trend chart was affected.
+
+**Symptom:** Feb 28 tooltip showed "Payroll: $96,809" when actual weekly payroll was ~$153k. Other weeks showed correspondingly inflated numbers to compensate (all-rows total remained accurate).
+
+**Fix:** Added `.order('period_date')` to direct payroll, admin payroll, and tax queries; `.order('transaction_date')` to the revenue and fuel queries. This ensures each 1000-row page contains a contiguous date range, so the per-week accumulation in `periodPayroll`, `periodAdminPayroll`, etc. is correct.
+
+**Same fix applied to `app/api/fuel/summary/route.ts`:** Added `.order('transaction_date')` to the paginated fuel query loop.
+
+### Month Dropdown Fixes (`app/dashboard/page.tsx`, `components/dashboard/UnifiedDashboard.tsx`)
+
+**Problem 1 — Cluttered dropdown with empty months:** Fiscal months with no imported data appeared in the dropdown. Fixed by fetching all imported dates from `payroll_imports`, `revenue_imports`, and `fuel_imports` in parallel in `app/dashboard/page.tsx`, then filtering `fiscalMonths` server-side to only those containing at least one imported date.
+
+**Problem 2 — Duplicate year in labels:** Month labels showed "December 2025 2025" because `m.name` already contained the year (e.g., "December 2025") and the dropdown appended `{m.year}`. Fixed by removing the `{m.year}` interpolation from the `<option>` label in `UnifiedDashboard.tsx`.
+
+**Problem 3 — Wrong default month:** The month sort used `a.sortOrder - b.sortOrder` (sort position 1–12, not globally unique across years), so December 2025 (sortOrder=12) could sort after January 2026 (sortOrder=1). Fixed by using year-first sort: `a.year !== b.year ? a.year - b.year : a.sortOrder - b.sortOrder`. The default selected month is `sortedMonths[sortedMonths.length - 1]` — now always the latest month with actual imported data.
+
+### TCS Payroll Discontinuation (context, not a code change)
+TCS entity was intentionally discontinued after the March 7, 2026 import. Former TCS employees moved to STS. No TCS payroll imports will exist after that date — this is expected and correct, not a data gap.
 
 ---
 

@@ -198,7 +198,10 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
 
   // ── Period selection ────────────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>('month')
-  const sortedMonths = useMemo(() => [...fiscalMonths].sort((a, b) => a.sortOrder - b.sortOrder), [fiscalMonths])
+  const sortedMonths = useMemo(
+    () => [...fiscalMonths].sort((a, b) => a.year !== b.year ? a.year - b.year : a.sortOrder - b.sortOrder),
+    [fiscalMonths]
+  )
   const latestMonth = sortedMonths[sortedMonths.length - 1]
   const [selectedMonthId, setSelectedMonthId] = useState<string>(latestMonth?.id ?? '')
   const [selectedQuarterIdx, setSelectedQuarterIdx] = useState<number>(0)
@@ -394,7 +397,7 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
               style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #333333', background: '#2a2a2a', color: '#cccccc', fontSize: 12 }}
             >
               {[...sortedMonths].reverse().map((m) => (
-                <option key={m.id} value={m.id}>{m.name} {m.year}</option>
+                <option key={m.id} value={m.id}>{m.name}</option>
               ))}
             </select>
           )}

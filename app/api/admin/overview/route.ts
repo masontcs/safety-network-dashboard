@@ -91,6 +91,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         .in('branch_id', snBranchIds)
         .gte('period_date', startDate)
         .lte('period_date', endDate)
+        .order('period_date')
         .range(from, from + PAGE_SIZE - 1)
 
       if (error) throw new Error(error.message)
@@ -119,6 +120,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         .in('branch_id', snBranchIds)
         .gte('transaction_date', startDate)
         .lte('transaction_date', endDate)
+        .order('transaction_date')
         .range(from, from + PAGE_SIZE - 1)
 
       if (error) throw new Error(error.message)
@@ -155,6 +157,7 @@ export async function GET(request: Request): Promise<NextResponse> {
           .in('payroll_code_id', directCodeIds)
           .gte('period_date', startDate)
           .lte('period_date', endDate)
+          .order('period_date')
           .range(from, from + PAGE_SIZE - 1)
 
         if (error) throw new Error(error.message)
@@ -189,6 +192,7 @@ export async function GET(request: Request): Promise<NextResponse> {
           .in('payroll_code_id', adminCodeIds)
           .gte('period_date', startDate)
           .lte('period_date', endDate)
+          .order('period_date')
           .range(from, from + PAGE_SIZE - 1)
 
         if (error) throw new Error(error.message)
@@ -210,6 +214,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         .is('business_tag', null)
         .gte('period_date', startDate)
         .lte('period_date', endDate)
+        .order('period_date')
         .range(from, from + PAGE_SIZE - 1)
       if (error) throw new Error(error.message)
       if (!data || data.length === 0) break
