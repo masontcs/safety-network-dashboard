@@ -30,7 +30,10 @@ export default async function FuelPage() {
     if (branchIds.length === 0) redirect('/login')
   }
 
-  const branches = (branchRes.data ?? []) as { id: string; name: string }[]
+  const allBranches = (branchRes.data ?? []) as { id: string; name: string }[]
+  const branches = branchIds === null
+    ? allBranches
+    : allBranches.filter((b) => branchIds.includes(b.id))
 
   // Only show fiscal months that contain at least one imported date
   const dateDates = new Set<string>()
