@@ -138,10 +138,10 @@ const LogOutIcon = () => (
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: <GridIcon />,  roles: ['branch_manager', 'district_manager', 'executive', 'admin'], exactMatch: true },
-  { href: '/dashboard?tab=fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['branch_manager', 'district_manager', 'executive'] },
+  { href: '/fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['branch_manager', 'district_manager', 'executive'] },
   { href: '/executive/data-explorer', label: 'Data Explorer', icon: <DatabaseIcon />, roles: ['executive'] },
   { href: '/executive/employees', label: 'Employees', icon: <PeopleIcon />, roles: ['executive'] },
-  { href: '/dashboard?tab=fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['admin'] },
+  { href: '/fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['admin'] },
   { href: '/admin/import',         label: 'Import',         icon: <UploadIcon />,   roles: ['admin'] },
   { href: '/admin/review',         label: 'Review',         icon: <ChartIcon />,    roles: ['admin'] },
   { href: '/admin/payroll-items',  label: 'Pay Items',      icon: <TagIcon />,      roles: ['admin'] },
