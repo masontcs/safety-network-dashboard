@@ -170,6 +170,10 @@ export default function Sidebar({ role }: SidebarProps) {
   const [expanded, setExpanded] = useState(false)
   const [accessRequestCount, setAccessRequestCount] = useState(0)
   const [allocationCount, setAllocationCount] = useState(0)
+  const [pendingHref, setPendingHref] = useState<string | null>(null)
+
+  // Clear optimistic state once navigation completes
+  useEffect(() => { setPendingHref(null) }, [pathname])
 
   useEffect(() => {
     if (role !== 'admin') return
@@ -265,9 +269,11 @@ export default function Sidebar({ role }: SidebarProps) {
       }}>
         {items.map((item) => {
           const [hrefPath] = item.href.split('?')
-          const isActive = item.exactMatch
-            ? pathname === hrefPath
-            : pathname === hrefPath || pathname.startsWith(hrefPath + '/')
+          const isActive = pendingHref
+            ? pendingHref === item.href
+            : item.exactMatch
+              ? pathname === hrefPath
+              : pathname === hrefPath || pathname.startsWith(hrefPath + '/')
           const count =
             item.href === '/admin/access-requests' ? accessRequestCount
             : item.href === '/admin/allocations' ? allocationCount
@@ -276,12 +282,15 @@ export default function Sidebar({ role }: SidebarProps) {
 
           function handleClick(e: React.MouseEvent) {
             const qs = item.href.split('?')[1]
-            if (!qs) return
-            const tab = new URLSearchParams(qs).get('tab')
-            if (tab && pathname === '/dashboard') {
-              e.preventDefault()
-              window.dispatchEvent(new CustomEvent('sn:tab', { detail: tab }))
+            if (qs) {
+              const tab = new URLSearchParams(qs).get('tab')
+              if (tab && pathname === '/dashboard') {
+                e.preventDefault()
+                window.dispatchEvent(new CustomEvent('sn:tab', { detail: tab }))
+                return
+              }
             }
+            setPendingHref(item.href)
           }
 
           return (
