@@ -136,8 +136,18 @@ const LogOutIcon = () => (
   </svg>
 )
 
+const ArIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <path d="M2 10h20" />
+    <path d="M7 15h2" />
+    <path d="M11 15h4" />
+  </svg>
+)
+
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: <GridIcon />,  roles: ['branch_manager', 'district_manager', 'executive', 'admin'], exactMatch: true },
+  { href: '/ar',        label: 'AR',         icon: <ArIcon />,    roles: ['branch_manager', 'district_manager', 'executive', 'admin'] },
   { href: '/fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['branch_manager', 'district_manager', 'executive'] },
   { href: '/executive/data-explorer', label: 'Data Explorer', icon: <DatabaseIcon />, roles: ['executive'] },
   { href: '/executive/employees', label: 'Employees', icon: <PeopleIcon />, roles: ['executive'] },

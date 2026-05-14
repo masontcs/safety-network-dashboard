@@ -199,6 +199,36 @@ export type Database = {
         Update: { id?: string; employee_id?: string; period_date?: string; branch_id?: string; percentage?: number; status?: string; requested_by?: string | null; approved_by?: string | null; notes?: string | null }
         Relationships: []
       }
+      ar_customers: {
+        Row: { id: string; display_name: string; notes: string | null; created_at: string }
+        Insert: { id?: string; display_name: string; notes?: string | null; created_at?: string }
+        Update: { id?: string; display_name?: string; notes?: string | null }
+        Relationships: []
+      }
+      ar_customer_entity_refs: {
+        Row: { id: string; customer_id: string; entity_code: string; quickbooks_name: string }
+        Insert: { id?: string; customer_id: string; entity_code: string; quickbooks_name: string }
+        Update: { id?: string; customer_id?: string; entity_code?: string; quickbooks_name?: string }
+        Relationships: []
+      }
+      ar_imports: {
+        Row: { id: string; entity_code: string; report_date: string; imported_at: string; imported_by: string | null; total_ar: number | null; invoice_count: number | null }
+        Insert: { id?: string; entity_code: string; report_date: string; imported_at?: string; imported_by?: string | null; total_ar?: number | null; invoice_count?: number | null }
+        Update: { id?: string; entity_code?: string; report_date?: string; imported_at?: string; imported_by?: string | null; total_ar?: number | null; invoice_count?: number | null }
+        Relationships: []
+      }
+      ar_class_codes: {
+        Row: { code: string; branch_id: string | null; entity_code: string | null }
+        Insert: { code: string; branch_id?: string | null; entity_code?: string | null }
+        Update: { code?: string; branch_id?: string | null; entity_code?: string | null }
+        Relationships: []
+      }
+      ar_invoices: {
+        Row: { id: string; import_id: string; customer_id: string; entity_code: string; branch_id: string | null; raw_class_code: string | null; invoice_number: string | null; po_number: string | null; job_name: string | null; invoice_date: string | null; due_date: string | null; terms: string | null; open_balance: number; aging_bucket: string | null; aging_days: number | null; created_at: string }
+        Insert: { id?: string; import_id: string; customer_id: string; entity_code: string; branch_id?: string | null; raw_class_code?: string | null; invoice_number?: string | null; po_number?: string | null; job_name?: string | null; invoice_date?: string | null; due_date?: string | null; terms?: string | null; open_balance: number; aging_bucket?: string | null; aging_days?: number | null; created_at?: string }
+        Update: { id?: string; import_id?: string; customer_id?: string; entity_code?: string; branch_id?: string | null; raw_class_code?: string | null; invoice_number?: string | null; po_number?: string | null; job_name?: string | null; invoice_date?: string | null; due_date?: string | null; terms?: string | null; open_balance?: number; aging_bucket?: string | null; aging_days?: number | null }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
