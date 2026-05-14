@@ -77,6 +77,9 @@ export type OverviewBranch = {
   hqOverhead: number
   allocatedFuel: number
   netAfterAlloc: number
+  revenueByPeriod: Array<{ periodDate: string; revenue: number }>
+  payrollByPeriod: Array<{ periodDate: string; payroll: number }>
+  fuelByPeriod: Array<{ periodDate: string; fuel: number }>
 }
 
 // ── Revenue API shape ─────────────────────────────────────────────────────────

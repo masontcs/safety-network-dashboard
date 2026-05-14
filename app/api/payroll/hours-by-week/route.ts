@@ -73,26 +73,33 @@ export async function GET(request: Request): Promise<NextResponse> {
       return NextResponse.json({ success: true, data: [] })
     }
 
-    // Fetch transactions and payroll item groups in parallel
-    const [txnRes, groupsRes] = await Promise.all([
-      supabase
-        .from('payroll_transactions')
-        .select('employee_id, payroll_code_id, period_date, hours, amount, payroll_item_id')
-        .in('payroll_code_id', codeIds)
-        .gte('period_date', startDate)
-        .lte('period_date', endDate)
-        .limit(50000),
-      supabase
-        .from('payroll_items')
-        .select('id, group_id, payroll_item_groups(name)'),
-    ])
-
-    if (txnRes.error) throw new Error(txnRes.error.message)
+    const groupsRes = await supabase
+      .from('payroll_items')
+      .select('id, group_id, payroll_item_groups(name)')
     if (groupsRes.error) throw new Error(groupsRes.error.message)
 
-    // Fetch employee allocations
+    // Paginate transactions to avoid Supabase 1000-row hard cap
+    const PAGE_SIZE = 1000
     type TxnRow = { employee_id: string; payroll_code_id: string; period_date: string; hours: number | null; amount: number; payroll_item_id: string | null }
-    const rawTxns = (txnRes.data ?? []) as TxnRow[]
+    const rawTxns: TxnRow[] = []
+    {
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase
+          .from('payroll_transactions')
+          .select('employee_id, payroll_code_id, period_date, hours, amount, payroll_item_id')
+          .in('payroll_code_id', codeIds)
+          .gte('period_date', startDate)
+          .lte('period_date', endDate)
+          .order('period_date')
+          .range(from, from + PAGE_SIZE - 1)
+        if (error) throw new Error(error.message)
+        if (!data || data.length === 0) break
+        rawTxns.push(...(data as TxnRow[]))
+        if (data.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
+    }
     const txnEmpIds = [...new Set(rawTxns.map((t) => t.employee_id))]
     const empDefaults: Record<string, EmployeeAllocation[]> = {}
     const empOverrides: Record<string, AllocationOverride[]> = {}

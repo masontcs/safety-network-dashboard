@@ -59,17 +59,25 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     type PayRow = { employee_id: string; payroll_code_id: string; period_date: string; amount: number; hours: number | null; rate: number | null; employees: { first_name: string; last_name: string } | null; payroll_codes: { branch_id: string | null; labor_type: LaborType } | null }
 
+    const PAGE_SIZE = 1000
     let rawDirectRows: PayRow[] = []
     if (directCodeIds.length > 0) {
-      const { data, error } = await supabase
-        .from('payroll_transactions')
-        .select('employee_id, payroll_code_id, period_date, amount, hours, rate, employees(first_name, last_name), payroll_codes(branch_id, labor_type)')
-        .in('payroll_code_id', directCodeIds)
-        .gte('period_date', startDate)
-        .lte('period_date', endDate)
-        .limit(50000)
-      if (error) throw new Error(`Failed to query direct labor: ${error.message}`)
-      rawDirectRows = (data ?? []) as PayRow[]
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase
+          .from('payroll_transactions')
+          .select('employee_id, payroll_code_id, period_date, amount, hours, rate, employees(first_name, last_name), payroll_codes(branch_id, labor_type)')
+          .in('payroll_code_id', directCodeIds)
+          .gte('period_date', startDate)
+          .lte('period_date', endDate)
+          .order('period_date')
+          .range(from, from + PAGE_SIZE - 1)
+        if (error) throw new Error(`Failed to query direct labor: ${error.message}`)
+        if (!data || data.length === 0) break
+        rawDirectRows.push(...(data as PayRow[]))
+        if (data.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
     }
 
     // ── Admin payroll ────────────────────────────────────────────────────────
@@ -96,15 +104,22 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     let rawAdminRows: PayRow[] = []
     if (adminCodeIds.length > 0) {
-      const { data, error } = await supabase
-        .from('payroll_transactions')
-        .select('employee_id, payroll_code_id, period_date, amount, hours, rate, employees(first_name, last_name), payroll_codes(branch_id, labor_type)')
-        .in('payroll_code_id', adminCodeIds)
-        .gte('period_date', startDate)
-        .lte('period_date', endDate)
-        .limit(50000)
-      if (error) throw new Error(`Failed to query admin payroll: ${error.message}`)
-      rawAdminRows = (data ?? []) as PayRow[]
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase
+          .from('payroll_transactions')
+          .select('employee_id, payroll_code_id, period_date, amount, hours, rate, employees(first_name, last_name), payroll_codes(branch_id, labor_type)')
+          .in('payroll_code_id', adminCodeIds)
+          .gte('period_date', startDate)
+          .lte('period_date', endDate)
+          .order('period_date')
+          .range(from, from + PAGE_SIZE - 1)
+        if (error) throw new Error(`Failed to query admin payroll: ${error.message}`)
+        if (!data || data.length === 0) break
+        rawAdminRows.push(...(data as PayRow[]))
+        if (data.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
     }
 
     // ── Employee allocations ─────────────────────────────────────────────────

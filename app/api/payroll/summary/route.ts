@@ -95,17 +95,23 @@ export async function GET(request: Request): Promise<NextResponse> {
       payroll_codes: { labor_type: LaborType; branch_id: string | null } | null
     }
 
+    const PAGE_SIZE = 1000
     let rawTxnData: PayrollTxnRow[] = []
     if (directCodeIds.length > 0) {
-      const { data: rawTxns, error: txnErr } = await supabase
-        .from('payroll_transactions')
-        .select('employee_id, amount, hours, rate, employees(first_name, last_name), payroll_codes(labor_type, branch_id)')
-        .in('payroll_code_id', directCodeIds)
-        .eq('period_date', periodDate)
-        .limit(50000)
-
-      if (txnErr) throw new Error(`Failed to query direct labor: ${txnErr.message}`)
-      rawTxnData = (rawTxns ?? []) as PayrollTxnRow[]
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase
+          .from('payroll_transactions')
+          .select('employee_id, amount, hours, rate, employees(first_name, last_name), payroll_codes(labor_type, branch_id)')
+          .in('payroll_code_id', directCodeIds)
+          .eq('period_date', periodDate)
+          .range(from, from + PAGE_SIZE - 1)
+        if (error) throw new Error(`Failed to query direct labor: ${error.message}`)
+        if (!data || data.length === 0) break
+        rawTxnData.push(...(data as PayrollTxnRow[]))
+        if (data.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
     }
 
     // Fetch employee allocation data for all employees in this period

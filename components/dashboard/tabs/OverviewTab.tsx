@@ -7,7 +7,7 @@ import type { TabProps } from './types'
 
 function r(n: number) { return Math.round(n * 100) / 100 }
 
-export default function OverviewTab({ role, data, branches, allocationOn }: TabProps) {
+export default function OverviewTab({ role, data, branches, selectedBranchId, allocationOn }: TabProps) {
   const isAdminOrExec = role === 'admin' || role === 'executive'
 
   let revenue = 0
@@ -21,18 +21,37 @@ export default function OverviewTab({ role, data, branches, allocationOn }: TabP
   let hqOverhead = 0
   let allocatedFuel = 0
 
+  const byBranch = isAdminOrExec ? (data.overview?.byBranch ?? []) : []
+  const selectedBranch = selectedBranchId ? byBranch.find((b) => b.branchId === selectedBranchId) : null
+
   if (isAdminOrExec && data.overview) {
-    const t = data.overview.totals
-    revenue = t.revenue
-    directPayroll = t.directPayroll
-    adminPayroll = t.adminPayroll
-    taxes = t.employerTaxes
-    fuel = t.fuel
-    grossProfit = t.grossProfit
-    gpPct = t.gpPct
-    corpOverhead = allocationOn ? (t.corpOverhead ?? 0) : 0
-    hqOverhead = allocationOn ? (t.hqOverhead ?? 0) : 0
-    allocatedFuel = allocationOn ? (t.allocatedFuel ?? 0) : 0
+    // When a specific branch is selected, use that branch's data instead of all-branch totals
+    const src = selectedBranch ?? data.overview.totals
+    if (selectedBranch) {
+      revenue = selectedBranch.revenue
+      directPayroll = selectedBranch.directPayroll
+      adminPayroll = selectedBranch.adminPayroll
+      taxes = selectedBranch.employerTaxes
+      fuel = selectedBranch.fuel
+      grossProfit = selectedBranch.grossProfit
+      gpPct = selectedBranch.gpPct
+      corpOverhead = allocationOn ? (selectedBranch.corpOverhead ?? 0) : 0
+      hqOverhead = allocationOn ? (selectedBranch.hqOverhead ?? 0) : 0
+      allocatedFuel = allocationOn ? (selectedBranch.allocatedFuel ?? 0) : 0
+    } else {
+      const t = data.overview.totals
+      revenue = t.revenue
+      directPayroll = t.directPayroll
+      adminPayroll = t.adminPayroll
+      taxes = t.employerTaxes
+      fuel = t.fuel
+      grossProfit = t.grossProfit
+      gpPct = t.gpPct
+      corpOverhead = allocationOn ? (t.corpOverhead ?? 0) : 0
+      hqOverhead = allocationOn ? (t.hqOverhead ?? 0) : 0
+      allocatedFuel = allocationOn ? (t.allocatedFuel ?? 0) : 0
+    }
+    void src
   } else if (data.revenue && data.payroll && data.fuelSummary) {
     revenue = data.revenue.totalRevenue
     directPayroll = data.payroll.total.direct
@@ -52,8 +71,26 @@ export default function OverviewTab({ role, data, branches, allocationOn }: TabP
   const displayGP = allocationOn ? adjGrossProfit : grossProfit
   const displayGpPct = allocationOn ? adjGpPct : gpPct
 
-  const periods = isAdminOrExec ? (data.overview?.byPeriod ?? []) : []
-  const byBranch = isAdminOrExec ? (data.overview?.byBranch ?? []) : []
+  // Build the weekly trend periods. When a branch is selected, reconstruct from branch's
+  // per-period arrays so the chart reflects only that branch's data.
+  const periods = (() => {
+    if (!isAdminOrExec) return []
+    if (selectedBranch) {
+      const revMap = new Map(selectedBranch.revenueByPeriod.map((p) => [p.periodDate, p.revenue]))
+      const payMap = new Map(selectedBranch.payrollByPeriod.map((p) => [p.periodDate, p.payroll]))
+      const fuelMap = new Map(selectedBranch.fuelByPeriod.map((p) => [p.periodDate, p.fuel]))
+      const allDates = new Set([...revMap.keys(), ...payMap.keys(), ...fuelMap.keys()])
+      return [...allDates].sort().map((periodDate) => ({
+        periodDate,
+        revenue: revMap.get(periodDate) ?? 0,
+        directPayroll: payMap.get(periodDate) ?? 0,
+        adminPayroll: 0,
+        employerTaxes: 0,
+        fuel: fuelMap.get(periodDate) ?? 0,
+      }))
+    }
+    return data.overview?.byPeriod ?? []
+  })()
   const branchNameMap: Record<string, string> = {}
   for (const b of branches) branchNameMap[b.id] = b.name
 
@@ -307,7 +344,7 @@ export default function OverviewTab({ role, data, branches, allocationOn }: TabP
       )}
 
       {/* ── Admin/exec: branch table ──────────────────────────────────────────── */}
-      {byBranch.length > 1 && (
+      {byBranch.length > 1 && !selectedBranchId && (
         <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>By Branch</div>
           <BranchTable byBranch={byBranch} branchNameMap={branchNameMap} allocationOn={allocationOn} />
