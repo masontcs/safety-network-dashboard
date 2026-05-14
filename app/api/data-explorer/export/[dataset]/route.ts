@@ -44,6 +44,8 @@ export async function GET(
     let csvContent = ''
     const filename = `${dataset}-export-${startDate}-to-${endDate}.csv`
 
+    const PAGE_SIZE = 1000
+
     if (dataset === 'payroll') {
       let entityId: string | null = null
       if (entityCode) {
@@ -56,25 +58,6 @@ export async function GET(
         codeIds = (codes ?? []).map((c) => c.id)
       }
 
-      let q = supabase
-        .from('payroll_transactions')
-        .select(`
-          id, period_date, hours, rate, amount,
-          employees(first_name, last_name),
-          payroll_codes(code, branches(id, name)),
-          entities(code),
-          payroll_items(name, payroll_item_groups(name))
-        `)
-        .gte('period_date', startDate)
-        .lte('period_date', endDate)
-        .order('period_date', { ascending: false })
-        .limit(10000)
-      if (entityId) q = q.eq('entity_id', entityId)
-      if (codeIds) q = q.in('payroll_code_id', codeIds)
-
-      const { data, error } = await q
-      if (error) throw new Error(error.message)
-
       type R = {
         id: string; period_date: string; hours: number | null; rate: number | null; amount: number
         employees: { first_name: string; last_name: string } | null
@@ -82,8 +65,30 @@ export async function GET(
         entities: { code: string } | null
         payroll_items: { name: string; payroll_item_groups: { name: string } | null } | null
       }
+      const data: R[] = []
+      {
+        let from = 0
+        while (true) {
+          let q = supabase
+            .from('payroll_transactions')
+            .select(`id, period_date, hours, rate, amount, employees(first_name, last_name), payroll_codes(code, branches(id, name)), entities(code), payroll_items(name, payroll_item_groups(name))`)
+            .gte('period_date', startDate)
+            .lte('period_date', endDate)
+            .order('period_date', { ascending: false })
+            .range(from, from + PAGE_SIZE - 1)
+          if (entityId) q = q.eq('entity_id', entityId)
+          if (codeIds) q = q.in('payroll_code_id', codeIds)
+          const { data: page, error } = await q
+          if (error) throw new Error(error.message)
+          if (!page || page.length === 0) break
+          data.push(...(page as unknown as R[]))
+          if (page.length < PAGE_SIZE) break
+          from += PAGE_SIZE
+        }
+      }
+
       const headers = ['Period Date', 'Employee', 'Branch', 'Entity', 'Payroll Code', 'Item', 'Group', 'Hours', 'Rate', 'Amount']
-      const csvRows = (data as unknown as R[]).map((r) => [
+      const csvRows = data.map((r) => [
         r.period_date,
         r.employees ? `${r.employees.first_name} ${r.employees.last_name}`.trim() : '',
         r.payroll_codes?.branches?.name ?? '',
@@ -104,21 +109,6 @@ export async function GET(
         const { data: ent } = await supabase.from('entities').select('id').eq('code', entityCode).single()
         entityId = ent?.id ?? null
       }
-      let q = supabase
-        .from('revenue_transactions')
-        .select(`
-          id, period_date, labor, rental, one_time_charges, sales_tax, total_revenue,
-          branches(id, name), entities(code), revenue_codes(code)
-        `)
-        .gte('period_date', startDate)
-        .lte('period_date', endDate)
-        .order('period_date', { ascending: false })
-        .limit(10000)
-      if (branchId) q = q.eq('branch_id', branchId)
-      if (entityId) q = q.eq('entity_id', entityId)
-
-      const { data, error } = await q
-      if (error) throw new Error(error.message)
 
       type R = {
         id: string; period_date: string; labor: number; rental: number
@@ -127,8 +117,30 @@ export async function GET(
         entities: { code: string } | null
         revenue_codes: { code: string } | null
       }
+      const data: R[] = []
+      {
+        let from = 0
+        while (true) {
+          let q = supabase
+            .from('revenue_transactions')
+            .select(`id, period_date, labor, rental, one_time_charges, sales_tax, total_revenue, branches(id, name), entities(code), revenue_codes(code)`)
+            .gte('period_date', startDate)
+            .lte('period_date', endDate)
+            .order('period_date', { ascending: false })
+            .range(from, from + PAGE_SIZE - 1)
+          if (branchId) q = q.eq('branch_id', branchId)
+          if (entityId) q = q.eq('entity_id', entityId)
+          const { data: page, error } = await q
+          if (error) throw new Error(error.message)
+          if (!page || page.length === 0) break
+          data.push(...(page as unknown as R[]))
+          if (page.length < PAGE_SIZE) break
+          from += PAGE_SIZE
+        }
+      }
+
       const headers = ['Period Date', 'Branch', 'Entity', 'Revenue Code', 'Labor', 'Rental', 'One-Time', 'Sales Tax', 'Total Revenue']
-      const csvRows = (data as unknown as R[]).map((r) => [
+      const csvRows = data.map((r) => [
         r.period_date,
         r.branches?.name ?? '',
         r.entities?.code ?? '',
@@ -143,24 +155,6 @@ export async function GET(
     }
 
     if (dataset === 'fuel') {
-      let q = supabase
-        .from('fuel_transactions')
-        .select(`
-          id, transaction_date, vendor, product, site_name, site_city, site_state,
-          gallons, price_per_gallon, total_pretax, tax, total_with_tax, mpg,
-          branches(id, name), employees(first_name, last_name), fuel_card_assignments(card_name)
-        `)
-        .gte('transaction_date', startDate)
-        .lte('transaction_date', endDate)
-        .is('business_tag', null)
-        .order('transaction_date', { ascending: false })
-        .limit(10000)
-      if (branchId) q = q.eq('branch_id', branchId)
-      if (vendor) q = q.eq('vendor', vendor as Vendor)
-
-      const { data, error } = await q
-      if (error) throw new Error(error.message)
-
       type R = {
         id: string; transaction_date: string; vendor: string; product: string | null
         site_name: string | null; site_city: string | null; site_state: string | null
@@ -170,8 +164,31 @@ export async function GET(
         employees: { first_name: string; last_name: string } | null
         fuel_card_assignments: { card_name: string } | null
       }
+      const data: R[] = []
+      {
+        let from = 0
+        while (true) {
+          let q = supabase
+            .from('fuel_transactions')
+            .select(`id, transaction_date, vendor, product, site_name, site_city, site_state, gallons, price_per_gallon, total_pretax, tax, total_with_tax, mpg, branches(id, name), employees(first_name, last_name), fuel_card_assignments(card_name)`)
+            .gte('transaction_date', startDate)
+            .lte('transaction_date', endDate)
+            .is('business_tag', null)
+            .order('transaction_date', { ascending: false })
+            .range(from, from + PAGE_SIZE - 1)
+          if (branchId) q = q.eq('branch_id', branchId)
+          if (vendor) q = q.eq('vendor', vendor as Vendor)
+          const { data: page, error } = await q
+          if (error) throw new Error(error.message)
+          if (!page || page.length === 0) break
+          data.push(...(page as unknown as R[]))
+          if (page.length < PAGE_SIZE) break
+          from += PAGE_SIZE
+        }
+      }
+
       const headers = ['Date', 'Card/Driver', 'Branch', 'Vendor', 'Product', 'Site', 'City', 'State', 'Gallons', 'Price/Gal', 'Pre-tax', 'Tax', 'Total', 'MPG']
-      const csvRows = (data as unknown as R[]).map((r) => {
+      const csvRows = data.map((r) => {
         let cardDriver = ''
         if (r.employees) cardDriver = `${r.employees.first_name} ${r.employees.last_name}`.trim()
         else if (r.fuel_card_assignments) cardDriver = r.fuel_card_assignments.card_name

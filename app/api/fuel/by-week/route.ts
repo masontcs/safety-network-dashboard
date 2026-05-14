@@ -45,23 +45,30 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     const supabase = createServiceClient()
 
-    let query = supabase
-      .from('fuel_transactions')
-      .select('transaction_date, total_with_tax, gallons, mpg')
-      .is('business_tag', null)
-      .gte('transaction_date', startDate)
-      .lte('transaction_date', endDate)
-
-    if (branchId) {
-      query = query.eq('branch_id', branchId)
-    } else if (access.branchIds !== null) {
-      query = query.in('branch_id', access.branchIds)
-    }
-
-    const { data, error } = await query
-    if (error) throw new Error(error.message)
-
+    const PAGE_SIZE = 1000
     type Row = { transaction_date: string; total_with_tax: number; gallons: number | null; mpg: number | null }
+    const data: Row[] = []
+    {
+      let from = 0
+      while (true) {
+        let q = supabase
+          .from('fuel_transactions')
+          .select('transaction_date, total_with_tax, gallons, mpg')
+          .is('business_tag', null)
+          .gte('transaction_date', startDate)
+          .lte('transaction_date', endDate)
+          .order('transaction_date')
+          .range(from, from + PAGE_SIZE - 1)
+        if (branchId) q = q.eq('branch_id', branchId)
+        else if (access.branchIds !== null) q = q.in('branch_id', access.branchIds)
+        const { data: page, error } = await q
+        if (error) throw new Error(error.message)
+        if (!page || page.length === 0) break
+        data.push(...(page as Row[]))
+        if (page.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
+    }
     const byWeek: Record<string, { cost: number; gallons: number; mpgSum: number; mpgCount: number }> = {}
 
     for (const t of (data ?? []) as Row[]) {

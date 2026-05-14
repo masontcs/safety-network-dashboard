@@ -45,21 +45,34 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     const supabase = createServiceClient()
 
-    // ── Summary: all rows ──────────────────────────────────────────────────────
-    let sumQ = supabase
-      .from('fuel_transactions')
-      .select('total_with_tax, gallons, price_per_gallon, fuel_card_assignment_id, employee_id', { count: 'exact' })
-      .gte('transaction_date', startDate)
-      .lte('transaction_date', endDate)
-      .is('business_tag', null) // SN only
-      .limit(10000)
-    if (branchId) sumQ = sumQ.eq('branch_id', branchId)
-    if (vendor) sumQ = sumQ.eq('vendor', vendor as Vendor)
+    // ── Summary: paginate to get all rows for accurate aggregation ────────────
+    const PAGE_SIZE = 1000
+    type SumRow = { total_with_tax: number; gallons: number | null; price_per_gallon: number | null; fuel_card_assignment_id: string | null; employee_id: string | null }
+    const rows0: SumRow[] = []
+    let totalCount = 0
+    {
+      let from = 0
+      while (true) {
+        let q = supabase
+          .from('fuel_transactions')
+          .select('total_with_tax, gallons, price_per_gallon, fuel_card_assignment_id, employee_id', { count: from === 0 ? 'exact' : undefined })
+          .gte('transaction_date', startDate)
+          .lte('transaction_date', endDate)
+          .is('business_tag', null)
+          .order('transaction_date')
+          .range(from, from + PAGE_SIZE - 1)
+        if (branchId) q = q.eq('branch_id', branchId)
+        if (vendor) q = q.eq('vendor', vendor as Vendor)
+        const { data: page, count: pageCount, error: sumErr } = await q
+        if (sumErr) throw new Error(sumErr.message)
+        if (from === 0 && pageCount != null) totalCount = pageCount
+        if (!page || page.length === 0) break
+        rows0.push(...(page as SumRow[]))
+        if (page.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
+    }
 
-    const { data: sumData, count, error: sumErr } = await sumQ
-    if (sumErr) throw new Error(sumErr.message)
-
-    const rows0 = sumData ?? []
     const totalCost = rows0.reduce((s, r) => s + (r.total_with_tax ?? 0), 0)
     const totalGallons = rows0.reduce((s, r) => s + (r.gallons ?? 0), 0)
     const gallonedRows = rows0.filter((r) => r.gallons && r.price_per_gallon)
@@ -71,6 +84,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       ...rows0.filter((r) => r.employee_id).map((r) => `emp:${r.employee_id}`),
     ])
     const uniqueCards = cardSet.size
+    const count = totalCount
 
     // ── Paginated rows ─────────────────────────────────────────────────────────
     const from = page * pageSize

@@ -50,10 +50,20 @@ export async function GET(request: Request): Promise<NextResponse> {
       query = query.in('branch_id', access.branchIds)
     }
 
-    const { data: transactions, error } = await query.limit(50000)
-    if (error) throw new Error(`Failed to query revenue: ${error.message}`)
-
-    const rows = transactions ?? []
+    const PAGE_SIZE = 1000
+    type RevRow = { branch_id: string; period_date: string; labor: number; rental: number; one_time_charges: number; sales_tax: number; total_revenue: number }
+    const rows: RevRow[] = []
+    {
+      let from = 0
+      while (true) {
+        const { data, error } = await query.range(from, from + PAGE_SIZE - 1)
+        if (error) throw new Error(`Failed to query revenue: ${error.message}`)
+        if (!data || data.length === 0) break
+        rows.push(...(data as RevRow[]))
+        if (data.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
+    }
     const totals = {
       labor: rows.reduce((s, t) => s + t.labor, 0),
       rental: rows.reduce((s, t) => s + t.rental, 0),

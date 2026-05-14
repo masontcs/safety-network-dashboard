@@ -503,46 +503,71 @@ export async function GET(request: Request): Promise<NextResponse> {
       let hqTotal = 0
 
       if (corpCodeIds.length > 0) {
-        const { data: corpTxns } = await supabase
-          .from('payroll_transactions')
-          .select('amount')
-          .in('payroll_code_id', corpCodeIds)
-          .gte('period_date', startDate!)
-          .lte('period_date', endDate!)
-        corpTotal = (corpTxns ?? []).reduce((s, t) => s + t.amount, 0)
+        let f = 0
+        while (true) {
+          const { data, error } = await supabase
+            .from('payroll_transactions').select('amount')
+            .in('payroll_code_id', corpCodeIds)
+            .gte('period_date', startDate!).lte('period_date', endDate!)
+            .range(f, f + PAGE_SIZE - 1)
+          if (error) throw new Error(error.message)
+          if (!data || data.length === 0) break
+          corpTotal += data.reduce((s, t) => s + t.amount, 0)
+          if (data.length < PAGE_SIZE) break
+          f += PAGE_SIZE
+        }
       }
 
       if (hqCodeIds.length > 0) {
-        const { data: hqTxns } = await supabase
-          .from('payroll_transactions')
-          .select('amount')
-          .in('payroll_code_id', hqCodeIds)
-          .gte('period_date', startDate!)
-          .lte('period_date', endDate!)
-        hqTotal = (hqTxns ?? []).reduce((s, t) => s + t.amount, 0)
+        let f = 0
+        while (true) {
+          const { data, error } = await supabase
+            .from('payroll_transactions').select('amount')
+            .in('payroll_code_id', hqCodeIds)
+            .gte('period_date', startDate!).lte('period_date', endDate!)
+            .range(f, f + PAGE_SIZE - 1)
+          if (error) throw new Error(error.message)
+          if (!data || data.length === 0) break
+          hqTotal += data.reduce((s, t) => s + t.amount, 0)
+          if (data.length < PAGE_SIZE) break
+          f += PAGE_SIZE
+        }
       }
 
-      // Corp/HQ employee fuel — identify corp/hq employees from payroll transactions in this period,
-      // then sum their fuel transactions
+      // Corp/HQ employee fuel — identify corp/hq employees, then sum their fuel
       const allCorpHqCodeIds = [...corpCodeIds, ...hqCodeIds]
       let corpHqFuelTotal = 0
       if (allCorpHqCodeIds.length > 0) {
-        const { data: corpHqPayTxns } = await supabase
-          .from('payroll_transactions')
-          .select('employee_id')
-          .in('payroll_code_id', allCorpHqCodeIds)
-          .gte('period_date', startDate!)
-          .lte('period_date', endDate!)
-        const corpHqEmpIds = [...new Set((corpHqPayTxns ?? []).map((t) => t.employee_id))]
+        const corpHqEmpSet = new Set<string>()
+        let f = 0
+        while (true) {
+          const { data, error } = await supabase
+            .from('payroll_transactions').select('employee_id')
+            .in('payroll_code_id', allCorpHqCodeIds)
+            .gte('period_date', startDate!).lte('period_date', endDate!)
+            .range(f, f + PAGE_SIZE - 1)
+          if (error) throw new Error(error.message)
+          if (!data || data.length === 0) break
+          for (const t of data) corpHqEmpSet.add(t.employee_id)
+          if (data.length < PAGE_SIZE) break
+          f += PAGE_SIZE
+        }
+        const corpHqEmpIds = [...corpHqEmpSet]
         if (corpHqEmpIds.length > 0) {
-          const { data: corpHqFuelTxns } = await supabase
-            .from('fuel_transactions')
-            .select('total_with_tax')
-            .in('employee_id', corpHqEmpIds)
-            .is('business_tag', null)
-            .gte('transaction_date', startDate!)
-            .lte('transaction_date', endDate!)
-          corpHqFuelTotal = (corpHqFuelTxns ?? []).reduce((s, t) => s + t.total_with_tax, 0)
+          let f2 = 0
+          while (true) {
+            const { data, error } = await supabase
+              .from('fuel_transactions').select('total_with_tax')
+              .in('employee_id', corpHqEmpIds)
+              .is('business_tag', null)
+              .gte('transaction_date', startDate!).lte('transaction_date', endDate!)
+              .range(f2, f2 + PAGE_SIZE - 1)
+            if (error) throw new Error(error.message)
+            if (!data || data.length === 0) break
+            corpHqFuelTotal += data.reduce((s, t) => s + t.total_with_tax, 0)
+            if (data.length < PAGE_SIZE) break
+            f2 += PAGE_SIZE
+          }
         }
       }
 

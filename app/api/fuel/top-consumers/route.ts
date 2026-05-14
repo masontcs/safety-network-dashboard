@@ -49,20 +49,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const supabase = createServiceClient()
 
     // Fetch all SN fuel transactions — employee-linked and general branch cards
-    let query = supabase
-      .from('fuel_transactions')
-      .select('employee_id, branch_id, transaction_date, total_with_tax, gallons, price_per_gallon, employees(first_name, last_name)')
-      .is('business_tag', null)
-      .gte('transaction_date', startDate)
-      .lte('transaction_date', endDate)
-
-    if (access.branchIds !== null) {
-      query = query.in('branch_id', access.branchIds)
-    }
-
-    const { data, error } = await query
-    if (error) throw new Error(error.message)
-
+    const PAGE_SIZE = 1000
     type Row = {
       employee_id: string | null
       branch_id: string | null
@@ -72,8 +59,27 @@ export async function GET(request: Request): Promise<NextResponse> {
       price_per_gallon: number | null
       employees: { first_name: string; last_name: string } | null
     }
-
-    const rawRows = (data ?? []) as Row[]
+    const rawRows: Row[] = []
+    {
+      let from = 0
+      while (true) {
+        let q = supabase
+          .from('fuel_transactions')
+          .select('employee_id, branch_id, transaction_date, total_with_tax, gallons, price_per_gallon, employees(first_name, last_name)')
+          .is('business_tag', null)
+          .gte('transaction_date', startDate)
+          .lte('transaction_date', endDate)
+          .order('transaction_date')
+          .range(from, from + PAGE_SIZE - 1)
+        if (access.branchIds !== null) q = q.in('branch_id', access.branchIds)
+        const { data: page, error } = await q
+        if (error) throw new Error(error.message)
+        if (!page || page.length === 0) break
+        rawRows.push(...(page as Row[]))
+        if (page.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
+    }
 
     // Fetch employee allocations
     const fuelEmpIds = [...new Set(rawRows.map((r) => r.employee_id).filter((id): id is string => id !== null))]

@@ -54,36 +54,59 @@ export async function GET(request: Request): Promise<NextResponse> {
       if (codeIds.length === 0) return NextResponse.json({ success: true, data: emptyResponse(page, pageSize) })
     }
 
-    // ── Summary: all matching rows (limit 10000) ───────────────────────────────
-    let sumQ = supabase
-      .from('payroll_transactions')
-      .select('amount, hours, employee_id', { count: 'exact' })
-      .gte('period_date', startDate)
-      .lte('period_date', endDate)
-      .limit(10000)
-    if (entityId) sumQ = sumQ.eq('entity_id', entityId)
-    if (codeIds) sumQ = sumQ.in('payroll_code_id', codeIds)
+    // ── Summary: paginate to get all rows for accurate aggregation ────────────
+    const PAGE_SIZE = 1000
+    type SumRow = { amount: number; hours: number | null; employee_id: string }
+    const sumData: SumRow[] = []
+    let count = 0
+    {
+      let from = 0
+      while (true) {
+        let q = supabase
+          .from('payroll_transactions')
+          .select('amount, hours, employee_id', { count: from === 0 ? 'exact' : undefined })
+          .gte('period_date', startDate)
+          .lte('period_date', endDate)
+          .range(from, from + PAGE_SIZE - 1)
+        if (entityId) q = q.eq('entity_id', entityId)
+        if (codeIds) q = q.in('payroll_code_id', codeIds)
+        const { data: page, count: pageCount, error: sumErr } = await q
+        if (sumErr) throw new Error(sumErr.message)
+        if (from === 0 && pageCount != null) count = pageCount
+        if (!page || page.length === 0) break
+        sumData.push(...(page as SumRow[]))
+        if (page.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
+    }
 
-    const { data: sumData, count, error: sumErr } = await sumQ
-    if (sumErr) throw new Error(sumErr.message)
-
-    const totalAmount = (sumData ?? []).reduce((s, r) => s + (r.amount ?? 0), 0)
-    const totalHours = (sumData ?? []).reduce((s, r) => s + (r.hours ?? 0), 0)
-    const employeeSet = new Set((sumData ?? []).map((r) => r.employee_id))
+    const totalAmount = sumData.reduce((s, r) => s + (r.amount ?? 0), 0)
+    const totalHours = sumData.reduce((s, r) => s + (r.hours ?? 0), 0)
+    const employeeSet = new Set(sumData.map((r) => r.employee_id))
     const employeeCount = employeeSet.size
     const avgPerEmployee = employeeCount > 0 ? totalAmount / employeeCount : 0
 
-    // Taxes (entity + date filtered only — payroll_taxes has no branch column)
-    let taxQ = supabase
-      .from('payroll_taxes')
-      .select('amount')
-      .is('business_tag', null)
-      .gte('period_date', startDate)
-      .lte('period_date', endDate)
-      .limit(10000)
-    if (entityId) taxQ = taxQ.eq('entity_id', entityId)
-    const { data: taxData } = await taxQ
-    const totalTaxes = (taxData ?? []).reduce((s, r) => s + (r.amount ?? 0), 0)
+    // Taxes — paginate too
+    const taxRows: Array<{ amount: number }> = []
+    {
+      let from = 0
+      while (true) {
+        let q = supabase
+          .from('payroll_taxes')
+          .select('amount')
+          .is('business_tag', null)
+          .gte('period_date', startDate)
+          .lte('period_date', endDate)
+          .range(from, from + PAGE_SIZE - 1)
+        if (entityId) q = q.eq('entity_id', entityId)
+        const { data: page } = await q
+        if (!page || page.length === 0) break
+        taxRows.push(...page)
+        if (page.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
+    }
+    const totalTaxes = taxRows.reduce((s, r) => s + (r.amount ?? 0), 0)
 
     // ── Paginated rows ─────────────────────────────────────────────────────────
     const from = page * pageSize

@@ -85,14 +85,19 @@ export async function GET(request: Request): Promise<NextResponse> {
     let corpPayroll = 0
 
     if (corpCodeIds.length > 0) {
-      const { data: corpTxns, error: corpTxnErr } = await supabase
-        .from('payroll_transactions')
-        .select('amount')
-        .in('payroll_code_id', corpCodeIds)
-        .eq('period_date', periodDate)
-
-      if (corpTxnErr) throw new Error(`Failed to load corp payroll: ${corpTxnErr.message}`)
-      corpPayroll = (corpTxns ?? []).reduce((s, t) => s + t.amount, 0)
+      const PAGE_SIZE = 1000
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase
+          .from('payroll_transactions').select('amount')
+          .in('payroll_code_id', corpCodeIds).eq('period_date', periodDate)
+          .range(from, from + PAGE_SIZE - 1)
+        if (error) throw new Error(`Failed to load corp payroll: ${error.message}`)
+        if (!data || data.length === 0) break
+        corpPayroll += data.reduce((s, t) => s + t.amount, 0)
+        if (data.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
     }
 
     // HQ payroll total (allocation_type = 'hq')
@@ -107,14 +112,19 @@ export async function GET(request: Request): Promise<NextResponse> {
     let hqPayroll = 0
 
     if (hqCodeIds.length > 0) {
-      const { data: hqTxns, error: hqTxnErr } = await supabase
-        .from('payroll_transactions')
-        .select('amount')
-        .in('payroll_code_id', hqCodeIds)
-        .eq('period_date', periodDate)
-
-      if (hqTxnErr) throw new Error(`Failed to load HQ payroll: ${hqTxnErr.message}`)
-      hqPayroll = (hqTxns ?? []).reduce((s, t) => s + t.amount, 0)
+      const PAGE_SIZE = 1000
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase
+          .from('payroll_transactions').select('amount')
+          .in('payroll_code_id', hqCodeIds).eq('period_date', periodDate)
+          .range(from, from + PAGE_SIZE - 1)
+        if (error) throw new Error(`Failed to load HQ payroll: ${error.message}`)
+        if (!data || data.length === 0) break
+        hqPayroll += data.reduce((s, t) => s + t.amount, 0)
+        if (data.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
     }
 
     const result = calculateAllocations(branchRevenues, corpPayroll, hqPayroll, snBusiness.hq_allocation_pct)

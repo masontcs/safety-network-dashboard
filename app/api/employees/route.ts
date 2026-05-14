@@ -36,14 +36,25 @@ export async function GET(request: Request): Promise<NextResponse> {
         return NextResponse.json({ success: true, data: [] })
       }
 
-      const { data: txns, error: txnErr } = await supabase
-        .from('payroll_transactions')
-        .select('employee_id')
-        .in('payroll_code_id', codeIds)
+      const PAGE_SIZE = 1000
+      const allTxns: Array<{ employee_id: string }> = []
+      {
+        let from = 0
+        while (true) {
+          const { data, error } = await supabase
+            .from('payroll_transactions')
+            .select('employee_id')
+            .in('payroll_code_id', codeIds)
+            .range(from, from + PAGE_SIZE - 1)
+          if (error) throw new Error(`Failed to load employee IDs: ${error.message}`)
+          if (!data || data.length === 0) break
+          allTxns.push(...data)
+          if (data.length < PAGE_SIZE) break
+          from += PAGE_SIZE
+        }
+      }
 
-      if (txnErr) throw new Error(`Failed to load employee IDs: ${txnErr.message}`)
-
-      const employeeIds = [...new Set((txns ?? []).map((t) => t.employee_id))]
+      const employeeIds = [...new Set(allTxns.map((t) => t.employee_id))]
 
       if (employeeIds.length === 0) {
         return NextResponse.json({ success: true, data: [] })
@@ -114,19 +125,28 @@ export async function GET(request: Request): Promise<NextResponse> {
       assignmentsByEmployee[a.employee_id].push(a)
     }
 
-    // Fetch latest payroll date per employee
-    // Fetch enough transactions to build a complete map
-    const { data: payrollTxns, error: ptErr } = await supabase
-      .from('payroll_transactions')
-      .select('employee_id, period_date')
-      .order('period_date', { ascending: false })
-      .limit(50000)
-
-    if (ptErr) throw new Error(`Failed to load payroll transactions: ${ptErr.message}`)
+    // Fetch latest payroll date per employee — paginate to get all transactions
+    const PAGE_SIZE = 1000
+    const payrollTxns: Array<{ employee_id: string; period_date: string }> = []
+    {
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase
+          .from('payroll_transactions')
+          .select('employee_id, period_date')
+          .order('period_date', { ascending: false })
+          .range(from, from + PAGE_SIZE - 1)
+        if (error) throw new Error(`Failed to load payroll transactions: ${error.message}`)
+        if (!data || data.length === 0) break
+        payrollTxns.push(...data)
+        if (data.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
+    }
 
     // Build map: employee_id → max period_date
     const lastPayrollByEmployee: Record<string, string> = {}
-    for (const t of payrollTxns ?? []) {
+    for (const t of payrollTxns) {
       if (!lastPayrollByEmployee[t.employee_id] || t.period_date > lastPayrollByEmployee[t.employee_id]) {
         lastPayrollByEmployee[t.employee_id] = t.period_date
       }

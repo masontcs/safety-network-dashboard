@@ -62,21 +62,11 @@ export async function GET(request: Request): Promise<NextResponse> {
       return NextResponse.json({ success: true, data: [] })
     }
 
-    const [txnRes, groupsRes, branchRes] = await Promise.all([
-      supabase
-        .from('payroll_transactions')
-        .select('employee_id, payroll_code_id, hours, amount, payroll_item_id, employees(first_name, last_name)')
-        .in('payroll_code_id', codeIds)
-        .gte('period_date', startDate)
-        .lte('period_date', endDate)
-        .limit(50000),
-      supabase
-        .from('payroll_items')
-        .select('id, payroll_item_groups(name)'),
+    const [groupsRes, branchRes] = await Promise.all([
+      supabase.from('payroll_items').select('id, payroll_item_groups(name)'),
       supabase.from('branches').select('id, name'),
     ])
 
-    if (txnRes.error) throw new Error(txnRes.error.message)
     if (groupsRes.error) throw new Error(groupsRes.error.message)
 
     const branchNameMap: Record<string, string> = {}
@@ -88,6 +78,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       itemClassMap[item.id] = classifyGroup(item.payroll_item_groups?.name ?? '')
     }
 
+    const PAGE_SIZE = 1000
     type TxnRow = {
       employee_id: string
       payroll_code_id: string
@@ -95,6 +86,25 @@ export async function GET(request: Request): Promise<NextResponse> {
       amount: number
       payroll_item_id: string | null
       employees: { first_name: string; last_name: string } | null
+    }
+    const txns: TxnRow[] = []
+    {
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase
+          .from('payroll_transactions')
+          .select('employee_id, payroll_code_id, hours, amount, payroll_item_id, employees(first_name, last_name)')
+          .in('payroll_code_id', codeIds)
+          .gte('period_date', startDate)
+          .lte('period_date', endDate)
+          .order('period_date')
+          .range(from, from + PAGE_SIZE - 1)
+        if (error) throw new Error(error.message)
+        if (!data || data.length === 0) break
+        txns.push(...(data as TxnRow[]))
+        if (data.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
     }
 
     type EmpAgg = {
@@ -108,7 +118,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
 
     const byEmp: Record<string, EmpAgg> = {}
-    for (const t of (txnRes.data ?? []) as TxnRow[]) {
+    for (const t of txns) {
       if (!t.employees) continue
       if (!byEmp[t.employee_id]) {
         byEmp[t.employee_id] = {
