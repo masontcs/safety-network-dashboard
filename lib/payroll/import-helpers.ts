@@ -115,8 +115,18 @@ export async function insertPayrollData(
   let txnCount = 0; let taxCount = 0; let pendingCount = 0; let stagedItemTxnCount = 0
   const newItemNames: string[] = []
 
+  // Deduplicate parsedEmployees by rawName — the Excel parser can produce the same
+  // name at two column positions (merged-cell artifacts), which would cause every
+  // transaction to be inserted twice.
+  const seenRawNames = new Set<string>()
+  const uniqueEmployees = parsedEmployees.filter((emp) => {
+    if (seenRawNames.has(emp.rawName)) return false
+    seenRawNames.add(emp.rawName)
+    return true
+  })
+
   // Pre-count live transactions (excludes staged-by-item) for progress reporting
-  const confirmedTxnTotal = parsedEmployees.reduce((sum, emp) => {
+  const confirmedTxnTotal = uniqueEmployees.reduce((sum, emp) => {
     const r = rMap.get(emp.rawName)
     if (!r || r.payrollCodeId === null) return sum
     return sum + emp.lineItems.filter((item) => {
@@ -126,7 +136,7 @@ export async function insertPayrollData(
   }, 0)
   const updateEvery = Math.max(1, Math.floor(confirmedTxnTotal / 10))
 
-  for (const emp of parsedEmployees) {
+  for (const emp of uniqueEmployees) {
     const res = rMap.get(emp.rawName)
     if (!res) continue
 

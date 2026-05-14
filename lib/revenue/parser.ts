@@ -149,7 +149,7 @@ function extractRecords(rows: Rows, warnings: string[]): ParsedRevenueRecord[] {
       const rental         = cellNum(rows, r, 3)
       const oneTimeCharges = cellNum(rows, r, 4)
       const salesTax       = cellNum(rows, r, 6)
-      const totalRevenue   = round2(labor + rental + oneTimeCharges + salesTax)
+      const totalRevenue   = round2(labor + rental + oneTimeCharges)
 
       const key = `${currentBranch}|${entityCode}`
 
@@ -160,7 +160,7 @@ function extractRecords(rows: Rows, warnings: string[]): ParsedRevenueRecord[] {
         existing.rental         = round2(existing.rental + rental)
         existing.oneTimeCharges = round2(existing.oneTimeCharges + oneTimeCharges)
         existing.salesTax       = round2(existing.salesTax + salesTax)
-        existing.totalRevenue   = round2(existing.totalRevenue + totalRevenue)
+        existing.totalRevenue   = round2(existing.labor + existing.rental + existing.oneTimeCharges)
       } else {
         acc.set(key, { branchName: currentBranch, entityCode, labor, rental, oneTimeCharges, salesTax, totalRevenue })
       }
