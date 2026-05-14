@@ -1,24 +1,27 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { Role } from '@/lib/supabase/database.types'
 import ArImportModal from './ArImportModal'
 
-interface Branch {
-  id: string
-  name: string
-}
+interface Branch { id: string; name: string }
 
 interface AgingSummary {
   aging: Record<string, number>
   total: number
-  lastImports: {
-    entity_code: string
-    report_date: string
-    imported_at: string
-    invoice_count: number
-    total_ar: number
-  }[]
+  lastImports: { entity_code: string; report_date: string; imported_at: string; invoice_count: number; total_ar: number }[]
+}
+
+interface Customer {
+  id: string
+  displayName: string
+  current: number
+  d30: number
+  d60: number
+  d90: number
+  d90plus: number
+  totalAr: number
+  invoiceCount: number
 }
 
 interface Invoice {
@@ -38,10 +41,10 @@ interface Invoice {
   customer: { id: string; display_name: string } | null
 }
 
-interface Props {
-  role: Role
-  branches: Branch[]
-}
+interface Props { role: Role; branches: Branch[] }
+
+type SortKey = 'displayName' | 'current' | 'd30' | 'd60' | 'd90' | 'd90plus' | 'totalAr' | 'invoiceCount'
+type SortDir = 'asc' | 'desc'
 
 const AGING_BUCKETS = ['Current', '1-30', '31-60', '61-90', '>90'] as const
 const ENTITIES = ['TCS', 'INC', 'STS'] as const
@@ -57,72 +60,352 @@ const BUCKET_COLORS: Record<string, string> = {
 function fmt(n: number) {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
-
 function fmtDate(iso: string | null) {
   if (!iso) return '—'
   const [y, m, d] = iso.split('-')
   return `${m}/${d}/${y}`
 }
 
+// ─── Sortable column header ────────────────────────────────────────────────────
+
+function SortTh({
+  label, sortKey, current, dir, onSort, right,
+}: {
+  label: string
+  sortKey: SortKey
+  current: SortKey
+  dir: SortDir
+  onSort: (k: SortKey) => void
+  right?: boolean
+}) {
+  const active = current === sortKey
+  return (
+    <th
+      onClick={() => onSort(sortKey)}
+      style={{
+        padding: '10px 12px',
+        textAlign: right ? 'right' : 'left',
+        fontSize: 11,
+        color: active ? '#ff6b00' : '#666',
+        fontWeight: 400,
+        whiteSpace: 'nowrap',
+        cursor: 'pointer',
+        userSelect: 'none',
+      }}
+    >
+      {label}
+      <span style={{ marginLeft: 4, opacity: active ? 1 : 0.3 }}>
+        {active ? (dir === 'asc' ? '↑' : '↓') : '↕'}
+      </span>
+    </th>
+  )
+}
+
+// ─── Aging summary cards ───────────────────────────────────────────────────────
+
+function AgingCards({
+  summary,
+  loading,
+  bucket,
+  onBucketClick,
+}: {
+  summary: AgingSummary | null
+  loading: boolean
+  bucket: string
+  onBucketClick: (b: string) => void
+}) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
+      <div
+        onClick={() => onBucketClick('')}
+        style={{
+          background: '#ff6b00', borderRadius: 12, padding: 16,
+          cursor: bucket ? 'pointer' : 'default',
+        }}
+      >
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+          Total AR
+        </div>
+        <div style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>
+          {loading ? '—' : fmt(summary?.total ?? 0)}
+        </div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>All buckets</div>
+      </div>
+
+      {AGING_BUCKETS.map((b) => (
+        <div
+          key={b}
+          onClick={() => onBucketClick(bucket === b ? '' : b)}
+          style={{
+            background: bucket === b ? '#2a2a2a' : '#1e1e1e',
+            border: `1px solid ${bucket === b ? BUCKET_COLORS[b] : '#2a2a2a'}`,
+            borderRadius: 12, padding: 16, cursor: 'pointer',
+          }}
+        >
+          <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+            {b} days
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 500, color: bucket === b ? BUCKET_COLORS[b] : '#fff' }}>
+            {loading ? '—' : fmt(summary?.aging[b] ?? 0)}
+          </div>
+          {summary && (
+            <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
+              {summary.total > 0 ? ((summary.aging[b] / summary.total) * 100).toFixed(1) + '%' : '0%'}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Customer detail view ──────────────────────────────────────────────────────
+
+function CustomerDetail({
+  customer, entity, onBack,
+}: {
+  customer: Customer
+  entity: string
+  onBack: () => void
+}) {
+  const [invoices, setInvoices]   = useState<Invoice[]>([])
+  const [total, setTotal]         = useState(0)
+  const [page, setPage]           = useState(1)
+  const [pageCount, setPageCount] = useState(0)
+  const [loading, setLoading]     = useState(true)
+
+  const PAGE_SIZE = 50
+
+  useEffect(() => {
+    setLoading(true)
+    const params = new URLSearchParams({ customerId: customer.id, page: String(page) })
+    if (entity) params.set('entity', entity)
+    fetch(`/api/ar/invoices?${params}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setInvoices(d.invoices ?? [])
+        setTotal(d.total ?? 0)
+        setPageCount(d.pageCount ?? 0)
+      })
+      .finally(() => setLoading(false))
+  }, [customer.id, entity, page])
+
+  // Aging breakdown for this customer (from pre-aggregated data)
+  const custAging: Record<string, number> = {
+    'Current': customer.current,
+    '1-30':    customer.d30,
+    '31-60':   customer.d60,
+    '61-90':   customer.d90,
+    '>90':     customer.d90plus,
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button
+          onClick={onBack}
+          style={{
+            background: '#2a2a2a', border: 'none', borderRadius: 8,
+            color: '#ccc', padding: '6px 12px', fontSize: 12,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+          }}
+        >
+          ← Back
+        </button>
+        <div style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>
+          {customer.displayName}
+        </div>
+        <div style={{ fontSize: 12, color: '#555', marginLeft: 4 }}>
+          {customer.invoiceCount} invoice{customer.invoiceCount !== 1 ? 's' : ''} · {fmt(customer.totalAr)} total
+        </div>
+      </div>
+
+      {/* Aging breakdown for this customer */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
+        <div style={{ background: '#ff6b00', borderRadius: 12, padding: 16 }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+            Total AR
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>{fmt(customer.totalAr)}</div>
+        </div>
+        {AGING_BUCKETS.map((b) => (
+          <div key={b} style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, padding: 16 }}>
+            <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>{b} days</div>
+            <div style={{ fontSize: 20, fontWeight: 500, color: custAging[b] > 0 ? BUCKET_COLORS[b] : '#444' }}>
+              {fmt(custAging[b])}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Invoices */}
+      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', overflow: 'hidden' }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #2a2a2a' }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>Open Invoices</span>
+          {total > 0 && <span style={{ fontSize: 11, color: '#555', marginLeft: 8 }}>{total} total</span>}
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
+                {['Invoice #', 'Entity', 'Branch', 'Job', 'PO #', 'Invoice Date', 'Due Date', 'Terms', 'Aging', 'Open Balance'].map((h) => (
+                  <th key={h} style={{ padding: '9px 12px', textAlign: h === 'Open Balance' ? 'right' : 'left', fontSize: 11, color: '#666', fontWeight: 400, whiteSpace: 'nowrap' }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>Loading…</td></tr>
+              ) : invoices.length === 0 ? (
+                <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>No invoices found</td></tr>
+              ) : (
+                invoices.map((inv) => (
+                  <tr key={inv.id} style={{ borderBottom: '1px solid #222' }}>
+                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>{inv.invoice_number ?? '—'}</td>
+                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc' }}>{inv.entity_code}</td>
+                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>
+                      {inv.branch?.name ?? <span style={{ color: '#555' }}>{inv.raw_class_code ?? '—'}</span>}
+                    </td>
+                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#888', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.job_name ?? '—'}</td>
+                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#888' }}>{inv.po_number ?? '—'}</td>
+                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#888', whiteSpace: 'nowrap' }}>{fmtDate(inv.invoice_date)}</td>
+                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>{fmtDate(inv.due_date)}</td>
+                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#888' }}>{inv.terms ?? '—'}</td>
+                    <td style={{ padding: '9px 12px', fontSize: 12, whiteSpace: 'nowrap' }}>
+                      <span style={{ background: `${BUCKET_COLORS[inv.aging_bucket] ?? '#333'}22`, color: BUCKET_COLORS[inv.aging_bucket] ?? '#888', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>
+                        {inv.aging_bucket}
+                      </span>
+                    </td>
+                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#fff', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                      {fmt(Number(inv.open_balance))}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {pageCount > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderTop: '1px solid #2a2a2a' }}>
+            <span style={{ fontSize: 12, color: '#666' }}>{total} invoice{total !== 1 ? 's' : ''}</span>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={{ background: '#2a2a2a', border: 'none', borderRadius: 6, color: page === 1 ? '#444' : '#ccc', padding: '4px 10px', fontSize: 12, cursor: page === 1 ? 'default' : 'pointer' }}>‹</button>
+              <span style={{ fontSize: 12, color: '#888', padding: '4px 8px' }}>{page} / {pageCount}</span>
+              <button onClick={() => setPage((p) => Math.min(pageCount, p + 1))} disabled={page === pageCount} style={{ background: '#2a2a2a', border: 'none', borderRadius: 6, color: page === pageCount ? '#444' : '#ccc', padding: '4px 10px', fontSize: 12, cursor: page === pageCount ? 'default' : 'pointer' }}>›</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Placeholder for future customer profile features */}
+      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 20 }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: '#fff', marginBottom: 4 }}>Customer Profile</div>
+        <div style={{ fontSize: 12, color: '#555' }}>Contacts, notes, project manager assignments, and status will appear here.</div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main dashboard ────────────────────────────────────────────────────────────
+
 export default function ArDashboard({ role, branches }: Props) {
   const isAdmin = role === 'admin'
 
-  // Filters
-  const [entity, setEntity]     = useState<string>('')
-  const [branchId, setBranchId] = useState<string>('')
-  const [bucket, setBucket]     = useState<string>('')
-  const [search, setSearch]     = useState<string>('')
-  const [page, setPage]         = useState(1)
+  const [entity, setEntity]     = useState('')
+  const [branchId, setBranchId] = useState('')
+  const [bucket, setBucket]     = useState('')
+  const [search, setSearch]     = useState('')
+  const [sortKey, setSortKey]   = useState<SortKey>('totalAr')
+  const [sortDir, setSortDir]   = useState<SortDir>('desc')
 
-  // Data
-  const [summary, setSummary]   = useState<AgingSummary | null>(null)
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [total, setTotal]       = useState(0)
-  const [pageCount, setPageCount] = useState(0)
-  const [loadingSummary, setLoadingSummary] = useState(true)
-  const [loadingInvoices, setLoadingInvoices] = useState(true)
+  const [summary, setSummary]     = useState<AgingSummary | null>(null)
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [loadingSummary, setLoadingSummary]   = useState(true)
+  const [loadingCustomers, setLoadingCustomers] = useState(true)
 
-  // Import modal
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [showImport, setShowImport] = useState(false)
 
   const fetchSummary = useCallback(async () => {
     setLoadingSummary(true)
-    const params = new URLSearchParams()
-    if (entity)   params.set('entity', entity)
-    if (branchId) params.set('branchId', branchId)
-    const res = await fetch(`/api/ar/summary?${params}`)
+    const p = new URLSearchParams()
+    if (entity)   p.set('entity', entity)
+    if (branchId) p.set('branchId', branchId)
+    const res = await fetch(`/api/ar/summary?${p}`)
     if (res.ok) setSummary(await res.json())
     setLoadingSummary(false)
   }, [entity, branchId])
 
-  const fetchInvoices = useCallback(async () => {
-    setLoadingInvoices(true)
-    const params = new URLSearchParams({ page: String(page) })
-    if (entity)   params.set('entity', entity)
-    if (branchId) params.set('branchId', branchId)
-    if (bucket)   params.set('agingBucket', bucket)
-    if (search)   params.set('search', search)
-    const res = await fetch(`/api/ar/invoices?${params}`)
+  const fetchCustomers = useCallback(async () => {
+    setLoadingCustomers(true)
+    const p = new URLSearchParams()
+    if (entity)   p.set('entity', entity)
+    if (branchId) p.set('branchId', branchId)
+    const res = await fetch(`/api/ar/customers?${p}`)
     if (res.ok) {
       const data = await res.json()
-      setInvoices(data.invoices)
-      setTotal(data.total)
-      setPageCount(data.pageCount)
+      setCustomers(data.customers ?? [])
     }
-    setLoadingInvoices(false)
-  }, [entity, branchId, bucket, search, page])
+    setLoadingCustomers(false)
+  }, [entity, branchId])
 
   useEffect(() => { fetchSummary() }, [fetchSummary])
-  useEffect(() => { fetchInvoices() }, [fetchInvoices])
+  useEffect(() => { fetchCustomers() }, [fetchCustomers])
 
-  // Reset page when filters change
-  useEffect(() => { setPage(1) }, [entity, branchId, bucket, search])
+  // Reset selected customer when filters change
+  useEffect(() => { setSelectedCustomer(null) }, [entity, branchId])
 
   const handleImportSuccess = () => {
     setShowImport(false)
     fetchSummary()
-    fetchInvoices()
+    fetchCustomers()
   }
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortKey(key); setSortDir('desc') }
+  }
+
+  // Filter customers by search + active bucket
+  const filteredCustomers = customers
+    .filter((c) => {
+      if (search && !c.displayName.toLowerCase().includes(search.toLowerCase())) return false
+      if (bucket) {
+        const bucketField: Record<string, keyof Customer> = {
+          'Current': 'current', '1-30': 'd30', '31-60': 'd60', '61-90': 'd90', '>90': 'd90plus',
+        }
+        const field = bucketField[bucket]
+        if (field && (c[field] as number) <= 0) return false
+      }
+      return true
+    })
+    .sort((a, b) => {
+      const av = a[sortKey]
+      const bv = b[sortKey]
+      if (typeof av === 'string' && typeof bv === 'string') {
+        return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+      }
+      return sortDir === 'asc' ? (av as number) - (bv as number) : (bv as number) - (av as number)
+    })
+
+  // ── Customer detail view ───────────────────────────────────────────────────
+
+  if (selectedCustomer) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <CustomerDetail
+          customer={selectedCustomer}
+          entity={entity}
+          onBack={() => setSelectedCustomer(null)}
+        />
+      </div>
+    )
+  }
+
+  // ── Customer list view ─────────────────────────────────────────────────────
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -130,8 +413,8 @@ export default function ArDashboard({ role, branches }: Props) {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Accounts Receivable</div>
-          {summary && (
+          <div style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>Accounts Receivable</div>
+          {summary && summary.lastImports.length > 0 && (
             <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
               {summary.lastImports.map((imp) => (
                 <span key={imp.entity_code} style={{ marginRight: 16 }}>
@@ -145,17 +428,9 @@ export default function ArDashboard({ role, branches }: Props) {
           <button
             onClick={() => setShowImport(true)}
             style={{
-              background: '#ff6b00',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 8,
-              padding: '8px 16px',
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
+              background: '#ff6b00', color: '#fff', border: 'none',
+              borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
             }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -168,219 +443,122 @@ export default function ArDashboard({ role, branches }: Props) {
         )}
       </div>
 
-      {/* Aging Summary Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
-        {/* Total card */}
-        <div
-          style={{
-            background: '#ff6b00',
-            borderRadius: 12,
-            padding: 16,
-            cursor: bucket ? 'pointer' : 'default',
-          }}
-          onClick={() => setBucket('')}
-        >
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
-            Total AR
-          </div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>
-            {loadingSummary ? '—' : fmt(summary?.total ?? 0)}
-          </div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>
-            All buckets
-          </div>
-        </div>
-
-        {AGING_BUCKETS.map((b) => (
-          <div
-            key={b}
-            onClick={() => setBucket(bucket === b ? '' : b)}
-            style={{
-              background: bucket === b ? '#2a2a2a' : '#1e1e1e',
-              border: `1px solid ${bucket === b ? BUCKET_COLORS[b] : '#2a2a2a'}`,
-              borderRadius: 12,
-              padding: 16,
-              cursor: 'pointer',
-            }}
-          >
-            <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
-              {b} days
-            </div>
-            <div style={{ fontSize: 20, fontWeight: 500, color: bucket === b ? BUCKET_COLORS[b] : '#fff' }}>
-              {loadingSummary ? '—' : fmt(summary?.aging[b] ?? 0)}
-            </div>
-            {summary && (
-              <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
-                {summary.total > 0
-                  ? ((summary.aging[b] / summary.total) * 100).toFixed(1) + '%'
-                  : '0%'}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+      {/* Aging summary cards */}
+      <AgingCards
+        summary={summary}
+        loading={loadingSummary}
+        bucket={bucket}
+        onBucketClick={setBucket}
+      />
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <select
           value={entity}
           onChange={(e) => setEntity(e.target.value)}
-          style={{
-            background: '#2a2a2a',
-            border: '1px solid #333',
-            borderRadius: 8,
-            color: '#ccc',
-            padding: '5px 12px',
-            fontSize: 12,
-            cursor: 'pointer',
-          }}
+          style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}
         >
           <option value="">All Entities</option>
-          {ENTITIES.map((e) => (
-            <option key={e} value={e}>{e}</option>
-          ))}
+          {ENTITIES.map((e) => <option key={e} value={e}>{e}</option>)}
         </select>
 
         {branches.length > 1 && (
           <select
             value={branchId}
             onChange={(e) => setBranchId(e.target.value)}
-            style={{
-              background: '#2a2a2a',
-              border: '1px solid #333',
-              borderRadius: 8,
-              color: '#ccc',
-              padding: '5px 12px',
-              fontSize: 12,
-              cursor: 'pointer',
-            }}
+            style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}
           >
             <option value="">All Branches</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
+            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         )}
 
         <input
           type="text"
-          placeholder="Search invoice #..."
+          placeholder="Search customer…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{
-            background: '#2a2a2a',
-            border: '1px solid #333',
-            borderRadius: 8,
-            color: '#ccc',
-            padding: '5px 12px',
-            fontSize: 12,
-            outline: 'none',
-            width: 180,
-          }}
+          style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '5px 12px', fontSize: 12, outline: 'none', width: 180 }}
         />
 
         {(entity || branchId || bucket || search) && (
           <button
             onClick={() => { setEntity(''); setBranchId(''); setBucket(''); setSearch('') }}
-            style={{
-              background: 'transparent',
-              border: '1px solid #333',
-              borderRadius: 8,
-              color: '#888',
-              padding: '5px 12px',
-              fontSize: 12,
-              cursor: 'pointer',
-            }}
+            style={{ background: 'transparent', border: '1px solid #333', borderRadius: 8, color: '#888', padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}
           >
             Clear
           </button>
         )}
+
+        {filteredCustomers.length > 0 && (
+          <span style={{ fontSize: 12, color: '#555', alignSelf: 'center', marginLeft: 4 }}>
+            {filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}
+          </span>
+        )}
       </div>
 
-      {/* Invoice Table */}
+      {/* Customer table */}
       <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
-                {['Customer', 'Invoice #', 'Entity', 'Branch', 'PO #', 'Job', 'Invoice Date', 'Due Date', 'Terms', 'Aging', 'Open Balance'].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      padding: '10px 12px',
-                      textAlign: h === 'Open Balance' ? 'right' : 'left',
-                      fontSize: 11,
-                      color: '#666',
-                      fontWeight: 400,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
+                <SortTh label="Customer"   sortKey="displayName"  current={sortKey} dir={sortDir} onSort={handleSort} />
+                <SortTh label="Current"    sortKey="current"      current={sortKey} dir={sortDir} onSort={handleSort} right />
+                <SortTh label="1–30 days"  sortKey="d30"          current={sortKey} dir={sortDir} onSort={handleSort} right />
+                <SortTh label="31–60 days" sortKey="d60"          current={sortKey} dir={sortDir} onSort={handleSort} right />
+                <SortTh label="61–90 days" sortKey="d90"          current={sortKey} dir={sortDir} onSort={handleSort} right />
+                <SortTh label=">90 days"   sortKey="d90plus"      current={sortKey} dir={sortDir} onSort={handleSort} right />
+                <SortTh label="Total AR"   sortKey="totalAr"      current={sortKey} dir={sortDir} onSort={handleSort} right />
+                <SortTh label="Invoices"   sortKey="invoiceCount" current={sortKey} dir={sortDir} onSort={handleSort} right />
               </tr>
             </thead>
             <tbody>
-              {loadingInvoices ? (
+              {loadingCustomers ? (
                 <tr>
-                  <td colSpan={11} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>
-                    Loading…
-                  </td>
+                  <td colSpan={8} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>Loading…</td>
                 </tr>
-              ) : invoices.length === 0 ? (
+              ) : filteredCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={11} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>
-                    No invoices found
+                  <td colSpan={8} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>
+                    {customers.length === 0 ? 'No AR data. Import a file to get started.' : 'No customers match your filters.'}
                   </td>
                 </tr>
               ) : (
-                invoices.map((inv) => (
+                filteredCustomers.map((cust) => (
                   <tr
-                    key={inv.id}
-                    style={{ borderBottom: '1px solid #222' }}
+                    key={cust.id}
+                    onClick={() => setSelectedCustomer(cust)}
+                    style={{
+                      borderBottom: '1px solid #222',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = '#242424')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = '')}
                   >
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ff6b00', whiteSpace: 'nowrap' }}>
-                      {inv.customer?.display_name ?? '—'}
+                    <td style={{ padding: '10px 12px', fontSize: 13, color: '#ff6b00', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                      {cust.displayName}
                     </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>
-                      {inv.invoice_number ?? '—'}
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.current > 0 ? '#fff' : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                      {cust.current > 0 ? fmt(cust.current) : '—'}
                     </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc' }}>
-                      {inv.entity_code}
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d30 > 0 ? BUCKET_COLORS['1-30'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                      {cust.d30 > 0 ? fmt(cust.d30) : '—'}
                     </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>
-                      {inv.branch?.name ?? (
-                        <span style={{ color: '#555' }}>{inv.raw_class_code ?? '—'}</span>
-                      )}
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d60 > 0 ? BUCKET_COLORS['31-60'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                      {cust.d60 > 0 ? fmt(cust.d60) : '—'}
                     </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#888' }}>
-                      {inv.po_number ?? '—'}
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d90 > 0 ? BUCKET_COLORS['61-90'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                      {cust.d90 > 0 ? fmt(cust.d90) : '—'}
                     </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#888', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {inv.job_name ?? '—'}
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d90plus > 0 ? BUCKET_COLORS['>90'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                      {cust.d90plus > 0 ? fmt(cust.d90plus) : '—'}
                     </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#888', whiteSpace: 'nowrap' }}>
-                      {fmtDate(inv.invoice_date)}
+                    <td style={{ padding: '10px 12px', fontSize: 13, color: '#fff', fontWeight: 500, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                      {fmt(cust.totalAr)}
                     </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>
-                      {fmtDate(inv.due_date)}
-                    </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#888' }}>
-                      {inv.terms ?? '—'}
-                    </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, whiteSpace: 'nowrap' }}>
-                      <span style={{
-                        background: `${BUCKET_COLORS[inv.aging_bucket] ?? '#333'}22`,
-                        color: BUCKET_COLORS[inv.aging_bucket] ?? '#888',
-                        borderRadius: 4,
-                        padding: '2px 8px',
-                        fontSize: 11,
-                      }}>
-                        {inv.aging_bucket}
-                      </span>
-                    </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#fff', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                      {fmt(inv.open_balance)}
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: '#666', textAlign: 'right' }}>
+                      {cust.invoiceCount}
                     </td>
                   </tr>
                 ))
@@ -388,55 +566,10 @@ export default function ArDashboard({ role, branches }: Props) {
             </tbody>
           </table>
         </div>
-
-        {/* Pagination */}
-        {pageCount > 1 && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '12px 16px',
-            borderTop: '1px solid #2a2a2a',
-          }}>
-            <span style={{ fontSize: 12, color: '#666' }}>
-              {total} invoice{total !== 1 ? 's' : ''}
-            </span>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                style={{
-                  background: '#2a2a2a', border: 'none', borderRadius: 6,
-                  color: page === 1 ? '#444' : '#ccc',
-                  padding: '4px 10px', fontSize: 12, cursor: page === 1 ? 'default' : 'pointer',
-                }}
-              >
-                ‹
-              </button>
-              <span style={{ fontSize: 12, color: '#888', padding: '4px 8px' }}>
-                {page} / {pageCount}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                disabled={page === pageCount}
-                style={{
-                  background: '#2a2a2a', border: 'none', borderRadius: 6,
-                  color: page === pageCount ? '#444' : '#ccc',
-                  padding: '4px 10px', fontSize: 12, cursor: page === pageCount ? 'default' : 'pointer',
-                }}
-              >
-                ›
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {showImport && (
-        <ArImportModal
-          onClose={() => setShowImport(false)}
-          onSuccess={handleImportSuccess}
-        />
+        <ArImportModal onClose={() => setShowImport(false)} onSuccess={handleImportSuccess} />
       )}
     </div>
   )
