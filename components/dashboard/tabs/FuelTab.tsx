@@ -1,6 +1,7 @@
 'use client'
 
 import MetricCard from '@/components/ui/MetricCard'
+import WeeklyChart from '@/components/charts/WeeklyChart'
 import { formatCurrency } from '@/lib/utils/format'
 import type { TabProps } from './types'
 
@@ -20,7 +21,10 @@ export default function FuelTab({ role, data, allocationOn }: TabProps) {
   const totalCost = baseCost + allocFuel
   const avgPpg = baseGallons > 0 ? baseCost / baseGallons : null
 
-  const maxCost = Math.max(...fuelByWeek.map((w) => w.totalCost), 1)
+  const weeklyChartData = fuelByWeek.map((w) => ({
+    date: w.weekEndDate,
+    cost: w.totalCost,
+  }))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -45,24 +49,13 @@ export default function FuelTab({ role, data, allocationOn }: TabProps) {
       {fuelByWeek.length > 0 && (
         <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Fuel Cost by Week</div>
-          <div style={{ overflowX: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 120, minWidth: fuelByWeek.length * 60 }}>
-              {fuelByWeek.map((w) => {
-                const h = (w.totalCost / maxCost) * 100
-                const d = new Date(w.weekEndDate + 'T00:00:00')
-                const label = `${d.getMonth() + 1}/${d.getDate()}`
-                return (
-                  <div key={w.weekEndDate} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }}>
-                    <div
-                      title={`${formatCurrency(w.totalCost)} (${w.totalGallons.toFixed(0)} gal)`}
-                      style={{ width: '80%', height: `${h}%`, background: '#cc4444', borderRadius: '2px 2px 0 0', opacity: 0.8 }}
-                    />
-                    <div style={{ fontSize: 9, color: '#555555', marginTop: 4 }}>{label}</div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+          <WeeklyChart
+            data={weeklyChartData}
+            dateKey="date"
+            series={[{ key: 'cost', label: 'Fuel Cost', color: '#cc4444', opacity: 0.85 }]}
+            height={180}
+            formatValue={(v) => `$${v.toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
+          />
         </div>
       )}
 

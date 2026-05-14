@@ -109,6 +109,7 @@ export type PayrollLineItem = {
   hours: number | null
   rate: number | null
   branchId?: string | null
+  periodDate?: string
 }
 
 export type PayrollRange = {

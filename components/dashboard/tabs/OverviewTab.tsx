@@ -1,15 +1,11 @@
 'use client'
 
 import MetricCard from '@/components/ui/MetricCard'
+import WeeklyChart from '@/components/charts/WeeklyChart'
 import { formatCurrency, formatPercent } from '@/lib/utils/format'
 import type { TabProps } from './types'
 
 function r(n: number) { return Math.round(n * 100) / 100 }
-
-function fmtDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00')
-  return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}`
-}
 
 export default function OverviewTab({ role, data, branches, allocationOn }: TabProps) {
   const isAdminOrExec = role === 'admin' || role === 'executive'
@@ -189,7 +185,22 @@ export default function OverviewTab({ role, data, branches, allocationOn }: TabP
       {periods.length > 0 && (
         <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Weekly Trend</div>
-          <AdminWeeklyChart periods={periods} />
+          <WeeklyChart
+            data={periods.map((p) => ({
+              date: p.periodDate,
+              revenue: p.revenue,
+              payroll: p.directPayroll + p.adminPayroll + p.employerTaxes,
+              fuel: p.fuel,
+            }))}
+            dateKey="date"
+            series={[
+              { key: 'revenue', label: 'Revenue', color: '#ff6b00' },
+              { key: 'payroll', label: 'Payroll', color: '#cc4444', opacity: 0.8 },
+              { key: 'fuel', label: 'Fuel', color: '#cc4444', opacity: 0.45 },
+            ]}
+            height={180}
+            formatValue={(v) => `$${v.toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
+          />
         </div>
       )}
 
@@ -211,7 +222,22 @@ export default function OverviewTab({ role, data, branches, allocationOn }: TabP
       {!isAdminOrExec && managerWeeklyPeriods.length > 0 && (
         <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Weekly Trend</div>
-          <ManagerWeeklyChart periods={managerWeeklyPeriods} />
+          <WeeklyChart
+            data={managerWeeklyPeriods.map((p) => ({
+              date: p.date,
+              revenue: p.revenue,
+              payroll: p.payroll,
+              fuel: p.fuel,
+            }))}
+            dateKey="date"
+            series={[
+              { key: 'revenue', label: 'Revenue', color: '#ff6b00' },
+              { key: 'payroll', label: 'Payroll', color: '#cc4444', opacity: 0.8 },
+              { key: 'fuel', label: 'Fuel', color: '#cc4444', opacity: 0.45 },
+            ]}
+            height={180}
+            formatValue={(v) => `$${v.toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
+          />
         </div>
       )}
 
@@ -318,93 +344,6 @@ function CostBar({ label, amount, total, color, opacity = 1 }: {
       <div style={{ width: 44, fontSize: 11, color: '#555555', textAlign: 'right', flexShrink: 0 }}>
         {formatPercent(pct)}
       </div>
-    </div>
-  )
-}
-
-// ── Admin/exec weekly chart ───────────────────────────────────────────────────
-
-type AdminPeriodRow = {
-  periodDate: string
-  revenue: number
-  directPayroll: number
-  adminPayroll: number
-  employerTaxes: number
-  fuel: number
-}
-
-function AdminWeeklyChart({ periods }: { periods: AdminPeriodRow[] }) {
-  const maxRevenue = Math.max(...periods.map((p) => p.revenue), 1)
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 120, minWidth: periods.length * 60 }}>
-        {periods.map((p) => {
-          const totalPayroll = p.directPayroll + p.adminPayroll + p.employerTaxes
-          const revH = (p.revenue / maxRevenue) * 100
-          const payH = (totalPayroll / maxRevenue) * 100
-          const fuelH = (p.fuel / maxRevenue) * 100
-          return (
-            <div key={p.periodDate} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 100, width: '100%', justifyContent: 'center' }}>
-                <div title={`Revenue: ${formatCurrency(p.revenue)}`} style={{ width: 10, height: `${revH}%`, background: '#ff6b00', borderRadius: '2px 2px 0 0' }} />
-                <div title={`Payroll: ${formatCurrency(totalPayroll)}`} style={{ width: 10, height: `${payH}%`, background: '#cc4444', borderRadius: '2px 2px 0 0', opacity: 0.8 }} />
-                <div title={`Fuel: ${formatCurrency(p.fuel)}`} style={{ width: 10, height: `${fuelH}%`, background: '#cc4444', borderRadius: '2px 2px 0 0', opacity: 0.5 }} />
-              </div>
-              <div style={{ fontSize: 9, color: '#555555', marginTop: 4 }}>{fmtDate(p.periodDate)}</div>
-            </div>
-          )
-        })}
-      </div>
-      <ChartLegend />
-    </div>
-  )
-}
-
-// ── Manager weekly chart ──────────────────────────────────────────────────────
-
-type ManagerPeriod = { date: string; revenue: number; payroll: number; fuel: number }
-
-function ManagerWeeklyChart({ periods }: { periods: ManagerPeriod[] }) {
-  const maxVal = Math.max(...periods.map((p) => p.revenue), 1)
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 120, minWidth: periods.length * 60 }}>
-        {periods.map((p) => {
-          const revH = (p.revenue / maxVal) * 100
-          const payH = (p.payroll / maxVal) * 100
-          const fuelH = (p.fuel / maxVal) * 100
-          return (
-            <div key={p.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 100, width: '100%', justifyContent: 'center' }}>
-                <div title={`Revenue: ${formatCurrency(p.revenue)}`} style={{ width: 10, height: `${revH}%`, background: '#ff6b00', borderRadius: '2px 2px 0 0' }} />
-                <div title={`Payroll: ${formatCurrency(p.payroll)}`} style={{ width: 10, height: `${payH}%`, background: '#cc4444', borderRadius: '2px 2px 0 0', opacity: 0.8 }} />
-                <div title={`Fuel: ${formatCurrency(p.fuel)}`} style={{ width: 10, height: `${fuelH}%`, background: '#cc4444', borderRadius: '2px 2px 0 0', opacity: 0.5 }} />
-              </div>
-              <div style={{ fontSize: 9, color: '#555555', marginTop: 4 }}>{fmtDate(p.date)}</div>
-            </div>
-          )
-        })}
-      </div>
-      <ChartLegend />
-    </div>
-  )
-}
-
-function ChartLegend() {
-  return (
-    <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
-      <LegendDot color='#ff6b00' label='Revenue' />
-      <LegendDot color='#cc4444' label='Payroll' />
-      <LegendDot color='rgba(204,68,68,0.5)' label='Fuel' />
-    </div>
-  )
-}
-
-function LegendDot({ color, label }: { color: string; label: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <div style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
-      <span style={{ fontSize: 10, color: '#888888' }}>{label}</span>
     </div>
   )
 }

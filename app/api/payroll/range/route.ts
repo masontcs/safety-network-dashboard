@@ -165,6 +165,7 @@ export async function GET(request: Request): Promise<NextResponse> {
           hours: t.hours !== null ? r2(t.hours * (split.percentage / 100)) : null,
           rate: t.rate,
           branchId,
+          periodDate: t.period_date,
         })
       } else {
         for (const split of splits) {
@@ -178,6 +179,7 @@ export async function GET(request: Request): Promise<NextResponse> {
             hours: t.hours !== null ? r2(t.hours * (split.percentage / 100)) : null,
             rate: t.rate,
             branchId: split.branchId,
+            periodDate: t.period_date,
           })
         }
       }
@@ -194,6 +196,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         hours: t.hours,
         rate: t.rate,
         branchId: t.payroll_codes.branch_id,
+        periodDate: t.period_date,
       })
     }
 

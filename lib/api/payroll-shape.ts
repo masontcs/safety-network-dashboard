@@ -10,6 +10,7 @@ export type PayrollLineItem = {
   hours: number | null
   rate: number | null
   branchId?: string | null
+  periodDate?: string
 }
 
 export type AdminPayrollDetail = { detail: PayrollLineItem[]; total: number }

@@ -8,6 +8,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  LabelList,
 } from 'recharts'
 
 export interface BarChartDataPoint {
@@ -23,6 +24,38 @@ interface BarChartProps {
   formatValue?: (value: number) => string
 }
 
+function compactMoney(v: number): string {
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`
+  if (v >= 1000) return `$${(v / 1000).toFixed(0)}k`
+  return `$${Math.round(v)}`
+}
+
+function CustomTooltip({ active, payload, label, formatValue }: {
+  active?: boolean
+  payload?: Array<{ value: number; color: string }>
+  label?: string
+  formatValue: (v: number) => string
+}) {
+  if (!active || !payload?.length) return null
+  return (
+    <div style={{
+      background: '#161616',
+      border: '1px solid #2a2a2a',
+      borderRadius: 8,
+      padding: '10px 14px',
+      fontSize: 12,
+      boxShadow: '0 8px 28px rgba(0,0,0,0.65)',
+      minWidth: 140,
+      pointerEvents: 'none',
+    }}>
+      <div style={{ color: '#888888', fontSize: 11, marginBottom: 6 }}>{label}</div>
+      <div style={{ color: '#ffffff', fontWeight: 500, fontSize: 14 }}>
+        {formatValue(payload[0].value)}
+      </div>
+    </div>
+  )
+}
+
 export default function BarChart({
   data,
   color = '#ff6b00',
@@ -30,11 +63,18 @@ export default function BarChart({
   showAxes = true,
   formatValue,
 }: BarChartProps) {
+  const fmt = formatValue ?? ((v: number) => `$${v.toLocaleString('en-US', { maximumFractionDigits: 0 })}`)
+  const showLabels = data.length <= 8
+
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <RechartsBarChart data={data} barCategoryGap="30%" margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+      <RechartsBarChart
+        data={data}
+        barCategoryGap="30%"
+        margin={{ top: showLabels ? 24 : 4, right: 4, left: 0, bottom: 0 }}
+      >
         {showAxes && (
-          <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#1f1f1f" vertical={false} />
         )}
         {showAxes && (
           <XAxis
@@ -46,24 +86,34 @@ export default function BarChart({
         )}
         {showAxes && (
           <YAxis
-            tick={{ fill: '#555555', fontSize: 9 }}
+            tick={{ fill: '#444444', fontSize: 9 }}
             axisLine={false}
             tickLine={false}
-            width={36}
+            width={44}
+            tickFormatter={compactMoney}
           />
         )}
         <Tooltip
-          contentStyle={{
-            background: '#2a2a2a',
-            border: '1px solid #333333',
-            borderRadius: 8,
-            fontSize: 12,
-          }}
-          labelStyle={{ color: '#888888' }}
-          itemStyle={{ color: '#ffffff' }}
-          formatter={(value: number) => [formatValue ? formatValue(value) : `$${value.toLocaleString()}`, '']}
+          content={(props) => (
+            <CustomTooltip
+              active={props.active}
+              payload={props.payload as Array<{ value: number; color: string }>}
+              label={String(props.label)}
+              formatValue={fmt}
+            />
+          )}
+          cursor={{ fill: 'rgba(255,255,255,0.025)' }}
         />
-        <Bar dataKey="value" fill={color} radius={[3, 3, 0, 0]} />
+        <Bar dataKey="value" fill={color} radius={[3, 3, 0, 0]}>
+          {showLabels && (
+            <LabelList
+              dataKey="value"
+              position="top"
+              style={{ fill: '#666666', fontSize: 10 }}
+              formatter={(v: number) => v > 0 ? compactMoney(v) : ''}
+            />
+          )}
+        </Bar>
       </RechartsBarChart>
     </ResponsiveContainer>
   )

@@ -1,8 +1,17 @@
 'use client'
 
+import { useState } from 'react'
 import MetricCard from '@/components/ui/MetricCard'
+import WeeklyChart from '@/components/charts/WeeklyChart'
 import { formatCurrency } from '@/lib/utils/format'
 import type { TabProps } from './types'
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso + 'T00:00:00')
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}`
+}
 
 export default function PayrollTab({ role, data, branches, allocationOn }: TabProps) {
   const pay = data.payroll
@@ -23,10 +32,18 @@ export default function PayrollTab({ role, data, branches, allocationOn }: TabPr
   const taxesTotal = pay.total.taxes
   const totalPayroll = directTotal + adminTotal + taxesTotal + corpOverhead + hqOverhead
 
-  const maxTotal = Math.max(
-    ...pay.byWeek.map((w) => w.direct + w.admin + w.taxes),
-    1
-  )
+  const weeklyChartData = pay.byWeek.map((w) => ({
+    date: w.periodDate,
+    taxes: w.taxes,
+    admin: w.admin,
+    direct: w.direct,
+  }))
+
+  const weeklySeries = [
+    { key: 'taxes', label: 'Taxes', color: '#555555', stackId: 'a' },
+    { key: 'admin', label: 'Admin Payroll', color: '#888888', stackId: 'a' },
+    { key: 'direct', label: 'Direct Labor', color: '#ff6b00', stackId: 'a' },
+  ]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -42,78 +59,56 @@ export default function PayrollTab({ role, data, branches, allocationOn }: TabPr
         />
       </div>
 
-      {/* Corp/HQ payroll breakdown when allocation is on */}
+      {/* Corp/HQ overhead breakdown */}
       {allocationOn && isAdminOrExec && (corpOverhead > 0 || hqOverhead > 0) && (
         <div style={{
           background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: '12px 16px',
           display: 'flex', gap: 32, alignItems: 'center',
         }}>
           <div style={{ fontSize: 11, color: '#888888', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Corp/HQ Overhead</div>
-          <Item label='Corp Payroll' value={formatCurrency(corpOverhead)} />
-          <Item label='HQ Payroll (SN share)' value={formatCurrency(hqOverhead)} />
+          <Stat label='Corp Payroll' value={formatCurrency(corpOverhead)} />
+          <Stat label='HQ Payroll (SN share)' value={formatCurrency(hqOverhead)} />
         </div>
       )}
 
-      {/* ── Weekly stacked bar ────────────────────────────────────────────────── */}
+      {/* ── Weekly payroll chart ──────────────────────────────────────────────── */}
       {pay.byWeek.length > 0 && (
         <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Weekly Payroll</div>
-          <div style={{ overflowX: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 120, minWidth: pay.byWeek.length * 60 }}>
-              {pay.byWeek.map((w) => {
-                const total = w.direct + w.admin + w.taxes
-                const dirH = (w.direct / maxTotal) * 100
-                const admH = (w.admin / maxTotal) * 100
-                const taxH = (w.taxes / maxTotal) * 100
-                const d = new Date(w.periodDate + 'T00:00:00')
-                const label = `${d.getMonth() + 1}/${d.getDate()}`
-                return (
-                  <div key={w.periodDate} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 40 }}>
-                    <div title={`Total: ${formatCurrency(total)}`} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: 100, width: '80%' }}>
-                      <div style={{ width: '100%', height: `${taxH}%`, background: '#555555', borderRadius: 0 }} title={`Taxes: ${formatCurrency(w.taxes)}`} />
-                      <div style={{ width: '100%', height: `${admH}%`, background: '#888888', borderRadius: 0 }} title={`Admin: ${formatCurrency(w.admin)}`} />
-                      <div style={{ width: '100%', height: `${dirH}%`, background: '#ff6b00', borderRadius: '2px 2px 0 0' }} title={`Direct: ${formatCurrency(w.direct)}`} />
-                    </div>
-                    <div style={{ fontSize: 9, color: '#555555', marginTop: 4 }}>{label}</div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
-            <LegendDot color='#ff6b00' label='Direct Labor' />
-            <LegendDot color='#888888' label='Admin Payroll' />
-            <LegendDot color='#555555' label='Taxes' />
-          </div>
+          <WeeklyChart
+            data={weeklyChartData}
+            dateKey="date"
+            series={weeklySeries}
+            height={180}
+            formatValue={(v) => `$${v.toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
+          />
         </div>
       )}
 
-      {/* ── Employee detail table — admin/exec see full rows, managers see summary ─ */}
-      {isAdminOrExec && pay.total.directDetail && pay.total.directDetail.length > 0 && (
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Direct Labor Detail</div>
-          <EmployeeTable rows={pay.total.directDetail} branchNameMap={branchNameMap} />
-        </div>
-      )}
-
-      {/* Admin payroll detail — admin/exec only */}
-      {isAdminOrExec && pay.total.adminDetail && pay.total.adminDetail.length > 0 && (
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Admin Payroll Detail</div>
-          <EmployeeTable rows={pay.total.adminDetail} branchNameMap={branchNameMap} />
-        </div>
-      )}
-
-      {/* Managers: direct labor detail only */}
-      {!isAdminOrExec && pay.total.directDetail && pay.total.directDetail.length > 0 && (
+      {/* ── Direct labor detail — drill-down table ────────────────────────────── */}
+      {pay.total.directDetail && pay.total.directDetail.length > 0 && (
         <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
           <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Direct Labor</div>
-          <EmployeeTable rows={pay.total.directDetail} branchNameMap={branchNameMap} />
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #2a2a2a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 12, color: '#888888' }}>Admin Payroll</span>
+          <DrilldownTable rows={pay.total.directDetail} branchNameMap={branchNameMap} />
+        </div>
+      )}
+
+      {/* ── Admin payroll detail — admin/exec only ────────────────────────────── */}
+      {isAdminOrExec && pay.total.adminDetail && pay.total.adminDetail.length > 0 && (
+        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Admin Payroll</div>
+          <DrilldownTable rows={pay.total.adminDetail} branchNameMap={branchNameMap} />
+        </div>
+      )}
+
+      {/* Managers: admin + taxes as lump-sum lines */}
+      {!isAdminOrExec && (
+        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: '12px 16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' }}>
+            <span style={{ fontSize: 12, color: '#888888' }}>Admin Payroll (lump sum)</span>
             <span style={{ fontSize: 14, color: '#ffffff', fontWeight: 500 }}>{formatCurrency(adminTotal)}</span>
           </div>
-          <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ borderTop: '1px solid #2a2a2a', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' }}>
             <span style={{ fontSize: 12, color: '#888888' }}>Employer Taxes</span>
             <span style={{ fontSize: 14, color: '#ffffff', fontWeight: 500 }}>{formatCurrency(taxesTotal)}</span>
           </div>
@@ -123,7 +118,7 @@ export default function PayrollTab({ role, data, branches, allocationOn }: TabPr
   )
 }
 
-function Item({ label, value }: { label: string; value: string }) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <div style={{ fontSize: 10, color: '#666666', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
@@ -132,46 +127,89 @@ function Item({ label, value }: { label: string; value: string }) {
   )
 }
 
-function LegendDot({ color, label }: { color: string; label: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-      <div style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
-      <span style={{ fontSize: 10, color: '#888888' }}>{label}</span>
-    </div>
-  )
+// ── Drill-down employee table ─────────────────────────────────────────────────
+
+type EmpRow = {
+  employeeId: string
+  displayName: string
+  laborType: string
+  amount: number
+  hours: number | null
+  rate: number | null
+  branchId?: string | null
+  periodDate?: string
 }
 
-type EmpRow = { employeeId: string; displayName: string; laborType: string; amount: number; hours: number | null; rate: number | null; branchId?: string | null }
+function DrilldownTable({ rows, branchNameMap }: { rows: EmpRow[]; branchNameMap: Record<string, string> }) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
-function EmployeeTable({ rows, branchNameMap }: { rows: EmpRow[]; branchNameMap: Record<string, string> }) {
-  const sorted = [...rows].sort((a, b) => b.amount - a.amount)
-  const total = rows.reduce((s, r) => s + r.amount, 0)
+  // Group by employeeId + branchId (an employee can appear in multiple branches via allocation)
+  const grouped = new Map<string, EmpRow[]>()
+  for (const row of rows) {
+    const key = `${row.employeeId}|${row.branchId ?? ''}`
+    if (!grouped.has(key)) grouped.set(key, [])
+    grouped.get(key)!.push(row)
+  }
+
+  const employees = [...grouped.entries()]
+    .map(([key, items]) => ({
+      key,
+      displayName: items[0].displayName,
+      branchId: items[0].branchId,
+      totalHours: items.reduce((s, r) => s + (r.hours ?? 0), 0),
+      totalAmount: items.reduce((s, r) => s + r.amount, 0),
+      items: [...items].sort((a, b) => (a.periodDate ?? '').localeCompare(b.periodDate ?? '')),
+      multipleWeeks: items.length > 1,
+    }))
+    .sort((a, b) => b.totalAmount - a.totalAmount)
+
+  const grandTotal = employees.reduce((s, e) => s + e.totalAmount, 0)
+  const grandHours = employees.reduce((s, e) => s + e.totalHours, 0)
+
+  function toggle(key: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) { next.delete(key) } else { next.add(key) }
+      return next
+    })
+  }
 
   return (
     <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
         <thead>
           <tr>
+            <th style={{ width: 20, padding: '0 4px 8px 0' }} />
             <th style={{ ...th, textAlign: 'left' }}>Employee</th>
             <th style={th}>Branch</th>
             <th style={th}>Hours</th>
-            <th style={th}>Rate</th>
             <th style={th}>Amount</th>
           </tr>
         </thead>
         <tbody>
-          {sorted.map((r, i) => (
-            <tr key={`${r.employeeId}-${i}`} style={{ borderBottom: '1px solid #2a2a2a' }}>
-              <td style={{ ...td, textAlign: 'left', color: '#cccccc' }}>{r.displayName}</td>
-              <td style={{ ...td, color: '#888888' }}>{r.branchId ? (branchNameMap[r.branchId] ?? '—') : '—'}</td>
-              <td style={td}>{r.hours !== null ? r.hours.toFixed(2) : '—'}</td>
-              <td style={td}>{r.rate !== null ? formatCurrency(r.rate) : '—'}</td>
-              <td style={{ ...td, color: '#ffffff' }}>{formatCurrency(r.amount)}</td>
-            </tr>
-          ))}
+          {employees.map((emp) => {
+            const isOpen = expanded.has(emp.key)
+            return (
+              <EmpGroup
+                key={emp.key}
+                emp={emp}
+                isOpen={isOpen}
+                onToggle={() => toggle(emp.key)}
+                branchNameMap={branchNameMap}
+              />
+            )
+          })}
           <tr style={{ borderTop: '1px solid #333333' }}>
-            <td colSpan={4} style={{ ...td, textAlign: 'left', color: '#888888' }}>Total</td>
-            <td style={{ ...td, color: '#ff6b00', fontWeight: 500 }}>{formatCurrency(total)}</td>
+            <td />
+            <td colSpan={2} style={{ ...td, textAlign: 'left', color: '#888888', padding: '8px 8px 6px 0' }}>
+              Total
+            </td>
+            <td style={{ ...td, color: '#cccccc', padding: '8px 8px 6px 8px' }}>
+              {grandHours > 0 ? grandHours.toFixed(2) : '—'}
+            </td>
+            <td style={{ ...td, color: '#ff6b00', fontWeight: 500, padding: '8px 0 6px 8px' }}>
+              {formatCurrency(grandTotal)}
+            </td>
           </tr>
         </tbody>
       </table>
@@ -179,5 +217,76 @@ function EmployeeTable({ rows, branchNameMap }: { rows: EmpRow[]; branchNameMap:
   )
 }
 
-const th: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', fontSize: 11, color: '#666666', fontWeight: 400 }
-const td: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', color: '#cccccc' }
+function EmpGroup({ emp, isOpen, onToggle, branchNameMap }: {
+  emp: {
+    key: string
+    displayName: string
+    branchId?: string | null
+    totalHours: number
+    totalAmount: number
+    items: EmpRow[]
+    multipleWeeks: boolean
+  }
+  isOpen: boolean
+  onToggle: () => void
+  branchNameMap: Record<string, string>
+}) {
+  return (
+    <>
+      <tr
+        onClick={emp.multipleWeeks ? onToggle : undefined}
+        style={{
+          borderBottom: isOpen ? 'none' : '1px solid #2a2a2a',
+          cursor: emp.multipleWeeks ? 'pointer' : 'default',
+          background: isOpen ? '#222222' : 'transparent',
+        }}
+      >
+        {/* Chevron */}
+        <td style={{ padding: '8px 4px 8px 0', color: '#555555', width: 20 }}>
+          {emp.multipleWeeks && (
+            <span style={{
+              display: 'inline-block',
+              fontSize: 12,
+              transition: 'transform 180ms ease',
+              transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+              lineHeight: 1,
+            }}>
+              ›
+            </span>
+          )}
+        </td>
+        <td style={{ ...td, textAlign: 'left', color: '#cccccc' }}>{emp.displayName}</td>
+        <td style={{ ...td, color: '#888888' }}>
+          {emp.branchId ? (branchNameMap[emp.branchId] ?? '—') : '—'}
+        </td>
+        <td style={td}>{emp.totalHours > 0 ? emp.totalHours.toFixed(2) : '—'}</td>
+        <td style={{ ...td, color: '#ffffff', fontWeight: 500 }}>{formatCurrency(emp.totalAmount)}</td>
+      </tr>
+
+      {isOpen && emp.items.map((item, i) => (
+        <tr
+          key={`${emp.key}-${i}`}
+          style={{
+            background: '#1a1a1a',
+            borderBottom: i < emp.items.length - 1 ? '1px solid #222222' : '1px solid #2a2a2a',
+          }}
+        >
+          <td />
+          <td style={{ ...td, textAlign: 'left', color: '#666666', paddingLeft: 20 }}>
+            {item.periodDate ? `Week of ${fmtDate(item.periodDate)}` : '—'}
+          </td>
+          <td style={{ ...td, color: '#555555' }}>
+            {item.rate !== null ? `$${item.rate.toFixed(2)}/hr` : '—'}
+          </td>
+          <td style={{ ...td, color: '#777777' }}>
+            {item.hours !== null ? item.hours.toFixed(2) : '—'}
+          </td>
+          <td style={{ ...td, color: '#999999' }}>{formatCurrency(item.amount)}</td>
+        </tr>
+      ))}
+    </>
+  )
+}
+
+const th: React.CSSProperties = { textAlign: 'right', padding: '0 8px 8px 8px', fontSize: 11, color: '#666666', fontWeight: 400 }
+const td: React.CSSProperties = { textAlign: 'right', padding: '8px 8px', color: '#cccccc' }
