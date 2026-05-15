@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
@@ -9,7 +8,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
   const supabase = createBrowserClient()
 
   async function handleSubmit(e: React.FormEvent) {
@@ -25,7 +23,9 @@ export default function LoginPage() {
       return
     }
 
-    router.push('/')
+    // Full navigation so cookies are committed before the middleware reads them.
+    // router.push() is a soft RSC fetch that can race with cookie writes.
+    window.location.href = '/'
   }
 
   return (
