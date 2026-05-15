@@ -34,7 +34,7 @@ export async function GET(request: Request): Promise<Response> {
       .eq('is_excluded', true)
     const excludedIds = (excludedRows ?? []).map((r) => r.id as string)
 
-    // ── Overall AR: all invoices (not excluded) ──────────────────────────────
+    // ── Overall AR: all invoices (not excluded), paginated ──────────────────
 
     let allInvQuery = supabase
       .from('ar_invoices')
@@ -43,8 +43,19 @@ export async function GET(request: Request): Promise<Response> {
     if (branchIds)  allInvQuery = allInvQuery.in('branch_id', branchIds)
     if (excludedIds.length > 0) allInvQuery = allInvQuery.not('customer_id', 'in', `(${excludedIds.join(',')})`)
 
-    const { data: allInvoices } = await allInvQuery
-    const invoices = (allInvoices ?? []) as { customer_id: string; open_balance: number; aging_bucket: string }[]
+    type InvRow = { customer_id: string; open_balance: number; aging_bucket: string }
+    const invoices: InvRow[] = []
+    {
+      const PAGE_SIZE = 1000
+      let from = 0
+      while (true) {
+        const { data, error } = await (allInvQuery as typeof allInvQuery).range(from, from + PAGE_SIZE - 1)
+        if (error || !data || data.length === 0) break
+        invoices.push(...(data as InvRow[]))
+        if (data.length < PAGE_SIZE) break
+        from += PAGE_SIZE
+      }
+    }
 
     // Aggregate overall aging totals
     const agingTotals: Record<string, number> = { 'Current': 0, '1-30': 0, '31-60': 0, '61-90': 0, '>90': 0 }
