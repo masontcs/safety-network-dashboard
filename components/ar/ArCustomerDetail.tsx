@@ -7,7 +7,7 @@ import type { Role } from '@/lib/supabase/database.types'
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface Contact { id: string; name: string; title: string | null; email: string | null; phone: string | null; isPrimary: boolean }
-interface Note    { id: string; content: string; createdAt: string; createdByName: string | null }
+interface Note    { id: string; content: string; noteType: 'collection' | 'branch'; createdAt: string; createdByName: string | null }
 interface PmAssignment { userId: string; displayName: string; role: string }
 interface ArAssignment { userId: string; displayName: string }
 interface EntityRef { entityCode: string; quickbooksName: string }
@@ -288,6 +288,11 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
   const isArAdmin    = role === 'admin' || role === 'ar_manager'
   const canManagePMs = role === 'admin' || role === 'district_manager' || role === 'branch_manager'
 
+  const canSeeCollectionNotes = isArAdmin || role === 'ar_team'
+  const canSeeBranchNotes     = isAdmin || role === 'executive' || role === 'district_manager' || role === 'branch_manager' || role === 'project_manager'
+  const canWriteCollectionNotes = canSeeCollectionNotes
+  const canWriteBranchNotes     = canSeeBranchNotes
+
   const [profile, setProfile]           = useState<CustomerProfile | null>(null)
   const [profileLoading, setProfileLoading] = useState(true)
   const [invoices, setInvoices]         = useState<Invoice[]>([])
@@ -300,8 +305,10 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
   const [arAssignments, setArAssignments] = useState<ArAssignment[]>([])
   const [showMerge, setShowMerge]       = useState(false)
   const [showAddContact, setShowAddContact] = useState(false)
-  const [noteText, setNoteText]         = useState('')
-  const [addingNote, setAddingNote]     = useState(false)
+  const [collectionNoteText, setCollectionNoteText] = useState('')
+  const [branchNoteText, setBranchNoteText]         = useState('')
+  const [addingCollectionNote, setAddingCollectionNote] = useState(false)
+  const [addingBranchNote, setAddingBranchNote]         = useState(false)
   const [togglingExclude, setTogglingExclude] = useState(false)
 
   const fetchProfile = useCallback(async () => {
@@ -367,18 +374,23 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
     setProfile((p) => p ? { ...p, collectionStatus: v } : p)
   }
 
-  const handleAddNote = async () => {
-    if (!noteText.trim()) return
-    setAddingNote(true)
+  const handleAddNote = async (noteType: 'collection' | 'branch') => {
+    const text = noteType === 'collection' ? collectionNoteText : branchNoteText
+    if (!text.trim()) return
+    if (noteType === 'collection') setAddingCollectionNote(true)
+    else setAddingBranchNote(true)
     const res = await fetch(`/api/ar/customers/${customer.id}/notes`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: noteText.trim() }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: text.trim(), noteType }),
     })
     if (res.ok) {
       const { note } = await res.json()
       setProfile((p) => p ? { ...p, notes: [note, ...p.notes] } : p)
-      setNoteText('')
+      if (noteType === 'collection') setCollectionNoteText('')
+      else setBranchNoteText('')
     }
-    setAddingNote(false)
+    if (noteType === 'collection') setAddingCollectionNote(false)
+    else setAddingBranchNote(false)
   }
 
   const handleDeleteNote = async (noteId: string) => {
@@ -672,39 +684,83 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
             )}
         </SectionCard>
 
-        {/* Notes */}
-        <SectionCard title="Notes">
-          <div style={{ marginBottom: 12 }}>
-            <textarea placeholder="Add a note…" value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={3}
-              style={{ width: '100%', background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
-              <button onClick={handleAddNote} disabled={addingNote || !noteText.trim()}
-                style={{ background: '#ff6b00', border: 'none', borderRadius: 6, color: '#fff', padding: '5px 14px', fontSize: 12, cursor: addingNote || !noteText.trim() ? 'default' : 'pointer', opacity: addingNote || !noteText.trim() ? 0.5 : 1 }}>
-                {addingNote ? 'Saving…' : 'Add Note'}
-              </button>
-            </div>
-          </div>
-          {profileLoading ? <div style={{ fontSize: 12, color: '#555' }}>Loading…</div>
-            : (profile?.notes ?? []).length === 0 ? <div style={{ fontSize: 12, color: '#555' }}>No notes yet.</div>
-            : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {(profile?.notes ?? []).map((n) => (
-                  <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid #2a2a2a' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                      <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
-                      {isArAdmin && (
-                        <button onClick={() => handleDeleteNote(n.id)}
-                          style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
-                      )}
-                    </div>
-                    <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>{n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}</div>
-                  </div>
-                ))}
+        {/* Collection Notes — ar_team, ar_manager, admin */}
+        {canSeeCollectionNotes && (
+          <SectionCard title="Collection Notes">
+            {canWriteCollectionNotes && (
+              <div style={{ marginBottom: 12 }}>
+                <textarea placeholder="Add a collection note…" value={collectionNoteText} onChange={(e) => setCollectionNoteText(e.target.value)} rows={3}
+                  style={{ width: '100%', background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+                  <button onClick={() => handleAddNote('collection')} disabled={addingCollectionNote || !collectionNoteText.trim()}
+                    style={{ background: '#ff6b00', border: 'none', borderRadius: 6, color: '#fff', padding: '5px 14px', fontSize: 12, cursor: addingCollectionNote || !collectionNoteText.trim() ? 'default' : 'pointer', opacity: addingCollectionNote || !collectionNoteText.trim() ? 0.5 : 1 }}>
+                    {addingCollectionNote ? 'Saving…' : 'Add Note'}
+                  </button>
+                </div>
               </div>
             )}
-        </SectionCard>
+            {profileLoading ? <div style={{ fontSize: 12, color: '#555' }}>Loading…</div>
+              : (profile?.notes ?? []).filter((n) => n.noteType === 'collection').length === 0
+                ? <div style={{ fontSize: 12, color: '#555' }}>No collection notes yet.</div>
+                : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {(profile?.notes ?? []).filter((n) => n.noteType === 'collection').map((n) => (
+                      <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid #2a2a2a' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                          <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
+                          {isArAdmin && (
+                            <button onClick={() => handleDeleteNote(n.id)}
+                              style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
+                              onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
+                              onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>{n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+          </SectionCard>
+        )}
+
+        {/* Branch Notes — branch_manager, district_manager, project_manager, executive, admin */}
+        {canSeeBranchNotes && (
+          <SectionCard title="Branch Notes">
+            {canWriteBranchNotes && (
+              <div style={{ marginBottom: 12 }}>
+                <textarea placeholder="Add a branch note…" value={branchNoteText} onChange={(e) => setBranchNoteText(e.target.value)} rows={3}
+                  style={{ width: '100%', background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+                  <button onClick={() => handleAddNote('branch')} disabled={addingBranchNote || !branchNoteText.trim()}
+                    style={{ background: '#ff6b00', border: 'none', borderRadius: 6, color: '#fff', padding: '5px 14px', fontSize: 12, cursor: addingBranchNote || !branchNoteText.trim() ? 'default' : 'pointer', opacity: addingBranchNote || !branchNoteText.trim() ? 0.5 : 1 }}>
+                    {addingBranchNote ? 'Saving…' : 'Add Note'}
+                  </button>
+                </div>
+              </div>
+            )}
+            {profileLoading ? <div style={{ fontSize: 12, color: '#555' }}>Loading…</div>
+              : (profile?.notes ?? []).filter((n) => n.noteType === 'branch').length === 0
+                ? <div style={{ fontSize: 12, color: '#555' }}>No branch notes yet.</div>
+                : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {(profile?.notes ?? []).filter((n) => n.noteType === 'branch').map((n) => (
+                      <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid #2a2a2a' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                          <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
+                          {isAdmin && (
+                            <button onClick={() => handleDeleteNote(n.id)}
+                              style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
+                              onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
+                              onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>{n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+          </SectionCard>
+        )}
       </div>
 
       {/* Invoice table */}

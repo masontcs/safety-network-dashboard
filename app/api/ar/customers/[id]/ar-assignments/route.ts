@@ -63,8 +63,8 @@ export async function POST(
       .eq('id', userId)
       .single()
     if (!prof) return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    if (prof.role !== 'ar_team') {
-      return NextResponse.json({ error: 'User is not an AR team member' }, { status: 400 })
+    if (prof.role !== 'ar_team' && prof.role !== 'ar_manager') {
+      return NextResponse.json({ error: 'User must be an AR team member or AR manager' }, { status: 400 })
     }
 
     const { error } = await supabase

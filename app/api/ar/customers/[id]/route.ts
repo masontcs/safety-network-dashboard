@@ -10,6 +10,10 @@ export async function GET(
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
 
+    const role = ctx.access.role
+    const canSeeCollection = ['admin', 'ar_manager', 'ar_team'].includes(role)
+    const canSeeBranch     = ['admin', 'executive', 'district_manager', 'branch_manager', 'project_manager'].includes(role)
+
     const supabase = createServiceClient()
     const { id } = params
 
@@ -24,7 +28,7 @@ export async function GET(
       supabase.from('ar_customers').select('id, display_name, is_excluded, customer_status, collection_status').eq('id', id).single(),
       supabase.from('ar_customer_entity_refs').select('entity_code, quickbooks_name').eq('customer_id', id),
       supabase.from('ar_customer_contacts').select('id, name, title, email, phone, is_primary, created_at').eq('customer_id', id).order('is_primary', { ascending: false }).order('created_at'),
-      supabase.from('ar_customer_notes').select('id, content, created_by, created_at').eq('customer_id', id).order('created_at', { ascending: false }),
+      supabase.from('ar_customer_notes').select('id, content, created_by, created_at, note_type').eq('customer_id', id).order('created_at', { ascending: false }),
       supabase.from('ar_customer_pm_assignments').select('user_id').eq('customer_id', id),
       supabase.from('ar_invoices').select('branch_id, open_balance').eq('customer_id', id),
     ])
@@ -78,12 +82,18 @@ export async function GET(
         collectionStatus: customer.collection_status ?? 'none',
         entityRefs:       (refs ?? []).map((r) => ({ entityCode: r.entity_code, quickbooksName: r.quickbooks_name })),
         contacts:         (contacts ?? []).map((c) => ({ id: c.id, name: c.name, title: c.title, email: c.email, phone: c.phone, isPrimary: c.is_primary })),
-        notes:            (notes ?? []).map((n) => ({
-          id:            n.id,
-          content:       n.content,
-          createdAt:     n.created_at,
-          createdByName: n.created_by ? (profileMap.get(n.created_by)?.display_name ?? null) : null,
-        })),
+        notes: (notes ?? [])
+          .filter((n) => {
+            const t = (n.note_type as string) ?? 'collection'
+            return (t === 'collection' && canSeeCollection) || (t === 'branch' && canSeeBranch)
+          })
+          .map((n) => ({
+            id:            n.id,
+            content:       n.content,
+            noteType:      (n.note_type as string) ?? 'collection',
+            createdAt:     n.created_at,
+            createdByName: n.created_by ? (profileMap.get(n.created_by)?.display_name ?? null) : null,
+          })),
         pmAssignments: (pmRows ?? []).map((p) => {
           const prof = profileMap.get(p.user_id)
           return { userId: p.user_id, displayName: prof?.display_name ?? '—', role: prof?.role ?? '—' }

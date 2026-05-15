@@ -12,8 +12,8 @@ export async function GET(): Promise<Response> {
     const supabase = createServiceClient()
     const { data } = await supabase
       .from('user_profiles')
-      .select('id, display_name')
-      .eq('role', 'ar_team')
+      .select('id, display_name, role')
+      .in('role', ['ar_team', 'ar_manager'])
       .order('display_name')
 
     return NextResponse.json({

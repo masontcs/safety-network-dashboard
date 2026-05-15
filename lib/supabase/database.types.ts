@@ -212,9 +212,9 @@ export type Database = {
         Relationships: []
       }
       ar_customer_notes: {
-        Row: { id: string; customer_id: string; content: string; created_by: string | null; created_at: string }
-        Insert: { id?: string; customer_id: string; content: string; created_by?: string | null; created_at?: string }
-        Update: { id?: string; customer_id?: string; content?: string; created_by?: string | null }
+        Row: { id: string; customer_id: string; content: string; created_by: string | null; created_at: string; note_type: string }
+        Insert: { id?: string; customer_id: string; content: string; created_by?: string | null; created_at?: string; note_type?: string }
+        Update: { id?: string; customer_id?: string; content?: string; created_by?: string | null; note_type?: string }
         Relationships: []
       }
       ar_customer_pm_assignments: {

@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, getArTeamCustomerIds } from '@/lib/api/auth'
+import { getAccessContext } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import type { Role } from '@/lib/supabase/database.types'
+
+const COLLECTION_ROLES: Role[] = ['admin', 'ar_manager', 'ar_team']
+const BRANCH_ROLES: Role[]     = ['admin', 'executive', 'district_manager', 'branch_manager', 'project_manager']
 
 export async function POST(
   request: Request,
@@ -11,27 +15,28 @@ export async function POST(
     if (!ctx.ok) return ctx.response
     const { role, userId } = ctx.access
 
-    // ar_team can add notes only to their assigned customers
-    if (role === 'ar_team') {
-      const assignedIds = await getArTeamCustomerIds(userId)
-      if (!assignedIds.includes(params.id)) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
-    } else if (role === 'project_manager' || role === 'district_manager' || role === 'branch_manager') {
-      // Branch-scoped roles: verify this customer has invoices in their branches
-      // (lightweight check — if they can see the customer they can note it)
-    }
-    // admin, ar_manager, executive: unrestricted
-
     const body = await request.json()
-    const content = body?.content?.trim()
+    const content  = body?.content?.trim()
+    const noteType = (body?.noteType ?? 'collection') as 'collection' | 'branch'
+
     if (!content) return NextResponse.json({ error: 'content is required' }, { status: 400 })
+    if (noteType !== 'collection' && noteType !== 'branch') {
+      return NextResponse.json({ error: 'Invalid noteType' }, { status: 400 })
+    }
+
+    // Validate the role can write this note type
+    if (noteType === 'collection' && !COLLECTION_ROLES.includes(role)) {
+      return NextResponse.json({ error: 'Your role cannot write collection notes' }, { status: 403 })
+    }
+    if (noteType === 'branch' && !BRANCH_ROLES.includes(role)) {
+      return NextResponse.json({ error: 'Your role cannot write branch notes' }, { status: 403 })
+    }
 
     const supabase = createServiceClient()
     const { data, error } = await supabase
       .from('ar_customer_notes')
-      .insert({ customer_id: params.id, content, created_by: userId ?? null })
-      .select('id, content, created_by, created_at')
+      .insert({ customer_id: params.id, content, created_by: userId ?? null, note_type: noteType })
+      .select('id, content, created_by, created_at, note_type')
       .single()
 
     if (error) return NextResponse.json({ error: 'Failed to add note' }, { status: 500 })
@@ -44,6 +49,7 @@ export async function POST(
       note: {
         id:            data.id,
         content:       data.content,
+        noteType:      data.note_type,
         createdAt:     data.created_at,
         createdByName: profile?.display_name ?? null,
       },
