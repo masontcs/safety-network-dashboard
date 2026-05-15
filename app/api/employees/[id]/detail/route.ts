@@ -155,13 +155,22 @@ export async function GET(
       from += PAGE_SIZE
     }
 
-    // Fetch employer tax history for this employee
-    const { data: taxRows, error: taxErr } = await supabase
-      .from('payroll_taxes')
-      .select('period_date, amount')
-      .eq('employee_id', employeeId)
-      .order('period_date', { ascending: false })
-    if (taxErr) throw new Error(`Failed to load tax history: ${taxErr.message}`)
+    // Fetch employer tax history for this employee (paginated)
+    const allTaxRows: { period_date: string; amount: number }[] = []
+    from = 0
+    while (true) {
+      const { data: taxPage, error: taxErr } = await supabase
+        .from('payroll_taxes')
+        .select('period_date, amount')
+        .eq('employee_id', employeeId)
+        .order('period_date', { ascending: false })
+        .range(from, from + PAGE_SIZE - 1)
+      if (taxErr) throw new Error(`Failed to load tax history: ${taxErr.message}`)
+      allTaxRows.push(...(taxPage ?? []))
+      if (!taxPage || taxPage.length < PAGE_SIZE) break
+      from += PAGE_SIZE
+    }
+    const taxRows = allTaxRows
 
     // Paginate fuel transactions
     const allFuelTxns: FuelTxnRow[] = []
