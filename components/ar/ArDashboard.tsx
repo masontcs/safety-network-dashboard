@@ -15,6 +15,7 @@ interface AgingSummary {
 interface Customer {
   id: string
   displayName: string
+  isExcluded: boolean
   current: number
   d30: number
   d60: number
@@ -162,17 +163,20 @@ function AgingCards({
 // ─── Customer detail view ──────────────────────────────────────────────────────
 
 function CustomerDetail({
-  customer, entity, onBack,
+  customer, entity, isAdmin, onBack, onRefresh,
 }: {
   customer: Customer
   entity: string
+  isAdmin: boolean
   onBack: () => void
+  onRefresh: () => void
 }) {
   const [invoices, setInvoices]   = useState<Invoice[]>([])
   const [total, setTotal]         = useState(0)
   const [page, setPage]           = useState(1)
   const [pageCount, setPageCount] = useState(0)
   const [loading, setLoading]     = useState(true)
+  const [toggling, setToggling]   = useState(false)
 
   const PAGE_SIZE = 50
 
@@ -190,7 +194,20 @@ function CustomerDetail({
       .finally(() => setLoading(false))
   }, [customer.id, entity, page])
 
-  // Aging breakdown for this customer (from pre-aggregated data)
+  const handleExcludeToggle = async () => {
+    setToggling(true)
+    try {
+      const res = await fetch(`/api/ar/customers/${customer.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isExcluded: !customer.isExcluded }),
+      })
+      if (res.ok) onRefresh()
+    } finally {
+      setToggling(false)
+    }
+  }
+
   const custAging: Record<string, number> = {
     'Current': customer.current,
     '1-30':    customer.d30,
@@ -213,30 +230,75 @@ function CustomerDetail({
         >
           ← Back
         </button>
-        <div style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>
+        <div style={{ fontSize: 22, fontWeight: 500, color: customer.isExcluded ? '#666' : '#fff', flex: 1 }}>
           {customer.displayName}
+          {customer.isExcluded && (
+            <span style={{ fontSize: 11, color: '#555', fontWeight: 400, marginLeft: 10, verticalAlign: 'middle' }}>
+              Excluded from AR
+            </span>
+          )}
         </div>
-        <div style={{ fontSize: 12, color: '#555', marginLeft: 4 }}>
+        <div style={{ fontSize: 12, color: '#555' }}>
           {customer.invoiceCount} invoice{customer.invoiceCount !== 1 ? 's' : ''} · {fmt(customer.totalAr)} total
         </div>
+        {isAdmin && (
+          <button
+            onClick={handleExcludeToggle}
+            disabled={toggling}
+            style={{
+              background: customer.isExcluded ? '#2a2a2a' : 'rgba(204,68,68,0.12)',
+              border: `1px solid ${customer.isExcluded ? '#333' : '#663333'}`,
+              borderRadius: 8,
+              color: customer.isExcluded ? '#888' : '#cc4444',
+              padding: '6px 14px', fontSize: 12,
+              cursor: toggling ? 'default' : 'pointer',
+              opacity: toggling ? 0.5 : 1,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {customer.isExcluded ? 'Restore to AR' : 'Exclude from AR'}
+          </button>
+        )}
       </div>
 
       {/* Aging breakdown for this customer */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
-        <div style={{ background: '#ff6b00', borderRadius: 12, padding: 16 }}>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+        <div style={{ background: customer.isExcluded ? '#2a2a2a' : '#ff6b00', borderRadius: 12, padding: 16 }}>
+          <div style={{ fontSize: 11, color: customer.isExcluded ? '#555' : 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
             Total AR
           </div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>{fmt(customer.totalAr)}</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: customer.isExcluded ? '#666' : '#fff' }}>{fmt(customer.totalAr)}</div>
         </div>
         {AGING_BUCKETS.map((b) => (
           <div key={b} style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, padding: 16 }}>
             <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>{b} days</div>
-            <div style={{ fontSize: 20, fontWeight: 500, color: custAging[b] > 0 ? BUCKET_COLORS[b] : '#444' }}>
+            <div style={{ fontSize: 20, fontWeight: 500, color: custAging[b] > 0 && !customer.isExcluded ? BUCKET_COLORS[b] : '#444' }}>
               {fmt(custAging[b])}
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Customer profile */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        {/* Contacts placeholder */}
+        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>Contacts</div>
+            {isAdmin && (
+              <button style={{ background: '#2a2a2a', border: 'none', borderRadius: 6, color: '#888', padding: '4px 10px', fontSize: 11, cursor: 'not-allowed', opacity: 0.5 }}>
+                + Add
+              </button>
+            )}
+          </div>
+          <div style={{ fontSize: 12, color: '#444' }}>No contacts yet.</div>
+        </div>
+
+        {/* Notes placeholder */}
+        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 500, color: '#fff', marginBottom: 12 }}>Notes</div>
+          <div style={{ fontSize: 12, color: '#444' }}>No notes yet.</div>
+        </div>
       </div>
 
       {/* Invoices */}
@@ -299,12 +361,6 @@ function CustomerDetail({
           </div>
         )}
       </div>
-
-      {/* Placeholder for future customer profile features */}
-      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 20 }}>
-        <div style={{ fontSize: 13, fontWeight: 500, color: '#fff', marginBottom: 4 }}>Customer Profile</div>
-        <div style={{ fontSize: 12, color: '#555' }}>Contacts, notes, project manager assignments, and status will appear here.</div>
-      </div>
     </div>
   )
 }
@@ -314,20 +370,21 @@ function CustomerDetail({
 export default function ArDashboard({ role, branches }: Props) {
   const isAdmin = role === 'admin'
 
-  const [entity, setEntity]     = useState('')
-  const [branchId, setBranchId] = useState('')
-  const [bucket, setBucket]     = useState('')
-  const [search, setSearch]     = useState('')
-  const [sortKey, setSortKey]   = useState<SortKey>('totalAr')
-  const [sortDir, setSortDir]   = useState<SortDir>('desc')
+  const [entity, setEntity]           = useState('')
+  const [branchId, setBranchId]       = useState('')
+  const [bucket, setBucket]           = useState('')
+  const [search, setSearch]           = useState('')
+  const [showExcluded, setShowExcluded] = useState(false)
+  const [sortKey, setSortKey]         = useState<SortKey>('totalAr')
+  const [sortDir, setSortDir]         = useState<SortDir>('desc')
 
-  const [summary, setSummary]     = useState<AgingSummary | null>(null)
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [loadingSummary, setLoadingSummary]   = useState(true)
+  const [summary, setSummary]               = useState<AgingSummary | null>(null)
+  const [customers, setCustomers]           = useState<Customer[]>([])
+  const [loadingSummary, setLoadingSummary]     = useState(true)
   const [loadingCustomers, setLoadingCustomers] = useState(true)
 
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
-  const [showImport, setShowImport] = useState(false)
+  const [showImport, setShowImport]             = useState(false)
 
   const fetchSummary = useCallback(async () => {
     setLoadingSummary(true)
@@ -342,15 +399,16 @@ export default function ArDashboard({ role, branches }: Props) {
   const fetchCustomers = useCallback(async () => {
     setLoadingCustomers(true)
     const p = new URLSearchParams()
-    if (entity)   p.set('entity', entity)
-    if (branchId) p.set('branchId', branchId)
+    if (entity)       p.set('entity', entity)
+    if (branchId)     p.set('branchId', branchId)
+    if (showExcluded) p.set('includeExcluded', 'true')
     const res = await fetch(`/api/ar/customers?${p}`)
     if (res.ok) {
       const data = await res.json()
       setCustomers(data.customers ?? [])
     }
     setLoadingCustomers(false)
-  }, [entity, branchId])
+  }, [entity, branchId, showExcluded])
 
   useEffect(() => { fetchSummary() }, [fetchSummary])
   useEffect(() => { fetchCustomers() }, [fetchCustomers])
@@ -369,7 +427,14 @@ export default function ArDashboard({ role, branches }: Props) {
     else { setSortKey(key); setSortDir('desc') }
   }
 
-  // Filter customers by search + active bucket
+  // Called from CustomerDetail after exclude/restore toggle
+  const handleRefreshAfterToggle = useCallback(() => {
+    fetchSummary()
+    fetchCustomers()
+    setSelectedCustomer(null)
+  }, [fetchSummary, fetchCustomers])
+
+  // Filter + sort
   const filteredCustomers = customers
     .filter((c) => {
       if (search && !c.displayName.toLowerCase().includes(search.toLowerCase())) return false
@@ -383,6 +448,8 @@ export default function ArDashboard({ role, branches }: Props) {
       return true
     })
     .sort((a, b) => {
+      // Always sort excluded customers to the bottom
+      if (a.isExcluded !== b.isExcluded) return a.isExcluded ? 1 : -1
       const av = a[sortKey]
       const bv = b[sortKey]
       if (typeof av === 'string' && typeof bv === 'string') {
@@ -390,6 +457,8 @@ export default function ArDashboard({ role, branches }: Props) {
       }
       return sortDir === 'asc' ? (av as number) - (bv as number) : (bv as number) - (av as number)
     })
+
+  const excludedCount = customers.filter((c) => c.isExcluded).length
 
   // ── Customer detail view ───────────────────────────────────────────────────
 
@@ -399,7 +468,9 @@ export default function ArDashboard({ role, branches }: Props) {
         <CustomerDetail
           customer={selectedCustomer}
           entity={entity}
+          isAdmin={isAdmin}
           onBack={() => setSelectedCustomer(null)}
+          onRefresh={handleRefreshAfterToggle}
         />
       </div>
     )
@@ -452,7 +523,7 @@ export default function ArDashboard({ role, branches }: Props) {
       />
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <select
           value={entity}
           onChange={(e) => setEntity(e.target.value)}
@@ -481,6 +552,22 @@ export default function ArDashboard({ role, branches }: Props) {
           style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '5px 12px', fontSize: 12, outline: 'none', width: 180 }}
         />
 
+        {isAdmin && (
+          <button
+            onClick={() => setShowExcluded((v) => !v)}
+            style={{
+              background: showExcluded ? 'rgba(204,68,68,0.12)' : 'transparent',
+              border: `1px solid ${showExcluded ? '#663333' : '#333'}`,
+              borderRadius: 8,
+              color: showExcluded ? '#cc4444' : '#666',
+              padding: '5px 12px', fontSize: 12, cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {showExcluded ? `Hide excluded (${excludedCount})` : `Show excluded${excludedCount > 0 ? ` (${excludedCount})` : ''}`}
+          </button>
+        )}
+
         {(entity || branchId || bucket || search) && (
           <button
             onClick={() => { setEntity(''); setBranchId(''); setBucket(''); setSearch('') }}
@@ -491,7 +578,7 @@ export default function ArDashboard({ role, branches }: Props) {
         )}
 
         {filteredCustomers.length > 0 && (
-          <span style={{ fontSize: 12, color: '#555', alignSelf: 'center', marginLeft: 4 }}>
+          <span style={{ fontSize: 12, color: '#555', marginLeft: 4 }}>
             {filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}
           </span>
         )}
@@ -532,12 +619,16 @@ export default function ArDashboard({ role, branches }: Props) {
                     style={{
                       borderBottom: '1px solid #222',
                       cursor: 'pointer',
+                      opacity: cust.isExcluded ? 0.45 : 1,
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = '#242424')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = '')}
                   >
-                    <td style={{ padding: '10px 12px', fontSize: 13, color: '#ff6b00', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                      {cust.displayName}
+                    <td style={{ padding: '10px 12px', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap' }}>
+                      <span style={{ color: cust.isExcluded ? '#555' : '#ff6b00' }}>{cust.displayName}</span>
+                      {cust.isExcluded && (
+                        <span style={{ fontSize: 10, color: '#444', marginLeft: 8, fontWeight: 400 }}>excluded</span>
+                      )}
                     </td>
                     <td style={{ padding: '10px 12px', fontSize: 12, color: cust.current > 0 ? '#fff' : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                       {cust.current > 0 ? fmt(cust.current) : '—'}

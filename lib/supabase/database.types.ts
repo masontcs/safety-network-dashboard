@@ -200,9 +200,9 @@ export type Database = {
         Relationships: []
       }
       ar_customers: {
-        Row: { id: string; display_name: string; notes: string | null; created_at: string }
-        Insert: { id?: string; display_name: string; notes?: string | null; created_at?: string }
-        Update: { id?: string; display_name?: string; notes?: string | null }
+        Row: { id: string; display_name: string; notes: string | null; created_at: string; is_excluded: boolean }
+        Insert: { id?: string; display_name: string; notes?: string | null; created_at?: string; is_excluded?: boolean }
+        Update: { id?: string; display_name?: string; notes?: string | null; is_excluded?: boolean }
         Relationships: []
       }
       ar_customer_entity_refs: {

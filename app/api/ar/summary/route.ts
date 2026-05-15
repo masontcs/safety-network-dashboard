@@ -33,6 +33,16 @@ export async function GET(request: Request): Promise<Response> {
       query = query.in('branch_id', branchIds)
     }
 
+    // Excluded customers are removed from all totals and KPIs
+    const { data: excludedRows } = await supabase
+      .from('ar_customers')
+      .select('id')
+      .eq('is_excluded', true)
+    const excludedIds = (excludedRows ?? []).map((r) => r.id as string)
+    if (excludedIds.length > 0) {
+      query = query.not('customer_id', 'in', `(${excludedIds.join(',')})`)
+    }
+
     type InvRow = { open_balance: number; aging_bucket: string; entity_code: string; branch_id: string | null }
     const invoices: InvRow[] = []
     {

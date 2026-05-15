@@ -10,8 +10,9 @@ export async function GET(request: Request): Promise<Response> {
     if (!ctx.ok) return ctx.response
 
     const { searchParams } = new URL(request.url)
-    const entityCode = searchParams.get('entity') || null
-    const branchId   = searchParams.get('branchId') || null
+    const entityCode      = searchParams.get('entity') || null
+    const branchId        = searchParams.get('branchId') || null
+    const includeExcluded = searchParams.get('includeExcluded') === 'true'
 
     const supabase = createServiceClient()
     const { branchIds } = ctx.access
@@ -66,28 +67,34 @@ export async function GET(request: Request): Promise<Response> {
       agg.invoiceCount++
     }
 
-    // Fetch display names for all customer ids
+    // Fetch display names and exclusion flags for all customer ids
     const customerIds = [...custMap.keys()]
     const { data: customers } = await supabase
       .from('ar_customers')
-      .select('id, display_name')
+      .select('id, display_name, is_excluded')
       .in('id', customerIds)
     const nameMap = new Map((customers ?? []).map((c) => [c.id as string, c.display_name as string]))
+    const excludedSet = new Set(
+      (customers ?? []).filter((c) => c.is_excluded).map((c) => c.id as string)
+    )
 
-    const result = customerIds.map((id) => {
-      const agg = custMap.get(id)!
-      return {
-        id,
-        displayName:  nameMap.get(id) ?? '—',
-        current:      Math.round(agg.buckets['Current'] * 100) / 100,
-        d30:          Math.round(agg.buckets['1-30'] * 100) / 100,
-        d60:          Math.round(agg.buckets['31-60'] * 100) / 100,
-        d90:          Math.round(agg.buckets['61-90'] * 100) / 100,
-        d90plus:      Math.round(agg.buckets['>90'] * 100) / 100,
-        totalAr:      Math.round(agg.totalAr * 100) / 100,
-        invoiceCount: agg.invoiceCount,
-      }
-    })
+    const result = customerIds
+      .filter((id) => includeExcluded || !excludedSet.has(id))
+      .map((id) => {
+        const agg = custMap.get(id)!
+        return {
+          id,
+          displayName:  nameMap.get(id) ?? '—',
+          isExcluded:   excludedSet.has(id),
+          current:      Math.round(agg.buckets['Current'] * 100) / 100,
+          d30:          Math.round(agg.buckets['1-30'] * 100) / 100,
+          d60:          Math.round(agg.buckets['31-60'] * 100) / 100,
+          d90:          Math.round(agg.buckets['61-90'] * 100) / 100,
+          d90plus:      Math.round(agg.buckets['>90'] * 100) / 100,
+          totalAr:      Math.round(agg.totalAr * 100) / 100,
+          invoiceCount: agg.invoiceCount,
+        }
+      })
 
     return NextResponse.json({ customers: result })
   } catch (err) {
