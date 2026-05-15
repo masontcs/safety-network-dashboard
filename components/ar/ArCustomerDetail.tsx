@@ -638,7 +638,7 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
 
         {/* Contacts */}
         <SectionCard title="Contacts"
-          action={isAdmin && !showAddContact ? (
+          action={!showAddContact ? (
             <button onClick={() => setShowAddContact(true)}
               style={{ background: '#2a2a2a', border: 'none', borderRadius: 6, color: '#ff6b00', padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>+ Add</button>
           ) : undefined}>
@@ -660,7 +660,7 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
                         {c.phone && <span style={{ fontSize: 11, color: '#888' }}>{c.phone}</span>}
                       </div>
                     </div>
-                    {isAdmin && (
+                    {isArAdmin && (
                       <button onClick={() => handleDeleteContact(c.id)}
                         style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
                         onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
