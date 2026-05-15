@@ -200,9 +200,9 @@ export type Database = {
         Relationships: []
       }
       ar_customers: {
-        Row: { id: string; display_name: string; notes: string | null; created_at: string; is_excluded: boolean; status: string }
-        Insert: { id?: string; display_name: string; notes?: string | null; created_at?: string; is_excluded?: boolean; status?: string }
-        Update: { id?: string; display_name?: string; notes?: string | null; is_excluded?: boolean; status?: string }
+        Row: { id: string; display_name: string; notes: string | null; created_at: string; is_excluded: boolean; customer_status: string; collection_status: string }
+        Insert: { id?: string; display_name: string; notes?: string | null; created_at?: string; is_excluded?: boolean; customer_status?: string; collection_status?: string }
+        Update: { id?: string; display_name?: string; notes?: string | null; is_excluded?: boolean; customer_status?: string; collection_status?: string }
         Relationships: []
       }
       ar_customer_contacts: {

@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { Role } from '@/lib/supabase/database.types'
 import ArImportModal from './ArImportModal'
 import ArCustomerDetail from './ArCustomerDetail'
+import ArMeetingDashboard from './ArMeetingDashboard'
 
 interface Branch { id: string; name: string }
 
@@ -46,6 +47,7 @@ interface Invoice {
 
 interface Props { role: Role; branches: Branch[] }
 
+type ViewMode = 'ar' | 'meeting'
 type SortKey = 'displayName' | 'current' | 'd30' | 'd60' | 'd90' | 'd90plus' | 'totalAr' | 'invoiceCount'
 type SortDir = 'asc' | 'desc'
 
@@ -167,6 +169,7 @@ function AgingCards({
 export default function ArDashboard({ role, branches }: Props) {
   const isAdmin = role === 'admin'
 
+  const [view, setView]               = useState<ViewMode>('ar')
   const [entity, setEntity]           = useState('')
   const [branchId, setBranchId]       = useState('')
   const [bucket, setBucket]           = useState('')
@@ -231,6 +234,20 @@ export default function ArDashboard({ role, branches }: Props) {
     setSelectedCustomer(null)
   }, [fetchSummary, fetchCustomers])
 
+  // Navigate from meeting dashboard → customer detail
+  const handleMeetingSelectCustomer = useCallback((id: string, name: string) => {
+    const found = customers.find((c) => c.id === id)
+    if (found) {
+      setSelectedCustomer(found)
+    } else {
+      // Customer might not be in the current customers list (e.g. excluded); create a minimal stub
+      setSelectedCustomer({
+        id, displayName: name, isExcluded: false,
+        current: 0, d30: 0, d60: 0, d90: 0, d90plus: 0, totalAr: 0, invoiceCount: 0,
+      })
+    }
+  }, [customers])
+
   // Filter + sort
   const filteredCustomers = customers
     .filter((c) => {
@@ -280,7 +297,7 @@ export default function ArDashboard({ role, branches }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>Accounts Receivable</div>
-          {summary && summary.lastImports.length > 0 && (
+          {view === 'ar' && summary && summary.lastImports.length > 0 && (
             <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
               {summary.lastImports.map((imp) => (
                 <span key={imp.entity_code} style={{ marginRight: 16 }}>
@@ -290,25 +307,54 @@ export default function ArDashboard({ role, branches }: Props) {
             </div>
           )}
         </div>
-        {isAdmin && (
-          <button
-            onClick={() => setShowImport(true)}
-            style={{
-              background: '#ff6b00', color: '#fff', border: 'none',
-              borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500,
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-            Import AR
-          </button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* View tabs */}
+          <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 3, gap: 2 }}>
+            {(['ar', 'meeting'] as ViewMode[]).map((v) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                style={{
+                  background: view === v ? '#ff6b00' : 'transparent',
+                  color: view === v ? '#fff' : '#888',
+                  border: 'none', borderRadius: 6,
+                  padding: '5px 14px', fontSize: 12, fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                {v === 'ar' ? 'AR' : 'Meeting'}
+              </button>
+            ))}
+          </div>
+          {isAdmin && (
+            <button
+              onClick={() => setShowImport(true)}
+              style={{
+                background: '#ff6b00', color: '#fff', border: 'none',
+                borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              Import AR
+            </button>
+          )}
+        </div>
       </div>
 
+      {/* Meeting dashboard view */}
+      {view === 'meeting' && (
+        <ArMeetingDashboard
+          entity={entity}
+          onSelectCustomer={handleMeetingSelectCustomer}
+        />
+      )}
+
+      {view === 'ar' && <>
       {/* Aging summary cards */}
       <AgingCards
         summary={summary}
@@ -453,6 +499,8 @@ export default function ArDashboard({ role, branches }: Props) {
           </table>
         </div>
       </div>
+
+      </>}
 
       {showImport && (
         <ArImportModal onClose={() => setShowImport(false)} onSuccess={handleImportSuccess} />
