@@ -21,7 +21,7 @@ export default async function ArPage() {
   const role = profileRes.data.role as Role
 
   let branchIds: string[] | null = null
-  if (role !== 'admin' && role !== 'executive') {
+  if (role !== 'admin' && role !== 'executive' && role !== 'ar_manager' && role !== 'ar_team') {
     branchIds = (assignRes.data ?? []).map((a: { branch_id: string }) => a.branch_id)
     if (branchIds.length === 0) redirect('/login')
   }
