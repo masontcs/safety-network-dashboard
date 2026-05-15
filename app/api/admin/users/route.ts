@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/utils/errors'
 import type { Role } from '@/lib/supabase/database.types'
 
-const VALID_ROLES: Role[] = ['admin', 'executive', 'district_manager', 'branch_manager']
+const VALID_ROLES: Role[] = ['admin', 'executive', 'district_manager', 'branch_manager', 'ar_manager', 'ar_team', 'project_manager']
 
 export async function GET(): Promise<NextResponse> {
   try {
