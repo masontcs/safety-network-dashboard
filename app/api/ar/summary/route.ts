@@ -13,6 +13,8 @@ export async function GET(request: Request): Promise<Response> {
     const entityCode = searchParams.get('entity') || null
     const branchId   = searchParams.get('branchId') || null
 
+    const showAll = searchParams.get('showAll') === 'true'
+
     const supabase = createServiceClient()
     const { branchIds, role } = ctx.access
 
@@ -33,8 +35,8 @@ export async function GET(request: Request): Promise<Response> {
       query = query.in('branch_id', branchIds)
     }
 
-    // ar_team: scope to assigned customers only
-    if (role === 'ar_team') {
+    // ar_team: scope to assigned customers only unless showAll is requested
+    if (role === 'ar_team' && !showAll) {
       const assignedIds = await getArTeamCustomerIds(ctx.access.userId)
       const ids = assignedIds.length > 0 ? assignedIds : ['00000000-0000-0000-0000-000000000000']
       query = query.in('customer_id', ids)

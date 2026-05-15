@@ -21,10 +21,12 @@ export async function GET(request: Request): Promise<Response> {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // ar_team: resolve assigned customer IDs before fetching invoices
+    const showAll = searchParams.get('showAll') === 'true'
+
+    // ar_team: resolve assigned customer IDs before fetching invoices (unless showing all)
     const { role } = ctx.access
     let arTeamCustomerIds: string[] | null = null
-    if (role === 'ar_team') {
+    if (role === 'ar_team' && !showAll) {
       const ids = await getArTeamCustomerIds(ctx.access.userId)
       arTeamCustomerIds = ids.length > 0 ? ids : []
       if (arTeamCustomerIds.length === 0) return NextResponse.json({ customers: [] })

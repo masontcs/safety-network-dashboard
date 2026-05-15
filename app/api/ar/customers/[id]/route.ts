@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardArAdminOnly, getArTeamCustomerIds } from '@/lib/api/auth'
+import { getAccessContext, guardArAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function GET(
@@ -9,14 +9,6 @@ export async function GET(
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-
-    // ar_team: only their assigned customers
-    if (ctx.access.role === 'ar_team') {
-      const assignedIds = await getArTeamCustomerIds(ctx.access.userId)
-      if (!assignedIds.includes(params.id)) {
-        return NextResponse.json({ error: 'Not found' }, { status: 404 })
-      }
-    }
 
     const supabase = createServiceClient()
     const { id } = params

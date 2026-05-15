@@ -170,6 +170,7 @@ export default function ArDashboard({ role, branches }: Props) {
   const isAdmin = role === 'admin'
 
   const [view, setView]               = useState<ViewMode>('ar')
+  const [showAll, setShowAll]         = useState(false)
   const [entity, setEntity]           = useState('')
   const [branchId, setBranchId]       = useState('')
   const [bucket, setBucket]           = useState('')
@@ -191,10 +192,11 @@ export default function ArDashboard({ role, branches }: Props) {
     const p = new URLSearchParams()
     if (entity)   p.set('entity', entity)
     if (branchId) p.set('branchId', branchId)
+    if (showAll)  p.set('showAll', 'true')
     const res = await fetch(`/api/ar/summary?${p}`)
     if (res.ok) setSummary(await res.json())
     setLoadingSummary(false)
-  }, [entity, branchId])
+  }, [entity, branchId, showAll])
 
   const fetchCustomers = useCallback(async () => {
     setLoadingCustomers(true)
@@ -202,13 +204,14 @@ export default function ArDashboard({ role, branches }: Props) {
     if (entity)       p.set('entity', entity)
     if (branchId)     p.set('branchId', branchId)
     if (showExcluded) p.set('includeExcluded', 'true')
+    if (showAll)      p.set('showAll', 'true')
     const res = await fetch(`/api/ar/customers?${p}`)
     if (res.ok) {
       const data = await res.json()
       setCustomers(data.customers ?? [])
     }
     setLoadingCustomers(false)
-  }, [entity, branchId, showExcluded])
+  }, [entity, branchId, showExcluded, showAll])
 
   useEffect(() => { fetchSummary() }, [fetchSummary])
   useEffect(() => { fetchCustomers() }, [fetchCustomers])
@@ -308,24 +311,39 @@ export default function ArDashboard({ role, branches }: Props) {
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* View tabs — Meeting tab hidden for ar_team */}
-          <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 3, gap: 2 }}>
-            {(['ar', ...(role !== 'ar_team' ? ['meeting'] : [])] as ViewMode[]).map((v) => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                style={{
-                  background: view === v ? '#ff6b00' : 'transparent',
-                  color: view === v ? '#fff' : '#888',
-                  border: 'none', borderRadius: 6,
-                  padding: '5px 14px', fontSize: 12, fontWeight: 500,
-                  cursor: 'pointer',
-                }}
-              >
-                {v === 'ar' ? 'AR' : 'Meeting'}
-              </button>
-            ))}
-          </div>
+          {role === 'ar_team' ? (
+            /* ar_team: scope toggle — My Customers vs All AR */
+            <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 3, gap: 2 }}>
+              {([false, true] as const).map((all) => (
+                <button key={String(all)} onClick={() => setShowAll(all)}
+                  style={{
+                    background: showAll === all ? '#ff6b00' : 'transparent',
+                    color: showAll === all ? '#fff' : '#888',
+                    border: 'none', borderRadius: 6,
+                    padding: '5px 14px', fontSize: 12, fontWeight: 500,
+                    cursor: 'pointer',
+                  }}>
+                  {all ? 'All AR' : 'My Customers'}
+                </button>
+              ))}
+            </div>
+          ) : (
+            /* other roles: AR / Meeting view toggle */
+            <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 3, gap: 2 }}>
+              {(['ar', 'meeting'] as ViewMode[]).map((v) => (
+                <button key={v} onClick={() => setView(v)}
+                  style={{
+                    background: view === v ? '#ff6b00' : 'transparent',
+                    color: view === v ? '#fff' : '#888',
+                    border: 'none', borderRadius: 6,
+                    padding: '5px 14px', fontSize: 12, fontWeight: 500,
+                    cursor: 'pointer',
+                  }}>
+                  {v === 'ar' ? 'AR' : 'Meeting'}
+                </button>
+              ))}
+            </div>
+          )}
           {isAdmin && (
             <button
               onClick={() => setShowImport(true)}
