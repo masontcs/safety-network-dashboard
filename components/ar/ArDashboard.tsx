@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+// Invoice interface only used by ArCustomerDetail now — kept here for the Customer list type
 import type { Role } from '@/lib/supabase/database.types'
 import ArImportModal from './ArImportModal'
+import ArCustomerDetail from './ArCustomerDetail'
 
 interface Branch { id: string; name: string }
 
@@ -160,211 +162,6 @@ function AgingCards({
   )
 }
 
-// ─── Customer detail view ──────────────────────────────────────────────────────
-
-function CustomerDetail({
-  customer, entity, isAdmin, onBack, onRefresh,
-}: {
-  customer: Customer
-  entity: string
-  isAdmin: boolean
-  onBack: () => void
-  onRefresh: () => void
-}) {
-  const [invoices, setInvoices]   = useState<Invoice[]>([])
-  const [total, setTotal]         = useState(0)
-  const [page, setPage]           = useState(1)
-  const [pageCount, setPageCount] = useState(0)
-  const [loading, setLoading]     = useState(true)
-  const [toggling, setToggling]   = useState(false)
-
-  const PAGE_SIZE = 50
-
-  useEffect(() => {
-    setLoading(true)
-    const params = new URLSearchParams({ customerId: customer.id, page: String(page) })
-    if (entity) params.set('entity', entity)
-    fetch(`/api/ar/invoices?${params}`)
-      .then((r) => r.json())
-      .then((d) => {
-        setInvoices(d.invoices ?? [])
-        setTotal(d.total ?? 0)
-        setPageCount(d.pageCount ?? 0)
-      })
-      .finally(() => setLoading(false))
-  }, [customer.id, entity, page])
-
-  const handleExcludeToggle = async () => {
-    setToggling(true)
-    try {
-      const res = await fetch(`/api/ar/customers/${customer.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isExcluded: !customer.isExcluded }),
-      })
-      if (res.ok) onRefresh()
-    } finally {
-      setToggling(false)
-    }
-  }
-
-  const custAging: Record<string, number> = {
-    'Current': customer.current,
-    '1-30':    customer.d30,
-    '31-60':   customer.d60,
-    '61-90':   customer.d90,
-    '>90':     customer.d90plus,
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button
-          onClick={onBack}
-          style={{
-            background: '#2a2a2a', border: 'none', borderRadius: 8,
-            color: '#ccc', padding: '6px 12px', fontSize: 12,
-            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-          }}
-        >
-          ← Back
-        </button>
-        <div style={{ fontSize: 22, fontWeight: 500, color: customer.isExcluded ? '#666' : '#fff', flex: 1 }}>
-          {customer.displayName}
-          {customer.isExcluded && (
-            <span style={{ fontSize: 11, color: '#555', fontWeight: 400, marginLeft: 10, verticalAlign: 'middle' }}>
-              Excluded from AR
-            </span>
-          )}
-        </div>
-        <div style={{ fontSize: 12, color: '#555' }}>
-          {customer.invoiceCount} invoice{customer.invoiceCount !== 1 ? 's' : ''} · {fmt(customer.totalAr)} total
-        </div>
-        {isAdmin && (
-          <button
-            onClick={handleExcludeToggle}
-            disabled={toggling}
-            style={{
-              background: customer.isExcluded ? '#2a2a2a' : 'rgba(204,68,68,0.12)',
-              border: `1px solid ${customer.isExcluded ? '#333' : '#663333'}`,
-              borderRadius: 8,
-              color: customer.isExcluded ? '#888' : '#cc4444',
-              padding: '6px 14px', fontSize: 12,
-              cursor: toggling ? 'default' : 'pointer',
-              opacity: toggling ? 0.5 : 1,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {customer.isExcluded ? 'Restore to AR' : 'Exclude from AR'}
-          </button>
-        )}
-      </div>
-
-      {/* Aging breakdown for this customer */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
-        <div style={{ background: customer.isExcluded ? '#2a2a2a' : '#ff6b00', borderRadius: 12, padding: 16 }}>
-          <div style={{ fontSize: 11, color: customer.isExcluded ? '#555' : 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
-            Total AR
-          </div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: customer.isExcluded ? '#666' : '#fff' }}>{fmt(customer.totalAr)}</div>
-        </div>
-        {AGING_BUCKETS.map((b) => (
-          <div key={b} style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, padding: 16 }}>
-            <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>{b} days</div>
-            <div style={{ fontSize: 20, fontWeight: 500, color: custAging[b] > 0 && !customer.isExcluded ? BUCKET_COLORS[b] : '#444' }}>
-              {fmt(custAging[b])}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Customer profile */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        {/* Contacts placeholder */}
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>Contacts</div>
-            {isAdmin && (
-              <button style={{ background: '#2a2a2a', border: 'none', borderRadius: 6, color: '#888', padding: '4px 10px', fontSize: 11, cursor: 'not-allowed', opacity: 0.5 }}>
-                + Add
-              </button>
-            )}
-          </div>
-          <div style={{ fontSize: 12, color: '#444' }}>No contacts yet.</div>
-        </div>
-
-        {/* Notes placeholder */}
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: '#fff', marginBottom: 12 }}>Notes</div>
-          <div style={{ fontSize: 12, color: '#444' }}>No notes yet.</div>
-        </div>
-      </div>
-
-      {/* Invoices */}
-      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', overflow: 'hidden' }}>
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid #2a2a2a' }}>
-          <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>Open Invoices</span>
-          {total > 0 && <span style={{ fontSize: 11, color: '#555', marginLeft: 8 }}>{total} total</span>}
-        </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
-                {['Invoice #', 'Entity', 'Branch', 'Job', 'PO #', 'Invoice Date', 'Due Date', 'Terms', 'Aging', 'Open Balance'].map((h) => (
-                  <th key={h} style={{ padding: '9px 12px', textAlign: h === 'Open Balance' ? 'right' : 'left', fontSize: 11, color: '#666', fontWeight: 400, whiteSpace: 'nowrap' }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>Loading…</td></tr>
-              ) : invoices.length === 0 ? (
-                <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>No invoices found</td></tr>
-              ) : (
-                invoices.map((inv) => (
-                  <tr key={inv.id} style={{ borderBottom: '1px solid #222' }}>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>{inv.invoice_number ?? '—'}</td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc' }}>{inv.entity_code}</td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>
-                      {inv.branch?.name ?? <span style={{ color: '#555' }}>{inv.raw_class_code ?? '—'}</span>}
-                    </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#888', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.job_name ?? '—'}</td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#888' }}>{inv.po_number ?? '—'}</td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#888', whiteSpace: 'nowrap' }}>{fmtDate(inv.invoice_date)}</td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>{fmtDate(inv.due_date)}</td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#888' }}>{inv.terms ?? '—'}</td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, whiteSpace: 'nowrap' }}>
-                      <span style={{ background: `${BUCKET_COLORS[inv.aging_bucket] ?? '#333'}22`, color: BUCKET_COLORS[inv.aging_bucket] ?? '#888', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>
-                        {inv.aging_bucket}
-                      </span>
-                    </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#fff', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                      {fmt(Number(inv.open_balance))}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        {pageCount > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderTop: '1px solid #2a2a2a' }}>
-            <span style={{ fontSize: 12, color: '#666' }}>{total} invoice{total !== 1 ? 's' : ''}</span>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={{ background: '#2a2a2a', border: 'none', borderRadius: 6, color: page === 1 ? '#444' : '#ccc', padding: '4px 10px', fontSize: 12, cursor: page === 1 ? 'default' : 'pointer' }}>‹</button>
-              <span style={{ fontSize: 12, color: '#888', padding: '4px 8px' }}>{page} / {pageCount}</span>
-              <button onClick={() => setPage((p) => Math.min(pageCount, p + 1))} disabled={page === pageCount} style={{ background: '#2a2a2a', border: 'none', borderRadius: 6, color: page === pageCount ? '#444' : '#ccc', padding: '4px 10px', fontSize: 12, cursor: page === pageCount ? 'default' : 'pointer' }}>›</button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ─── Main dashboard ────────────────────────────────────────────────────────────
 
 export default function ArDashboard({ role, branches }: Props) {
@@ -464,15 +261,13 @@ export default function ArDashboard({ role, branches }: Props) {
 
   if (selectedCustomer) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <CustomerDetail
-          customer={selectedCustomer}
-          entity={entity}
-          isAdmin={isAdmin}
-          onBack={() => setSelectedCustomer(null)}
-          onRefresh={handleRefreshAfterToggle}
-        />
-      </div>
+      <ArCustomerDetail
+        customer={selectedCustomer}
+        entity={entity}
+        isAdmin={isAdmin}
+        onBack={() => setSelectedCustomer(null)}
+        onRefresh={handleRefreshAfterToggle}
+      />
     )
   }
 

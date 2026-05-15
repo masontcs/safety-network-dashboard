@@ -200,9 +200,27 @@ export type Database = {
         Relationships: []
       }
       ar_customers: {
-        Row: { id: string; display_name: string; notes: string | null; created_at: string; is_excluded: boolean }
-        Insert: { id?: string; display_name: string; notes?: string | null; created_at?: string; is_excluded?: boolean }
-        Update: { id?: string; display_name?: string; notes?: string | null; is_excluded?: boolean }
+        Row: { id: string; display_name: string; notes: string | null; created_at: string; is_excluded: boolean; status: string }
+        Insert: { id?: string; display_name: string; notes?: string | null; created_at?: string; is_excluded?: boolean; status?: string }
+        Update: { id?: string; display_name?: string; notes?: string | null; is_excluded?: boolean; status?: string }
+        Relationships: []
+      }
+      ar_customer_contacts: {
+        Row: { id: string; customer_id: string; name: string; title: string | null; email: string | null; phone: string | null; is_primary: boolean; created_at: string }
+        Insert: { id?: string; customer_id: string; name: string; title?: string | null; email?: string | null; phone?: string | null; is_primary?: boolean; created_at?: string }
+        Update: { id?: string; customer_id?: string; name?: string; title?: string | null; email?: string | null; phone?: string | null; is_primary?: boolean }
+        Relationships: []
+      }
+      ar_customer_notes: {
+        Row: { id: string; customer_id: string; content: string; created_by: string | null; created_at: string }
+        Insert: { id?: string; customer_id: string; content: string; created_by?: string | null; created_at?: string }
+        Update: { id?: string; customer_id?: string; content?: string; created_by?: string | null }
+        Relationships: []
+      }
+      ar_customer_pm_assignments: {
+        Row: { id: string; customer_id: string; user_id: string; created_at: string }
+        Insert: { id?: string; customer_id: string; user_id: string; created_at?: string }
+        Update: { id?: string; customer_id?: string; user_id?: string }
         Relationships: []
       }
       ar_customer_entity_refs: {
