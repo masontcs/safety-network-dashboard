@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext } from '@/lib/api/auth'
+import { getAccessContext, guardArAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 const COLLECTION_PRIORITY: Record<string, number> = {
@@ -19,6 +19,8 @@ export async function GET(request: Request): Promise<Response> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
+    const meetingGuard = guardArAdminOnly(ctx.access.role)
+    if (meetingGuard) return meetingGuard
 
     const { searchParams } = new URL(request.url)
     const entityCode = searchParams.get('entity') || null

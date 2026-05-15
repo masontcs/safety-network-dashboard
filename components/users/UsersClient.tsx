@@ -14,17 +14,23 @@ interface User {
 }
 
 const ROLE_LABELS: Record<Role, string> = {
-  admin: 'Admin',
-  executive: 'Executive',
+  admin:            'Admin',
+  executive:        'Executive',
   district_manager: 'District Manager',
-  branch_manager: 'Branch Manager',
+  branch_manager:   'Branch Manager',
+  ar_manager:       'AR Manager',
+  ar_team:          'AR Team',
+  project_manager:  'Project Manager',
 }
 
 const ROLE_COLORS: Record<Role, string> = {
-  admin: '#ff6b00',
-  executive: '#888888',
+  admin:            '#ff6b00',
+  executive:        '#888888',
   district_manager: '#cccccc',
-  branch_manager: '#666666',
+  branch_manager:   '#666666',
+  ar_manager:       '#ff6b00',
+  ar_team:          '#888',
+  project_manager:  '#4caf50',
 }
 
 const selectStyle: React.CSSProperties = {
@@ -105,7 +111,8 @@ export default function UsersClient() {
   const [createError, setCreateError] = useState<string | null>(null)
 
   const branchMap = Object.fromEntries(branches.map((b) => [b.id, b.name]))
-  const needsBranchScope = (role: Role) => role === 'district_manager' || role === 'branch_manager'
+  const needsBranchScope = (role: Role) =>
+    role === 'district_manager' || role === 'branch_manager' || role === 'project_manager'
 
   useEffect(() => {
     fetch('/api/admin/users')

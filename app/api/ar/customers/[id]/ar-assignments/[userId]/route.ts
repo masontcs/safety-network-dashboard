@@ -14,15 +14,16 @@ export async function DELETE(
 
     const supabase = createServiceClient()
     const { error } = await supabase
-      .from('ar_customer_pm_assignments')
+      .from('ar_customer_assignments')
       .delete()
       .eq('customer_id', params.id)
       .eq('user_id', params.userId)
 
-    if (error) return NextResponse.json({ error: 'Failed to remove PM' }, { status: 500 })
+    if (error) return NextResponse.json({ error: 'Failed to remove assignment' }, { status: 500 })
+
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('AR PM remove error:', err)
+    console.error('AR assignment DELETE error:', err)
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }

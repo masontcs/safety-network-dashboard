@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext } from '@/lib/api/auth'
+import { getAccessContext, guardFuelAccess } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/utils/errors'
 
@@ -7,6 +7,8 @@ export async function GET(): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
+    const fuelGuard = guardFuelAccess(ctx.access.role)
+    if (fuelGuard) return fuelGuard
     const { access } = ctx
     const supabase = createServiceClient()
 

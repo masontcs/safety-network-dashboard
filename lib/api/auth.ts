@@ -7,17 +7,58 @@ type AccessResult =
   | { ok: true; access: UserAccess }
   | { ok: false; response: NextResponse }
 
+// ── Role sets ──────────────────────────────────────────────────────────────────
+
+const NO_PAYROLL_ROLES: Role[] = ['ar_manager', 'ar_team', 'project_manager']
+const NO_FUEL_ROLES:    Role[] = ['ar_manager', 'ar_team', 'project_manager']
+const NO_REVENUE_ROLES: Role[] = ['ar_manager', 'ar_team']
+
+// ── Guard helpers ──────────────────────────────────────────────────────────────
+
 export function isAdminRole(role: Role): boolean {
   return role === 'admin'
 }
 
+// Full platform admin only
 export function guardAdminOnly(role: Role): NextResponse | null {
-  if (isAdminRole(role)) return null
+  if (role === 'admin') return null
   return NextResponse.json(
     { success: false, error: 'Admin access required.', code: 'FORBIDDEN' },
     { status: 403 }
   )
 }
+
+// AR administrative operations (status changes, imports, exclusions, merges)
+export function guardArAdminOnly(role: Role): NextResponse | null {
+  if (role === 'admin' || role === 'ar_manager') return null
+  return NextResponse.json(
+    { success: false, error: 'AR admin access required.', code: 'FORBIDDEN' },
+    { status: 403 }
+  )
+}
+
+export function guardPayrollAccess(role: Role): NextResponse | null {
+  if (NO_PAYROLL_ROLES.includes(role)) {
+    return NextResponse.json({ success: false, error: 'Access denied.', code: 'FORBIDDEN' }, { status: 403 })
+  }
+  return null
+}
+
+export function guardFuelAccess(role: Role): NextResponse | null {
+  if (NO_FUEL_ROLES.includes(role)) {
+    return NextResponse.json({ success: false, error: 'Access denied.', code: 'FORBIDDEN' }, { status: 403 })
+  }
+  return null
+}
+
+export function guardRevenueAccess(role: Role): NextResponse | null {
+  if (NO_REVENUE_ROLES.includes(role)) {
+    return NextResponse.json({ success: false, error: 'Access denied.', code: 'FORBIDDEN' }, { status: 403 })
+  }
+  return null
+}
+
+// ── Access context ─────────────────────────────────────────────────────────────
 
 export async function getAccessContext(): Promise<AccessResult> {
   const routeClient = createRouteClient()
@@ -53,11 +94,12 @@ export async function getAccessContext(): Promise<AccessResult> {
 
   const role = profile.role as Role
 
-  // admin and executive get null (all access)
-  if (role === 'admin' || role === 'executive') {
+  // Roles with null branchIds — either full access or customer-scoped (handled per AR route)
+  if (role === 'admin' || role === 'executive' || role === 'ar_manager' || role === 'ar_team') {
     return { ok: true, access: { userId: user.id, role, branchIds: null } }
   }
 
+  // project_manager, district_manager, branch_manager: branch-scoped via assignments
   const { data: assignments, error: assignError } = await supabase
     .from('user_branch_assignments')
     .select('branch_id')
@@ -76,4 +118,15 @@ export async function getAccessContext(): Promise<AccessResult> {
   const branchIds = (assignments ?? []).map((a) => a.branch_id)
 
   return { ok: true, access: { userId: user.id, role, branchIds } }
+}
+
+// ── AR team customer scope helper ──────────────────────────────────────────────
+
+export async function getArTeamCustomerIds(userId: string): Promise<string[]> {
+  const supabase = createServiceClient()
+  const { data } = await supabase
+    .from('ar_customer_assignments')
+    .select('customer_id')
+    .eq('user_id', userId)
+  return (data ?? []).map((r) => r.customer_id as string)
 }

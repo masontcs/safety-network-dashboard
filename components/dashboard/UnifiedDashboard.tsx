@@ -484,14 +484,15 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
     return getSaturdaysInMonth(selectedMonth.startDate, selectedMonth.endDate)
   }, [selectedMonth])
 
-  // ── Tab config ───────────────────────────────────────────────────────────────
-  const tabs: Array<{ key: Tab; label: string }> = [
+  // ── Tab config (filtered by role) ────────────────────────────────────────────
+  const allTabs: Array<{ key: Tab; label: string; roles?: Role[] }> = [
     { key: 'overview', label: 'Overview' },
-    { key: 'revenue', label: 'Revenue' },
-    { key: 'payroll', label: 'Payroll' },
-    { key: 'fuel', label: 'Fuel' },
-    { key: 'profits', label: 'Profits' },
+    { key: 'revenue',  label: 'Revenue' },
+    { key: 'payroll',  label: 'Payroll',  roles: ['admin', 'executive', 'district_manager', 'branch_manager'] },
+    { key: 'fuel',     label: 'Fuel',     roles: ['admin', 'executive', 'district_manager', 'branch_manager'] },
+    { key: 'profits',  label: 'Profits',  roles: ['admin', 'executive', 'district_manager', 'branch_manager'] },
   ]
+  const tabs = allTabs.filter((t) => !t.roles || t.roles.includes(role))
 
   const tabProps = {
     role, data, branches, selectedBranchId, allocationOn,

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext } from '@/lib/api/auth'
+import { getAccessContext, guardPayrollAccess } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { canAccessBranch } from '@/lib/utils/access'
 import { apiError } from '@/lib/utils/errors'
@@ -16,6 +16,8 @@ export async function GET(request: Request): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
+    const payrollGuard = guardPayrollAccess(ctx.access.role)
+    if (payrollGuard) return payrollGuard
 
     const { access } = ctx
     const { searchParams } = new URL(request.url)

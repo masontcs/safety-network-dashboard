@@ -2,10 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAccessContext, guardArAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
-export async function DELETE(
-  _request: Request,
-  { params }: { params: { id: string; noteId: string } }
-): Promise<Response> {
+export async function GET(): Promise<Response> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
@@ -13,16 +10,17 @@ export async function DELETE(
     if (guard) return guard
 
     const supabase = createServiceClient()
-    const { error } = await supabase
-      .from('ar_customer_notes')
-      .delete()
-      .eq('id', params.noteId)
-      .eq('customer_id', params.id)
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('id, display_name')
+      .eq('role', 'ar_team')
+      .order('display_name')
 
-    if (error) return NextResponse.json({ error: 'Failed to delete note' }, { status: 500 })
-    return NextResponse.json({ success: true })
+    return NextResponse.json({
+      users: (data ?? []).map((u) => ({ id: u.id as string, displayName: u.display_name as string })),
+    })
   } catch (err) {
-    console.error('AR note DELETE error:', err)
+    console.error('AR team-members GET error:', err)
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }

@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import type { Role } from '@/lib/supabase/database.types'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface Contact { id: string; name: string; title: string | null; email: string | null; phone: string | null; isPrimary: boolean }
 interface Note    { id: string; content: string; createdAt: string; createdByName: string | null }
 interface PmAssignment { userId: string; displayName: string; role: string }
+interface ArAssignment { userId: string; displayName: string }
 interface EntityRef { entityCode: string; quickbooksName: string }
 interface BranchSlice { name: string; total: number }
 
@@ -42,7 +44,7 @@ interface SearchResult { id: string; displayName: string; entityRefs: EntityRef[
 interface Props {
   customer: CustomerSummary
   entity: string
-  isAdmin: boolean
+  role: Role
   onBack: () => void
   onRefresh: () => void
 }
@@ -282,7 +284,10 @@ function ContactForm({ customerId, onSaved, onCancel }: { customerId: string; on
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
-export default function ArCustomerDetail({ customer, entity, isAdmin, onBack, onRefresh }: Props) {
+export default function ArCustomerDetail({ customer, entity, role, onBack, onRefresh }: Props) {
+  const isAdmin   = role === 'admin'
+  const isArAdmin = role === 'admin' || role === 'ar_manager'
+
   const [profile, setProfile]           = useState<CustomerProfile | null>(null)
   const [profileLoading, setProfileLoading] = useState(true)
   const [invoices, setInvoices]         = useState<Invoice[]>([])
@@ -291,6 +296,8 @@ export default function ArCustomerDetail({ customer, entity, isAdmin, onBack, on
   const [invPageCount, setInvPageCount] = useState(0)
   const [invLoading, setInvLoading]     = useState(true)
   const [users, setUsers]               = useState<SystemUser[]>([])
+  const [arTeamUsers, setArTeamUsers]   = useState<{ id: string; displayName: string }[]>([])
+  const [arAssignments, setArAssignments] = useState<ArAssignment[]>([])
   const [showMerge, setShowMerge]       = useState(false)
   const [showAddContact, setShowAddContact] = useState(false)
   const [noteText, setNoteText]         = useState('')
@@ -322,6 +329,20 @@ export default function ArCustomerDetail({ customer, entity, isAdmin, onBack, on
       .then((r) => r.json())
       .then((d) => setUsers((d.users ?? []).map((u: { id: string; display_name?: string; displayName?: string; role: string }) => ({ id: u.id, displayName: u.display_name ?? u.displayName ?? '—', role: u.role }))))
   }, [isAdmin])
+
+  useEffect(() => {
+    if (!isArAdmin) return
+    fetch('/api/ar/team-members')
+      .then((r) => r.json())
+      .then((d) => setArTeamUsers(d.users ?? []))
+  }, [isArAdmin])
+
+  useEffect(() => {
+    if (!isArAdmin) return
+    fetch(`/api/ar/customers/${customer.id}/ar-assignments`)
+      .then((r) => r.json())
+      .then((d) => setArAssignments(d.assignments ?? []))
+  }, [isArAdmin, customer.id])
 
   const patchCustomer = async (payload: Record<string, unknown>) => {
     await fetch(`/api/ar/customers/${customer.id}`, {
@@ -394,6 +415,21 @@ export default function ArCustomerDetail({ customer, entity, isAdmin, onBack, on
     setProfile((p) => p ? { ...p, pmAssignments: p.pmAssignments.filter((pm) => pm.userId !== userId) } : p)
   }
 
+  const handleAssignAr = async (userId: string) => {
+    const res = await fetch(`/api/ar/customers/${customer.id}/ar-assignments`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }),
+    })
+    if (res.ok) {
+      const { assignment } = await res.json()
+      setArAssignments((prev) => [...prev, { userId: assignment.userId, displayName: assignment.displayName }])
+    }
+  }
+
+  const handleRemoveAr = async (userId: string) => {
+    await fetch(`/api/ar/customers/${customer.id}/ar-assignments/${userId}`, { method: 'DELETE' })
+    setArAssignments((prev) => prev.filter((a) => a.userId !== userId))
+  }
+
   // Chart data
   const agingChartData = [
     { name: 'Current', value: customer.current },
@@ -407,6 +443,9 @@ export default function ArCustomerDetail({ customer, entity, isAdmin, onBack, on
 
   const assignedPmIds  = new Set(profile?.pmAssignments.map((pm) => pm.userId) ?? [])
   const availableUsers = users.filter((u) => !assignedPmIds.has(u.id))
+
+  const assignedArIds       = new Set(arAssignments.map((a) => a.userId))
+  const availableArTeamUsers = arTeamUsers.filter((u) => !assignedArIds.has(u.id))
 
   const custStatusMeta = getCustomerStatusMeta(profile?.customerStatus ?? 'active')
   const collStatusMeta = getCollectionStatusMeta(profile?.collectionStatus ?? 'none')
@@ -435,7 +474,7 @@ export default function ArCustomerDetail({ customer, entity, isAdmin, onBack, on
           </span>
         )}
         {/* Collection status */}
-        {isAdmin && profile ? (
+        {isArAdmin && profile ? (
           <select value={profile.collectionStatus} onChange={(e) => handleCollectionStatusChange(e.target.value)}
             style={{ background: `${collStatusMeta.color}18`, border: `1px solid ${collStatusMeta.color}`, borderRadius: 8, color: collStatusMeta.color, padding: '5px 10px', fontSize: 12, cursor: 'pointer' }}>
             {COLLECTION_STATUS_OPTIONS.map((o) => (
@@ -569,6 +608,34 @@ export default function ArCustomerDetail({ customer, entity, isAdmin, onBack, on
             )}
         </SectionCard>
 
+        {/* AR Team Assignments — admin and ar_manager only */}
+        {isArAdmin && (
+          <SectionCard title="AR Team"
+            action={availableArTeamUsers.length > 0 ? (
+              <select value="" onChange={(e) => { if (e.target.value) handleAssignAr(e.target.value) }}
+                style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 6, color: '#ff6b00', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>
+                <option value="">+ Assign</option>
+                {availableArTeamUsers.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
+              </select>
+            ) : undefined}>
+            {arAssignments.length === 0 ? (
+              <div style={{ fontSize: 12, color: '#555' }}>No AR team members assigned.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {arAssignments.map((a) => (
+                  <div key={a.userId} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ flex: 1, fontSize: 12, color: '#ccc' }}>{a.displayName}</div>
+                    <button onClick={() => handleRemoveAr(a.userId)}
+                      style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </SectionCard>
+        )}
+
         {/* Contacts */}
         <SectionCard title="Contacts"
           action={isAdmin && !showAddContact ? (
@@ -607,18 +674,16 @@ export default function ArCustomerDetail({ customer, entity, isAdmin, onBack, on
 
         {/* Notes */}
         <SectionCard title="Notes">
-          {isAdmin && (
-            <div style={{ marginBottom: 12 }}>
-              <textarea placeholder="Add a note…" value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={3}
-                style={{ width: '100%', background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
-                <button onClick={handleAddNote} disabled={addingNote || !noteText.trim()}
-                  style={{ background: '#ff6b00', border: 'none', borderRadius: 6, color: '#fff', padding: '5px 14px', fontSize: 12, cursor: addingNote || !noteText.trim() ? 'default' : 'pointer', opacity: addingNote || !noteText.trim() ? 0.5 : 1 }}>
-                  {addingNote ? 'Saving…' : 'Add Note'}
-                </button>
-              </div>
+          <div style={{ marginBottom: 12 }}>
+            <textarea placeholder="Add a note…" value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={3}
+              style={{ width: '100%', background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+              <button onClick={handleAddNote} disabled={addingNote || !noteText.trim()}
+                style={{ background: '#ff6b00', border: 'none', borderRadius: 6, color: '#fff', padding: '5px 14px', fontSize: 12, cursor: addingNote || !noteText.trim() ? 'default' : 'pointer', opacity: addingNote || !noteText.trim() ? 0.5 : 1 }}>
+                {addingNote ? 'Saving…' : 'Add Note'}
+              </button>
             </div>
-          )}
+          </div>
           {profileLoading ? <div style={{ fontSize: 12, color: '#555' }}>Loading…</div>
             : (profile?.notes ?? []).length === 0 ? <div style={{ fontSize: 12, color: '#555' }}>No notes yet.</div>
             : (
@@ -627,7 +692,7 @@ export default function ArCustomerDetail({ customer, entity, isAdmin, onBack, on
                   <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid #2a2a2a' }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                       <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
-                      {isAdmin && (
+                      {isArAdmin && (
                         <button onClick={() => handleDeleteNote(n.id)}
                           style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
                           onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}

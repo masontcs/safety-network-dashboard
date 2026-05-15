@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
+import { getAccessContext, guardAdminOnly, guardPayrollAccess } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/utils/errors'
 import { resolveEmployeeAllocation, type AllocationOverride, type EmployeeAllocation } from '@/lib/allocation/employee-allocation'
@@ -37,6 +37,8 @@ export async function GET(request: Request): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
+    const payrollGuard = guardPayrollAccess(ctx.access.role)
+    if (payrollGuard) return payrollGuard
 
     const guard = guardAdminOnly(ctx.access.role)
     if (guard) return guard

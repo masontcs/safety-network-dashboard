@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
+import { getAccessContext, guardArAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 export async function POST(
@@ -9,7 +9,7 @@ export async function POST(
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardAdminOnly(ctx.access.role)
+    const guard = guardArAdminOnly(ctx.access.role)
     if (guard) return guard
 
     const body = await request.json()

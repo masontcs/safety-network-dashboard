@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext } from '@/lib/api/auth'
+import { getAccessContext, getArTeamCustomerIds } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 const AGING_BUCKETS = ['Current', '1-30', '31-60', '61-90', '>90'] as const
@@ -31,6 +31,13 @@ export async function GET(request: Request): Promise<Response> {
       query = query.eq('branch_id', branchId)
     } else if (branchIds) {
       query = query.in('branch_id', branchIds)
+    }
+
+    // ar_team: scope to assigned customers only
+    if (role === 'ar_team') {
+      const assignedIds = await getArTeamCustomerIds(ctx.access.userId)
+      const ids = assignedIds.length > 0 ? assignedIds : ['00000000-0000-0000-0000-000000000000']
+      query = query.in('customer_id', ids)
     }
 
     // Excluded customers are removed from all totals and KPIs

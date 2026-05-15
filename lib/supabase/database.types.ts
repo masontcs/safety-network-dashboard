@@ -2,7 +2,7 @@
 // Regenerate after schema changes:
 //   npx supabase gen types typescript --project-id zobgzhgwgduziszzevzp > lib/supabase/database.types.ts
 
-export type Role = 'admin' | 'executive' | 'district_manager' | 'branch_manager'
+export type Role = 'admin' | 'executive' | 'district_manager' | 'branch_manager' | 'ar_manager' | 'ar_team' | 'project_manager'
 export type LaborType =
   | 'direct'
   | 'admin_hourly'
@@ -221,6 +221,12 @@ export type Database = {
         Row: { id: string; customer_id: string; user_id: string; created_at: string }
         Insert: { id?: string; customer_id: string; user_id: string; created_at?: string }
         Update: { id?: string; customer_id?: string; user_id?: string }
+        Relationships: []
+      }
+      ar_customer_assignments: {
+        Row: { id: string; customer_id: string; user_id: string; assigned_by: string | null; assigned_at: string }
+        Insert: { id?: string; customer_id: string; user_id: string; assigned_by?: string | null; assigned_at?: string }
+        Update: { id?: string; customer_id?: string; user_id?: string; assigned_by?: string | null }
         Relationships: []
       }
       ar_customer_entity_refs: {

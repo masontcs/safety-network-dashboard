@@ -281,7 +281,7 @@ export default function ArDashboard({ role, branches }: Props) {
       <ArCustomerDetail
         customer={selectedCustomer}
         entity={entity}
-        isAdmin={isAdmin}
+        role={role}
         onBack={() => setSelectedCustomer(null)}
         onRefresh={handleRefreshAfterToggle}
       />
@@ -308,9 +308,9 @@ export default function ArDashboard({ role, branches }: Props) {
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* View tabs */}
+          {/* View tabs — Meeting tab hidden for ar_team */}
           <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 3, gap: 2 }}>
-            {(['ar', 'meeting'] as ViewMode[]).map((v) => (
+            {(['ar', ...(role !== 'ar_team' ? ['meeting'] : [])] as ViewMode[]).map((v) => (
               <button
                 key={v}
                 onClick={() => setView(v)}

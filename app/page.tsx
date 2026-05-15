@@ -9,6 +9,9 @@ const DASHBOARD_ROUTES: Record<Role, string> = {
   executive:        '/dashboard',
   district_manager: '/dashboard',
   branch_manager:   '/dashboard',
+  ar_manager:       '/ar',
+  ar_team:          '/ar',
+  project_manager:  '/dashboard',
 }
 
 export default async function RootPage() {

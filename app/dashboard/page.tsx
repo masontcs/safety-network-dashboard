@@ -27,6 +27,9 @@ export default async function DashboardPage() {
   const role = profileRes.data.role as Role
   const userName = profileRes.data.display_name ?? ''
 
+  // AR-only roles don't belong on the dashboard
+  if (role === 'ar_manager' || role === 'ar_team') redirect('/ar')
+
   // admin/executive have null branchIds (all access); managers get their assigned branches
   const userBranchIds: string[] | null =
     role === 'admin' || role === 'executive'

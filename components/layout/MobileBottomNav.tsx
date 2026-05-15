@@ -8,10 +8,13 @@ import type { Role } from '@/lib/supabase/database.types'
 interface Props { role: Role }
 
 const ROLE_HOME: Record<Role, string> = {
-  admin: '/admin',
-  executive: '/executive',
+  admin:            '/admin',
+  executive:        '/executive',
   district_manager: '/district',
-  branch_manager: '/manager',
+  branch_manager:   '/manager',
+  ar_manager:       '/ar',
+  ar_team:          '/ar',
+  project_manager:  '/dashboard',
 }
 
 // Additional nav items that go in the "More" sheet

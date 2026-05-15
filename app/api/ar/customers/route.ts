@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext } from '@/lib/api/auth'
+import { getAccessContext, getArTeamCustomerIds } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 const AGING_BUCKETS = ['Current', '1-30', '31-60', '61-90', '>90'] as const
@@ -21,6 +21,15 @@ export async function GET(request: Request): Promise<Response> {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    // ar_team: resolve assigned customer IDs before fetching invoices
+    const { role } = ctx.access
+    let arTeamCustomerIds: string[] | null = null
+    if (role === 'ar_team') {
+      const ids = await getArTeamCustomerIds(ctx.access.userId)
+      arTeamCustomerIds = ids.length > 0 ? ids : []
+      if (arTeamCustomerIds.length === 0) return NextResponse.json({ customers: [] })
+    }
+
     // Paginate through all invoices and aggregate by customer
     type InvRow = { customer_id: string; open_balance: number; aging_bucket: string }
     const invoices: InvRow[] = []
@@ -33,7 +42,9 @@ export async function GET(request: Request): Promise<Response> {
           .select('customer_id, open_balance, aging_bucket')
           .range(from, from + PAGE_SIZE - 1)
         if (entityCode) q = q.eq('entity_code', entityCode)
-        if (branchId) {
+        if (arTeamCustomerIds !== null) {
+          q = q.in('customer_id', arTeamCustomerIds)
+        } else if (branchId) {
           q = q.eq('branch_id', branchId)
         } else if (branchIds) {
           q = q.in('branch_id', branchIds)
