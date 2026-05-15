@@ -38,7 +38,6 @@ interface CustomerSummary {
   current: number; d30: number; d60: number; d90: number; d90plus: number; totalAr: number; invoiceCount: number
 }
 
-interface SystemUser { id: string; displayName: string; role: string }
 interface SearchResult { id: string; displayName: string; entityRefs: EntityRef[] }
 
 interface Props {
@@ -285,8 +284,9 @@ function ContactForm({ customerId, onSaved, onCancel }: { customerId: string; on
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export default function ArCustomerDetail({ customer, entity, role, onBack, onRefresh }: Props) {
-  const isAdmin   = role === 'admin'
-  const isArAdmin = role === 'admin' || role === 'ar_manager'
+  const isAdmin      = role === 'admin'
+  const isArAdmin    = role === 'admin' || role === 'ar_manager'
+  const canManagePMs = role === 'admin' || role === 'district_manager' || role === 'branch_manager'
 
   const [profile, setProfile]           = useState<CustomerProfile | null>(null)
   const [profileLoading, setProfileLoading] = useState(true)
@@ -295,7 +295,7 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
   const [invPage, setInvPage]           = useState(1)
   const [invPageCount, setInvPageCount] = useState(0)
   const [invLoading, setInvLoading]     = useState(true)
-  const [users, setUsers]               = useState<SystemUser[]>([])
+  const [pmCandidates, setPmCandidates] = useState<{ id: string; displayName: string; role: string }[]>([])
   const [arTeamUsers, setArTeamUsers]   = useState<{ id: string; displayName: string }[]>([])
   const [arAssignments, setArAssignments] = useState<ArAssignment[]>([])
   const [showMerge, setShowMerge]       = useState(false)
@@ -324,11 +324,11 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
   }, [customer.id, entity, invPage])
 
   useEffect(() => {
-    if (!isAdmin) return
-    fetch('/api/admin/users')
+    if (!canManagePMs) return
+    fetch('/api/ar/pm-candidates')
       .then((r) => r.json())
-      .then((d) => setUsers((d.users ?? []).map((u: { id: string; display_name?: string; displayName?: string; role: string }) => ({ id: u.id, displayName: u.display_name ?? u.displayName ?? '—', role: u.role }))))
-  }, [isAdmin])
+      .then((d) => setPmCandidates(d.users ?? []))
+  }, [canManagePMs])
 
   useEffect(() => {
     if (!isArAdmin) return
@@ -441,8 +441,8 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
 
   const branchChartData = (profile?.branchBreakdown ?? []).map((b) => ({ name: b.name, value: b.total }))
 
-  const assignedPmIds  = new Set(profile?.pmAssignments.map((pm) => pm.userId) ?? [])
-  const availableUsers = users.filter((u) => !assignedPmIds.has(u.id))
+  const assignedPmIds      = new Set(profile?.pmAssignments.map((pm) => pm.userId) ?? [])
+  const availablePmCandidates = pmCandidates.filter((u) => !assignedPmIds.has(u.id))
 
   const assignedArIds       = new Set(arAssignments.map((a) => a.userId))
   const availableArTeamUsers = arTeamUsers.filter((u) => !assignedArIds.has(u.id))
@@ -579,11 +579,11 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
 
         {/* Project Managers */}
         <SectionCard title="Project Managers"
-          action={isAdmin && availableUsers.length > 0 ? (
+          action={canManagePMs && availablePmCandidates.length > 0 ? (
             <select value="" onChange={(e) => { if (e.target.value) handleAssignPm(e.target.value) }}
               style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 6, color: '#ff6b00', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>
               <option value="">+ Assign PM</option>
-              {availableUsers.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
+              {availablePmCandidates.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
             </select>
           ) : undefined}>
           {profileLoading ? <div style={{ fontSize: 12, color: '#555' }}>Loading…</div>
@@ -596,7 +596,7 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
                       <div style={{ fontSize: 12, color: '#ccc' }}>{pm.displayName}</div>
                       <div style={{ fontSize: 11, color: '#555' }}>{pm.role.replace(/_/g, ' ')}</div>
                     </div>
-                    {isAdmin && (
+                    {canManagePMs && (
                       <button onClick={() => handleRemovePm(pm.userId)}
                         style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}
                         onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}

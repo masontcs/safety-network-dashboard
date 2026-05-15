@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardArAdminOnly } from '@/lib/api/auth'
+import { getAccessContext } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+
+const ALLOWED_ROLES = ['admin', 'ar_manager', 'district_manager', 'branch_manager']
 
 export async function DELETE(
   _request: Request,
@@ -9,8 +11,9 @@ export async function DELETE(
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardArAdminOnly(ctx.access.role)
-    if (guard) return guard
+    if (!ALLOWED_ROLES.includes(ctx.access.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const supabase = createServiceClient()
     const { error } = await supabase

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardArAdminOnly } from '@/lib/api/auth'
+import { getAccessContext } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+
+const ALLOWED_ROLES = ['admin', 'ar_manager', 'district_manager', 'branch_manager']
 
 export async function POST(
   request: Request,
@@ -9,8 +11,9 @@ export async function POST(
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardArAdminOnly(ctx.access.role)
-    if (guard) return guard
+    if (!ALLOWED_ROLES.includes(ctx.access.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const body = await request.json()
     const userId = body?.userId
@@ -19,6 +22,21 @@ export async function POST(
     }
 
     const supabase = createServiceClient()
+    const { branchIds } = ctx.access
+
+    // Branch/district managers can only assign PMs from their own branches
+    if (branchIds !== null) {
+      const { data: pmBranches } = await supabase
+        .from('user_branch_assignments')
+        .select('branch_id')
+        .eq('user_id', userId)
+        .in('branch_id', branchIds)
+
+      if (!pmBranches || pmBranches.length === 0) {
+        return NextResponse.json({ error: 'That user is not in your branch' }, { status: 403 })
+      }
+    }
+
     const { error } = await supabase
       .from('ar_customer_pm_assignments')
       .insert({ customer_id: params.id, user_id: userId })
