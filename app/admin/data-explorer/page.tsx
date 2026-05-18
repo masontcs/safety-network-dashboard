@@ -16,7 +16,7 @@ export default async function AdminDataExplorerPage() {
     .single()
 
   const profile = profileRaw as { role: Role; display_name: string } | null
-  if (!profile || profile.role !== 'admin') redirect('/admin')
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'executive')) redirect('/dashboard')
 
   const [{ data: branchesRaw }, { data: entitiesRaw }] = await Promise.all([
     supabase.from('branches').select('id, name').eq('is_active', true).order('name'),
@@ -27,7 +27,7 @@ export default async function AdminDataExplorerPage() {
   const entities = (entitiesRaw as { id: string; code: string }[] | null) ?? []
 
   return (
-    <DashboardShell role="admin" userName={profile.display_name}>
+    <DashboardShell role={profile.role} userName={profile.display_name}>
       <DataExplorerClient branches={branches} entities={entities} />
     </DashboardShell>
   )

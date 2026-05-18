@@ -159,7 +159,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/targets',        label: 'Targets',        icon: <TargetIcon />,   roles: ['admin', 'executive'] },
   { href: '/admin/fiscal-months',    label: 'Fiscal Months',    icon: <CalendarIcon />, roles: ['admin'] },
   { href: '/admin/fiscal-quarters',    label: 'Fiscal Quarters',   icon: <LayersIcon />,  roles: ['admin'] },
-  { href: '/admin/data-explorer',   label: 'Data Explorer',   icon: <DatabaseIcon />, roles: ['admin'] },
+  { href: '/admin/data-explorer',   label: 'Data Explorer',   icon: <DatabaseIcon />, roles: ['admin', 'executive'] },
   { href: '/admin/allocations',     label: 'Allocations',     icon: <SplitIcon />,    roles: ['admin', 'executive'] },
   { href: '/admin/access-requests',   label: 'Access Requests',   icon: <InboxIcon />,   roles: ['admin'] },
   { href: '/admin/users',          label: 'Users',          icon: <UsersIcon />,    roles: ['admin'] },

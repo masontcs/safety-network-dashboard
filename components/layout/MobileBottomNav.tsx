@@ -119,7 +119,7 @@ const NAV_CONFIG: Record<Role, NavConfig> = {
       { href: '/fuel',      label: 'Fuel',       icon: (a) => <FuelIcon a={a} /> },
     ],
     more: [
-      { href: '/executive/data-explorer', label: 'Data Explorer' },
+      { href: '/admin/data-explorer', label: 'Data Explorer' },
       { href: '/executive/employees',     label: 'Employees' },
       { href: '/admin/targets',           label: 'Targets' },
       { href: '/admin/allocations',       label: 'Allocations' },
