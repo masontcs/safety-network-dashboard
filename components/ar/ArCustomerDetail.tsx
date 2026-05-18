@@ -344,11 +344,10 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
   }, [isArAdmin])
 
   useEffect(() => {
-    if (!isArAdmin) return
     fetch(`/api/ar/customers/${customer.id}/ar-assignments`)
       .then((r) => r.json())
       .then((d) => setArAssignments(d.assignments ?? []))
-  }, [isArAdmin, customer.id])
+  }, [customer.id])
 
   const patchCustomer = async (payload: Record<string, unknown>) => {
     await fetch(`/api/ar/customers/${customer.id}`, {
@@ -623,33 +622,33 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
             )}
         </SectionCard>
 
-        {/* AR Team Assignments — admin and ar_manager only */}
-        {isArAdmin && (
-          <SectionCard title="AR Team"
-            action={availableArTeamUsers.length > 0 ? (
-              <select value="" onChange={(e) => { if (e.target.value) handleAssignAr(e.target.value) }}
-                style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 6, color: '#ff6b00', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>
-                <option value="">+ Assign</option>
-                {availableArTeamUsers.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
-              </select>
-            ) : undefined}>
-            {arAssignments.length === 0 ? (
-              <div style={{ fontSize: 12, color: '#555' }}>No AR team members assigned.</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {arAssignments.map((a) => (
-                  <div key={a.userId} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ flex: 1, fontSize: 12, color: '#ccc' }}>{a.displayName}</div>
+        {/* AR Team Assignments — visible to all; manage controls for admin/ar_manager only */}
+        <SectionCard title="AR Team"
+          action={isArAdmin && availableArTeamUsers.length > 0 ? (
+            <select value="" onChange={(e) => { if (e.target.value) handleAssignAr(e.target.value) }}
+              style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 6, color: '#ff6b00', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>
+              <option value="">+ Assign</option>
+              {availableArTeamUsers.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
+            </select>
+          ) : undefined}>
+          {arAssignments.length === 0 ? (
+            <div style={{ fontSize: 12, color: '#555' }}>No AR team members assigned.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {arAssignments.map((a) => (
+                <div key={a.userId} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ flex: 1, fontSize: 12, color: '#ccc' }}>{a.displayName}</div>
+                  {isArAdmin && (
                     <button onClick={() => handleRemoveAr(a.userId)}
                       style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}
                       onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
                       onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </SectionCard>
-        )}
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
 
         {/* Contacts */}
         <SectionCard title="Contacts"
