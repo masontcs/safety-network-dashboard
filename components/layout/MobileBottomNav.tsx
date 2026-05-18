@@ -54,6 +54,16 @@ function UploadIcon({ a }: { a: boolean }) {
   )
 }
 
+function EmployeesIcon({ a }: { a: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? '#ff6b00' : '#666'} strokeWidth={1.8}>
+      <circle cx="9" cy="7" r="4" />
+      <path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2" />
+      <path d="M19 8v6M16 11h6" />
+    </svg>
+  )
+}
+
 function MenuIcon({ a }: { a: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? '#ff6b00' : '#666'} strokeWidth={1.8}>
@@ -83,14 +93,14 @@ type NavConfig   = { primary: PrimaryItem[]; more: MoreItem[] }
 const NAV_CONFIG: Record<Role, NavConfig> = {
   admin: {
     primary: [
-      { href: '/dashboard',    label: 'Dashboard', icon: (a) => <GridIcon a={a} />, exact: true },
-      { href: '/ar',           label: 'AR',         icon: (a) => <ArIcon a={a} /> },
-      { href: '/fuel',         label: 'Fuel',       icon: (a) => <FuelIcon a={a} /> },
-      { href: '/admin/import', label: 'Import',     icon: (a) => <UploadIcon a={a} /> },
+      { href: '/dashboard',      label: 'Dashboard', icon: (a) => <GridIcon a={a} />, exact: true },
+      { href: '/ar',             label: 'AR',         icon: (a) => <ArIcon a={a} /> },
+      { href: '/fuel',           label: 'Fuel',       icon: (a) => <FuelIcon a={a} /> },
+      { href: '/admin/employees', label: 'Employees', icon: (a) => <EmployeesIcon a={a} /> },
     ],
     more: [
+      { href: '/admin/import',          label: 'Import' },
       { href: '/admin/review',          label: 'Review' },
-      { href: '/admin/employees',       label: 'Employees' },
       { href: '/admin/targets',         label: 'Targets' },
       { href: '/admin/data-explorer',   label: 'Data Explorer' },
       { href: '/admin/allocations',     label: 'Allocations' },
