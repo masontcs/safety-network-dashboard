@@ -184,14 +184,14 @@ function AgingBar({ kpis }: { kpis: MeetingKPIs }) {
         })}
       </div>
 
-      {/* Legend */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
+      {/* Legend — flex-wrap so items flow to a second row on narrow screens */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 16px' }}>
         {AGING_BUCKETS.map((b) => {
           const val = kpis.agingTotals[b] ?? 0
           return (
-            <div key={b} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div key={b} style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 100, flex: '1 1 100px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: AGING_COLORS[b] }} />
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: AGING_COLORS[b], flexShrink: 0 }} />
                 <span style={{ fontSize: 11, color: '#888' }}>{b} days</span>
               </div>
               <div style={{ fontSize: 13, fontWeight: 500, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
