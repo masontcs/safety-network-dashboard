@@ -382,62 +382,62 @@ export default function ArDashboard({ role, branches }: Props) {
       />
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <select
-          value={entity}
-          onChange={(e) => setEntity(e.target.value)}
-          style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}
-        >
-          <option value="">All Entities</option>
-          {ENTITIES.map((e) => <option key={e} value={e}>{e}</option>)}
-        </select>
-
-        {branches.length > 1 && (
-          <select
-            value={branchId}
-            onChange={(e) => setBranchId(e.target.value)}
-            style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}
-          >
-            <option value="">All Branches</option>
-            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        )}
-
+      <div className="ar-filter-col" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
         <input
           type="text"
           placeholder="Search customer…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '5px 12px', fontSize: 12, outline: 'none', width: 180 }}
+          className="ar-filter-search"
+          style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, outline: 'none', width: 200 }}
         />
-
-        {isAdmin && (
-          <button
-            onClick={() => setShowExcluded((v) => !v)}
-            style={{
-              background: showExcluded ? 'rgba(204,68,68,0.12)' : 'transparent',
-              border: `1px solid ${showExcluded ? '#663333' : '#333'}`,
-              borderRadius: 8,
-              color: showExcluded ? '#cc4444' : '#666',
-              padding: '5px 12px', fontSize: 12, cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
+        <div className="ar-filter-row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <select
+            value={entity}
+            onChange={(e) => setEntity(e.target.value)}
+            style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
           >
-            {showExcluded ? `Hide excluded (${excludedCount})` : `Show excluded${excludedCount > 0 ? ` (${excludedCount})` : ''}`}
-          </button>
-        )}
+            <option value="">All Entities</option>
+            {ENTITIES.map((e) => <option key={e} value={e}>{e}</option>)}
+          </select>
 
-        {(entity || branchId || bucket || search) && (
-          <button
-            onClick={() => { setEntity(''); setBranchId(''); setBucket(''); setSearch('') }}
-            style={{ background: 'transparent', border: '1px solid #333', borderRadius: 8, color: '#888', padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}
-          >
-            Clear
-          </button>
-        )}
+          {branches.length > 1 && (
+            <select
+              value={branchId}
+              onChange={(e) => setBranchId(e.target.value)}
+              style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
+            >
+              <option value="">All Branches</option>
+              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          )}
+
+          {isAdmin && (
+            <button
+              onClick={() => setShowExcluded((v) => !v)}
+              style={{
+                background: showExcluded ? 'rgba(204,68,68,0.12)' : 'transparent',
+                border: `1px solid ${showExcluded ? '#663333' : '#333'}`,
+                borderRadius: 8, color: showExcluded ? '#cc4444' : '#666',
+                padding: '7px 12px', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
+              }}
+            >
+              {showExcluded ? `Hide excluded (${excludedCount})` : `Excluded${excludedCount > 0 ? ` (${excludedCount})` : ''}`}
+            </button>
+          )}
+
+          {(entity || branchId || bucket || search) && (
+            <button
+              onClick={() => { setEntity(''); setBranchId(''); setBucket(''); setSearch('') }}
+              style={{ background: 'transparent', border: '1px solid #333', borderRadius: 8, color: '#888', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
 
         {filteredCustomers.length > 0 && (
-          <span style={{ fontSize: 12, color: '#555', marginLeft: 4 }}>
+          <span style={{ fontSize: 12, color: '#555' }}>
             {filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}
           </span>
         )}

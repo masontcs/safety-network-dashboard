@@ -124,7 +124,7 @@ function DonutChart({ data, colors, centerLabel }: {
   if (total === 0) return <div style={{ fontSize: 12, color: '#555', textAlign: 'center', padding: '32px 0' }}>No data</div>
 
   return (
-    <ResponsiveContainer width="100%" height={200}>
+    <ResponsiveContainer width="100%" height={160}>
       <PieChart>
         <Pie
           data={data}
@@ -259,7 +259,7 @@ function ContactForm({ customerId, onSaved, onCancel }: { customerId: string; on
   const inp = { background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '6px 10px', fontSize: 12, outline: 'none', width: '100%', boxSizing: 'border-box' as const }
   return (
     <div style={{ background: '#242424', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+      <div className="ar-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <input placeholder="Name *" value={name} onChange={(e) => setName(e.target.value)} style={inp} />
         <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} style={inp} />
         <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} style={inp} />
@@ -465,46 +465,50 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* Header */}
-      <div className="ar-page-header" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <button onClick={onBack}
-          style={{ background: '#2a2a2a', border: 'none', borderRadius: 8, color: '#ccc', padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
-          ← Back
-        </button>
-        <div style={{ fontSize: 22, fontWeight: 500, color: profile?.isExcluded ? '#666' : '#fff', flex: 1 }}>
-          {customer.displayName}
-        </div>
-        {/* Customer status */}
-        {isAdmin && profile ? (
-          <select value={profile.customerStatus} onChange={(e) => handleCustomerStatusChange(e.target.value)}
-            style={{ background: `${custStatusMeta.color}18`, border: `1px solid ${custStatusMeta.color}`, borderRadius: 8, color: custStatusMeta.color, padding: '5px 10px', fontSize: 12, cursor: 'pointer' }}>
-            {CUSTOMER_STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        ) : profile && (
-          <span style={{ background: `${custStatusMeta.color}18`, border: `1px solid ${custStatusMeta.color}`, borderRadius: 8, color: custStatusMeta.color, padding: '5px 10px', fontSize: 12 }}>
-            {custStatusMeta.label}
-          </span>
-        )}
-        {/* Collection status */}
-        {isArAdmin && profile ? (
-          <select value={profile.collectionStatus} onChange={(e) => handleCollectionStatusChange(e.target.value)}
-            style={{ background: `${collStatusMeta.color}18`, border: `1px solid ${collStatusMeta.color}`, borderRadius: 8, color: collStatusMeta.color, padding: '5px 10px', fontSize: 12, cursor: 'pointer' }}>
-            {COLLECTION_STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.value === 'none' ? 'No Collection Issue' : `${o.label}${o.priority > 0 ? ` (P${o.priority})` : ''}`}
-              </option>
-            ))}
-          </select>
-        ) : profile && profile.collectionStatus !== 'none' && (
-          <span style={{ background: `${collStatusMeta.color}18`, border: `1px solid ${collStatusMeta.color}`, borderRadius: 8, color: collStatusMeta.color, padding: '5px 10px', fontSize: 12 }}>
-            {collStatusMeta.label}
-          </span>
-        )}
-        {isAdmin && (
-          <button onClick={handleExcludeToggle} disabled={togglingExclude}
-            style={{ background: profile?.isExcluded ? '#2a2a2a' : 'rgba(204,68,68,0.12)', border: `1px solid ${profile?.isExcluded ? '#333' : '#663333'}`, borderRadius: 8, color: profile?.isExcluded ? '#888' : '#cc4444', padding: '6px 14px', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            {profile?.isExcluded ? 'Restore to AR' : 'Exclude from AR'}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* Back + name row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={onBack}
+            style={{ background: '#2a2a2a', border: 'none', borderRadius: 8, color: '#ccc', padding: '6px 12px', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
+            ← Back
           </button>
-        )}
+          <div style={{ fontSize: 18, fontWeight: 500, color: profile?.isExcluded ? '#666' : '#fff', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {customer.displayName}
+          </div>
+        </div>
+        {/* Status badges row — wraps to next line naturally */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          {isAdmin && profile ? (
+            <select value={profile.customerStatus} onChange={(e) => handleCustomerStatusChange(e.target.value)}
+              style={{ background: `${custStatusMeta.color}18`, border: `1px solid ${custStatusMeta.color}`, borderRadius: 8, color: custStatusMeta.color, padding: '5px 10px', fontSize: 12, cursor: 'pointer' }}>
+              {CUSTOMER_STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          ) : profile && (
+            <span style={{ background: `${custStatusMeta.color}18`, border: `1px solid ${custStatusMeta.color}`, borderRadius: 8, color: custStatusMeta.color, padding: '5px 10px', fontSize: 12 }}>
+              {custStatusMeta.label}
+            </span>
+          )}
+          {isArAdmin && profile ? (
+            <select value={profile.collectionStatus} onChange={(e) => handleCollectionStatusChange(e.target.value)}
+              style={{ background: `${collStatusMeta.color}18`, border: `1px solid ${collStatusMeta.color}`, borderRadius: 8, color: collStatusMeta.color, padding: '5px 10px', fontSize: 12, cursor: 'pointer' }}>
+              {COLLECTION_STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.value === 'none' ? 'No Collection Issue' : `${o.label}${o.priority > 0 ? ` (P${o.priority})` : ''}`}
+                </option>
+              ))}
+            </select>
+          ) : profile && profile.collectionStatus !== 'none' && (
+            <span style={{ background: `${collStatusMeta.color}18`, border: `1px solid ${collStatusMeta.color}`, borderRadius: 8, color: collStatusMeta.color, padding: '5px 10px', fontSize: 12 }}>
+              {collStatusMeta.label}
+            </span>
+          )}
+          {isAdmin && (
+            <button onClick={handleExcludeToggle} disabled={togglingExclude}
+              style={{ background: profile?.isExcluded ? '#2a2a2a' : 'rgba(204,68,68,0.12)', border: `1px solid ${profile?.isExcluded ? '#333' : '#663333'}`, borderRadius: 8, color: profile?.isExcluded ? '#888' : '#cc4444', padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}>
+              {profile?.isExcluded ? 'Restore' : 'Exclude'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Aging cards row */}

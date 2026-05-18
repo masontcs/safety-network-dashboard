@@ -29,7 +29,7 @@ export default function FuelTab({ role, data, allocationOn }: TabProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* ── KPI row ──────────────────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      <div className="dash-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         <MetricCard
           label='Total Fuel Cost'
           sub={allocationOn && isAdminOrExec ? 'Incl. Corp/HQ' : undefined}

@@ -24,7 +24,8 @@ export default function DashboardShell({ role, branchName, userName, children }:
           className="dashboard-main"
           style={{
             flex: 1,
-            overflow: 'auto',
+            overflowY: 'auto',
+            overflowX: 'hidden',
             background: '#111111',
             padding: 16,
           }}

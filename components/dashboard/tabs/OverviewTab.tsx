@@ -155,7 +155,7 @@ export default function OverviewTab({ role, data, branches, selectedBranchId, al
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* ── KPI row ──────────────────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', gap: 12 }}>
+      <div className="dash-metric-grid" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', gap: 12 }}>
         <MetricCard
           variant='hero'
           label='Gross Profit'
@@ -178,7 +178,7 @@ export default function OverviewTab({ role, data, branches, selectedBranchId, al
 
       {/* ── Manager: second KPI row ───────────────────────────────────────────── */}
       {!isAdminOrExec && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+        <div className="dash-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           <MetricCard
             label='Direct Labor'
             value={formatCurrency(directPayroll)}

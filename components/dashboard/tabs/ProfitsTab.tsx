@@ -64,7 +64,7 @@ export default function ProfitsTab({ role, data, branches, allocationOn }: TabPr
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* ── KPI row ──────────────────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      <div className="dash-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         <MetricCard
           variant='hero'
           label={allocationOn && isAdminOrExec ? 'Net After Overhead' : 'Gross Profit'}
