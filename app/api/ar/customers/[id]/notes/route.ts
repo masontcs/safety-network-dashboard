@@ -3,8 +3,9 @@ import { getAccessContext } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { Role } from '@/lib/supabase/database.types'
 
-const COLLECTION_ROLES: Role[] = ['admin', 'ar_manager', 'ar_team']
-const BRANCH_ROLES: Role[]     = ['admin', 'executive', 'district_manager', 'branch_manager', 'project_manager']
+// Write access per note type
+const COLLECTION_WRITE_ROLES: Role[] = ['admin', 'ar_manager', 'ar_team', 'executive']
+const OPERATION_WRITE_ROLES: Role[]  = ['admin', 'executive', 'district_manager', 'branch_manager', 'project_manager']
 
 export async function POST(
   request: Request,
@@ -17,19 +18,19 @@ export async function POST(
 
     const body = await request.json()
     const content  = body?.content?.trim()
-    const noteType = (body?.noteType ?? 'collection') as 'collection' | 'branch'
+    const noteType = (body?.noteType ?? 'collection') as 'collection' | 'operation'
 
     if (!content) return NextResponse.json({ error: 'content is required' }, { status: 400 })
-    if (noteType !== 'collection' && noteType !== 'branch') {
+    if (noteType !== 'collection' && noteType !== 'operation') {
       return NextResponse.json({ error: 'Invalid noteType' }, { status: 400 })
     }
 
     // Validate the role can write this note type
-    if (noteType === 'collection' && !COLLECTION_ROLES.includes(role)) {
+    if (noteType === 'collection' && !COLLECTION_WRITE_ROLES.includes(role)) {
       return NextResponse.json({ error: 'Your role cannot write collection notes' }, { status: 403 })
     }
-    if (noteType === 'branch' && !BRANCH_ROLES.includes(role)) {
-      return NextResponse.json({ error: 'Your role cannot write branch notes' }, { status: 403 })
+    if (noteType === 'operation' && !OPERATION_WRITE_ROLES.includes(role)) {
+      return NextResponse.json({ error: 'Your role cannot write operation notes' }, { status: 403 })
     }
 
     const supabase = createServiceClient()

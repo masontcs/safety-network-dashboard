@@ -10,9 +10,7 @@ export async function GET(
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
 
-    const role = ctx.access.role
-    const canSeeCollection = ['admin', 'ar_manager', 'ar_team'].includes(role)
-    const canSeeBranch     = ['admin', 'executive', 'district_manager', 'branch_manager', 'project_manager'].includes(role)
+    // All roles can see both note types; write access is enforced at the POST endpoint
 
     const supabase = createServiceClient()
     const { id } = params
@@ -82,12 +80,7 @@ export async function GET(
         collectionStatus: customer.collection_status ?? 'none',
         entityRefs:       (refs ?? []).map((r) => ({ entityCode: r.entity_code, quickbooksName: r.quickbooks_name })),
         contacts:         (contacts ?? []).map((c) => ({ id: c.id, name: c.name, title: c.title, email: c.email, phone: c.phone, isPrimary: c.is_primary })),
-        notes: (notes ?? [])
-          .filter((n) => {
-            const t = (n.note_type as string) ?? 'collection'
-            return (t === 'collection' && canSeeCollection) || (t === 'branch' && canSeeBranch)
-          })
-          .map((n) => ({
+        notes: (notes ?? []).map((n) => ({
             id:            n.id,
             content:       n.content,
             noteType:      (n.note_type as string) ?? 'collection',
