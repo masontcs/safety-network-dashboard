@@ -37,11 +37,26 @@ const BUCKET_HEADER_MAP: Record<string, ArInvoiceRow['agingBucket']> = {
   '> 90':     '>90',
 }
 
+// Identifies the AR data sheet by looking for the "Type" column header in col D (index 3).
+// QB exports often include a first tab with instructions — this skips it automatically.
+function findDataSheet(wb: XLSX.WorkBook): XLSX.WorkSheet | null {
+  for (const name of wb.SheetNames) {
+    const ws = wb.Sheets[name]
+    if (!ws) continue
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '', range: 0, }) as unknown[][]
+    // Scan the first 10 rows for the "Type" header in column D (index 3)
+    for (let i = 0; i < Math.min(rows.length, 10); i++) {
+      if (String(rows[i]?.[3] ?? '').trim() === 'Type') return ws
+    }
+  }
+  return null
+}
+
 export function parseArFile(buffer: Buffer, _entityCode: string): ParseResult {
   try {
     const wb = XLSX.read(buffer, { type: 'buffer' })
-    const ws = wb.Sheets[wb.SheetNames[0]]
-    if (!ws) return { success: false, error: 'Workbook has no sheets' }
+    const ws = findDataSheet(wb)
+    if (!ws) return { success: false, error: 'Could not find AR data sheet — expected a sheet with a "Type" column header' }
 
     const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' }) as unknown[][]
 

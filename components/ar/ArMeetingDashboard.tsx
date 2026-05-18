@@ -185,7 +185,7 @@ function AgingBar({ kpis }: { kpis: MeetingKPIs }) {
       </div>
 
       {/* Legend */}
-      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
         {AGING_BUCKETS.map((b) => {
           const val = kpis.agingTotals[b] ?? 0
           return (
@@ -249,7 +249,8 @@ function CustomerRow({
       onMouseEnter={(e) => (e.currentTarget.style.background = '#242424')}
       onMouseLeave={(e) => (e.currentTarget.style.background = '')}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: latestNote !== undefined ? 6 : 0 }}>
+      {/* Row 1: priority + name + amount */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         {priority !== undefined && (
           <span style={{
             fontSize: 10, fontWeight: 600,
@@ -262,10 +263,17 @@ function CustomerRow({
           </span>
         )}
 
-        <span style={{ fontSize: 13, fontWeight: 500, color: '#ff6b00', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#ff6b00', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
           {displayName}
         </span>
 
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+          {fmt(totalAr)}
+        </span>
+      </div>
+
+      {/* Row 2: status badge + aging bucket */}
+      <div style={{ paddingLeft: priority !== undefined ? 36 : 0, display: 'flex', alignItems: 'center', gap: 8, marginBottom: latestNote !== undefined ? 4 : 0 }}>
         {statusLabel && (
           <span style={{
             fontSize: 10, color: statusColor,
@@ -275,21 +283,15 @@ function CustomerRow({
             {statusLabel}
           </span>
         )}
-
-        <span style={{
-          fontSize: 10, color: AGING_COLORS[maxAgingBucket] ?? '#888', flexShrink: 0,
-        }}>
+        <span style={{ fontSize: 10, color: AGING_COLORS[maxAgingBucket] ?? '#888', flexShrink: 0 }}>
           {maxAgingBucket}
-        </span>
-
-        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-          {fmt(totalAr)}
         </span>
       </div>
 
+      {/* Row 3: latest note (action items only) */}
       {latestNote !== undefined && (
         latestNote ? (
-          <div style={{ paddingLeft: priority !== undefined ? 38 : 0, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+          <div style={{ paddingLeft: priority !== undefined ? 36 : 0, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
             <div style={{ fontSize: 11, color: '#666', whiteSpace: 'nowrap', marginTop: 1 }}>
               {latestNote.createdByName ?? 'Unknown'} · {timeAgo(latestNote.createdAt)}
             </div>
@@ -298,7 +300,7 @@ function CustomerRow({
             </div>
           </div>
         ) : (
-          <div style={{ paddingLeft: priority !== undefined ? 38 : 0, fontSize: 11, color: '#3a3a3a', fontStyle: 'italic' }}>
+          <div style={{ paddingLeft: priority !== undefined ? 36 : 0, fontSize: 11, color: '#3a3a3a', fontStyle: 'italic' }}>
             No notes yet
           </div>
         )
@@ -346,7 +348,7 @@ export default function ArMeetingDashboard({ entity, onSelectCustomer }: Props) 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* KPI row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      <div className="dash-metric-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
         <KpiCard
           label="Total AR"
           value={fmtShort(kpis.totalAr)}
@@ -375,7 +377,7 @@ export default function ArMeetingDashboard({ entity, onSelectCustomer }: Props) 
       <AgingBar kpis={kpis} />
 
       {/* Main grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16, alignItems: 'start' }}>
+      <div className="ar-meeting-grid">
 
         {/* Left: Action items (if any) or Top Customers */}
         <div>

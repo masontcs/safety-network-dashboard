@@ -209,7 +209,7 @@ export default function ArImportModal({ onClose, onSuccess }: Props) {
         {/* File picker */}
         <div style={{ marginBottom: 20 }}>
           <label style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 6 }}>
-            File (.xlsx)
+            File (.xlsx, .xlsm)
           </label>
           <div
             onClick={() => !isLoading && inputRef.current?.click()}
@@ -235,7 +235,7 @@ export default function ArImportModal({ onClose, onSuccess }: Props) {
           <input
             ref={inputRef}
             type="file"
-            accept=".xlsx,.xls"
+            accept=".xlsx,.xls,.xlsm"
             style={{ display: 'none' }}
             onChange={(e) => {
               setFile(e.target.files?.[0] ?? null)
