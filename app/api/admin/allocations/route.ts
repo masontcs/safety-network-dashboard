@@ -7,8 +7,9 @@ export async function GET(): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardAdminOnly(ctx.access.role)
-    if (guard) return guard
+    if (ctx.access.role !== 'admin' && ctx.access.role !== 'executive') {
+      return NextResponse.json({ success: false, error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
+    }
 
     const supabase = createServiceClient()
 

@@ -16,7 +16,7 @@ export default async function TargetsPage() {
     .single()
 
   const profile = profileRaw as { role: Role; display_name: string } | null
-  if (!profile || profile.role !== 'admin') redirect('/admin')
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'executive')) redirect('/dashboard')
 
   const [branchesRes, fiscalMonthsRes] = await Promise.all([
     supabase
@@ -36,7 +36,7 @@ export default async function TargetsPage() {
   const fiscalMonths = (fiscalMonthsRes.data as { id: string; name: string; year: number; start_date: string; end_date: string }[] | null) ?? []
 
   return (
-    <DashboardShell role="admin" userName={profile.display_name}>
+    <DashboardShell role={profile.role} userName={profile.display_name}>
       <TargetsClient branches={branches} fiscalMonths={fiscalMonths} />
     </DashboardShell>
   )

@@ -121,6 +121,8 @@ const NAV_CONFIG: Record<Role, NavConfig> = {
     more: [
       { href: '/executive/data-explorer', label: 'Data Explorer' },
       { href: '/executive/employees',     label: 'Employees' },
+      { href: '/admin/targets',           label: 'Targets' },
+      { href: '/admin/allocations',       label: 'Allocations' },
     ],
   },
   district_manager: {

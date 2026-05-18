@@ -16,10 +16,10 @@ export default async function AllocationsPage() {
     .single()
 
   const profile = profileRaw as { role: Role; display_name: string } | null
-  if (!profile || profile.role !== 'admin') redirect('/admin')
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'executive')) redirect('/dashboard')
 
   return (
-    <DashboardShell role="admin" userName={profile.display_name}>
+    <DashboardShell role={profile.role} userName={profile.display_name}>
       <AllocationsClient />
     </DashboardShell>
   )
