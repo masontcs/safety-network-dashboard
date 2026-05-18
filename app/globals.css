@@ -266,13 +266,6 @@ html {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Bottom nav offset for dashboard pages on mobile */
-@media (max-width: 767px) {
-  .dashboard-main {
-    padding-bottom: 76px !important;
-  }
-}
-
 .filter-pill:hover {
   border-color: #ff6b00;
 }
@@ -280,4 +273,62 @@ html {
 .filter-pill-active {
   border-color: #ff6b00;
   color: #ff6b00;
+}
+
+/* ─────────────────────────────────────────────
+   Responsive grid utilities
+───────────────────────────────────────────── */
+
+/* 6-col aging summary row → 3-col on mobile */
+.ar-aging-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+}
+
+/* 2-col detail sections → 1-col on mobile */
+.ar-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Show table on desktop, card list on mobile */
+.ar-table-wrap { display: block; }
+.ar-card-list  { display: none;  }
+
+/* Horizontally scrolling tab bar */
+.tab-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.tab-scroll::-webkit-scrollbar { display: none; }
+
+@media (max-width: 767px) {
+  .dashboard-main {
+    padding: 12px !important;
+    padding-bottom: 80px !important;
+  }
+
+  .ar-aging-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .ar-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ar-table-wrap { display: none; }
+  .ar-card-list  { display: flex; flex-direction: column; gap: 8px; }
+
+  /* AR page header stacks on mobile */
+  .ar-page-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  /* Tighten card padding on mobile */
+  .card { padding: 12px; }
 }

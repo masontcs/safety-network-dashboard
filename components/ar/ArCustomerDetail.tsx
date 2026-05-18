@@ -465,7 +465,7 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <div className="ar-page-header" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <button onClick={onBack}
           style={{ background: '#2a2a2a', border: 'none', borderRadius: 8, color: '#ccc', padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
           ← Back
@@ -508,7 +508,7 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
       </div>
 
       {/* Aging cards row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
+      <div className="ar-aging-grid">
         <div style={{ background: profile?.isExcluded ? '#2a2a2a' : '#ff6b00', borderRadius: 12, padding: 16 }}>
           <div style={{ fontSize: 11, color: profile?.isExcluded ? '#555' : 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Total AR</div>
           <div style={{ fontSize: 22, fontWeight: 500, color: profile?.isExcluded ? '#666' : '#fff' }}>{fmt(customer.totalAr)}</div>
@@ -525,7 +525,7 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
       </div>
 
       {/* Charts row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="ar-detail-grid">
         <SectionCard title="Aging Breakdown">
           <DonutChart
             data={agingChartData}
@@ -564,7 +564,7 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
       </div>
 
       {/* Profile sections grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="ar-detail-grid">
 
         {/* Entity Links */}
         <SectionCard title="Entity Links"
@@ -764,7 +764,7 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
           <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>Open Invoices</span>
           {invTotal > 0 && <span style={{ fontSize: 11, color: '#555' }}>{invTotal} total</span>}
         </div>
-        <div style={{ overflowX: 'auto' }}>
+        <div className="table-scroll">
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #2a2a2a' }}>

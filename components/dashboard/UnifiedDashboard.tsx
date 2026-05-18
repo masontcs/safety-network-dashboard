@@ -503,10 +503,10 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
       {/* ── Header row ─────────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div className="ar-page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Dashboard</div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="tab-scroll" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {/* Allocation toggle — admin/exec only */}
           {canSeeAllocation && (
             <button
@@ -609,7 +609,7 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
       </div>
 
       {/* ── Tab bar ──────────────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid #2a2a2a', marginBottom: 20 }}>
+      <div className="tab-scroll" style={{ display: 'flex', gap: 2, borderBottom: '1px solid #2a2a2a', marginBottom: 20 }}>
         {tabs.map((t) => (
           <button
             key={t.key}

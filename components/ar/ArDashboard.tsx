@@ -120,7 +120,7 @@ function AgingCards({
   onBucketClick: (b: string) => void
 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
+    <div className="ar-aging-grid">
       <div
         onClick={() => onBucketClick('')}
         style={{
@@ -297,7 +297,7 @@ export default function ArDashboard({ role, branches }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="ar-page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>Accounts Receivable</div>
           {view === 'ar' && summary && summary.lastImports.length > 0 && (
@@ -443,8 +443,8 @@ export default function ArDashboard({ role, branches }: Props) {
         )}
       </div>
 
-      {/* Customer table */}
-      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', overflow: 'hidden' }}>
+      {/* Customer table — desktop */}
+      <div className="ar-table-wrap" style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
@@ -461,61 +461,69 @@ export default function ArDashboard({ role, branches }: Props) {
             </thead>
             <tbody>
               {loadingCustomers ? (
-                <tr>
-                  <td colSpan={8} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>Loading…</td>
-                </tr>
+                <tr><td colSpan={8} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>Loading…</td></tr>
               ) : filteredCustomers.length === 0 ? (
-                <tr>
-                  <td colSpan={8} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>
-                    {customers.length === 0 ? 'No AR data. Import a file to get started.' : 'No customers match your filters.'}
-                  </td>
-                </tr>
+                <tr><td colSpan={8} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>
+                  {customers.length === 0 ? 'No AR data. Import a file to get started.' : 'No customers match your filters.'}
+                </td></tr>
               ) : (
                 filteredCustomers.map((cust) => (
-                  <tr
-                    key={cust.id}
-                    onClick={() => setSelectedCustomer(cust)}
-                    style={{
-                      borderBottom: '1px solid #222',
-                      cursor: 'pointer',
-                      opacity: cust.isExcluded ? 0.45 : 1,
-                    }}
+                  <tr key={cust.id} onClick={() => setSelectedCustomer(cust)}
+                    style={{ borderBottom: '1px solid #222', cursor: 'pointer', opacity: cust.isExcluded ? 0.45 : 1 }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = '#242424')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = '')}
-                  >
+                    onMouseLeave={(e) => (e.currentTarget.style.background = '')}>
                     <td style={{ padding: '10px 12px', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap' }}>
                       <span style={{ color: cust.isExcluded ? '#555' : '#ff6b00' }}>{cust.displayName}</span>
-                      {cust.isExcluded && (
-                        <span style={{ fontSize: 10, color: '#444', marginLeft: 8, fontWeight: 400 }}>excluded</span>
-                      )}
+                      {cust.isExcluded && <span style={{ fontSize: 10, color: '#444', marginLeft: 8, fontWeight: 400 }}>excluded</span>}
                     </td>
-                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.current > 0 ? '#fff' : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                      {cust.current > 0 ? fmt(cust.current) : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d30 > 0 ? BUCKET_COLORS['1-30'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                      {cust.d30 > 0 ? fmt(cust.d30) : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d60 > 0 ? BUCKET_COLORS['31-60'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                      {cust.d60 > 0 ? fmt(cust.d60) : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d90 > 0 ? BUCKET_COLORS['61-90'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                      {cust.d90 > 0 ? fmt(cust.d90) : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d90plus > 0 ? BUCKET_COLORS['>90'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                      {cust.d90plus > 0 ? fmt(cust.d90plus) : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', fontSize: 13, color: '#fff', fontWeight: 500, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                      {fmt(cust.totalAr)}
-                    </td>
-                    <td style={{ padding: '10px 12px', fontSize: 12, color: '#666', textAlign: 'right' }}>
-                      {cust.invoiceCount}
-                    </td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.current > 0 ? '#fff' : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.current > 0 ? fmt(cust.current) : '—'}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d30 > 0 ? BUCKET_COLORS['1-30'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.d30 > 0 ? fmt(cust.d30) : '—'}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d60 > 0 ? BUCKET_COLORS['31-60'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.d60 > 0 ? fmt(cust.d60) : '—'}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d90 > 0 ? BUCKET_COLORS['61-90'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.d90 > 0 ? fmt(cust.d90) : '—'}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d90plus > 0 ? BUCKET_COLORS['>90'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.d90plus > 0 ? fmt(cust.d90plus) : '—'}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 13, color: '#fff', fontWeight: 500, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmt(cust.totalAr)}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: '#666', textAlign: 'right' }}>{cust.invoiceCount}</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Customer cards — mobile */}
+      <div className="ar-card-list">
+        {loadingCustomers ? (
+          <div style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>Loading…</div>
+        ) : filteredCustomers.length === 0 ? (
+          <div style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>
+            {customers.length === 0 ? 'No AR data. Import a file to get started.' : 'No customers match your filters.'}
+          </div>
+        ) : (
+          filteredCustomers.map((cust) => (
+            <div key={cust.id} onClick={() => setSelectedCustomer(cust)}
+              style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 14, cursor: 'pointer', opacity: cust.isExcluded ? 0.5 : 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <span style={{ fontSize: 14, fontWeight: 500, color: cust.isExcluded ? '#555' : '#ff6b00' }}>{cust.displayName}</span>
+                <span style={{ fontSize: 16, fontWeight: 500, color: '#fff' }}>{fmt(cust.totalAr)}</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                {([['Current', cust.current, 'Current'], ['1-30', cust.d30, '1–30d'], ['31-60', cust.d60, '31–60d'], ['61-90', cust.d90, '61–90d'], ['>90', cust.d90plus, '>90d']] as [string, number, string][]).map(([key, val, label]) => (
+                  <div key={key} style={{ background: '#2a2a2a', borderRadius: 6, padding: '6px 8px' }}>
+                    <div style={{ fontSize: 10, color: '#555', marginBottom: 2 }}>{label}</div>
+                    <div style={{ fontSize: 12, color: val > 0 ? BUCKET_COLORS[key] : '#444', fontVariantNumeric: 'tabular-nums' }}>
+                      {val > 0 ? fmt(val) : '—'}
+                    </div>
+                  </div>
+                ))}
+                <div style={{ background: '#2a2a2a', borderRadius: 6, padding: '6px 8px' }}>
+                  <div style={{ fontSize: 10, color: '#555', marginBottom: 2 }}>Invoices</div>
+                  <div style={{ fontSize: 12, color: '#888' }}>{cust.invoiceCount}</div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       </>}
