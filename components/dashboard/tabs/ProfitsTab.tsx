@@ -97,6 +97,16 @@ export default function ProfitsTab({ role, data, branches, selectedBranchId, all
         />
       </div>
 
+      {/* ── Goals by branch ────────────────────────────────────────────────────── */}
+      <GoalsByBranch
+        byBranch={byBranch}
+        targets={data.targets ?? []}
+        branchNameMap={branchNameMap}
+        singleBranchRevenue={byBranch.length === 0 ? revenue : null}
+        singleBranchGpPct={byBranch.length === 0 ? gpPct : null}
+        selectedBranchId={selectedBranchId}
+      />
+
       {/* ── By-branch profit table ─────────────────────────────────────────────── */}
       {byBranch.length > 1 && (
         <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
@@ -151,6 +161,196 @@ export default function ProfitsTab({ role, data, branches, selectedBranchId, all
       )}
     </div>
   )
+}
+
+// ── Variance color helper ─────────────────────────────────────────────────────
+
+function varianceColor(actual: number, target: number): string {
+  if (actual >= target) return '#4caf50'
+  const miss = (target - actual) / target
+  if (miss <= 0.05) return '#4caf50'
+  if (miss <= 0.15) return '#cc9900'
+  return '#cc4444'
+}
+
+function gpVarianceColor(actual: number, target: number): string {
+  const diff = actual - target
+  if (diff >= 0) return '#4caf50'
+  if (diff >= -2) return '#cc9900'
+  return '#cc4444'
+}
+
+function StatusPill({ label, color }: { label: string; color: string }) {
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 600, color,
+      background: `${color}22`,
+      borderRadius: 4, padding: '2px 7px', whiteSpace: 'nowrap',
+    }}>
+      {label}
+    </span>
+  )
+}
+
+function revStatus(actual: number, target: number) {
+  if (actual >= target) return <StatusPill label="On Target" color="#4caf50" />
+  const miss = (target - actual) / target
+  if (miss <= 0.05) return <StatusPill label="Close" color="#cc9900" />
+  if (miss <= 0.15) return <StatusPill label="Behind" color="#cc9900" />
+  return <StatusPill label="Off Track" color="#cc4444" />
+}
+
+function gpStatus(actual: number, target: number) {
+  const diff = actual - target
+  if (diff >= 0) return <StatusPill label="On Target" color="#4caf50" />
+  if (diff >= -2) return <StatusPill label="Close" color="#cc9900" />
+  return <StatusPill label="Off Track" color="#cc4444" />
+}
+
+// ── Goals by Branch component ─────────────────────────────────────────────────
+
+type ByBranchRow = {
+  branchId: string; revenue: number; grossProfit: number; gpPct: number
+}
+type BranchTargetRow = {
+  branchId: string; revenueTarget: number | null; profitPctTarget: number | null
+}
+
+function GoalsByBranch({
+  byBranch, targets, branchNameMap,
+  singleBranchRevenue, singleBranchGpPct, selectedBranchId,
+}: {
+  byBranch: ByBranchRow[]
+  targets: BranchTargetRow[]
+  branchNameMap: Record<string, string>
+  singleBranchRevenue: number | null
+  singleBranchGpPct: number | null
+  selectedBranchId: string
+}) {
+  if (targets.length === 0) return null
+
+  const targetMap = new Map(targets.map((t) => [t.branchId, t]))
+
+  // Multi-branch view: join byBranch actuals with targets
+  if (byBranch.length > 0) {
+    // Collect all branches that appear in either actuals or targets
+    const allIds = [...new Set([...byBranch.map((b) => b.branchId), ...targets.map((t) => t.branchId)])]
+    const actualMap = new Map(byBranch.map((b) => [b.branchId, b]))
+
+    const rows = allIds
+      .map((id) => ({
+        id,
+        name: branchNameMap[id] ?? id,
+        actual: actualMap.get(id) ?? null,
+        target: targetMap.get(id) ?? null,
+      }))
+      .filter((r) => r.target) // only show branches that have a target set
+      .sort((a, b) => (b.actual?.revenue ?? 0) - (a.actual?.revenue ?? 0))
+
+    if (rows.length === 0) return null
+
+    const totalRevTarget = rows.reduce((s, r) => s + (r.target?.revenueTarget ?? 0), 0)
+    const totalRevActual = rows.reduce((s, r) => s + (r.actual?.revenue ?? 0), 0)
+    const totalGP = rows.reduce((s, r) => s + (r.actual?.grossProfit ?? 0), 0)
+    const totalGpPct = totalRevActual > 0 ? Math.round((totalGP / totalRevActual) * 1000) / 10 : 0
+
+    return (
+      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Goals by Branch</div>
+        <div className="table-scroll">
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr>
+                <th style={{ ...th, textAlign: 'left' }}>Branch</th>
+                <th style={th}>Rev Target</th>
+                <th style={th}>Actual Rev</th>
+                <th style={th}>vs. Target</th>
+                <th style={th}>GP% Goal</th>
+                <th style={th}>Actual GP%</th>
+                <th style={th}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ id, name, actual, target }) => {
+                const revTarget = target?.revenueTarget ?? null
+                const gpTarget  = target?.profitPctTarget ?? null
+                const revActual = actual?.revenue ?? 0
+                const gpActual  = actual?.gpPct ?? 0
+                const revDelta  = revTarget != null ? revActual - revTarget : null
+                return (
+                  <tr key={id} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                    <td style={{ ...td, textAlign: 'left', color: '#ff6b00' }}>{name}</td>
+                    <td style={td}>{revTarget != null ? formatCurrency(revTarget) : <span style={{ color: '#444' }}>—</span>}</td>
+                    <td style={{ ...td, color: '#ffffff' }}>{formatCurrency(revActual)}</td>
+                    <td style={{ ...td, color: revDelta != null ? varianceColor(revActual, revTarget!) : '#666' }}>
+                      {revDelta != null ? `${revDelta >= 0 ? '+' : ''}${formatCurrency(revDelta)}` : '—'}
+                    </td>
+                    <td style={td}>{gpTarget != null ? `${gpTarget}%` : <span style={{ color: '#444' }}>—</span>}</td>
+                    <td style={{ ...td, color: gpTarget != null ? gpVarianceColor(gpActual, gpTarget) : '#cccccc' }}>
+                      {formatPercent(gpActual)}
+                    </td>
+                    <td style={{ ...td, textAlign: 'right' }}>
+                      {revTarget != null ? revStatus(revActual, revTarget) : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: '1px solid #333' }}>
+                <td style={{ ...td, textAlign: 'left', color: '#888', fontWeight: 500 }}>Total</td>
+                <td style={{ ...td, color: '#888' }}>{formatCurrency(totalRevTarget)}</td>
+                <td style={{ ...td, color: '#ffffff', fontWeight: 500 }}>{formatCurrency(totalRevActual)}</td>
+                <td style={{ ...td, color: varianceColor(totalRevActual, totalRevTarget), fontWeight: 500 }}>
+                  {`${totalRevActual - totalRevTarget >= 0 ? '+' : ''}${formatCurrency(totalRevActual - totalRevTarget)}`}
+                </td>
+                <td style={td}>—</td>
+                <td style={{ ...td, fontWeight: 500, color: '#ffffff' }}>{formatPercent(totalGpPct)}</td>
+                <td style={{ ...td, textAlign: 'right' }}>{revStatus(totalRevActual, totalRevTarget)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
+  // Single-branch view
+  if (selectedBranchId && singleBranchRevenue !== null && singleBranchGpPct !== null) {
+    const target = targetMap.get(selectedBranchId)
+    if (!target) return null
+    const revTarget = target.revenueTarget
+    const gpTarget  = target.profitPctTarget
+    const revDelta  = revTarget != null ? singleBranchRevenue - revTarget : null
+    return (
+      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Goals</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          {revTarget != null && (
+            <div style={{ flex: '1 1 160px', background: '#2a2a2a', borderRadius: 10, padding: 14 }}>
+              <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Revenue vs. Target</div>
+              <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{formatCurrency(singleBranchRevenue)}</div>
+              <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Target: {formatCurrency(revTarget)}</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: varianceColor(singleBranchRevenue, revTarget), marginTop: 6 }}>
+                {revDelta! >= 0 ? '+' : ''}{formatCurrency(revDelta!)}
+              </div>
+              <div style={{ marginTop: 8 }}>{revStatus(singleBranchRevenue, revTarget)}</div>
+            </div>
+          )}
+          {gpTarget != null && (
+            <div style={{ flex: '1 1 160px', background: '#2a2a2a', borderRadius: 10, padding: 14 }}>
+              <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>GP% vs. Target</div>
+              <div style={{ fontSize: 20, fontWeight: 500, color: gpVarianceColor(singleBranchGpPct, gpTarget) }}>{formatPercent(singleBranchGpPct)}</div>
+              <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Target: {gpTarget}%</div>
+              <div style={{ marginTop: 8 }}>{gpStatus(singleBranchGpPct, gpTarget)}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return null
 }
 
 const th: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', fontSize: 11, color: '#666666', fontWeight: 400 }

@@ -155,6 +155,12 @@ export type FuelSummary = {
 
 // ── All dashboard data ────────────────────────────────────────────────────────
 
+export type BranchTarget = {
+  branchId: string
+  revenueTarget: number | null
+  profitPctTarget: number | null
+}
+
 export type DashboardData = {
   overview: { totals: OverviewTotals; byPeriod: OverviewPeriod[]; byBranch: OverviewBranch[] } | null
   revenue: RevenueSummary | null
@@ -162,6 +168,7 @@ export type DashboardData = {
   fuelByWeek: FuelByWeek | null
   fuelConsumers: FuelConsumer[] | null
   fuelSummary: FuelSummary | null
+  targets: BranchTarget[] | null
   loading: boolean
   error: string | null
 }
@@ -399,7 +406,7 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
   const [data, setData] = useState<DashboardData>({
     overview: null, revenue: null, payroll: null,
     fuelByWeek: null, fuelConsumers: null, fuelSummary: null,
-    loading: false, error: null,
+    targets: null, loading: false, error: null,
   })
 
   // ── Computed date range ─────────────────────────────────────────────────────
@@ -434,6 +441,7 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
         fetch(`/api/fuel/by-week?startDate=${startDate}&endDate=${endDate}${branchParam}`),
         fetch(`/api/fuel/top-consumers?startDate=${startDate}&endDate=${endDate}${branchParam}&limit=20`),
         fetch(`/api/fuel/summary?startDate=${startDate}&endDate=${endDate}${branchParam}`),
+        fetch(`/api/targets?startDate=${startDate}&endDate=${endDate}${branchParam}`),
       ]
 
       if (isAdminOrExec) {
@@ -444,7 +452,7 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
       const jsons = await Promise.all(responses.map((r) => r.json()))
 
       if (isAdminOrExec) {
-        const [overviewRes, revRes, payRes, fuelWeekRes, fuelConsRes, fuelSumRes] = jsons
+        const [overviewRes, revRes, payRes, fuelWeekRes, fuelConsRes, fuelSumRes, targetsRes] = jsons
         setData({
           overview: overviewRes.success ? overviewRes.data : null,
           revenue: revRes.success ? revRes.data : null,
@@ -452,11 +460,12 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
           fuelByWeek: fuelWeekRes.success ? fuelWeekRes.data : null,
           fuelConsumers: fuelConsRes.success ? fuelConsRes.data : null,
           fuelSummary: fuelSumRes.success ? fuelSumRes.data : null,
+          targets: targetsRes.success ? targetsRes.data : null,
           loading: false,
           error: null,
         })
       } else {
-        const [revRes, payRes, fuelWeekRes, fuelConsRes, fuelSumRes] = jsons
+        const [revRes, payRes, fuelWeekRes, fuelConsRes, fuelSumRes, targetsRes] = jsons
         setData({
           overview: null,
           revenue: revRes.success ? revRes.data : null,
@@ -464,6 +473,7 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
           fuelByWeek: fuelWeekRes.success ? fuelWeekRes.data : null,
           fuelConsumers: fuelConsRes.success ? fuelConsRes.data : null,
           fuelSummary: fuelSumRes.success ? fuelSumRes.data : null,
+          targets: targetsRes.success ? targetsRes.data : null,
           loading: false,
           error: null,
         })
