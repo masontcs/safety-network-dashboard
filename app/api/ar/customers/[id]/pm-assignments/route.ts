@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAccessContext } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
-const ALLOWED_ROLES = ['admin', 'ar_manager', 'district_manager', 'branch_manager']
+const ALLOWED_ROLES = ['admin', 'executive', 'ar_manager', 'district_manager', 'branch_manager']
 
 export async function POST(
   request: Request,

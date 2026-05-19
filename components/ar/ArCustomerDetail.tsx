@@ -286,7 +286,7 @@ function ContactForm({ customerId, onSaved, onCancel }: { customerId: string; on
 export default function ArCustomerDetail({ customer, entity, role, onBack, onRefresh }: Props) {
   const isAdmin      = role === 'admin'
   const isArAdmin    = role === 'admin' || role === 'ar_manager'
-  const canManagePMs = role === 'admin' || role === 'district_manager' || role === 'branch_manager'
+  const canManagePMs = role === 'admin' || role === 'executive' || role === 'district_manager' || role === 'branch_manager'
 
   // All roles see both note sections; write access differs
   const canWriteCollectionNotes = isAdmin || role === 'ar_manager' || role === 'ar_team' || role === 'executive'
@@ -299,7 +299,8 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
   const [invPage, setInvPage]           = useState(1)
   const [invPageCount, setInvPageCount] = useState(0)
   const [invLoading, setInvLoading]     = useState(true)
-  const [pmCandidates, setPmCandidates] = useState<{ id: string; displayName: string; role: string }[]>([])
+  interface PmBranch { id: string; name: string; users: { id: string; displayName: string; role: string }[] }
+  const [pmBranches, setPmBranches] = useState<PmBranch[]>([])
   const [arTeamUsers, setArTeamUsers]   = useState<{ id: string; displayName: string }[]>([])
   const [arAssignments, setArAssignments] = useState<ArAssignment[]>([])
   const [showMerge, setShowMerge]       = useState(false)
@@ -331,10 +332,10 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
 
   useEffect(() => {
     if (!canManagePMs) return
-    fetch('/api/ar/pm-candidates')
+    fetch(`/api/ar/pm-candidates?customerId=${customer.id}`)
       .then((r) => r.json())
-      .then((d) => setPmCandidates(d.users ?? []))
-  }, [canManagePMs])
+      .then((d) => setPmBranches(d.branches ?? []))
+  }, [canManagePMs, customer.id])
 
   useEffect(() => {
     if (!isArAdmin) return
@@ -451,8 +452,20 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
 
   const branchChartData = (profile?.branchBreakdown ?? []).map((b) => ({ name: b.name, value: b.total }))
 
-  const assignedPmIds      = new Set(profile?.pmAssignments.map((pm) => pm.userId) ?? [])
-  const availablePmCandidates = pmCandidates.filter((u) => !assignedPmIds.has(u.id))
+  const assignedPmIds = new Set(profile?.pmAssignments.map((pm) => pm.userId) ?? [])
+
+  // Build branch groups with assigned users removed and duplicates collapsed
+  const seenInDropdown = new Set<string>()
+  const availablePmBranches = pmBranches
+    .map((branch) => ({
+      ...branch,
+      users: branch.users.filter((u) => {
+        if (assignedPmIds.has(u.id) || seenInDropdown.has(u.id)) return false
+        seenInDropdown.add(u.id)
+        return true
+      }),
+    }))
+    .filter((b) => b.users.length > 0)
 
   const assignedArIds       = new Set(arAssignments.map((a) => a.userId))
   const availableArTeamUsers = arTeamUsers.filter((u) => !assignedArIds.has(u.id))
@@ -594,11 +607,17 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
 
         {/* Project Managers */}
         <SectionCard title="Project Managers"
-          action={canManagePMs && availablePmCandidates.length > 0 ? (
+          action={canManagePMs && availablePmBranches.length > 0 ? (
             <select value="" onChange={(e) => { if (e.target.value) handleAssignPm(e.target.value) }}
               style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 6, color: '#ff6b00', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>
               <option value="">+ Assign PM</option>
-              {availablePmCandidates.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
+              {availablePmBranches.map((branch) => (
+                <optgroup key={branch.id} label={branch.name}>
+                  {branch.users.map((u) => (
+                    <option key={u.id} value={u.id}>{u.displayName}</option>
+                  ))}
+                </optgroup>
+              ))}
             </select>
           ) : undefined}>
           {profileLoading ? <div style={{ fontSize: 12, color: '#555' }}>Loading…</div>
