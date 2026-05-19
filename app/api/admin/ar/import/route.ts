@@ -143,7 +143,7 @@ export async function POST(request: Request): Promise<Response> {
               report_date: reportDate,
               imported_by: ctx.access.userId,
               total_ar: totalAr,
-              invoice_count: invoiceRows.length,
+              invoice_count: invoiceRows.filter((r) => r.rowType === 'invoice').length,
             })
             .select('id')
             .single()
@@ -171,6 +171,7 @@ export async function POST(request: Request): Promise<Response> {
               open_balance:   row.openBalance,
               aging_bucket:   row.agingBucket,
               aging_days:     row.agingDays,
+              row_type:       row.rowType,
             }))
 
           const BATCH = 500
@@ -205,7 +206,7 @@ export async function POST(request: Request): Promise<Response> {
             type: 'done',
             data: {
               importId:      importRecord.id,
-              invoiceCount:  invoicesToInsert.length,
+              invoiceCount:  invoicesToInsert.filter((r) => r.row_type === 'invoice').length,
               totalAr,
               reportDate,
               newCustomers:  brandNewNames.length,

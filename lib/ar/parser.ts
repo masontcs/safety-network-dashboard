@@ -12,6 +12,7 @@ export interface ArInvoiceRow {
   openBalance: number
   agingBucket: 'Current' | '1-30' | '31-60' | '61-90' | '>90'
   agingDays: number | null
+  rowType: 'invoice' | 'credit_memo'
 }
 
 export interface ParsedArFile {
@@ -83,8 +84,8 @@ export function parseArFile(buffer: Buffer, _entityCode: string): ParseResult {
       // Subtotal rows (e.g. "Total Current", "Total 1 - 30")
       if (col0.startsWith('total ')) continue
 
-      // Only process invoice rows
-      if (col3 !== 'Invoice') continue
+      // Only process invoice and credit memo rows
+      if (col3 !== 'Invoice' && col3 !== 'Credit Memo') continue
 
       const rawName = String(row[11] ?? '').trim()
       if (!rawName) continue
@@ -93,10 +94,14 @@ export function parseArFile(buffer: Buffer, _entityCode: string): ParseResult {
       const qbName   = colonIdx >= 0 ? rawName.substring(0, colonIdx).trim() : rawName
       const jobName  = colonIdx >= 0 ? rawName.substring(colonIdx + 1).trim() || null : null
 
+      const isCreditMemo = col3 === 'Credit Memo'
+
       const poRaw = String(row[9] ?? '').trim()
-      const poNumber = poRaw && poRaw.toUpperCase() !== 'NA' && poRaw.toUpperCase() !== 'N/A'
+      const poNumber = !isCreditMemo && poRaw && poRaw.toUpperCase() !== 'NA' && poRaw.toUpperCase() !== 'N/A'
         ? poRaw
         : null
+
+      const rawBalance = Number(row[21]) || 0
 
       invoiceRows.push({
         qbName,
@@ -105,11 +110,12 @@ export function parseArFile(buffer: Buffer, _entityCode: string): ParseResult {
         invoiceNumber: String(row[7] ?? '').trim(),
         poNumber,
         invoiceDate:   excelDateToIso(row[5]),
-        dueDate:       excelDateToIso(row[15]),
-        terms:         String(row[13] ?? '').trim() || null,
-        openBalance:   Number(row[21]) || 0,
+        dueDate:       isCreditMemo ? null : excelDateToIso(row[15]),
+        terms:         isCreditMemo ? null : (String(row[13] ?? '').trim() || null),
+        openBalance:   isCreditMemo ? -Math.abs(rawBalance) : rawBalance,
         agingBucket:   currentBucket,
-        agingDays:     typeof row[19] === 'number' ? row[19] : null,
+        agingDays:     isCreditMemo ? null : (typeof row[19] === 'number' ? row[19] : null),
+        rowType:       isCreditMemo ? 'credit_memo' : 'invoice',
       })
     }
 

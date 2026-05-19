@@ -28,7 +28,7 @@ export async function GET(
       supabase.from('ar_customer_contacts').select('id, name, title, email, phone, is_primary, created_at').eq('customer_id', id).order('is_primary', { ascending: false }).order('created_at'),
       supabase.from('ar_customer_notes').select('id, content, created_by, created_at, note_type').eq('customer_id', id).order('created_at', { ascending: false }),
       supabase.from('ar_customer_pm_assignments').select('user_id').eq('customer_id', id),
-      supabase.from('ar_invoices').select('branch_id, open_balance').eq('customer_id', id),
+      supabase.from('ar_invoices').select('branch_id, open_balance').eq('customer_id', id).eq('row_type', 'invoice'),
     ])
 
     if (!customer) return NextResponse.json({ error: 'Not found' }, { status: 404 })

@@ -465,15 +465,16 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
 
       {/* Header */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {/* Back + name row */}
+        {/* Back + name + download row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button onClick={onBack}
             style={{ background: '#2a2a2a', border: 'none', borderRadius: 8, color: '#ccc', padding: '6px 12px', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
             ← Back
           </button>
-          <div style={{ fontSize: 18, fontWeight: 500, color: profile?.isExcluded ? '#666' : '#fff', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: 18, fontWeight: 500, color: profile?.isExcluded ? '#666' : '#fff', minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {customer.displayName}
           </div>
+          <DownloadStatementButton customerId={customer.id} />
         </div>
         {/* Status badges row — wraps to next line naturally */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
@@ -817,6 +818,89 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
       {showMerge && profile && (
         <MergeModal customerId={customer.id} customerName={customer.displayName} onClose={() => setShowMerge(false)}
           onMerged={(name) => { setShowMerge(false); fetchProfile(); alert(`Merged "${name}" into ${customer.displayName}.`) }} />
+      )}
+    </div>
+  )
+}
+
+// ── Download Statement Button ──────────────────────────────────────────────────
+
+function DownloadStatementButton({ customerId }: { customerId: string }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState<string | null>(null)
+
+  async function handleDownload() {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/ar/customers/${customerId}/statement`)
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        setError((json as { error?: string }).error ?? 'Failed to generate statement')
+        return
+      }
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      const disposition = res.headers.get('Content-Disposition') ?? ''
+      const match = disposition.match(/filename="([^"]+)"/)
+      a.download = match?.[1] ?? 'statement.pdf'
+      a.href = url
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setError('Network error — please try again')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={{ position: 'relative', flexShrink: 0 }}>
+      <button
+        onClick={handleDownload}
+        disabled={loading}
+        title="Download PDF Statement"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          background: loading ? '#2a2a2a' : '#ff6b00',
+          border: 'none', borderRadius: 8,
+          color: '#fff', padding: '6px 14px',
+          fontSize: 12, fontWeight: 500,
+          cursor: loading ? 'default' : 'pointer',
+          opacity: loading ? 0.7 : 1,
+          transition: 'opacity 0.15s',
+        }}
+      >
+        {loading ? (
+          <>
+            <span style={{ fontSize: 13 }}>⏳</span>
+            Generating…
+          </>
+        ) : (
+          <>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Statement
+          </>
+        )}
+      </button>
+      {error && (
+        <div style={{
+          position: 'absolute', top: '110%', right: 0, zIndex: 20,
+          background: '#2a2a2a', border: '1px solid #cc4444', borderRadius: 8,
+          padding: '8px 12px', fontSize: 11, color: '#cc4444',
+          whiteSpace: 'nowrap', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+        }}>
+          {error}
+          <button onClick={() => setError(null)}
+            style={{ marginLeft: 8, background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: 11 }}>
+            ×
+          </button>
+        </div>
       )}
     </div>
   )

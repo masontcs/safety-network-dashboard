@@ -33,11 +33,12 @@ export async function GET(request: Request): Promise<Response> {
       .select(
         `id, entity_code, invoice_number, po_number, job_name,
          invoice_date, due_date, terms, open_balance, aging_bucket, aging_days,
-         raw_class_code,
+         raw_class_code, row_type,
          branch:branches(id, name),
          customer:ar_customers(id, display_name)`,
         { count: 'exact' }
       )
+      .eq('row_type', 'invoice')
       .order('due_date', { ascending: true })
       .range(from, to)
 

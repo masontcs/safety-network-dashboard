@@ -33,7 +33,7 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     // Paginate through all invoices and aggregate by customer
-    type InvRow = { customer_id: string; open_balance: number; aging_bucket: string }
+    type InvRow = { customer_id: string; open_balance: number; aging_bucket: string; row_type: string }
     const invoices: InvRow[] = []
     {
       const PAGE_SIZE = 1000
@@ -41,7 +41,7 @@ export async function GET(request: Request): Promise<Response> {
       while (true) {
         let q = supabase
           .from('ar_invoices')
-          .select('customer_id, open_balance, aging_bucket')
+          .select('customer_id, open_balance, aging_bucket, row_type')
           .range(from, from + PAGE_SIZE - 1)
         if (entityCode) q = q.eq('entity_code', entityCode)
         if (arTeamCustomerIds !== null) {
@@ -77,7 +77,7 @@ export async function GET(request: Request): Promise<Response> {
       const amount = Number(inv.open_balance) || 0
       if (inv.aging_bucket in agg.buckets) agg.buckets[inv.aging_bucket] += amount
       agg.totalAr += amount
-      agg.invoiceCount++
+      if (inv.row_type === 'invoice') agg.invoiceCount++
     }
 
     // Fetch display names and exclusion flags for all customer ids
