@@ -68,6 +68,19 @@ function cleanInvoiceNum(n: string | null): string {
   return String(parseInt(digits, 10))
 }
 
+// Numeric value of invoice # for sorting (lower = older)
+function invoiceNumSortKey(n: string | null): number {
+  if (!n) return Infinity
+  const digits = n.replace(/[^0-9]/g, '')
+  return digits ? parseInt(digits, 10) : Infinity
+}
+
+// Truncate job name to prevent column overflow
+function truncateJob(s: string | null, max = 45): string {
+  if (!s) return '—'
+  return s.length > max ? s.slice(0, max - 1) + '…' : s
+}
+
 // ── Design tokens ─────────────────────────────────────────────────────────────
 
 const ORANGE  = '#ff6b00'
@@ -88,13 +101,8 @@ const s = StyleSheet.create({
     paddingBottom: 48,
   },
 
-  // Orange stripe at very top
-  topStripe: {
-    backgroundColor: ORANGE,
-    height: 4,
-  },
+  topStripe: { backgroundColor: ORANGE, height: 4 },
 
-  // Header
   header: {
     paddingHorizontal: 40,
     paddingTop: 24,
@@ -103,261 +111,121 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-end',
   },
-  companyName: {
-    fontSize: 18,
-    fontFamily: 'Helvetica-Bold',
-    color: INK,
-    letterSpacing: -0.3,
-  },
-  companyTagline: {
-    fontSize: 8,
-    color: LABEL,
-    marginTop: 3,
-  },
-  headerRight: {
-    alignItems: 'flex-end',
-  },
-  statementTitle: {
-    fontSize: 11,
-    fontFamily: 'Helvetica-Bold',
-    color: ORANGE,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-  },
-  asOfDate: {
-    fontSize: 8,
-    color: LABEL,
-    marginTop: 4,
-  },
+  companyName:    { fontSize: 18, fontFamily: 'Helvetica-Bold', color: INK, letterSpacing: -0.3 },
+  companyTagline: { fontSize: 8, color: LABEL, marginTop: 3 },
+  headerRight:    { alignItems: 'flex-end' },
+  statementTitle: { fontSize: 11, fontFamily: 'Helvetica-Bold', color: ORANGE, textTransform: 'uppercase', letterSpacing: 1.5 },
+  asOfDate:       { fontSize: 8, color: LABEL, marginTop: 4 },
 
-  rule: {
-    borderBottomColor: RULE,
-    borderBottomWidth: 1,
-    marginHorizontal: 40,
-  },
+  rule: { borderBottomColor: RULE, borderBottomWidth: 1, marginHorizontal: 40 },
 
-  body: {
-    paddingHorizontal: 40,
-    paddingTop: 24,
-  },
+  body: { paddingHorizontal: 40, paddingTop: 24 },
 
-  // Bill-to
-  billToLabel: {
-    fontSize: 7,
-    color: LABEL,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 5,
-  },
-  customerName: {
-    fontSize: 16,
-    fontFamily: 'Helvetica-Bold',
-    color: INK,
-  },
-  entityList: {
-    fontSize: 8,
-    color: LABEL,
-    marginTop: 4,
-  },
+  billToLabel:  { fontSize: 7, color: LABEL, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 5 },
+  customerName: { fontSize: 16, fontFamily: 'Helvetica-Bold', color: INK },
+  entityList:   { fontSize: 8, color: LABEL, marginTop: 4 },
 
-  sectionGap: {
-    marginTop: 28,
-  },
-
-  // Aging summary — light cards, no dark backgrounds
-  agingGrid: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 20,
-    marginBottom: 24,
-  },
+  // Aging summary
+  agingGrid: { flexDirection: 'row', gap: 8, marginTop: 20, marginBottom: 24 },
   agingCard: {
-    flex: 1,
-    backgroundColor: SURFACE,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    alignItems: 'center',
+    flex: 1, backgroundColor: SURFACE, borderRadius: 8,
+    paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center',
   },
   agingCardTotal: {
-    flex: 1,
-    backgroundColor: ORANGE,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    alignItems: 'center',
+    flex: 1, backgroundColor: ORANGE, borderRadius: 8,
+    paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center',
   },
-  agingCardLabel: {
-    fontSize: 7,
-    color: LABEL,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 5,
-  },
-  agingCardLabelTotal: {
-    fontSize: 7,
-    color: '#ffffff99',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 5,
-  },
-  agingCardAmount: {
-    fontSize: 10,
-    fontFamily: 'Helvetica-Bold',
-    color: INK,
-  },
-  agingCardAmountTotal: {
-    fontSize: 10,
-    fontFamily: 'Helvetica-Bold',
-    color: WHITE,
-  },
+  agingCardLabel:      { fontSize: 7, color: LABEL, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 },
+  agingCardLabelTotal: { fontSize: 7, color: '#ffffff99', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 },
+  agingCardAmount:      { fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK },
+  agingCardAmountTotal: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: WHITE },
 
-  // Section label
+  // Section labels
   sectionLabel: {
-    fontSize: 8,
-    fontFamily: 'Helvetica-Bold',
-    color: LABEL,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 8,
+    fontSize: 8, fontFamily: 'Helvetica-Bold', color: LABEL,
+    textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8,
+  },
+  creditsSectionLabel: {
+    fontSize: 8, fontFamily: 'Helvetica-Bold', color: ORANGE,
+    textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8, marginTop: 20,
   },
 
-  // Table — clean, no dark header block
+  // Table
   tableHeaderRow: {
-    flexDirection: 'row',
-    paddingVertical: 6,
-    paddingHorizontal: 6,
-    borderBottomColor: INK,
-    borderBottomWidth: 1,
+    flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 6,
+    borderBottomColor: INK, borderBottomWidth: 1,
   },
-  th: {
-    fontSize: 7,
-    color: LABEL,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontFamily: 'Helvetica-Bold',
-  },
+  th: { fontSize: 7, color: LABEL, textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: 'Helvetica-Bold' },
+
   tableRow: {
-    flexDirection: 'row',
-    paddingVertical: 7,
-    paddingHorizontal: 6,
-    borderBottomColor: RULE,
-    borderBottomWidth: 1,
+    flexDirection: 'row', paddingVertical: 7, paddingHorizontal: 6,
+    borderBottomColor: RULE, borderBottomWidth: 1,
   },
   tableRowShaded: {
-    flexDirection: 'row',
-    paddingVertical: 7,
-    paddingHorizontal: 6,
-    backgroundColor: SURFACE,
-    borderBottomColor: RULE,
-    borderBottomWidth: 1,
+    flexDirection: 'row', paddingVertical: 7, paddingHorizontal: 6,
+    backgroundColor: SURFACE, borderBottomColor: RULE, borderBottomWidth: 1,
   },
-  tableRowCredit: {
-    flexDirection: 'row',
-    paddingVertical: 7,
-    paddingHorizontal: 6,
-    borderBottomColor: '#ffd0b0',
-    borderBottomWidth: 1,
+  creditRow: {
+    flexDirection: 'row', paddingVertical: 7, paddingHorizontal: 6,
+    borderBottomColor: '#ffd0b0', borderBottomWidth: 1,
+  },
+  creditRowShaded: {
+    flexDirection: 'row', paddingVertical: 7, paddingHorizontal: 6,
+    backgroundColor: '#fff8f4', borderBottomColor: '#ffd0b0', borderBottomWidth: 1,
   },
 
-  cell:        { fontSize: 8, color: INK },
-  cellMuted:   { fontSize: 8, color: LABEL },
-  cellCredit:  { fontSize: 8, color: ORANGE, fontFamily: 'Helvetica-Bold' },
-  cellRight:   { fontSize: 8, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' },
-  cellRightCredit: { fontSize: 8, color: ORANGE, textAlign: 'right', fontFamily: 'Helvetica-Bold' },
+  cell:       { fontSize: 8, color: INK },
+  cellMuted:  { fontSize: 8, color: LABEL },
+  cellRight:  { fontSize: 8, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' },
+  cellOrange: { fontSize: 8, color: ORANGE, fontFamily: 'Helvetica-Bold' },
+  cellOrangeRight: { fontSize: 8, color: ORANGE, textAlign: 'right', fontFamily: 'Helvetica-Bold' },
 
-  // Columns — 9 columns, adjusted widths
-  colDate:    { width: '10%' },
-  colNum:     { width: '9%' },
-  colPo:      { width: '9%' },
-  colJob:     { width: '24%' },
-  colEntity:  { width: '7%' },
-  colBucket:  { width: '10%' },
-  colDays:    { width: '7%' },
-  colBalance: { width: '12%' },
-  colType:    { width: '7%' },
+  // Invoice table columns (no Type column — section heading serves that purpose)
+  iColDate:    { width: '10%' },
+  iColNum:     { width: '10%' },
+  iColPo:      { width: '9%' },
+  iColJob:     { width: '28%' },
+  iColEntity:  { width: '8%' },
+  iColBucket:  { width: '10%' },
+  iColDays:    { width: '7%' },
+  iColBalance: { width: '13%' },  // + remaining ≈ 95% → some gutter from padding
 
-  // Totals
-  totalsBlock: {
-    marginTop: 16,
-    paddingHorizontal: 6,
-    alignItems: 'flex-end',
-    gap: 6,
-  },
+  // Credit table columns (simpler — no aging)
+  cColDate:    { width: '11%' },
+  cColNum:     { width: '12%' },
+  cColPo:      { width: '10%' },
+  cColJob:     { width: '38%' },
+  cColEntity:  { width: '9%' },
+  cColBalance: { width: '15%' },
+
+  // Totals block
+  totalsBlock: { marginTop: 16, paddingHorizontal: 6, alignItems: 'flex-end', gap: 6 },
   totalLine: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    gap: 24,
-    paddingVertical: 3,
+    flexDirection: 'row', justifyContent: 'flex-end',
+    alignItems: 'center', gap: 24, paddingVertical: 3,
   },
-  totalLineBold: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    gap: 24,
-    paddingVertical: 3,
-    borderTopColor: RULE,
-    borderTopWidth: 1,
-    marginTop: 4,
-    paddingTop: 8,
+  totalLineDivider: {
+    flexDirection: 'row', justifyContent: 'flex-end',
+    alignItems: 'center', gap: 24,
+    paddingVertical: 3, borderTopColor: RULE, borderTopWidth: 1,
+    marginTop: 4, paddingTop: 8,
   },
-  totalLabel: {
-    fontSize: 8,
-    color: LABEL,
-    width: 90,
-    textAlign: 'right',
-  },
-  totalAmount: {
-    fontSize: 8,
-    fontFamily: 'Helvetica-Bold',
-    color: INK,
-    width: 70,
-    textAlign: 'right',
-  },
+  totalLabel:  { fontSize: 8, color: LABEL, width: 90, textAlign: 'right' },
+  totalAmount: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: INK, width: 70, textAlign: 'right' },
 
-  // Balance due — minimal, right-aligned
-  balanceDueBlock: {
-    marginTop: 20,
-    paddingHorizontal: 6,
-    alignItems: 'flex-end',
-  },
-  balanceDuePill: {
-    borderRadius: 10,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    backgroundColor: SURFACE,
-    alignItems: 'flex-end',
-  },
-  balanceDueLabel: {
-    fontSize: 8,
-    color: LABEL,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  balanceDueAmount: {
-    fontSize: 20,
-    fontFamily: 'Helvetica-Bold',
-    color: ORANGE,
-  },
+  // Balance due
+  balanceDueBlock: { marginTop: 20, paddingHorizontal: 6, alignItems: 'flex-end' },
+  balanceDuePill:  { borderRadius: 10, paddingHorizontal: 20, paddingVertical: 14, backgroundColor: SURFACE, alignItems: 'flex-end' },
+  balanceDueLabel:  { fontSize: 8, color: LABEL, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
+  balanceDueAmount: { fontSize: 20, fontFamily: 'Helvetica-Bold', color: ORANGE },
 
   // Footer
   pageFooter: {
-    position: 'absolute',
-    bottom: 18,
-    left: 40,
-    right: 40,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderTopColor: RULE,
-    borderTopWidth: 1,
-    paddingTop: 6,
+    position: 'absolute', bottom: 18, left: 40, right: 40,
+    flexDirection: 'row', justifyContent: 'space-between',
+    borderTopColor: RULE, borderTopWidth: 1, paddingTop: 6,
   },
-  footerText: {
-    fontSize: 7,
-    color: LABEL,
-  },
+  footerText: { fontSize: 7, color: LABEL },
 })
 
 // ── Column header helper ───────────────────────────────────────────────────────
@@ -371,11 +239,16 @@ function TH({ style, children }: { style: Style; children: string }) {
 export function StatementDocument({ data }: { data: StatementData }) {
   const { customer, lineItems, asOfDate, companyName } = data
 
-  const invoices = lineItems.filter((i) => i.rowType === 'invoice')
-  const credits  = lineItems.filter((i) => i.rowType === 'credit_memo')
+  const invoices = lineItems
+    .filter((i) => i.rowType === 'invoice')
+    .sort((a, b) => invoiceNumSortKey(a.invoiceNumber) - invoiceNumSortKey(b.invoiceNumber))
+
+  const credits = lineItems
+    .filter((i) => i.rowType === 'credit_memo')
+    .sort((a, b) => invoiceNumSortKey(a.invoiceNumber) - invoiceNumSortKey(b.invoiceNumber))
 
   const totalInvoices = invoices.reduce((s, i) => s + i.openBalance, 0)
-  const totalCredits  = credits.reduce((s, i) => s + i.openBalance, 0)
+  const totalCredits  = credits.reduce((s, i) => s + i.openBalance, 0)   // negative
   const netBalance    = totalInvoices + totalCredits
 
   const BUCKETS = ['Current', '1-30', '31-60', '61-90', '>90'] as const
@@ -385,19 +258,12 @@ export function StatementDocument({ data }: { data: StatementData }) {
     if (b in aging) aging[b] += inv.openBalance
   }
 
-  const sorted = [...lineItems].sort((a, b) => {
-    const da = a.invoiceDate ?? ''
-    const db = b.invoiceDate ?? ''
-    return db.localeCompare(da)
-  })
-
   const entityList = customer.entityRefs.map((r) => r.entityCode).join('  ·  ')
 
   return (
     <Document title={`Statement — ${customer.displayName}`} author={companyName}>
       <Page size="LETTER" style={s.page}>
 
-        {/* ── Orange top stripe ─────────────────────────────────────────────── */}
         <View style={s.topStripe} />
 
         {/* ── Header ────────────────────────────────────────────────────────── */}
@@ -435,55 +301,63 @@ export function StatementDocument({ data }: { data: StatementData }) {
             </View>
           </View>
 
-          {/* ── Transaction table ─────────────────────────────────────────── */}
-          <Text style={s.sectionLabel}>Transaction Detail</Text>
+          {/* ── Invoices ──────────────────────────────────────────────────── */}
+          <Text style={s.sectionLabel}>Open Invoices</Text>
 
           <View style={s.tableHeaderRow}>
-            <TH style={s.colDate}>Date</TH>
-            <TH style={s.colType}>Type</TH>
-            <TH style={s.colNum}>Invoice #</TH>
-            <TH style={s.colPo}>PO #</TH>
-            <TH style={s.colJob}>Job / Description</TH>
-            <TH style={s.colEntity}>Entity</TH>
-            <TH style={s.colBucket}>Aging</TH>
-            <TH style={{ ...s.colDays, textAlign: 'right' }}>Days</TH>
-            <TH style={{ ...s.colBalance, textAlign: 'right' }}>Balance</TH>
+            <TH style={s.iColDate}>Date</TH>
+            <TH style={s.iColNum}>Invoice #</TH>
+            <TH style={s.iColPo}>PO #</TH>
+            <TH style={s.iColJob}>Job / Description</TH>
+            <TH style={s.iColEntity}>Entity</TH>
+            <TH style={s.iColBucket}>Aging</TH>
+            <TH style={{ ...s.iColDays, textAlign: 'right' }}>Days</TH>
+            <TH style={{ ...s.iColBalance, textAlign: 'right' }}>Balance</TH>
           </View>
 
-          {sorted.map((item, idx) => {
-            const isCredit = item.rowType === 'credit_memo'
-            const RowStyle = isCredit
-              ? s.tableRowCredit
-              : idx % 2 === 0 ? s.tableRow : s.tableRowShaded
+          {invoices.map((item, idx) => (
+            <View key={item.id} style={idx % 2 === 0 ? s.tableRow : s.tableRowShaded}>
+              <Text style={[s.cellMuted, s.iColDate]}>{fmtDate(item.invoiceDate)}</Text>
+              <Text style={[s.cell, s.iColNum]}>{cleanInvoiceNum(item.invoiceNumber)}</Text>
+              <Text style={[s.cellMuted, s.iColPo]}>{item.poNumber ?? '—'}</Text>
+              <Text style={[s.cellMuted, s.iColJob]}>{truncateJob(item.jobName)}</Text>
+              <Text style={[s.cellMuted, s.iColEntity]}>{item.entityCode}</Text>
+              <Text style={[s.cellMuted, s.iColBucket]}>{agingLabel(item.agingBucket)}</Text>
+              <Text style={[s.cellMuted, { ...s.iColDays, textAlign: 'right' }]}>
+                {item.agingDays != null ? String(item.agingDays) : '—'}
+              </Text>
+              <Text style={[s.cellRight, s.iColBalance]}>{fmt(item.openBalance)}</Text>
+            </View>
+          ))}
 
-            const agingDaysStr = isCredit
-              ? '—'
-              : item.agingDays != null ? String(item.agingDays) : '—'
+          {/* ── Credits ───────────────────────────────────────────────────── */}
+          {credits.length > 0 && (
+            <>
+              <Text style={s.creditsSectionLabel}>Credits</Text>
 
-            return (
-              <View key={item.id} style={RowStyle}>
-                <Text style={[s.cellMuted, s.colDate]}>{fmtDate(item.invoiceDate)}</Text>
-                <Text style={[isCredit ? s.cellCredit : s.cellMuted, s.colType]}>
-                  {isCredit ? 'Credit' : 'Invoice'}
-                </Text>
-                <Text style={[s.cell, s.colNum]}>{cleanInvoiceNum(item.invoiceNumber)}</Text>
-                <Text style={[s.cellMuted, s.colPo]}>{item.poNumber ?? '—'}</Text>
-                <Text style={[s.cellMuted, s.colJob]}>{item.jobName ?? '—'}</Text>
-                <Text style={[s.cellMuted, s.colEntity]}>{item.entityCode}</Text>
-                <Text style={[s.cellMuted, s.colBucket]}>
-                  {isCredit ? '—' : agingLabel(item.agingBucket)}
-                </Text>
-                <Text style={[s.cellMuted, { ...s.colDays, textAlign: 'right' }]}>
-                  {agingDaysStr}
-                </Text>
-                <Text style={[isCredit ? s.cellRightCredit : s.cellRight, s.colBalance]}>
-                  {isCredit
-                    ? `(${fmt(Math.abs(item.openBalance))})`
-                    : fmt(item.openBalance)}
-                </Text>
+              <View style={s.tableHeaderRow}>
+                <TH style={s.cColDate}>Date</TH>
+                <TH style={s.cColNum}>Credit #</TH>
+                <TH style={s.cColPo}>PO #</TH>
+                <TH style={s.cColJob}>Job / Description</TH>
+                <TH style={s.cColEntity}>Entity</TH>
+                <TH style={{ ...s.cColBalance, textAlign: 'right' }}>Amount</TH>
               </View>
-            )
-          })}
+
+              {credits.map((item, idx) => (
+                <View key={item.id} style={idx % 2 === 0 ? s.creditRow : s.creditRowShaded}>
+                  <Text style={[s.cellMuted, s.cColDate]}>{fmtDate(item.invoiceDate)}</Text>
+                  <Text style={[s.cellOrange, s.cColNum]}>{cleanInvoiceNum(item.invoiceNumber)}</Text>
+                  <Text style={[s.cellMuted, s.cColPo]}>{item.poNumber ?? '—'}</Text>
+                  <Text style={[s.cellMuted, s.cColJob]}>{truncateJob(item.jobName, 60)}</Text>
+                  <Text style={[s.cellMuted, s.cColEntity]}>{item.entityCode}</Text>
+                  <Text style={[s.cellOrangeRight, s.cColBalance]}>
+                    ({fmt(Math.abs(item.openBalance))})
+                  </Text>
+                </View>
+              ))}
+            </>
+          )}
 
           {/* ── Totals ────────────────────────────────────────────────────── */}
           <View style={s.totalsBlock}>
