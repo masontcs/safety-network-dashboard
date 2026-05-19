@@ -721,26 +721,35 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
             </div>
           )}
           {profileLoading ? <div style={{ fontSize: 12, color: '#555' }}>Loading…</div>
-            : (profile?.notes ?? []).filter((n) => n.noteType === 'collection').length === 0
-              ? <div style={{ fontSize: 12, color: '#555' }}>No collection notes yet.</div>
-              : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {(profile?.notes ?? []).filter((n) => n.noteType === 'collection').map((n) => (
-                    <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid #2a2a2a' }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                        <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
-                        {isArAdmin && (
-                          <button onClick={() => handleDeleteNote(n.id)}
-                            style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
-                            onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                            onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
-                        )}
+            : (() => {
+                const allCollection = (profile?.notes ?? []).filter((n) => n.noteType === 'collection')
+                const shown = allCollection.slice(0, 5)
+                const extra = allCollection.length - shown.length
+                if (shown.length === 0) return <div style={{ fontSize: 12, color: '#555' }}>No collection notes yet.</div>
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {shown.map((n) => (
+                      <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid #2a2a2a' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                          <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
+                          {isArAdmin && (
+                            <button onClick={() => handleDeleteNote(n.id)}
+                              style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
+                              onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
+                              onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>{n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}</div>
                       </div>
-                      <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>{n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                    {extra > 0 && (
+                      <div style={{ fontSize: 11, color: '#444', textAlign: 'center', paddingTop: 2 }}>
+                        {extra} older note{extra !== 1 ? 's' : ''} not shown
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
         </SectionCard>
 
         {/* Operation Notes — write: admin/executive/district_manager/branch_manager/project_manager; read-only: ar_team/ar_manager */}
@@ -758,26 +767,35 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
             </div>
           )}
           {profileLoading ? <div style={{ fontSize: 12, color: '#555' }}>Loading…</div>
-            : (profile?.notes ?? []).filter((n) => n.noteType === 'operation').length === 0
-              ? <div style={{ fontSize: 12, color: '#555' }}>No operation notes yet.</div>
-              : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {(profile?.notes ?? []).filter((n) => n.noteType === 'operation').map((n) => (
-                    <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid #2a2a2a' }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                        <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
-                        {isAdmin && (
-                          <button onClick={() => handleDeleteNote(n.id)}
-                            style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
-                            onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                            onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
-                        )}
+            : (() => {
+                const allOperation = (profile?.notes ?? []).filter((n) => n.noteType === 'operation')
+                const shown = allOperation.slice(0, 5)
+                const extra = allOperation.length - shown.length
+                if (shown.length === 0) return <div style={{ fontSize: 12, color: '#555' }}>No operation notes yet.</div>
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {shown.map((n) => (
+                      <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid #2a2a2a' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                          <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
+                          {isAdmin && (
+                            <button onClick={() => handleDeleteNote(n.id)}
+                              style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
+                              onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
+                              onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>{n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}</div>
                       </div>
-                      <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>{n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                    {extra > 0 && (
+                      <div style={{ fontSize: 11, color: '#444', textAlign: 'center', paddingTop: 2 }}>
+                        {extra} older note{extra !== 1 ? 's' : ''} not shown
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
         </SectionCard>
       </div>
 
