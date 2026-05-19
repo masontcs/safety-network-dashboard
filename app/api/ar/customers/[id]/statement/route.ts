@@ -16,6 +16,7 @@ type RawLineItem = {
   job_name: string | null
   open_balance: number
   aging_bucket: string | null
+  aging_days: number | null
   entity_code: string
   branch: { name: string } | null
 }
@@ -52,7 +53,7 @@ export async function GET(
       .from('ar_invoices')
       .select(`
         id, row_type, invoice_number, invoice_date, due_date, po_number,
-        job_name, open_balance, aging_bucket, entity_code,
+        job_name, open_balance, aging_bucket, aging_days, entity_code,
         branch:branches(name)
       `)
       .eq('customer_id', id)
@@ -82,6 +83,7 @@ export async function GET(
       jobName:       r.job_name,
       openBalance:   r.open_balance,
       agingBucket:   r.aging_bucket,
+      agingDays:     r.aging_days,
       entityCode:    r.entity_code,
       branchName:    r.branch?.name ?? null,
     }))
