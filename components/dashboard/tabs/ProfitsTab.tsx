@@ -207,6 +207,25 @@ function gpStatus(actual: number, target: number) {
   return <StatusPill label="Off Track" color="#cc4444" />
 }
 
+function combinedStatus(
+  revActual: number, revTarget: number | null,
+  gpActual: number,  gpTarget: number | null,
+): React.ReactNode {
+  const hasRev = revTarget != null
+  const hasGp  = gpTarget != null
+  if (!hasRev && !hasGp) return '—'
+
+  const revOk  = !hasRev || revActual >= revTarget
+  const gpOk   = !hasGp  || gpActual  >= gpTarget
+  const revMiss = hasRev && revTarget > 0 ? (revTarget - revActual) / revTarget : 0
+
+  if (revOk && gpOk)   return <StatusPill label="On Target"   color="#4caf50" />
+  if (revOk && !gpOk)  return <StatusPill label="Low Margin"  color="#ff9800" />
+  if (!revOk && gpOk)  return <StatusPill label="Low Revenue" color={revMiss > 0.15 ? '#cc4444' : '#cc9900'} />
+  if (revMiss <= 0.15) return <StatusPill label="Behind"      color="#cc9900" />
+  return                      <StatusPill label="Off Track"   color="#cc4444" />
+}
+
 // ── Goals by Branch component ─────────────────────────────────────────────────
 
 type ByBranchRow = {
@@ -294,7 +313,7 @@ function GoalsByBranch({
                       {formatPercent(gpActual)}
                     </td>
                     <td style={{ ...td, textAlign: 'right' }}>
-                      {revTarget != null ? revStatus(revActual, revTarget) : '—'}
+                      {(revTarget != null || gpTarget != null) ? combinedStatus(revActual, revTarget, gpActual, gpTarget) : '—'}
                     </td>
                   </tr>
                 )
@@ -312,7 +331,7 @@ function GoalsByBranch({
                 <td style={{ ...td, fontWeight: 500, color: avgGpGoal != null ? gpVarianceColor(blendedGpActual, avgGpGoal) : '#ffffff' }}>
                   {formatPercent(blendedGpActual)}
                 </td>
-                <td style={{ ...td, textAlign: 'right' }}>{revStatus(totalRevActual, totalRevTarget)}</td>
+                <td style={{ ...td, textAlign: 'right' }}>{combinedStatus(totalRevActual, totalRevTarget, blendedGpActual, avgGpGoal ?? null)}</td>
               </tr>
             </tfoot>
           </table>
