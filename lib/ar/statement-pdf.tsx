@@ -98,10 +98,18 @@ const s = StyleSheet.create({
     fontSize: 9,
     color: INK,
     backgroundColor: WHITE,
+    paddingTop: 28,    // breathing room on overflow pages; topStripe is absolute so unaffected
     paddingBottom: 48,
   },
 
-  topStripe: { backgroundColor: ORANGE, height: 4 },
+  topStripe: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: ORANGE,
+    height: 4,
+  },
 
   header: {
     paddingHorizontal: 40,
@@ -264,7 +272,7 @@ export function StatementDocument({ data }: { data: StatementData }) {
     <Document title={`Statement — ${customer.displayName}`} author={companyName}>
       <Page size="LETTER" style={s.page}>
 
-        <View style={s.topStripe} />
+        <View style={s.topStripe} fixed />
 
         {/* ── Header ────────────────────────────────────────────────────────── */}
         <View style={s.header}>
@@ -304,7 +312,7 @@ export function StatementDocument({ data }: { data: StatementData }) {
           {/* ── Invoices ──────────────────────────────────────────────────── */}
           <Text style={s.sectionLabel}>Open Invoices</Text>
 
-          <View style={s.tableHeaderRow}>
+          <View style={s.tableHeaderRow} fixed>
             <TH style={s.iColDate}>Date</TH>
             <TH style={s.iColNum}>Invoice #</TH>
             <TH style={s.iColPo}>PO #</TH>
@@ -333,15 +341,16 @@ export function StatementDocument({ data }: { data: StatementData }) {
           {/* ── Credits ───────────────────────────────────────────────────── */}
           {credits.length > 0 && (
             <>
-              <Text style={s.creditsSectionLabel}>Credits</Text>
-
-              <View style={s.tableHeaderRow}>
-                <TH style={s.cColDate}>Date</TH>
-                <TH style={s.cColNum}>Credit #</TH>
-                <TH style={s.cColPo}>PO #</TH>
-                <TH style={s.cColJob}>Job / Description</TH>
-                <TH style={s.cColEntity}>Entity</TH>
-                <TH style={{ ...s.cColBalance, textAlign: 'right' }}>Amount</TH>
+              <View wrap={false}>
+                <Text style={s.creditsSectionLabel}>Credits</Text>
+                <View style={s.tableHeaderRow}>
+                  <TH style={s.cColDate}>Date</TH>
+                  <TH style={s.cColNum}>Credit #</TH>
+                  <TH style={s.cColPo}>PO #</TH>
+                  <TH style={s.cColJob}>Job / Description</TH>
+                  <TH style={s.cColEntity}>Entity</TH>
+                  <TH style={{ ...s.cColBalance, textAlign: 'right' }}>Amount</TH>
+                </View>
               </View>
 
               {credits.map((item, idx) => (
