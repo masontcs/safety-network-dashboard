@@ -252,7 +252,11 @@ function GoalsByBranch({
     const totalRevTarget = rows.reduce((s, r) => s + (r.target?.revenueTarget ?? 0), 0)
     const totalRevActual = rows.reduce((s, r) => s + (r.actual?.revenue ?? 0), 0)
     const totalGP = rows.reduce((s, r) => s + (r.actual?.grossProfit ?? 0), 0)
-    const totalGpPct = totalRevActual > 0 ? Math.round((totalGP / totalRevActual) * 1000) / 10 : 0
+    const blendedGpActual = totalRevActual > 0 ? Math.round((totalGP / totalRevActual) * 1000) / 10 : 0
+    const gpGoalRows = rows.filter((r) => r.target?.profitPctTarget != null)
+    const avgGpGoal = gpGoalRows.length > 0
+      ? Math.round(gpGoalRows.reduce((s, r) => s + r.target!.profitPctTarget!, 0) / gpGoalRows.length * 10) / 10
+      : null
 
     return (
       <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
@@ -304,8 +308,10 @@ function GoalsByBranch({
                 <td style={{ ...td, color: varianceColor(totalRevActual, totalRevTarget), fontWeight: 500 }}>
                   {`${totalRevActual - totalRevTarget >= 0 ? '+' : ''}${formatCurrency(totalRevActual - totalRevTarget)}`}
                 </td>
-                <td style={td}>—</td>
-                <td style={{ ...td, fontWeight: 500, color: '#ffffff' }}>{formatPercent(totalGpPct)}</td>
+                <td style={{ ...td, color: '#888' }}>{avgGpGoal != null ? `${avgGpGoal}%` : '—'}</td>
+                <td style={{ ...td, fontWeight: 500, color: avgGpGoal != null ? gpVarianceColor(blendedGpActual, avgGpGoal) : '#ffffff' }}>
+                  {formatPercent(blendedGpActual)}
+                </td>
                 <td style={{ ...td, textAlign: 'right' }}>{revStatus(totalRevActual, totalRevTarget)}</td>
               </tr>
             </tfoot>

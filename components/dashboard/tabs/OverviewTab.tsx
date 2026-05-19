@@ -204,6 +204,20 @@ export default function OverviewTab({ role, data, branches, selectedBranchId, al
         </div>
       )}
 
+      {/* ── Goals ────────────────────────────────────────────────────────────── */}
+      {(data.targets ?? []).length > 0 && (
+        <OverviewGoals
+          targets={data.targets ?? []}
+          isAdminOrExec={isAdminOrExec}
+          adminByBranch={byBranch}
+          managerByBranch={managerByBranch}
+          selectedBranchId={selectedBranchId}
+          totalRevenue={revenue}
+          totalGpPct={displayGpPct}
+          branchNameMap={branchNameMap}
+        />
+      )}
+
       {/* ── Allocation breakdown (admin/exec) ────────────────────────────────── */}
       {allocationOn && isAdminOrExec && (corpOverhead > 0 || hqOverhead > 0 || allocatedFuel > 0) && (
         <div style={{
@@ -458,3 +472,241 @@ function BranchTable({ byBranch, branchNameMap, allocationOn }: {
 
 const th: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', fontSize: 11, color: '#666666', fontWeight: 400, whiteSpace: 'nowrap' }
 const td: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', color: '#cccccc' }
+
+// ── Goals helpers ─────────────────────────────────────────────────────────────
+
+type TargetRow = { branchId: string; revenueTarget: number | null; profitPctTarget: number | null }
+
+function varianceColor(actual: number, target: number): string {
+  if (actual >= target) return '#4caf50'
+  const miss = (target - actual) / target
+  if (miss <= 0.05) return '#4caf50'
+  if (miss <= 0.15) return '#cc9900'
+  return '#cc4444'
+}
+
+function gpVarianceColor(actual: number, target: number): string {
+  const diff = actual - target
+  if (diff >= 0) return '#4caf50'
+  if (diff >= -2) return '#cc9900'
+  return '#cc4444'
+}
+
+function StatusPill({ label, color }: { label: string; color: string }) {
+  return (
+    <span style={{ fontSize: 10, fontWeight: 600, color, background: `${color}22`, borderRadius: 4, padding: '2px 7px', whiteSpace: 'nowrap' }}>
+      {label}
+    </span>
+  )
+}
+
+function revStatus(actual: number, target: number) {
+  if (actual >= target) return <StatusPill label="On Target" color="#4caf50" />
+  const miss = (target - actual) / target
+  if (miss <= 0.05) return <StatusPill label="Close" color="#cc9900" />
+  if (miss <= 0.15) return <StatusPill label="Behind" color="#cc9900" />
+  return <StatusPill label="Off Track" color="#cc4444" />
+}
+
+function gpStatus(actual: number, target: number) {
+  const diff = actual - target
+  if (diff >= 0) return <StatusPill label="On Target" color="#4caf50" />
+  if (diff >= -2) return <StatusPill label="Close" color="#cc9900" />
+  return <StatusPill label="Off Track" color="#cc4444" />
+}
+
+// ── OverviewGoals ─────────────────────────────────────────────────────────────
+
+function OverviewGoals({
+  targets, isAdminOrExec, adminByBranch, managerByBranch,
+  selectedBranchId, totalRevenue, totalGpPct, branchNameMap,
+}: {
+  targets: TargetRow[]
+  isAdminOrExec: boolean
+  adminByBranch: Array<{ branchId: string; revenue: number; grossProfit: number; gpPct: number }>
+  managerByBranch: Array<{ id: string; revenue: number; directPayroll: number }>
+  selectedBranchId: string
+  totalRevenue: number
+  totalGpPct: number
+  branchNameMap: Record<string, string>
+}) {
+  if (targets.length === 0) return null
+  const targetMap = new Map(targets.map((t) => [t.branchId, t]))
+
+  // Admin/exec multi-branch (no branch filter): full table with revenue + GP%
+  if (isAdminOrExec && adminByBranch.length > 1 && !selectedBranchId) {
+    const allIds = [...new Set([...adminByBranch.map((b) => b.branchId), ...targets.map((t) => t.branchId)])]
+    const actualMap = new Map(adminByBranch.map((b) => [b.branchId, b]))
+    const rows = allIds
+      .map((id) => ({ id, name: branchNameMap[id] ?? id, actual: actualMap.get(id) ?? null, target: targetMap.get(id) ?? null }))
+      .filter((row) => row.target)
+      .sort((a, b) => (b.actual?.revenue ?? 0) - (a.actual?.revenue ?? 0))
+    if (rows.length === 0) return null
+
+    const totalRevTarget = rows.reduce((s, r) => s + (r.target?.revenueTarget ?? 0), 0)
+    const totalRevActual = rows.reduce((s, r) => s + (r.actual?.revenue ?? 0), 0)
+    const totalGP = rows.reduce((s, r) => s + (r.actual?.grossProfit ?? 0), 0)
+    const blendedGpActual = totalRevActual > 0 ? Math.round((totalGP / totalRevActual) * 1000) / 10 : 0
+    const gpGoalRows = rows.filter((r) => r.target?.profitPctTarget != null)
+    const avgGpGoal = gpGoalRows.length > 0
+      ? Math.round(gpGoalRows.reduce((s, r) => s + r.target!.profitPctTarget!, 0) / gpGoalRows.length * 10) / 10
+      : null
+
+    return (
+      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Goals by Branch</div>
+        <div className="table-scroll">
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr>
+                <th style={{ ...th, textAlign: 'left' }}>Branch</th>
+                <th style={th}>Rev Target</th>
+                <th style={th}>Actual Rev</th>
+                <th style={th}>vs. Target</th>
+                <th style={th}>GP% Goal</th>
+                <th style={th}>Actual GP%</th>
+                <th style={th}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ id, name, actual, target }) => {
+                const revTarget = target?.revenueTarget ?? null
+                const gpTarget  = target?.profitPctTarget ?? null
+                const revActual = actual?.revenue ?? 0
+                const gpActual  = actual?.gpPct ?? 0
+                const revDelta  = revTarget != null ? revActual - revTarget : null
+                return (
+                  <tr key={id} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                    <td style={{ ...td, textAlign: 'left', color: '#ff6b00' }}>{name}</td>
+                    <td style={td}>{revTarget != null ? formatCurrency(revTarget) : <span style={{ color: '#444' }}>—</span>}</td>
+                    <td style={{ ...td, color: '#ffffff' }}>{formatCurrency(revActual)}</td>
+                    <td style={{ ...td, color: revDelta != null ? varianceColor(revActual, revTarget!) : '#666' }}>
+                      {revDelta != null ? `${revDelta >= 0 ? '+' : ''}${formatCurrency(revDelta)}` : '—'}
+                    </td>
+                    <td style={td}>{gpTarget != null ? `${gpTarget}%` : <span style={{ color: '#444' }}>—</span>}</td>
+                    <td style={{ ...td, color: gpTarget != null ? gpVarianceColor(gpActual, gpTarget) : '#cccccc' }}>
+                      {formatPercent(gpActual)}
+                    </td>
+                    <td style={{ ...td, textAlign: 'right' }}>
+                      {revTarget != null ? revStatus(revActual, revTarget) : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: '1px solid #333' }}>
+                <td style={{ ...td, textAlign: 'left', color: '#888', fontWeight: 500 }}>Total</td>
+                <td style={{ ...td, color: '#888' }}>{formatCurrency(totalRevTarget)}</td>
+                <td style={{ ...td, color: '#ffffff', fontWeight: 500 }}>{formatCurrency(totalRevActual)}</td>
+                <td style={{ ...td, color: varianceColor(totalRevActual, totalRevTarget), fontWeight: 500 }}>
+                  {`${totalRevActual - totalRevTarget >= 0 ? '+' : ''}${formatCurrency(totalRevActual - totalRevTarget)}`}
+                </td>
+                <td style={{ ...td, color: '#888' }}>{avgGpGoal != null ? `${avgGpGoal}%` : '—'}</td>
+                <td style={{ ...td, fontWeight: 500, color: avgGpGoal != null ? gpVarianceColor(blendedGpActual, avgGpGoal) : '#ffffff' }}>
+                  {formatPercent(blendedGpActual)}
+                </td>
+                <td style={{ ...td, textAlign: 'right' }}>{revStatus(totalRevActual, totalRevTarget)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
+  // Manager multi-branch: revenue-only table (no per-branch GP% available)
+  if (!isAdminOrExec && managerByBranch.length > 1) {
+    const rows = managerByBranch
+      .map((b) => ({ id: b.id, name: branchNameMap[b.id] ?? b.id, revActual: b.revenue, target: targetMap.get(b.id) ?? null }))
+      .filter((r) => r.target)
+      .sort((a, b) => b.revActual - a.revActual)
+    if (rows.length === 0) return null
+
+    const totalRevTarget = rows.reduce((s, r) => s + (r.target?.revenueTarget ?? 0), 0)
+    const totalRevActual = rows.reduce((s, r) => s + r.revActual, 0)
+
+    return (
+      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Revenue Goals by Branch</div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr>
+              <th style={{ ...th, textAlign: 'left' }}>Branch</th>
+              <th style={th}>Target</th>
+              <th style={th}>Actual</th>
+              <th style={th}>vs. Target</th>
+              <th style={th}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ id, name, revActual, target }) => {
+              const revTarget = target?.revenueTarget ?? null
+              const revDelta  = revTarget != null ? revActual - revTarget : null
+              return (
+                <tr key={id} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                  <td style={{ ...td, textAlign: 'left', color: '#ff6b00' }}>{name}</td>
+                  <td style={td}>{revTarget != null ? formatCurrency(revTarget) : <span style={{ color: '#444' }}>—</span>}</td>
+                  <td style={{ ...td, color: '#ffffff' }}>{formatCurrency(revActual)}</td>
+                  <td style={{ ...td, color: revDelta != null ? varianceColor(revActual, revTarget!) : '#666' }}>
+                    {revDelta != null ? `${revDelta >= 0 ? '+' : ''}${formatCurrency(revDelta)}` : '—'}
+                  </td>
+                  <td style={{ ...td, textAlign: 'right' }}>
+                    {revTarget != null ? revStatus(revActual, revTarget) : '—'}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+          <tfoot>
+            <tr style={{ borderTop: '1px solid #333' }}>
+              <td style={{ ...td, textAlign: 'left', color: '#888', fontWeight: 500 }}>Total</td>
+              <td style={{ ...td, color: '#888' }}>{formatCurrency(totalRevTarget)}</td>
+              <td style={{ ...td, color: '#ffffff', fontWeight: 500 }}>{formatCurrency(totalRevActual)}</td>
+              <td style={{ ...td, color: varianceColor(totalRevActual, totalRevTarget), fontWeight: 500 }}>
+                {`${totalRevActual - totalRevTarget >= 0 ? '+' : ''}${formatCurrency(totalRevActual - totalRevTarget)}`}
+              </td>
+              <td style={{ ...td, textAlign: 'right' }}>{revStatus(totalRevActual, totalRevTarget)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    )
+  }
+
+  // Single-branch (selected branch for admin/exec, or single-branch manager)
+  const branchId = selectedBranchId || targets[0]?.branchId
+  if (!branchId) return null
+  const target = targetMap.get(branchId)
+  if (!target) return null
+  const revTarget = target.revenueTarget
+  const gpTarget  = target.profitPctTarget
+  const revDelta  = revTarget != null ? totalRevenue - revTarget : null
+
+  return (
+    <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
+      <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Goals</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+        {revTarget != null && (
+          <div style={{ flex: '1 1 160px', background: '#2a2a2a', borderRadius: 10, padding: 14 }}>
+            <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Revenue vs. Target</div>
+            <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{formatCurrency(totalRevenue)}</div>
+            <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Target: {formatCurrency(revTarget)}</div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: varianceColor(totalRevenue, revTarget), marginTop: 6 }}>
+              {revDelta! >= 0 ? '+' : ''}{formatCurrency(revDelta!)}
+            </div>
+            <div style={{ marginTop: 8 }}>{revStatus(totalRevenue, revTarget)}</div>
+          </div>
+        )}
+        {gpTarget != null && (
+          <div style={{ flex: '1 1 160px', background: '#2a2a2a', borderRadius: 10, padding: 14 }}>
+            <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>GP% vs. Target</div>
+            <div style={{ fontSize: 20, fontWeight: 500, color: gpVarianceColor(totalGpPct, gpTarget) }}>{formatPercent(totalGpPct)}</div>
+            <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Target: {gpTarget}%</div>
+            <div style={{ marginTop: 8 }}>{gpStatus(totalGpPct, gpTarget)}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
