@@ -299,6 +299,8 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
   const [invPage, setInvPage]           = useState(1)
   const [invPageCount, setInvPageCount] = useState(0)
   const [invLoading, setInvLoading]     = useState(true)
+  const [credits, setCredits]           = useState<Invoice[]>([])
+  const [creditsLoading, setCreditsLoading] = useState(true)
   interface PmBranch { id: string; name: string; users: { id: string; displayName: string; role: string }[] }
   const [pmBranches, setPmBranches] = useState<PmBranch[]>([])
   const [arTeamUsers, setArTeamUsers]   = useState<{ id: string; displayName: string }[]>([])
@@ -329,6 +331,16 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
       .then((d) => { setInvoices(d.invoices ?? []); setInvTotal(d.total ?? 0); setInvPageCount(d.pageCount ?? 0) })
       .finally(() => setInvLoading(false))
   }, [customer.id, entity, invPage])
+
+  useEffect(() => {
+    setCreditsLoading(true)
+    const p = new URLSearchParams({ customerId: customer.id, rowType: 'credit_memo' })
+    if (entity) p.set('entity', entity)
+    fetch(`/api/ar/invoices?${p}`)
+      .then((r) => r.json())
+      .then((d) => setCredits(d.invoices ?? []))
+      .finally(() => setCreditsLoading(false))
+  }, [customer.id, entity])
 
   useEffect(() => {
     if (!canManagePMs) return
@@ -851,6 +863,54 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
           </div>
         )}
       </div>
+
+      {/* Credits table — only rendered if there are any */}
+      {(creditsLoading || credits.length > 0) && (
+        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', overflow: 'hidden' }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>Credits</span>
+            {credits.length > 0 && (
+              <>
+                <span style={{ fontSize: 11, color: '#555' }}>{credits.length} total</span>
+                <span style={{ marginLeft: 'auto', fontSize: 12, color: '#ff6b00', fontVariantNumeric: 'tabular-nums' }}>
+                  {fmt(credits.reduce((s, c) => s + Math.abs(Number(c.open_balance)), 0))}
+                </span>
+              </>
+            )}
+          </div>
+          <div className="table-scroll">
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
+                  {['Credit #', 'Entity', 'Branch', 'Job', 'PO #', 'Date', 'Credit Amount'].map((h) => (
+                    <th key={h} style={{ padding: '9px 12px', textAlign: h === 'Credit Amount' ? 'right' : 'left', fontSize: 11, color: '#666', fontWeight: 400, whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {creditsLoading
+                  ? <tr><td colSpan={7} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>Loading…</td></tr>
+                  : credits.map((cr) => (
+                    <tr key={cr.id} style={{ borderBottom: '1px solid #222', background: 'rgba(255,107,0,0.03)' }}>
+                      <td style={{ padding: '9px 12px', fontSize: 12, color: '#ff6b00', whiteSpace: 'nowrap' }}>{cr.invoice_number ?? '—'}</td>
+                      <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc' }}>{cr.entity_code}</td>
+                      <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>
+                        {cr.branch?.name ?? <span style={{ color: '#555' }}>{cr.raw_class_code ?? '—'}</span>}
+                      </td>
+                      <td style={{ padding: '9px 12px', fontSize: 12, color: '#888', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cr.job_name ?? '—'}</td>
+                      <td style={{ padding: '9px 12px', fontSize: 12, color: '#888' }}>{cr.po_number ?? '—'}</td>
+                      <td style={{ padding: '9px 12px', fontSize: 12, color: '#888', whiteSpace: 'nowrap' }}>{fmtDate(cr.invoice_date)}</td>
+                      <td style={{ padding: '9px 12px', fontSize: 12, color: '#ff6b00', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                        ({fmt(Math.abs(Number(cr.open_balance)))})
+                      </td>
+                    </tr>
+                  ))
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {showMerge && profile && (
         <MergeModal customerId={customer.id} customerName={customer.displayName} onClose={() => setShowMerge(false)}

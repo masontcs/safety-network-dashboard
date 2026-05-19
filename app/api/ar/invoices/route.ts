@@ -15,6 +15,7 @@ export async function GET(request: Request): Promise<Response> {
     const agingBucket = searchParams.get('agingBucket') || null
     const customerId  = searchParams.get('customerId') || null
     const search      = searchParams.get('search') || null
+    const rowType     = searchParams.get('rowType') || 'invoice'
     const page        = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
 
     const { branchIds } = ctx.access
@@ -38,7 +39,7 @@ export async function GET(request: Request): Promise<Response> {
          customer:ar_customers(id, display_name)`,
         { count: 'exact' }
       )
-      .eq('row_type', 'invoice')
+      .eq('row_type', rowType === 'credit_memo' ? 'credit_memo' : 'invoice')
       .order('due_date', { ascending: true })
       .range(from, to)
 
