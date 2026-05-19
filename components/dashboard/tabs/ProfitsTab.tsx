@@ -7,7 +7,7 @@ import type { TabProps } from './types'
 
 function r(n: number) { return Math.round(n * 100) / 100 }
 
-export default function ProfitsTab({ role, data, branches, allocationOn }: TabProps) {
+export default function ProfitsTab({ role, data, branches, selectedBranchId, allocationOn }: TabProps) {
   const isAdminOrExec = role === 'admin' || role === 'executive'
   const branchNameMap: Record<string, string> = {}
   for (const b of branches) branchNameMap[b.id] = b.name
@@ -28,7 +28,9 @@ export default function ProfitsTab({ role, data, branches, allocationOn }: TabPr
     corpOverhead: number; hqOverhead: number; allocatedFuel: number; netAfterAlloc: number
   }> = []
 
-  if (isAdminOrExec && data.overview) {
+  // Use overview (all-branch) only when no branch filter is active.
+  // When a branch is selected, fall through to the branch-filtered individual API responses.
+  if (isAdminOrExec && data.overview && !selectedBranchId) {
     const t = data.overview.totals
     revenue = t.revenue
     directPayroll = t.directPayroll
