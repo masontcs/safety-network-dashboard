@@ -430,7 +430,7 @@ export default function ArMeetingDashboard({ entity, onSelectCustomer }: Props) 
         </div>
 
         {/* Right: Recent activity + New customers */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0, overflow: 'hidden' }}>
 
           {/* Recent activity */}
           <div>
@@ -455,7 +455,7 @@ export default function ArMeetingDashboard({ entity, onSelectCustomer }: Props) 
                       <span style={{ fontSize: 12, fontWeight: 500, color: '#ff6b00' }}>{act.customerName}</span>
                       <span style={{ fontSize: 10, color: '#555' }}>{timeAgo(act.createdAt)}</span>
                     </div>
-                    <div style={{ fontSize: 12, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: 12, color: '#aaa', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                       {act.content}
                     </div>
                     {act.createdByName && (

@@ -18,6 +18,9 @@ export async function GET(request: Request): Promise<Response> {
     const supabase = createServiceClient()
     const { branchIds, role } = ctx.access
 
+    // sales: bypass branch filter — sees all AR regardless of branch assignments
+    const effectiveBranchIds = role === 'sales' ? null : branchIds
+
     // Build invoice query scoped to user's branch access
     let query = supabase
       .from('ar_invoices')
@@ -27,12 +30,12 @@ export async function GET(request: Request): Promise<Response> {
 
     if (branchId) {
       // If user is a manager and the requested branch isn't in their assignments, deny
-      if (branchIds && !branchIds.includes(branchId)) {
+      if (effectiveBranchIds && !effectiveBranchIds.includes(branchId)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
       query = query.eq('branch_id', branchId)
-    } else if (branchIds) {
-      query = query.in('branch_id', branchIds)
+    } else if (effectiveBranchIds) {
+      query = query.in('branch_id', effectiveBranchIds)
     }
 
     // ar_team: scope to assigned customers only unless showAll is requested

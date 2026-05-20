@@ -18,6 +18,7 @@ const ROLE_HOME: Record<Role, string> = {
   ar_team:          '/ar',
   office_team:      '/ar',
   project_manager:  '/dashboard',
+  sales:            '/dashboard',
 }
 
 // Path prefixes each role is allowed to visit
@@ -30,6 +31,7 @@ const ROLE_ALLOWED_PREFIXES: Record<Role, string[]> = {
   ar_team:          ['/ar'],
   office_team:      ['/ar'],
   project_manager:  ['/dashboard', '/ar'],
+  sales:            ['/dashboard', '/ar'],
 }
 
 export async function middleware(request: NextRequest) {

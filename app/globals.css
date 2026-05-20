@@ -318,9 +318,25 @@ a:active, button:active, [role="button"]:active {
 /* Meeting tab: action list left + sidebar right */
 .ar-meeting-grid {
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: 1fr minmax(0, 360px);
   gap: 16px;
   align-items: start;
+}
+/* Prevent grid children from overflowing their track */
+.ar-meeting-grid > * {
+  min-width: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 960px) {
+  /* Narrow the right column at mid-screen before stacking */
+  .ar-meeting-grid {
+    grid-template-columns: 1fr minmax(0, 300px);
+  }
+  /* KPI row: 4-col → 2-col at mid-size screens */
+  .dash-metric-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
 }
 
 @media (max-width: 767px) {
@@ -354,7 +370,8 @@ a:active, button:active, [role="button"]:active {
   /* ── Prevent grid overflow ────────────────────────── */
   .dash-metric-grid > *,
   .ar-aging-grid > *,
-  .ar-detail-grid > * { min-width: 0; }
+  .ar-detail-grid > *,
+  .ar-meeting-grid > * { min-width: 0; overflow: hidden; }
 
   /* ── Customer table ↔ card list ──────────────────── */
   .ar-table-wrap { display: none; }

@@ -5,7 +5,7 @@ import type { Role } from '@/lib/supabase/database.types'
 
 // Write access per note type
 const COLLECTION_WRITE_ROLES: Role[] = ['admin', 'ar_manager', 'ar_team', 'office_team', 'executive']
-const OPERATION_WRITE_ROLES: Role[]  = ['admin', 'executive', 'district_manager', 'branch_manager', 'project_manager']
+const OPERATION_WRITE_ROLES: Role[]  = ['admin', 'executive', 'district_manager', 'branch_manager', 'project_manager', 'sales']
 
 const VALID_COMM_TYPES  = ['email', 'phone_call', 'text', 'in_person', 'portal']
 const VALID_OUTCOMES    = ['positive', 'no_answer', 'needs_follow_up', 'roadblock', 'promise_to_pay', 'escalated', 'unproductive']

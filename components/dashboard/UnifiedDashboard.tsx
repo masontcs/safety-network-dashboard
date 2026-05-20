@@ -386,7 +386,9 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
   const [allocationOn, setAllocationOn] = useState<boolean>(false)
 
   // ── Active tab ──────────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<Tab>(role === 'project_manager' ? 'revenue' : 'overview')
+  const [activeTab, setActiveTab] = useState<Tab>(
+    (role === 'project_manager' || role === 'sales') ? 'revenue' : 'overview'
+  )
 
   useEffect(() => {
     // Read initial tab from URL on mount (e.g. arriving via /dashboard?tab=fuel)
@@ -440,6 +442,27 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
       const allocParam = allocationOn && canSeeAllocation ? '&allocation=true' : ''
 
       const isAdminOrExec = role === 'admin' || role === 'executive'
+      const isSales = role === 'sales'
+
+      // Sales: revenue only — no payroll, no fuel
+      if (isSales) {
+        const [revRes, targetsRes] = await Promise.all([
+          fetch(`/api/revenue/summary?startDate=${startDate}&endDate=${endDate}${branchParam}`),
+          fetch(`/api/targets?startDate=${startDate}&endDate=${endDate}${branchParam}`),
+        ]).then((rs) => Promise.all(rs.map((r) => r.json())))
+        setData({
+          overview: null,
+          revenue: revRes.success ? revRes.data : null,
+          payroll: null,
+          fuelByWeek: null,
+          fuelConsumers: null,
+          fuelSummary: null,
+          targets: targetsRes.success ? targetsRes.data : null,
+          loading: false,
+          error: null,
+        })
+        return
+      }
 
       const fetches: Array<Promise<Response>> = [
         fetch(`/api/revenue/summary?startDate=${startDate}&endDate=${endDate}${branchParam}`),

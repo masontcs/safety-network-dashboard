@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import type { Role } from '@/lib/supabase/database.types'
 import { createBrowserClient } from '@/lib/supabase/client'
@@ -10,7 +10,10 @@ import { createBrowserClient } from '@/lib/supabase/client'
 interface Contact { id: string; name: string; title: string | null; email: string | null; phone: string | null; isPrimary: boolean }
 interface Note    {
   id: string; content: string; noteType: 'collection' | 'operation'; createdAt: string; createdByName: string | null
-  communicationType: string | null; contactName: string | null; outcome: string | null
+  communicationType: string | null; contactName: string | null; outcome: string | null; isPinned: boolean
+}
+interface InvoiceNote {
+  id: string; content: string; createdAt: string; createdByName: string | null
 }
 interface PmAssignment { userId: string; displayName: string; role: string }
 interface ArAssignment { userId: string; displayName: string; role: string }
@@ -36,7 +39,20 @@ interface Invoice {
   id: string; entity_code: string; invoice_number: string | null; po_number: string | null
   job_name: string | null; invoice_date: string | null; due_date: string | null; terms: string | null
   open_balance: number; aging_bucket: string; aging_days: number | null; raw_class_code: string | null
+  invoice_status: string | null
   branch: { id: string; name: string } | null
+}
+
+const INVOICE_STATUS_OPTIONS = [
+  { value: 'disputed',        label: 'Disputed',         color: '#cc4444' },
+  { value: 'short_pay',       label: 'Short Pay',        color: '#cc6600' },
+  { value: 'payment_pending', label: 'Payment Pending',  color: '#cc9900' },
+  { value: 'lien_filed',      label: 'Lien Filed',       color: '#cc4444' },
+  { value: 'in_legal',        label: 'In Legal',         color: '#992222' },
+  { value: 'write_off',       label: 'Write-Off',        color: '#555555' },
+]
+function getInvStatusMeta(v: string) {
+  return INVOICE_STATUS_OPTIONS.find((o) => o.value === v) ?? null
 }
 
 interface CustomerSummary {
@@ -46,10 +62,13 @@ interface CustomerSummary {
 
 interface SearchResult { id: string; displayName: string; entityRefs: EntityRef[] }
 
+interface Branch { id: string; name: string }
+
 interface Props {
   customer: CustomerSummary
   entity: string
   role: Role
+  branches: Branch[]
   onBack: () => void
   onRefresh: () => void
 }
@@ -336,14 +355,14 @@ function ContactForm({ customerId, onSaved, onCancel }: { customerId: string; on
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
-export default function ArCustomerDetail({ customer, entity, role, onBack, onRefresh }: Props) {
+export default function ArCustomerDetail({ customer, entity, role, branches, onBack, onRefresh }: Props) {
   const isAdmin      = role === 'admin'
   const isArAdmin    = role === 'admin' || role === 'ar_manager'
   const canManagePMs = role === 'admin' || role === 'executive' || role === 'district_manager' || role === 'branch_manager'
 
   // All roles see both note sections; write access differs
   const canWriteCollectionNotes = isAdmin || role === 'ar_manager' || role === 'ar_team' || role === 'office_team' || role === 'executive'
-  const canWriteOperationNotes  = isAdmin || role === 'executive' || role === 'district_manager' || role === 'branch_manager' || role === 'project_manager'
+  const canWriteOperationNotes  = isAdmin || role === 'executive' || role === 'district_manager' || role === 'branch_manager' || role === 'project_manager' || role === 'sales'
 
   const [profile, setProfile]           = useState<CustomerProfile | null>(null)
   const [profileLoading, setProfileLoading] = useState(true)
@@ -352,6 +371,7 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
   const [invPage, setInvPage]           = useState(1)
   const [invPageCount, setInvPageCount] = useState(0)
   const [invLoading, setInvLoading]     = useState(true)
+  const [invBranchId, setInvBranchId]   = useState('')
   const [credits, setCredits]           = useState<Invoice[]>([])
   const [creditsLoading, setCreditsLoading] = useState(true)
   interface PmBranch { id: string; name: string; users: { id: string; displayName: string; role: string }[] }
@@ -370,6 +390,13 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
   const [collContactName, setCollContactName] = useState('')
   const [collOutcome, setCollOutcome]     = useState('')
 
+  // Invoice notes expansion
+  const [expandedInvId, setExpandedInvId]   = useState<string | null>(null)
+  const [invNotes, setInvNotes]             = useState<Record<string, InvoiceNote[]>>({})
+  const [invNotesLoading, setInvNotesLoading] = useState<Record<string, boolean>>({})
+  const [invNoteText, setInvNoteText]       = useState('')
+  const [addingInvNote, setAddingInvNote]   = useState(false)
+
   const fetchProfile = useCallback(async () => {
     setProfileLoading(true)
     const res = await fetch(`/api/ar/customers/${customer.id}`)
@@ -379,25 +406,30 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
 
   useEffect(() => { fetchProfile() }, [fetchProfile])
 
+  // Reset page when branch filter changes
+  useEffect(() => { setInvPage(1) }, [invBranchId])
+
   useEffect(() => {
     setInvLoading(true)
     const p = new URLSearchParams({ customerId: customer.id, page: String(invPage) })
-    if (entity) p.set('entity', entity)
+    if (entity)      p.set('entity', entity)
+    if (invBranchId) p.set('branchId', invBranchId)
     fetch(`/api/ar/invoices?${p}`)
       .then((r) => r.json())
       .then((d) => { setInvoices(d.invoices ?? []); setInvTotal(d.total ?? 0); setInvPageCount(d.pageCount ?? 0) })
       .finally(() => setInvLoading(false))
-  }, [customer.id, entity, invPage])
+  }, [customer.id, entity, invPage, invBranchId])
 
   useEffect(() => {
     setCreditsLoading(true)
     const p = new URLSearchParams({ customerId: customer.id, rowType: 'credit_memo' })
-    if (entity) p.set('entity', entity)
+    if (entity)      p.set('entity', entity)
+    if (invBranchId) p.set('branchId', invBranchId)
     fetch(`/api/ar/invoices?${p}`)
       .then((r) => r.json())
       .then((d) => setCredits(d.invoices ?? []))
       .finally(() => setCreditsLoading(false))
-  }, [customer.id, entity])
+  }, [customer.id, entity, invBranchId])
 
   useEffect(() => {
     if (!canManagePMs) return
@@ -459,9 +491,24 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
             communicationType: (row.communication_type as string | null) ?? null,
             contactName:       (row.contact_name as string | null) ?? null,
             outcome:           (row.outcome as string | null) ?? null,
+            isPinned:          !!(row.is_pinned),
           }
           return { ...p, notes: [note, ...p.notes] }
         })
+      })
+
+      // ── Note updated (pin/unpin) by another user ──────────────────────────
+      .on('postgres_changes', {
+        event:  'UPDATE',
+        schema: 'public',
+        table:  'ar_customer_notes',
+        filter: `customer_id=eq.${customer.id}`,
+      }, (payload) => {
+        const row = payload.new as Record<string, unknown>
+        setProfile((p) => p ? {
+          ...p,
+          notes: p.notes.map((n) => n.id === row.id ? { ...n, isPinned: !!row.is_pinned } : n),
+        } : p)
       })
 
       // ── Note deleted by another user ───────────────────────────────────────
@@ -563,7 +610,8 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
     })
     if (res.ok) {
       const { note } = await res.json()
-      setProfile((p) => p ? { ...p, notes: [note, ...p.notes] } : p)
+      const noteWithPin = { ...note, isPinned: note.isPinned ?? false }
+      setProfile((p) => p ? { ...p, notes: [noteWithPin, ...p.notes] } : p)
       if (noteType === 'collection') {
         setCollectionNoteText('')
         setCollCommType('')
@@ -580,6 +628,62 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
   const handleDeleteNote = async (noteId: string) => {
     await fetch(`/api/ar/customers/${customer.id}/notes/${noteId}`, { method: 'DELETE' })
     setProfile((p) => p ? { ...p, notes: p.notes.filter((n) => n.id !== noteId) } : p)
+  }
+
+  const handlePinNote = async (noteId: string, pin: boolean) => {
+    await fetch(`/api/ar/customers/${customer.id}/notes/${noteId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isPinned: pin }),
+    })
+    setProfile((p) => p ? { ...p, notes: p.notes.map((n) => n.id === noteId ? { ...n, isPinned: pin } : n) } : p)
+  }
+
+  const loadInvNotes = async (invoiceId: string) => {
+    setInvNotesLoading((p) => ({ ...p, [invoiceId]: true }))
+    const res = await fetch(`/api/ar/invoices/${invoiceId}/notes`)
+    if (res.ok) {
+      const { notes } = await res.json()
+      setInvNotes((p) => ({ ...p, [invoiceId]: notes }))
+    }
+    setInvNotesLoading((p) => ({ ...p, [invoiceId]: false }))
+  }
+
+  const handleToggleInv = (invoiceId: string) => {
+    if (expandedInvId === invoiceId) {
+      setExpandedInvId(null)
+    } else {
+      setExpandedInvId(invoiceId)
+      setInvNoteText('')
+      if (!invNotes[invoiceId]) loadInvNotes(invoiceId)
+    }
+  }
+
+  const handleInvStatusChange = async (invoiceId: string, status: string) => {
+    await fetch(`/api/ar/invoices/${invoiceId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoiceStatus: status || null }),
+    })
+    setInvoices((prev) => prev.map((inv) => inv.id === invoiceId ? { ...inv, invoice_status: status || null } : inv))
+  }
+
+  const handleAddInvNote = async (invoiceId: string) => {
+    if (!invNoteText.trim()) return
+    setAddingInvNote(true)
+    const res = await fetch(`/api/ar/invoices/${invoiceId}/notes`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: invNoteText.trim() }),
+    })
+    if (res.ok) {
+      const { note } = await res.json()
+      setInvNotes((p) => ({ ...p, [invoiceId]: [note, ...(p[invoiceId] ?? [])] }))
+      setInvNoteText('')
+    }
+    setAddingInvNote(false)
+  }
+
+  const handleDeleteInvNote = async (invoiceId: string, noteId: string) => {
+    await fetch(`/api/ar/invoices/${invoiceId}/notes/${noteId}`, { method: 'DELETE' })
+    setInvNotes((p) => ({ ...p, [invoiceId]: (p[invoiceId] ?? []).filter((n) => n.id !== noteId) }))
   }
 
   const handleContactSaved = (contact: Contact) => {
@@ -675,65 +779,88 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
           </div>
           <DownloadStatementButton customerId={customer.id} />
         </div>
-        {/* Status badges row — wraps to next line naturally */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-          {isAdmin && profile ? (
-            <select value={profile.customerStatus} onChange={(e) => handleCustomerStatusChange(e.target.value)}
-              style={{ background: `${custStatusMeta.color}18`, border: `1px solid ${custStatusMeta.color}`, borderRadius: 8, color: custStatusMeta.color, padding: '5px 10px', fontSize: 12, cursor: 'pointer' }}>
-              {CUSTOMER_STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          ) : profile && (
-            <span style={{ background: `${custStatusMeta.color}18`, border: `1px solid ${custStatusMeta.color}`, borderRadius: 8, color: custStatusMeta.color, padding: '5px 10px', fontSize: 12 }}>
-              {custStatusMeta.label}
-            </span>
-          )}
-          {isArAdmin && profile ? (
-            <select value={profile.collectionStatus} onChange={(e) => handleCollectionStatusChange(e.target.value)}
-              style={{ background: `${collStatusMeta.color}18`, border: `1px solid ${collStatusMeta.color}`, borderRadius: 8, color: collStatusMeta.color, padding: '5px 10px', fontSize: 12, cursor: 'pointer' }}>
-              {COLLECTION_STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.value === 'none' ? 'No Collection Issue' : `${o.label}${o.priority > 0 ? ` (P${o.priority})` : ''}`}
-                </option>
-              ))}
-            </select>
-          ) : profile && profile.collectionStatus !== 'none' && (
-            <span style={{ background: `${collStatusMeta.color}18`, border: `1px solid ${collStatusMeta.color}`, borderRadius: 8, color: collStatusMeta.color, padding: '5px 10px', fontSize: 12 }}>
-              {collStatusMeta.label}
-            </span>
-          )}
+        {/* Status row — labeled controls for AR admins */}
+        {profile && (
+          <div style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 10, padding: '10px 14px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 20px', alignItems: 'flex-start' }}>
 
-          {/* Collection phase */}
-          {isArAdmin && profile ? (
-            <select value={profile.collectionPhase} onChange={(e) => handleCollectionPhaseChange(e.target.value)}
-              style={{ background: `${collPhaseMeta.color}18`, border: `1px solid ${collPhaseMeta.color}55`, borderRadius: 8, color: collPhaseMeta.color, padding: '5px 10px', fontSize: 12, cursor: 'pointer' }}>
-              {COLLECTION_PHASE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          ) : profile && profile.collectionPhase !== 'collection_team' && (
-            <span style={{ background: `${collPhaseMeta.color}18`, border: `1px solid ${collPhaseMeta.color}55`, borderRadius: 8, color: collPhaseMeta.color, padding: '5px 10px', fontSize: 12 }}>
-              {collPhaseMeta.label}
-            </span>
-          )}
+              {/* Account Status */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>Account Status</span>
+                {isAdmin ? (
+                  <select value={profile.customerStatus} onChange={(e) => handleCustomerStatusChange(e.target.value)}
+                    style={{ background: `${custStatusMeta.color}18`, border: `1px solid ${custStatusMeta.color}`, borderRadius: 7, color: custStatusMeta.color, padding: '5px 10px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
+                    {CUSTOMER_STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                ) : (
+                  <span style={{ background: `${custStatusMeta.color}18`, border: `1px solid ${custStatusMeta.color}`, borderRadius: 7, color: custStatusMeta.color, padding: '5px 10px', fontSize: 12 }}>
+                    {custStatusMeta.label}
+                  </span>
+                )}
+              </div>
 
-          {/* Contact frequency */}
-          {isArAdmin && profile ? (
-            <select value={profile.contactFrequency ?? ''} onChange={(e) => handleContactFrequencyChange(e.target.value)}
-              style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: profile.contactFrequency ? '#cccccc' : '#555', padding: '5px 10px', fontSize: 12, cursor: 'pointer' }}>
-              <option value=''>Frequency…</option>
-              {CONTACT_FREQUENCY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          ) : profile?.contactFrequency && (
-            <span style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#888', padding: '5px 10px', fontSize: 12 }}>
-              {getFrequencyLabel(profile.contactFrequency)}
-            </span>
-          )}
+              {/* Collection Issue */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>Collection Issue</span>
+                {isArAdmin ? (
+                  <select value={profile.collectionStatus} onChange={(e) => handleCollectionStatusChange(e.target.value)}
+                    style={{ background: `${collStatusMeta.color}18`, border: `1px solid ${collStatusMeta.color}`, borderRadius: 7, color: collStatusMeta.color, padding: '5px 10px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
+                    {COLLECTION_STATUS_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.value === 'none' ? 'No Issue' : `${o.label}${o.priority > 0 ? ` · P${o.priority}` : ''}`}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span style={{ background: `${collStatusMeta.color}18`, border: `1px solid ${collStatusMeta.color}`, borderRadius: 7, color: collStatusMeta.color, padding: '5px 10px', fontSize: 12 }}>
+                    {profile.collectionStatus === 'none' ? 'No Issue' : collStatusMeta.label}
+                  </span>
+                )}
+              </div>
 
-          {isAdmin && (
-            <button onClick={handleExcludeToggle} disabled={togglingExclude}
-              style={{ background: profile?.isExcluded ? '#2a2a2a' : 'rgba(204,68,68,0.12)', border: `1px solid ${profile?.isExcluded ? '#333' : '#663333'}`, borderRadius: 8, color: profile?.isExcluded ? '#888' : '#cc4444', padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}>
-              {profile?.isExcluded ? 'Restore' : 'Exclude'}
-            </button>
-          )}
-        </div>
+              {/* Escalation Level */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>Escalation Level</span>
+                {isArAdmin ? (
+                  <select value={profile.collectionPhase} onChange={(e) => handleCollectionPhaseChange(e.target.value)}
+                    style={{ background: `${collPhaseMeta.color}18`, border: `1px solid ${collPhaseMeta.color}55`, borderRadius: 7, color: collPhaseMeta.color, padding: '5px 10px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
+                    {COLLECTION_PHASE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                ) : (
+                  <span style={{ background: `${collPhaseMeta.color}18`, border: `1px solid ${collPhaseMeta.color}55`, borderRadius: 7, color: collPhaseMeta.color, padding: '5px 10px', fontSize: 12 }}>
+                    {collPhaseMeta.label}
+                  </span>
+                )}
+              </div>
+
+              {/* Contact Frequency */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>Contact Frequency</span>
+                {isArAdmin ? (
+                  <select value={profile.contactFrequency ?? ''} onChange={(e) => handleContactFrequencyChange(e.target.value)}
+                    style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 7, color: profile.contactFrequency ? '#cccccc' : '#555', padding: '5px 10px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
+                    <option value=''>Not Set</option>
+                    {CONTACT_FREQUENCY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                ) : (
+                  <span style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 7, color: '#888', padding: '5px 10px', fontSize: 12 }}>
+                    {profile.contactFrequency ? getFrequencyLabel(profile.contactFrequency) : 'Not Set'}
+                  </span>
+                )}
+              </div>
+
+              {isAdmin && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>Visibility</span>
+                  <button onClick={handleExcludeToggle} disabled={togglingExclude}
+                    style={{ background: profile.isExcluded ? '#2a2a2a' : 'rgba(204,68,68,0.12)', border: `1px solid ${profile.isExcluded ? '#333' : '#663333'}`, borderRadius: 7, color: profile.isExcluded ? '#888' : '#cc4444', padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}>
+                    {profile.isExcluded ? 'Restore' : 'Exclude'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Aging cards row */}
@@ -961,24 +1088,33 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
             <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {/* Row 1: comm type + contact name */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                <select value={collCommType} onChange={(e) => setCollCommType(e.target.value)}
-                  style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: collCommType ? '#ccc' : '#555', padding: '6px 10px', fontSize: 12, outline: 'none' }}>
-                  <option value=''>How contacted…</option>
-                  {COMMUNICATION_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-                <input
-                  placeholder='Contact name (optional)'
-                  value={collContactName}
-                  onChange={(e) => setCollContactName(e.target.value)}
-                  style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '6px 10px', fontSize: 12, outline: 'none' }}
-                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em' }}>How Contacted</span>
+                  <select value={collCommType} onChange={(e) => setCollCommType(e.target.value)}
+                    style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: collCommType ? '#ccc' : '#555', padding: '6px 10px', fontSize: 12, outline: 'none' }}>
+                    <option value=''>Not specified</option>
+                    {COMMUNICATION_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact Name</span>
+                  <input
+                    placeholder='Who did you speak with?'
+                    value={collContactName}
+                    onChange={(e) => setCollContactName(e.target.value)}
+                    style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '6px 10px', fontSize: 12, outline: 'none' }}
+                  />
+                </div>
               </div>
               {/* Row 2: outcome */}
-              <select value={collOutcome} onChange={(e) => setCollOutcome(e.target.value)}
-                style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: collOutcome ? (getOutcomeMeta(collOutcome)?.color ?? '#ccc') : '#555', padding: '6px 10px', fontSize: 12, outline: 'none' }}>
-                <option value=''>Outcome…</option>
-                {OUTCOME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Outcome</span>
+                <select value={collOutcome} onChange={(e) => setCollOutcome(e.target.value)}
+                  style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: collOutcome ? (getOutcomeMeta(collOutcome)?.color ?? '#ccc') : '#555', padding: '6px 10px', fontSize: 12, outline: 'none' }}>
+                  <option value=''>Select outcome…</option>
+                  {OUTCOME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
               {/* Row 3: note text */}
               <textarea placeholder="Add a collection note…" value={collectionNoteText} onChange={(e) => setCollectionNoteText(e.target.value)} rows={3}
                 style={{ width: '100%', background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
@@ -993,46 +1129,72 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
           {profileLoading ? <div style={{ fontSize: 12, color: '#555' }}>Loading…</div>
             : (() => {
                 const allCollection = (profile?.notes ?? []).filter((n) => n.noteType === 'collection')
-                const shown = allCollection.slice(0, 5)
-                const extra = allCollection.length - shown.length
-                if (shown.length === 0) return <div style={{ fontSize: 12, color: '#555' }}>No collection notes yet.</div>
+                const pinned   = allCollection.filter((n) => n.isPinned)
+                const unpinned = allCollection.filter((n) => !n.isPinned)
+                const shown    = unpinned.slice(0, 5)
+                const extra    = unpinned.length - shown.length
+
+                const NoteRow = ({ n, isPinnedSection }: { n: typeof allCollection[0]; isPinnedSection: boolean }) => {
+                  const outcomeMeta = n.outcome ? getOutcomeMeta(n.outcome) : null
+                  return (
+                    <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid #2a2a2a' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                        <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
+                        {isArAdmin && (
+                          <>
+                            <button
+                              onClick={() => handlePinNote(n.id, !n.isPinned)}
+                              title={n.isPinned ? 'Unpin note' : 'Pin note to top'}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: '2px 4px', flexShrink: 0, color: isPinnedSection ? '#ff6b00' : '#444', transition: 'color 0.15s' }}
+                              onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6b00')}
+                              onMouseLeave={(e) => (e.currentTarget.style.color = isPinnedSection ? '#ff6b00' : '#444')}>
+                              📌
+                            </button>
+                            <button onClick={() => handleDeleteNote(n.id)}
+                              style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
+                              onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
+                              onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
+                          </>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 5 }}>
+                        {outcomeMeta && (
+                          <span style={{ fontSize: 10, fontWeight: 600, color: outcomeMeta.color, background: `${outcomeMeta.color}18`, borderRadius: 4, padding: '1px 6px' }}>
+                            {outcomeMeta.label}
+                          </span>
+                        )}
+                        {n.communicationType && (
+                          <span style={{ fontSize: 10, color: '#666', background: '#2a2a2a', borderRadius: 4, padding: '1px 6px' }}>
+                            {getCommTypeLabel(n.communicationType)}
+                          </span>
+                        )}
+                        {n.contactName && <span style={{ fontSize: 10, color: '#555' }}>w/ {n.contactName}</span>}
+                        <span style={{ fontSize: 11, color: '#555', marginLeft: 'auto' }}>{n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}</span>
+                      </div>
+                    </div>
+                  )
+                }
+
+                if (allCollection.length === 0) return <div style={{ fontSize: 12, color: '#555' }}>No collection notes yet.</div>
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {shown.map((n) => {
-                      const outcomeMeta = n.outcome ? getOutcomeMeta(n.outcome) : null
-                      return (
-                        <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid #2a2a2a' }}>
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                            <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
-                            {isArAdmin && (
-                              <button onClick={() => handleDeleteNote(n.id)}
-                                style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
-                                onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                                onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
-                            )}
-                          </div>
-                          {/* Note metadata row */}
-                          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 5 }}>
-                            {outcomeMeta && (
-                              <span style={{ fontSize: 10, fontWeight: 600, color: outcomeMeta.color, background: `${outcomeMeta.color}18`, borderRadius: 4, padding: '1px 6px' }}>
-                                {outcomeMeta.label}
-                              </span>
-                            )}
-                            {n.communicationType && (
-                              <span style={{ fontSize: 10, color: '#666', background: '#2a2a2a', borderRadius: 4, padding: '1px 6px' }}>
-                                {getCommTypeLabel(n.communicationType)}
-                              </span>
-                            )}
-                            {n.contactName && (
-                              <span style={{ fontSize: 10, color: '#555' }}>w/ {n.contactName}</span>
-                            )}
-                            <span style={{ fontSize: 11, color: '#555', marginLeft: 'auto' }}>{n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}</span>
-                          </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    {/* ── Pinned notes block ── */}
+                    {pinned.length > 0 && (
+                      <div style={{ background: 'rgba(255,107,0,0.06)', border: '1px solid rgba(255,107,0,0.2)', borderRadius: 8, padding: '8px 10px', marginBottom: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
+                          <span style={{ fontSize: 11, color: '#ff6b00', fontWeight: 500 }}>📌 Pinned</span>
                         </div>
-                      )
-                    })}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          {pinned.map((n) => <NoteRow key={n.id} n={n} isPinnedSection />)}
+                        </div>
+                      </div>
+                    )}
+                    {/* ── Recent notes ── */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {shown.map((n) => <NoteRow key={n.id} n={n} isPinnedSection={false} />)}
+                    </div>
                     {extra > 0 && (
-                      <div style={{ fontSize: 11, color: '#444', textAlign: 'center', paddingTop: 2 }}>
+                      <div style={{ fontSize: 11, color: '#444', textAlign: 'center', paddingTop: 8 }}>
                         {extra} older note{extra !== 1 ? 's' : ''} not shown
                       </div>
                     )}
@@ -1090,40 +1252,158 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
 
       {/* Invoice table */}
       <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', overflow: 'hidden' }}>
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13, fontWeight: 500, color: '#fff' }}>Open Invoices</span>
           {invTotal > 0 && <span style={{ fontSize: 11, color: '#555' }}>{invTotal} total</span>}
+          <span style={{ fontSize: 11, color: '#444' }}>· click row for notes &amp; flags</span>
+          <div style={{ flex: 1 }} />
+          {branches.length > 1 && (
+            <select
+              value={invBranchId}
+              onChange={(e) => setInvBranchId(e.target.value)}
+              style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 7, color: invBranchId ? '#ccc' : '#666', padding: '4px 10px', fontSize: 12, cursor: 'pointer', outline: 'none' }}
+            >
+              <option value=''>All Branches</option>
+              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          )}
         </div>
         <div className="table-scroll">
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
-                {['Invoice #', 'Entity', 'Branch', 'Job', 'PO #', 'Invoice Date', 'Due Date', 'Terms', 'Aging', 'Open Balance'].map((h) => (
+                <th style={{ width: 32, padding: '9px 8px 9px 12px' }} />
+                {['Invoice #', 'Entity', 'Branch', 'Job', 'PO #', 'Invoice Date', 'Due Date', 'Terms', 'Status', 'Aging', 'Open Balance'].map((h) => (
                   <th key={h} style={{ padding: '9px 12px', textAlign: h === 'Open Balance' ? 'right' : 'left', fontSize: 11, color: '#666', fontWeight: 400, whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {invLoading ? <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>Loading…</td></tr>
-                : invoices.length === 0 ? <tr><td colSpan={10} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>No invoices found</td></tr>
-                : invoices.map((inv) => (
-                  <tr key={inv.id} style={{ borderBottom: '1px solid #222' }}>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>{inv.invoice_number ?? '—'}</td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc' }}>{inv.entity_code}</td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>
-                      {inv.branch?.name ?? <span style={{ color: '#555' }}>{inv.raw_class_code ?? '—'}</span>}
-                    </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#888', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.job_name ?? '—'}</td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#888' }}>{inv.po_number ?? '—'}</td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#888', whiteSpace: 'nowrap' }}>{fmtDate(inv.invoice_date)}</td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>{fmtDate(inv.due_date)}</td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#888' }}>{inv.terms ?? '—'}</td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, whiteSpace: 'nowrap' }}>
-                      <span style={{ background: `${BUCKET_COLORS[inv.aging_bucket] ?? '#333'}22`, color: BUCKET_COLORS[inv.aging_bucket] ?? '#888', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>{inv.aging_bucket}</span>
-                    </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#fff', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmt(Number(inv.open_balance))}</td>
-                  </tr>
-                ))}
+              {invLoading ? <tr><td colSpan={12} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>Loading…</td></tr>
+                : invoices.length === 0 ? <tr><td colSpan={12} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>No invoices found</td></tr>
+                : invoices.map((inv) => {
+                  const isExpanded   = expandedInvId === inv.id
+                  const invStatusMeta = inv.invoice_status ? getInvStatusMeta(inv.invoice_status) : null
+                  const loadedNotes  = invNotes[inv.id]
+                  const noteCount    = loadedNotes?.length ?? 0
+
+                  return (
+                    <React.Fragment key={inv.id}>
+                      <tr
+                        style={{ borderBottom: isExpanded ? 'none' : '1px solid #222', cursor: 'pointer', background: isExpanded ? '#1a1a1a' : 'transparent' }}
+                        onClick={() => handleToggleInv(inv.id)}>
+                        {/* Chevron */}
+                        <td style={{ padding: '9px 8px 9px 12px', fontSize: 11, color: '#444' }}>
+                          <span style={{ display: 'inline-block', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', userSelect: 'none' }}>▶</span>
+                        </td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                            {inv.invoice_number ?? '—'}
+                            {noteCount > 0 && (
+                              <span style={{ background: '#ff6b00', color: '#fff', borderRadius: 10, fontSize: 9, fontWeight: 700, padding: '1px 5px', lineHeight: 1.4 }}>{noteCount}</span>
+                            )}
+                          </span>
+                        </td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc' }}>{inv.entity_code}</td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>
+                          {inv.branch?.name ?? <span style={{ color: '#555' }}>{inv.raw_class_code ?? '—'}</span>}
+                        </td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: '#888', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.job_name ?? '—'}</td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: '#888' }}>{inv.po_number ?? '—'}</td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: '#888', whiteSpace: 'nowrap' }}>{fmtDate(inv.invoice_date)}</td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>{fmtDate(inv.due_date)}</td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: '#888' }}>{inv.terms ?? '—'}</td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, whiteSpace: 'nowrap' }}>
+                          {invStatusMeta ? (
+                            <span style={{ background: `${invStatusMeta.color}22`, color: invStatusMeta.color, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                              {invStatusMeta.label}
+                            </span>
+                          ) : <span style={{ color: '#444' }}>—</span>}
+                        </td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, whiteSpace: 'nowrap' }}>
+                          <span style={{ background: `${BUCKET_COLORS[inv.aging_bucket] ?? '#333'}22`, color: BUCKET_COLORS[inv.aging_bucket] ?? '#888', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>{inv.aging_bucket}</span>
+                        </td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: '#fff', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmt(Number(inv.open_balance))}</td>
+                      </tr>
+
+                      {/* ── Expanded invoice panel ── */}
+                      {isExpanded && (
+                        <tr key={`${inv.id}-expand`} style={{ borderBottom: '1px solid #222' }}>
+                          <td colSpan={12} style={{ padding: 0 }}>
+                            <div style={{ background: '#161616', padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}
+                              onClick={(e) => e.stopPropagation()}>
+
+                              {/* Invoice status row */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <span style={{ fontSize: 11, color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Invoice Flag</span>
+                                {isArAdmin ? (
+                                  <select
+                                    value={inv.invoice_status ?? ''}
+                                    onChange={(e) => handleInvStatusChange(inv.id, e.target.value)}
+                                    style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 7, color: invStatusMeta ? invStatusMeta.color : '#555', padding: '5px 10px', fontSize: 12, outline: 'none', cursor: 'pointer' }}>
+                                    <option value=''>No Flag</option>
+                                    {INVOICE_STATUS_OPTIONS.map((o) => (
+                                      <option key={o.value} value={o.value}>{o.label}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <span style={{ fontSize: 12, color: invStatusMeta ? invStatusMeta.color : '#444' }}>
+                                    {invStatusMeta ? invStatusMeta.label : 'No flag'}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Notes */}
+                              <div>
+                                <div style={{ fontSize: 11, color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Invoice Notes</div>
+                                {invNotesLoading[inv.id] && <div style={{ fontSize: 12, color: '#555' }}>Loading notes…</div>}
+                                {!invNotesLoading[inv.id] && (
+                                  <>
+                                    {(invNotes[inv.id] ?? []).length === 0 && (
+                                      <div style={{ fontSize: 12, color: '#555', marginBottom: isArAdmin ? 10 : 0 }}>No notes for this invoice.</div>
+                                    )}
+                                    {(invNotes[inv.id] ?? []).map((note) => (
+                                      <div key={note.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, paddingBottom: 8, marginBottom: 8, borderBottom: '1px solid #222' }}>
+                                        <div style={{ flex: 1 }}>
+                                          <div style={{ fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{note.content}</div>
+                                          <div style={{ fontSize: 11, color: '#555', marginTop: 3 }}>{note.createdByName ?? 'Unknown'} · {fmtTs(note.createdAt)}</div>
+                                        </div>
+                                        {isArAdmin && (
+                                          <button onClick={() => handleDeleteInvNote(inv.id, note.id)}
+                                            style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 13, padding: '2px 4px', flexShrink: 0 }}
+                                            onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
+                                            onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
+                                        )}
+                                      </div>
+                                    ))}
+                                    {isArAdmin && (
+                                      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                                        <input
+                                          placeholder="Add a note about this invoice…"
+                                          value={invNoteText}
+                                          onChange={(e) => setInvNoteText(e.target.value)}
+                                          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddInvNote(inv.id) } }}
+                                          style={{ flex: 1, background: '#2a2a2a', border: '1px solid #333', borderRadius: 7, color: '#ccc', padding: '6px 10px', fontSize: 12, outline: 'none' }}
+                                        />
+                                        <button
+                                          onClick={() => handleAddInvNote(inv.id)}
+                                          disabled={addingInvNote || !invNoteText.trim()}
+                                          style={{ background: '#ff6b00', border: 'none', borderRadius: 7, color: '#fff', padding: '6px 14px', fontSize: 12, cursor: addingInvNote || !invNoteText.trim() ? 'default' : 'pointer', opacity: addingInvNote || !invNoteText.trim() ? 0.5 : 1, whiteSpace: 'nowrap' }}>
+                                          {addingInvNote ? '…' : 'Add'}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  )
+                })}
             </tbody>
           </table>
         </div>

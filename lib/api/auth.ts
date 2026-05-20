@@ -9,8 +9,8 @@ type AccessResult =
 
 // ── Role sets ──────────────────────────────────────────────────────────────────
 
-const NO_PAYROLL_ROLES: Role[] = ['ar_manager', 'ar_team', 'office_team', 'project_manager']
-const NO_FUEL_ROLES:    Role[] = ['ar_manager', 'ar_team', 'office_team', 'project_manager']
+const NO_PAYROLL_ROLES: Role[] = ['ar_manager', 'ar_team', 'office_team', 'project_manager', 'sales']
+const NO_FUEL_ROLES:    Role[] = ['ar_manager', 'ar_team', 'office_team', 'project_manager', 'sales']
 const NO_REVENUE_ROLES: Role[] = ['ar_manager', 'ar_team', 'office_team']
 
 // ── Guard helpers ──────────────────────────────────────────────────────────────
@@ -99,7 +99,7 @@ export async function getAccessContext(): Promise<AccessResult> {
     return { ok: true, access: { userId: user.id, role, branchIds: null } }
   }
 
-  // project_manager, district_manager, branch_manager: branch-scoped via assignments
+  // sales, project_manager, district_manager, branch_manager: branch-scoped via assignments
   const { data: assignments, error: assignError } = await supabase
     .from('user_branch_assignments')
     .select('branch_id')

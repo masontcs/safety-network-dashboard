@@ -328,6 +328,7 @@ export default function ArDashboard({ role, branches }: Props) {
         customer={selectedCustomer}
         entity={entity}
         role={role}
+        branches={branches}
         onBack={() => setSelectedCustomer(null)}
         onRefresh={handleRefreshAfterToggle}
       />

@@ -164,6 +164,13 @@ const NAV_CONFIG: Record<Role, NavConfig> = {
     ],
     more: [],
   },
+  sales: {
+    primary: [
+      { href: '/dashboard', label: 'Dashboard', icon: (a) => <GridIcon a={a} />, exact: true },
+      { href: '/ar',        label: 'AR',         icon: (a) => <ArIcon a={a} /> },
+    ],
+    more: [],
+  },
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────

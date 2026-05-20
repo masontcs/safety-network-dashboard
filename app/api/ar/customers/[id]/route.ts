@@ -26,7 +26,7 @@ export async function GET(
       supabase.from('ar_customers').select('id, display_name, is_excluded, customer_status, collection_status, collection_phase, contact_frequency').eq('id', id).single(),
       supabase.from('ar_customer_entity_refs').select('entity_code, quickbooks_name').eq('customer_id', id),
       supabase.from('ar_customer_contacts').select('id, name, title, email, phone, is_primary, created_at').eq('customer_id', id).order('is_primary', { ascending: false }).order('created_at'),
-      supabase.from('ar_customer_notes').select('id, content, created_by, created_at, note_type, communication_type, contact_name, outcome').eq('customer_id', id).order('created_at', { ascending: false }),
+      supabase.from('ar_customer_notes').select('id, content, created_by, created_at, note_type, communication_type, contact_name, outcome, is_pinned').eq('customer_id', id).order('created_at', { ascending: false }),
       supabase.from('ar_customer_pm_assignments').select('user_id').eq('customer_id', id),
       supabase.from('ar_invoices').select('branch_id, open_balance').eq('customer_id', id).eq('row_type', 'invoice'),
     ])
@@ -91,6 +91,7 @@ export async function GET(
             communicationType: n.communication_type ?? null,
             contactName:       n.contact_name ?? null,
             outcome:           n.outcome ?? null,
+            isPinned:          n.is_pinned ?? false,
           })),
         pmAssignments: (pmRows ?? []).map((p) => {
           const prof = profileMap.get(p.user_id)

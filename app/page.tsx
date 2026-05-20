@@ -13,6 +13,7 @@ const DASHBOARD_ROUTES: Record<Role, string> = {
   ar_team:          '/ar',
   office_team:      '/ar',
   project_manager:  '/dashboard',
+  sales:            '/dashboard',
 }
 
 export default async function RootPage() {

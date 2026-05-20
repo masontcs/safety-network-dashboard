@@ -171,6 +171,9 @@ export async function GET(request: Request): Promise<NextResponse> {
         })
       } else {
         for (const split of splits) {
+          // Enforce branch access on allocation splits — branch/district managers must not
+          // see payroll rows attributed to branches outside their assignments.
+          if (access.branchIds !== null && !access.branchIds.includes(split.branchId)) continue
           directItems.push({
             employeeId: t.employee_id,
             displayName: `${t.employees.first_name} ${t.employees.last_name}`.trim(),

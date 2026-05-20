@@ -15,16 +15,20 @@ export async function GET(request: Request): Promise<Response> {
     const includeExcluded = searchParams.get('includeExcluded') === 'true'
 
     const supabase = createServiceClient()
-    const { branchIds } = ctx.access
+    const { branchIds, role: roleEarly } = ctx.access
 
-    if (branchId && branchIds && !branchIds.includes(branchId)) {
+    // sales bypasses branch filter for AR — they see all customers
+    if (branchId && branchIds && roleEarly !== 'sales' && !branchIds.includes(branchId)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const showAll = searchParams.get('showAll') === 'true'
 
-    // ar_team / office_team: resolve assigned customer IDs before fetching (unless showing all)
+    // sales: bypass branch filter — see all AR regardless of branch assignments
     const { role } = ctx.access
+    const effectiveBranchIds = role === 'sales' ? null : branchIds
+
+    // ar_team / office_team: resolve assigned customer IDs before fetching (unless showing all)
     let arTeamCustomerIds: string[] | null = null
     if ((role === 'ar_team' || role === 'office_team') && !showAll) {
       const ids = await getArTeamCustomerIds(ctx.access.userId)
@@ -48,8 +52,8 @@ export async function GET(request: Request): Promise<Response> {
           q = q.in('customer_id', arTeamCustomerIds)
         } else if (branchId) {
           q = q.eq('branch_id', branchId)
-        } else if (branchIds) {
-          q = q.in('branch_id', branchIds)
+        } else if (effectiveBranchIds) {
+          q = q.in('branch_id', effectiveBranchIds)
         }
         const { data, error } = await q
         if (error) return NextResponse.json({ error: 'Failed to load invoices' }, { status: 500 })

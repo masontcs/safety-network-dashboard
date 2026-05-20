@@ -146,8 +146,8 @@ const ArIcon = () => (
 )
 
 const NAV_ITEMS: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: <GridIcon />,  roles: ['branch_manager', 'district_manager', 'executive', 'admin', 'project_manager'], exactMatch: true },
-  { href: '/ar',        label: 'AR',         icon: <ArIcon />,    roles: ['branch_manager', 'district_manager', 'executive', 'admin', 'ar_manager', 'ar_team', 'project_manager'] },
+  { href: '/dashboard', label: 'Dashboard', icon: <GridIcon />,  roles: ['branch_manager', 'district_manager', 'executive', 'admin', 'project_manager', 'sales'], exactMatch: true },
+  { href: '/ar',        label: 'AR',         icon: <ArIcon />,    roles: ['branch_manager', 'district_manager', 'executive', 'admin', 'ar_manager', 'ar_team', 'project_manager', 'sales'] },
   { href: '/fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['branch_manager', 'district_manager', 'executive'] },
   { href: '/executive/data-explorer', label: 'Data Explorer', icon: <DatabaseIcon />, roles: ['executive'] },
   { href: '/executive/employees', label: 'Employees', icon: <PeopleIcon />, roles: ['executive'] },

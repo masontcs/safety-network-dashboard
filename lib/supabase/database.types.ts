@@ -2,7 +2,7 @@
 // Regenerate after schema changes:
 //   npx supabase gen types typescript --project-id zobgzhgwgduziszzevzp > lib/supabase/database.types.ts
 
-export type Role = 'admin' | 'executive' | 'district_manager' | 'branch_manager' | 'ar_manager' | 'ar_team' | 'office_team' | 'project_manager'
+export type Role = 'admin' | 'executive' | 'district_manager' | 'branch_manager' | 'ar_manager' | 'ar_team' | 'office_team' | 'project_manager' | 'sales'
 export type LaborType =
   | 'direct'
   | 'admin_hourly'
@@ -212,9 +212,15 @@ export type Database = {
         Relationships: []
       }
       ar_customer_notes: {
-        Row: { id: string; customer_id: string; content: string; created_by: string | null; created_at: string; note_type: string; communication_type: string | null; contact_name: string | null; outcome: string | null }
-        Insert: { id?: string; customer_id: string; content: string; created_by?: string | null; created_at?: string; note_type?: string; communication_type?: string | null; contact_name?: string | null; outcome?: string | null }
-        Update: { id?: string; customer_id?: string; content?: string; created_by?: string | null; note_type?: string; communication_type?: string | null; contact_name?: string | null; outcome?: string | null }
+        Row: { id: string; customer_id: string; content: string; created_by: string | null; created_at: string; note_type: string; communication_type: string | null; contact_name: string | null; outcome: string | null; is_pinned: boolean }
+        Insert: { id?: string; customer_id: string; content: string; created_by?: string | null; created_at?: string; note_type?: string; communication_type?: string | null; contact_name?: string | null; outcome?: string | null; is_pinned?: boolean }
+        Update: { id?: string; customer_id?: string; content?: string; created_by?: string | null; note_type?: string; communication_type?: string | null; contact_name?: string | null; outcome?: string | null; is_pinned?: boolean }
+        Relationships: []
+      }
+      ar_invoice_notes: {
+        Row: { id: string; invoice_id: string; content: string; created_by: string | null; created_at: string }
+        Insert: { id?: string; invoice_id: string; content: string; created_by?: string | null; created_at?: string }
+        Update: { id?: string; invoice_id?: string; content?: string; created_by?: string | null }
         Relationships: []
       }
       ar_customer_pm_assignments: {
@@ -248,9 +254,9 @@ export type Database = {
         Relationships: []
       }
       ar_invoices: {
-        Row: { id: string; import_id: string; customer_id: string; entity_code: string; branch_id: string | null; raw_class_code: string | null; invoice_number: string | null; po_number: string | null; job_name: string | null; invoice_date: string | null; due_date: string | null; terms: string | null; open_balance: number; aging_bucket: string | null; aging_days: number | null; row_type: string; created_at: string }
-        Insert: { id?: string; import_id: string; customer_id: string; entity_code: string; branch_id?: string | null; raw_class_code?: string | null; invoice_number?: string | null; po_number?: string | null; job_name?: string | null; invoice_date?: string | null; due_date?: string | null; terms?: string | null; open_balance: number; aging_bucket?: string | null; aging_days?: number | null; row_type?: string; created_at?: string }
-        Update: { id?: string; import_id?: string; customer_id?: string; entity_code?: string; branch_id?: string | null; raw_class_code?: string | null; invoice_number?: string | null; po_number?: string | null; job_name?: string | null; invoice_date?: string | null; due_date?: string | null; terms?: string | null; open_balance?: number; aging_bucket?: string | null; aging_days?: number | null; row_type?: string }
+        Row: { id: string; import_id: string; customer_id: string; entity_code: string; branch_id: string | null; raw_class_code: string | null; invoice_number: string | null; po_number: string | null; job_name: string | null; invoice_date: string | null; due_date: string | null; terms: string | null; open_balance: number; aging_bucket: string | null; aging_days: number | null; row_type: string; invoice_status: string | null; created_at: string }
+        Insert: { id?: string; import_id: string; customer_id: string; entity_code: string; branch_id?: string | null; raw_class_code?: string | null; invoice_number?: string | null; po_number?: string | null; job_name?: string | null; invoice_date?: string | null; due_date?: string | null; terms?: string | null; open_balance: number; aging_bucket?: string | null; aging_days?: number | null; row_type?: string; invoice_status?: string | null; created_at?: string }
+        Update: { id?: string; import_id?: string; customer_id?: string; entity_code?: string; branch_id?: string | null; raw_class_code?: string | null; invoice_number?: string | null; po_number?: string | null; job_name?: string | null; invoice_date?: string | null; due_date?: string | null; terms?: string | null; open_balance?: number; aging_bucket?: string | null; aging_days?: number | null; row_type?: string; invoice_status?: string | null }
         Relationships: []
       }
     }

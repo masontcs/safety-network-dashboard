@@ -8,7 +8,7 @@ const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/
 
 const VALID_ROLES: Role[] = [
   'branch_manager', 'district_manager', 'executive',
-  'ar_manager', 'ar_team', 'office_team', 'project_manager', 'admin',
+  'ar_manager', 'ar_team', 'office_team', 'project_manager', 'sales', 'admin',
 ]
 
 export async function PATCH(

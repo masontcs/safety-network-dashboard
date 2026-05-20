@@ -17,7 +17,7 @@ interface AccessRequest {
   branchName: string | null
   requestedRole: string
   notes: string | null
-  status: 'pending' | 'approved' | 'denied'
+  status: 'pending' | 'approved' | 'archived' | 'denied'
   reviewedAt: string | null
   createdAt: string
 }
@@ -30,6 +30,7 @@ const ROLE_LABELS: Record<string, string> = {
   ar_team:          'AR Team',
   office_team:      'Office Team',
   project_manager:  'Project Manager',
+  sales:            'Sales',
   admin:            'Admin',
 }
 
@@ -41,6 +42,7 @@ const APPROVABLE_ROLES = [
   { value: 'ar_team',          label: 'AR Team' },
   { value: 'office_team',      label: 'Office Team' },
   { value: 'project_manager',  label: 'Project Manager' },
+  { value: 'sales',            label: 'Sales' },
 ]
 
 function fmtDate(dateStr: string): string {
@@ -51,34 +53,39 @@ function StatusPill({ status }: { status: AccessRequest['status'] }) {
   const styles: Record<string, React.CSSProperties> = {
     pending:  { background: '#2a1a00', color: '#ff9800', border: '1px solid #3a2a00' },
     approved: { background: '#1a3a1a', color: '#4caf50', border: '1px solid #2a4a2a' },
-    denied:   { background: '#2a2a2a', color: '#666666', border: '1px solid #333333' },
+    archived: { background: '#2a2a2a', color: '#555555', border: '1px solid #333333' },
+    // legacy denied records
+    denied:   { background: '#2a2a2a', color: '#555555', border: '1px solid #333333' },
   }
+  const label = status === 'denied' ? 'Archived' : status.charAt(0).toUpperCase() + status.slice(1)
   return (
-    <span style={{ ...styles[status], borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 500 }}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
+    <span style={{ ...(styles[status] ?? styles.archived), borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 500 }}>
+      {label}
     </span>
   )
 }
 
 type ModalState =
   | null
-  | { type: 'approve'; request: AccessRequest }
-  | { type: 'deny'; request: AccessRequest }
+  | { type: 'review'; request: AccessRequest }
+  | { type: 'archive'; request: AccessRequest }
 
 export default function AccessRequestsClient() {
-  const [requests, setRequests] = useState<AccessRequest[]>([])
-  const [branches, setBranches] = useState<Branch[]>([])
-  const [loading, setLoading] = useState(true)
+  const [requests, setRequests]     = useState<AccessRequest[]>([])
+  const [branches, setBranches]     = useState<Branch[]>([])
+  const [loading, setLoading]       = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
-  const [modal, setModal] = useState<ModalState>(null)
-  const [actionRole, setActionRole] = useState('')
+  const [modal, setModal]           = useState<ModalState>(null)
+
+  // Review modal state
+  const [actionRole, setActionRole]         = useState('')
   const [actionBranchIds, setActionBranchIds] = useState<string[]>([])
-  const [actionUsername, setActionUsername] = useState('')
-  const [tmpPassword, setTmpPassword] = useState('')
+  const [actionUsername, setActionUsername]   = useState('')
+  const [tmpPassword, setTmpPassword]         = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [copied, setCopied] = useState(false)
-  const [actionSaving, setActionSaving] = useState(false)
-  const [actionError, setActionError] = useState<string | null>(null)
+  const [copied, setCopied]                   = useState(false)
+  const [actionSaving, setActionSaving]       = useState(false)
+  const [actionError, setActionError]         = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/access-requests')
@@ -94,9 +101,9 @@ export default function AccessRequestsClient() {
 
   function generatePassword(): string {
     const letters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    const digits = '0123456789'
+    const digits  = '0123456789'
     const special = '!@#$%'
-    const all = letters + digits + special
+    const all     = letters + digits + special
     let pwd = letters[Math.floor(Math.random() * letters.length)]
     pwd += digits[Math.floor(Math.random() * digits.length)]
     pwd += special[Math.floor(Math.random() * special.length)]
@@ -117,8 +124,8 @@ export default function AccessRequestsClient() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  function openApprove(req: AccessRequest) {
-    setModal({ type: 'approve', request: req })
+  function openReview(req: AccessRequest) {
+    setModal({ type: 'review', request: req })
     setActionRole(req.requestedRole)
     setActionBranchIds(req.branchId ? [req.branchId] : [])
     setActionUsername(req.username ?? '')
@@ -128,8 +135,8 @@ export default function AccessRequestsClient() {
     setActionError(null)
   }
 
-  function openDeny(req: AccessRequest) {
-    setModal({ type: 'deny', request: req })
+  function openArchive(req: AccessRequest) {
+    setModal({ type: 'archive', request: req })
     setActionError(null)
   }
 
@@ -144,7 +151,7 @@ export default function AccessRequestsClient() {
   }
 
   async function handleApprove() {
-    if (!modal || modal.type !== 'approve') return
+    if (!modal || modal.type !== 'review') return
     if (actionBranchIds.length === 0) { setActionError('At least one branch is required.'); return }
     if (tmpPassword.length < 8) { setActionError('Temporary password must be at least 8 characters.'); return }
     if (tmpPassword !== confirmPassword) { setActionError('Passwords do not match.'); return }
@@ -154,7 +161,13 @@ export default function AccessRequestsClient() {
       const res = await fetch(`/api/admin/access-requests/${modal.request.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve', role: actionRole, branchIds: actionBranchIds, temporaryPassword: tmpPassword, username: actionUsername }),
+        body: JSON.stringify({
+          action: 'approve',
+          role: actionRole,
+          branchIds: actionBranchIds,
+          temporaryPassword: tmpPassword,
+          username: actionUsername,
+        }),
       })
       const json = await res.json()
       if (!json.success) { setActionError(json.error); return }
@@ -169,8 +182,8 @@ export default function AccessRequestsClient() {
     }
   }
 
-  async function handleDeny() {
-    if (!modal || modal.type !== 'deny') return
+  async function handleArchive() {
+    if (!modal || modal.type !== 'archive') return
     setActionSaving(true)
     setActionError(null)
     try {
@@ -182,7 +195,7 @@ export default function AccessRequestsClient() {
       const json = await res.json()
       if (!json.success) { setActionError(json.error); return }
       setRequests((prev) =>
-        prev.map((r) => r.id === modal.request.id ? { ...r, status: 'denied' as const } : r)
+        prev.map((r) => r.id === modal.request.id ? { ...r, status: 'archived' as const } : r)
       )
       closeModal()
     } catch {
@@ -192,7 +205,7 @@ export default function AccessRequestsClient() {
     }
   }
 
-  const pending = requests.filter((r) => r.status === 'pending')
+  const pending  = requests.filter((r) => r.status === 'pending')
   const reviewed = requests.filter((r) => r.status !== 'pending')
 
   if (fetchError) {
@@ -225,8 +238,9 @@ export default function AccessRequestsClient() {
 
         {/* Pending table */}
         <div className="card" style={{ padding: 0 }}>
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid #2a2a2a', fontSize: 12, fontWeight: 500, color: '#cccccc' }}>
-            Pending Review
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #2a2a2a', display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 500, color: '#cccccc' }}>Pending Review</span>
+            <span style={{ fontSize: 11, color: '#555' }}>— click Review to approve or adjust the role &amp; branches before creating the account</span>
           </div>
           {loading ? (
             <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -240,7 +254,7 @@ export default function AccessRequestsClient() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Name', 'Email', 'Username', 'Branch', 'Role Requested', 'Submitted', 'Notes', ''].map((h) => (
+                  {['Name', 'Email', 'Username', 'Requested Branch', 'Requested Role', 'Submitted', 'Notes', ''].map((h) => (
                     <th key={h} style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 400, fontSize: 11, color: '#666666', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #2a2a2a' }}>
                       {h}
                     </th>
@@ -257,10 +271,10 @@ export default function AccessRequestsClient() {
                     <td style={{ padding: '11px 16px', fontSize: 12, color: '#888888', fontFamily: 'monospace' }}>
                       {r.username ?? <span style={{ color: '#555555' }}>—</span>}
                     </td>
-                    <td style={{ padding: '11px 16px', fontSize: 12, color: '#cccccc', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '11px 16px', fontSize: 12, color: '#888888', whiteSpace: 'nowrap' }}>
                       {r.branchName ?? <span style={{ color: '#555555' }}>—</span>}
                     </td>
-                    <td style={{ padding: '11px 16px', fontSize: 12, color: '#cccccc', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '11px 16px', fontSize: 12, color: '#888888', whiteSpace: 'nowrap' }}>
                       {ROLE_LABELS[r.requestedRole] ?? r.requestedRole}
                     </td>
                     <td style={{ padding: '11px 16px', fontSize: 12, color: '#888888', whiteSpace: 'nowrap' }}>
@@ -274,19 +288,23 @@ export default function AccessRequestsClient() {
                       ) : <span style={{ color: '#555555' }}>—</span>}
                     </td>
                     <td style={{ padding: '11px 16px', whiteSpace: 'nowrap', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
                         <button
-                          onClick={() => openApprove(r)}
+                          onClick={() => openReview(r)}
                           className="btn-primary"
-                          style={{ fontSize: 12, padding: '5px 12px' }}
+                          style={{ fontSize: 12, padding: '5px 14px' }}
                         >
-                          Approve
+                          Review →
                         </button>
+                        {/* Archive: subtle — only for clearly erroneous/spam requests */}
                         <button
-                          onClick={() => openDeny(r)}
-                          style={{ background: 'none', border: '1px solid #333333', borderRadius: 6, color: '#888888', fontSize: 12, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' }}
+                          onClick={() => openArchive(r)}
+                          title="Archive this request (not a block — they can re-apply)"
+                          style={{ background: 'none', border: '1px solid #2a2a2a', borderRadius: 6, color: '#444444', fontSize: 11, padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = '#666'; e.currentTarget.style.borderColor = '#444' }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = '#444'; e.currentTarget.style.borderColor = '#2a2a2a' }}
                         >
-                          Deny
+                          Archive
                         </button>
                       </div>
                     </td>
@@ -340,7 +358,7 @@ export default function AccessRequestsClient() {
         )}
       </div>
 
-      {/* Modal overlay */}
+      {/* ── Modal overlay ──────────────────────────────────────────────────────── */}
       {modal && (
         <div
           style={{
@@ -359,26 +377,39 @@ export default function AccessRequestsClient() {
               borderRadius: 12,
               padding: 28,
               width: '100%',
-              maxWidth: 480,
+              maxWidth: 500,
               maxHeight: '90vh',
               overflowY: 'auto',
             }}
           >
-            {modal.type === 'approve' ? (
+            {/* ── Review & Approve modal ──────────────────────────────────────── */}
+            {modal.type === 'review' && (
               <>
                 <div style={{ fontSize: 16, fontWeight: 500, color: '#ffffff', marginBottom: 4 }}>
-                  Approve Request
+                  Review Request — {modal.request.firstName} {modal.request.lastName}
                 </div>
-                <div style={{ fontSize: 12, color: '#888888', marginBottom: 20 }}>
-                  Set a temporary password for {modal.request.firstName} {modal.request.lastName}. They will be required to change it on first login.
+                <div style={{ fontSize: 12, color: '#666', marginBottom: 16, lineHeight: 1.5 }}>
+                  Adjust the role and branches below if what they requested isn&rsquo;t right, then create the account.
+                </div>
+
+                {/* What they requested — reference row */}
+                <div style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 8, padding: '10px 14px', marginBottom: 20, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>They requested</div>
+                    <div style={{ fontSize: 12, color: '#888' }}>
+                      <span style={{ color: '#ccc' }}>{ROLE_LABELS[modal.request.requestedRole] ?? modal.request.requestedRole}</span>
+                      {modal.request.branchName && <span style={{ color: '#555' }}> · {modal.request.branchName}</span>}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Email</div>
+                    <div style={{ fontSize: 12, color: '#888' }}>{modal.request.email}</div>
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div>
-                    <div style={{ fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Email</div>
-                    <div style={{ fontSize: 13, color: '#cccccc' }}>{modal.request.email}</div>
-                  </div>
 
+                  {/* Username */}
                   <div>
                     <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                       Username
@@ -399,9 +430,13 @@ export default function AccessRequestsClient() {
                     </div>
                   </div>
 
+                  {/* Role — labelled as "Approved Role" to make clear it's what gets set */}
                   <div>
                     <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
-                      Role
+                      Approved Role
+                      {actionRole !== modal.request.requestedRole && (
+                        <span style={{ marginLeft: 8, color: '#ff6b00', fontWeight: 600 }}>changed</span>
+                      )}
                     </label>
                     <select value={actionRole} onChange={(e) => setActionRole(e.target.value)} style={selectStyle}>
                       {APPROVABLE_ROLES.map((r) => (
@@ -410,9 +445,13 @@ export default function AccessRequestsClient() {
                     </select>
                   </div>
 
+                  {/* Branches */}
                   <div>
                     <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
-                      Branches
+                      Approved Branches
+                      {modal.request.branchId && !actionBranchIds.includes(modal.request.branchId) && (
+                        <span style={{ marginLeft: 8, color: '#ff6b00', fontWeight: 600 }}>changed</span>
+                      )}
                     </label>
                     <BranchMultiSelect
                       branches={branches}
@@ -422,6 +461,7 @@ export default function AccessRequestsClient() {
                     />
                   </div>
 
+                  {/* Temporary password */}
                   <div>
                     <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                       Temporary Password
@@ -493,13 +533,19 @@ export default function AccessRequestsClient() {
                   </div>
                 </div>
               </>
-            ) : (
+            )}
+
+            {/* ── Archive modal ───────────────────────────────────────────────── */}
+            {modal.type === 'archive' && (
               <>
                 <div style={{ fontSize: 16, fontWeight: 500, color: '#ffffff', marginBottom: 8 }}>
-                  Deny Request
+                  Archive Request
                 </div>
-                <div style={{ fontSize: 13, color: '#888888', marginBottom: 24, lineHeight: 1.5 }}>
-                  Are you sure you want to deny {modal.request.firstName} {modal.request.lastName}&rsquo;s request for {ROLE_LABELS[modal.request.requestedRole]} access?
+                <div style={{ fontSize: 13, color: '#888888', marginBottom: 8, lineHeight: 1.6 }}>
+                  This will remove <span style={{ color: '#ccc' }}>{modal.request.firstName} {modal.request.lastName}</span>&rsquo;s request from the pending queue.
+                </div>
+                <div style={{ fontSize: 12, color: '#555', marginBottom: 24, padding: '8px 10px', background: '#1a1a1a', borderRadius: 6, border: '1px solid #2a2a2a', lineHeight: 1.5 }}>
+                  This does <strong style={{ color: '#888' }}>not</strong> block the person from re-applying or getting access in the future. Use this only for duplicate or clearly erroneous submissions.
                 </div>
 
                 {actionError && (
@@ -508,11 +554,11 @@ export default function AccessRequestsClient() {
 
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button
-                    onClick={handleDeny}
+                    onClick={handleArchive}
                     disabled={actionSaving}
-                    style={{ flex: 1, background: '#3a1a1a', border: '1px solid #4a2a2a', borderRadius: 8, color: '#cc4444', fontSize: 14, fontWeight: 500, padding: '9px 0', cursor: 'pointer', fontFamily: 'inherit', opacity: actionSaving ? 0.6 : 1 }}
+                    style={{ flex: 1, background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#888888', fontSize: 14, fontWeight: 500, padding: '9px 0', cursor: 'pointer', fontFamily: 'inherit', opacity: actionSaving ? 0.6 : 1 }}
                   >
-                    {actionSaving ? 'Denying…' : 'Deny Request'}
+                    {actionSaving ? 'Archiving…' : 'Archive Request'}
                   </button>
                   <button
                     onClick={closeModal}

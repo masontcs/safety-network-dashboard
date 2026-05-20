@@ -19,14 +19,20 @@ export async function GET(request: Request): Promise<Response> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const meetingGuard = guardArAdminOnly(ctx.access.role)
-    if (meetingGuard) return meetingGuard
+
+    const { role } = ctx.access
+    // Meeting tab accessible to AR admins and sales
+    if (role !== 'admin' && role !== 'ar_manager' && role !== 'sales') {
+      return NextResponse.json({ success: false, error: 'AR admin access required.', code: 'FORBIDDEN' }, { status: 403 })
+    }
 
     const { searchParams } = new URL(request.url)
     const entityCode = searchParams.get('entity') || null
 
     const supabase = createServiceClient()
-    const { branchIds } = ctx.access
+    // sales sees all AR regardless of branch assignments
+    const { branchIds: rawBranchIds } = ctx.access
+    const branchIds = role === 'sales' ? null : rawBranchIds
 
     // ── Fetch excluded customer IDs ──────────────────────────────────────────
 
