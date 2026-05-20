@@ -179,6 +179,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
   // Branch transfer state (admin + executive only)
   const [transferData, setTransferData] = useState<TransferData | null>(null)
   const [showTransferForm, setShowTransferForm] = useState(false)
+  const [transferEntity, setTransferEntity] = useState('')   // entity filter (INC/TCS/STS)
   const [transferCodeId, setTransferCodeId] = useState('')
   const [transferDate, setTransferDate] = useState('')
   const [transferNotes, setTransferNotes] = useState('')
@@ -502,6 +503,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
       const json = await res.json()
       if (!json.success) throw new Error(json.error ?? 'Transfer failed')
       setShowTransferForm(false)
+      setTransferEntity('')
       setTransferCodeId('')
       setTransferDate('')
       setTransferNotes('')
@@ -1162,11 +1164,19 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
 
           {/* Transfer form */}
           {isAdmin && showTransferForm && (() => {
-            const codesByBranch = transferData.payrollCodes.reduce<Record<string, TransferPayrollCode[]>>((acc, pc) => {
+            // Unique entities that have codes (sorted)
+            const entityCodes = [...new Set(transferData.payrollCodes.map((pc) => pc.entityCode))].sort()
+
+            // Filter codes to selected entity, then group by branch
+            const filteredCodes = transferEntity
+              ? transferData.payrollCodes.filter((pc) => pc.entityCode === transferEntity)
+              : []
+            const codesByBranch = filteredCodes.reduce<Record<string, TransferPayrollCode[]>>((acc, pc) => {
               if (!acc[pc.branchName]) acc[pc.branchName] = []
               acc[pc.branchName].push(pc)
               return acc
             }, {})
+
             const selectedCode = transferData.payrollCodes.find((c) => c.id === transferCodeId)
             const selectedBranchName = selectedCode?.branchName ?? ''
             const expectedName = data.employee.displayName
@@ -1178,28 +1188,58 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                 <p style={{ ...cardLabelStyle, marginBottom: 16 }}>Transfer Branch</p>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {/* Payroll code selector */}
+
+                  {/* Step 1: Entity picker */}
                   <div>
                     <label style={{ fontSize: 11, color: '#888888', display: 'block', marginBottom: 4 }}>
-                      NEW PAYROLL CODE
+                      ENTITY
+                    </label>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {entityCodes.map((code) => (
+                        <button
+                          key={code}
+                          onClick={() => { setTransferEntity(code); setTransferCodeId('') }}
+                          style={{
+                            padding: '5px 16px',
+                            borderRadius: 8,
+                            fontSize: 13,
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            border: transferEntity === code ? '1px solid #ff6b00' : '1px solid #333333',
+                            background: transferEntity === code ? 'rgba(255,107,0,0.15)' : '#2a2a2a',
+                            color: transferEntity === code ? '#ff6b00' : '#888888',
+                          }}
+                        >
+                          {code}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Step 2: Payroll code selector — only shown after entity chosen */}
+                  {transferEntity && (
+                  <div>
+                    <label style={{ fontSize: 11, color: '#888888', display: 'block', marginBottom: 4 }}>
+                      DESTINATION PAYROLL CODE
                     </label>
                     <select
                       value={transferCodeId}
                       onChange={(e) => setTransferCodeId(e.target.value)}
                       style={{ ...selectStyle, width: '100%', maxWidth: 400 }}
                     >
-                      <option value="">— select payroll code —</option>
+                      <option value="">— select destination —</option>
                       {Object.entries(codesByBranch).sort(([a], [b]) => a.localeCompare(b)).map(([branchName, codes]) => (
                         <optgroup key={branchName} label={branchName}>
                           {codes.map((pc) => (
                             <option key={pc.id} value={pc.id}>
-                              {pc.code} ({pc.entityCode} / {pc.laborType})
+                              {pc.code} · {pc.laborType.replace(/_/g, ' ')}
                             </option>
                           ))}
                         </optgroup>
                       ))}
                     </select>
                   </div>
+                  )}
 
                   {/* Effective date */}
                   <div>
@@ -1287,6 +1327,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                     <button
                       onClick={() => {
                         setShowTransferForm(false)
+                        setTransferEntity('')
                         setTransferCodeId('')
                         setTransferDate('')
                         setTransferNotes('')
