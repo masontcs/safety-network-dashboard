@@ -29,12 +29,12 @@ const ROLE_LABELS: Record<Role, string> = {
 
 const ROLE_COLORS: Record<Role, string> = {
   admin:            '#ff6b00',
-  executive:        '#888888',
+  executive:        '#cccccc',
   district_manager: '#cccccc',
-  branch_manager:   '#666666',
-  ar_manager:       '#ff6b00',
-  ar_team:          '#888',
-  project_manager:  '#4caf50',
+  branch_manager:   '#cccccc',
+  ar_manager:       '#cccccc',
+  ar_team:          '#cccccc',
+  project_manager:  '#cccccc',
 }
 
 const selectStyle: React.CSSProperties = {
@@ -378,7 +378,7 @@ export default function UsersClient() {
 
   return (
     <>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 960 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1100 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Users</div>
           <button onClick={openCreate} className="btn-primary" style={{ fontSize: 13, padding: '7px 16px' }}>
@@ -392,14 +392,23 @@ export default function UsersClient() {
               {[1, 2, 3].map((i) => <Skeleton key={i} height={48} />)}
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: 64 }} />   {/* Access */}
+                <col style={{ width: '18%' }} /> {/* Name */}
+                <col style={{ width: '13%' }} /> {/* Username */}
+                <col style={{ width: '22%' }} /> {/* Email */}
+                <col style={{ width: '13%' }} /> {/* Role */}
+                <col />                          {/* Branches — takes remaining */}
+                <col style={{ width: 180 }} />   {/* Actions */}
+              </colgroup>
               <thead>
                 <tr>
                   {['Access', 'Name', 'Username', 'Email', 'Role', 'Branches', ''].map((h) => (
                     <th
                       key={h}
                       className="table-header"
-                      style={{ textAlign: 'left', padding: '12px 16px', borderBottom: '1px solid #2a2a2a', fontWeight: 400 }}
+                      style={{ textAlign: 'left', padding: '10px 14px', borderBottom: '1px solid #2a2a2a', fontWeight: 400 }}
                     >
                       {h}
                     </th>
@@ -409,10 +418,12 @@ export default function UsersClient() {
               <tbody>
                 {users.map((user) => {
                   const isEditing = editing === user.id
+                  const shownBranches = user.branchIds.slice(0, 3)
+                  const extraCount = user.branchIds.length - shownBranches.length
                   return (
                     <tr key={user.id} style={{ borderBottom: '1px solid #2a2a2a', opacity: user.isActive ? 1 : 0.45 }}>
                       {/* Access toggle */}
-                      <td style={{ padding: '12px 16px', width: 64, textAlign: 'center' }}>
+                      <td style={{ padding: '12px 14px', textAlign: 'center', verticalAlign: 'middle' }}>
                         <button
                           onClick={() => handleToggleActive(user.id, !user.isActive)}
                           title={user.isActive ? 'Deactivate user' : 'Activate user'}
@@ -426,6 +437,7 @@ export default function UsersClient() {
                             position: 'relative',
                             transition: 'background 0.18s',
                             padding: 0,
+                            flexShrink: 0,
                           }}
                         >
                           <span style={{
@@ -443,12 +455,14 @@ export default function UsersClient() {
                       </td>
 
                       {/* Name */}
-                      <td className="table-body" style={{ padding: '12px 16px', whiteSpace: 'nowrap', color: user.isActive ? '#ffffff' : '#888888' }}>
-                        {user.displayName || '—'}
+                      <td style={{ padding: '12px 14px', verticalAlign: 'middle', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span className="table-body" style={{ color: user.isActive ? '#ffffff' : '#888888', fontSize: 13, fontWeight: 500 }}>
+                          {user.displayName || '—'}
+                        </span>
                       </td>
 
                       {/* Username */}
-                      <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '12px 14px', verticalAlign: 'middle', overflow: 'hidden' }}>
                         {isEditing ? (
                           <input
                             type="text"
@@ -459,22 +473,22 @@ export default function UsersClient() {
                             autoCapitalize="none"
                             autoCorrect="off"
                             spellCheck={false}
-                            style={{ ...selectStyle, width: 120, fontFamily: 'monospace', fontSize: 12 }}
+                            style={{ ...selectStyle, width: '100%', fontFamily: 'monospace', fontSize: 12 }}
                           />
                         ) : user.username ? (
-                          <span style={{ fontSize: 12, color: '#888888', fontFamily: 'monospace' }}>{user.username}</span>
+                          <span style={{ fontSize: 12, color: '#aaaaaa', fontFamily: 'monospace' }}>{user.username}</span>
                         ) : (
                           <span style={{ fontSize: 12, color: '#3a3a3a' }}>—</span>
                         )}
                       </td>
 
                       {/* Email */}
-                      <td className="table-body" style={{ padding: '12px 16px' }}>
-                        {user.email}
+                      <td style={{ padding: '12px 14px', verticalAlign: 'middle', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span className="table-body" style={{ fontSize: 12 }}>{user.email}</span>
                       </td>
 
                       {/* Role */}
-                      <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '12px 14px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         {isEditing ? (
                           <select
                             value={editRole}
@@ -486,14 +500,14 @@ export default function UsersClient() {
                             ))}
                           </select>
                         ) : (
-                          <span style={{ fontSize: 12, color: ROLE_COLORS[user.role], fontWeight: 500 }}>
+                          <span style={{ fontSize: 12, color: ROLE_COLORS[user.role], fontWeight: user.role === 'admin' ? 600 : 400 }}>
                             {ROLE_LABELS[user.role]}
                           </span>
                         )}
                       </td>
 
                       {/* Branches */}
-                      <td style={{ padding: '12px 16px', minWidth: 220 }}>
+                      <td style={{ padding: '12px 14px', verticalAlign: 'middle' }}>
                         {isEditing ? (
                           <BranchMultiSelect
                             branches={branches}
@@ -506,18 +520,23 @@ export default function UsersClient() {
                             {needsBranchScope(user.role) ? 'None assigned' : 'All branches'}
                           </span>
                         ) : (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                            {user.branchIds.map((id) => (
-                              <span key={id} className="branch-name" style={{ fontSize: 11 }}>
+                          <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 4, alignItems: 'center', overflow: 'hidden' }}>
+                            {shownBranches.map((id) => (
+                              <span key={id} style={{ fontSize: 11, color: '#ff6b00', whiteSpace: 'nowrap', flexShrink: 0 }}>
                                 {branchMap[id] ?? id}
                               </span>
                             ))}
+                            {extraCount > 0 && (
+                              <span style={{ fontSize: 11, color: '#555555', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                +{extraCount} more
+                              </span>
+                            )}
                           </div>
                         )}
                       </td>
 
                       {/* Actions */}
-                      <td style={{ padding: '12px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '12px 14px', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                         {isEditing ? (
                           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                             <button
@@ -536,18 +555,18 @@ export default function UsersClient() {
                             </button>
                           </div>
                         ) : (
-                          <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
                             <button
                               onClick={() => startEdit(user)}
-                              style={{ background: 'none', border: 'none', color: '#ff6b00', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+                              style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 6, color: '#ff6b00', fontSize: 12, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit' }}
                             >
                               Edit
                             </button>
                             <button
                               onClick={() => openReset(user)}
-                              style={{ background: 'none', border: 'none', color: '#888888', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+                              style={{ background: 'none', border: '1px solid #2a2a2a', borderRadius: 6, color: '#666666', fontSize: 12, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit' }}
                             >
-                              Reset Password
+                              Reset PW
                             </button>
                           </div>
                         )}
