@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import type { Role } from '@/lib/supabase/database.types'
+import { createBrowserClient } from '@/lib/supabase/client'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -416,6 +417,97 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
     fetch(`/api/ar/customers/${customer.id}/ar-assignments`)
       .then((r) => r.json())
       .then((d) => setArAssignments(d.assignments ?? []))
+  }, [customer.id])
+
+  // ── Realtime subscriptions ──────────────────────────────────────────────────
+  useEffect(() => {
+    const supabase = createBrowserClient()
+
+    const channel = supabase
+      .channel(`ar-customer-${customer.id}`)
+
+      // ── New collection note from another user ──────────────────────────────
+      .on('postgres_changes', {
+        event:  'INSERT',
+        schema: 'public',
+        table:  'ar_customer_notes',
+        filter: `customer_id=eq.${customer.id}`,
+      }, async (payload) => {
+        const row = payload.new as Record<string, unknown>
+        // Skip notes that were added by this session (already in state via optimistic update)
+        setProfile((p) => {
+          if (!p || p.notes.some((n) => n.id === row.id)) return p
+          return p // will be updated after author lookup below
+        })
+        let createdByName: string | null = null
+        if (row.created_by) {
+          const { data } = await supabase
+            .from('user_profiles')
+            .select('display_name')
+            .eq('id', row.created_by as string)
+            .single()
+          createdByName = (data as { display_name: string } | null)?.display_name ?? null
+        }
+        setProfile((p) => {
+          if (!p || p.notes.some((n) => n.id === row.id)) return p
+          const note: Note = {
+            id:                row.id as string,
+            content:           row.content as string,
+            noteType:          (row.note_type as 'collection' | 'operation') ?? 'collection',
+            createdAt:         row.created_at as string,
+            createdByName,
+            communicationType: (row.communication_type as string | null) ?? null,
+            contactName:       (row.contact_name as string | null) ?? null,
+            outcome:           (row.outcome as string | null) ?? null,
+          }
+          return { ...p, notes: [note, ...p.notes] }
+        })
+      })
+
+      // ── Note deleted by another user ───────────────────────────────────────
+      .on('postgres_changes', {
+        event:  'DELETE',
+        schema: 'public',
+        table:  'ar_customer_notes',
+        filter: `customer_id=eq.${customer.id}`,
+      }, (payload) => {
+        const row = payload.old as Record<string, unknown>
+        setProfile((p) => p ? { ...p, notes: p.notes.filter((n) => n.id !== row.id) } : p)
+      })
+
+      // ── Customer status / phase / frequency updated by another user ────────
+      .on('postgres_changes', {
+        event:  'UPDATE',
+        schema: 'public',
+        table:  'ar_customers',
+        filter: `id=eq.${customer.id}`,
+      }, (payload) => {
+        const row = payload.new as Record<string, unknown>
+        setProfile((p) => p ? {
+          ...p,
+          customerStatus:   (row.customer_status   as string) ?? p.customerStatus,
+          collectionStatus: (row.collection_status as string) ?? p.collectionStatus,
+          collectionPhase:  (row.collection_phase  as string) ?? p.collectionPhase,
+          contactFrequency: (row.contact_frequency as string | null) ?? p.contactFrequency,
+          isExcluded:       typeof row.is_excluded === 'boolean' ? row.is_excluded : p.isExcluded,
+        } : p)
+      })
+
+      // ── AR team assignment changed by another user ─────────────────────────
+      .on('postgres_changes', {
+        event:  '*',
+        schema: 'public',
+        table:  'ar_customer_assignments',
+        filter: `customer_id=eq.${customer.id}`,
+      }, () => {
+        fetch(`/api/ar/customers/${customer.id}/ar-assignments`)
+          .then((r) => r.json())
+          .then((d) => setArAssignments(d.assignments ?? []))
+      })
+
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
   }, [customer.id])
 
   const patchCustomer = async (payload: Record<string, unknown>) => {

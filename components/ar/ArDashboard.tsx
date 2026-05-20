@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 // Invoice interface only used by ArCustomerDetail now — kept here for the Customer list type
 import type { Role } from '@/lib/supabase/database.types'
 import ArImportModal from './ArImportModal'
 import ArCustomerDetail from './ArCustomerDetail'
 import ArMeetingDashboard from './ArMeetingDashboard'
+import { createBrowserClient } from '@/lib/supabase/client'
 
 interface Branch { id: string; name: string }
 
@@ -218,6 +219,48 @@ export default function ArDashboard({ role, branches }: Props) {
 
   // Reset selected customer when filters change
   useEffect(() => { setSelectedCustomer(null) }, [entity, branchId])
+
+  // ── Realtime: live customer status / exclude updates ───────────────────────
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    const supabase = createBrowserClient()
+
+    const channel = supabase
+      .channel('ar-customers-list')
+      .on('postgres_changes', {
+        event:  'UPDATE',
+        schema: 'public',
+        table:  'ar_customers',
+      }, (payload) => {
+        const row = payload.new as Record<string, unknown>
+        // Optimistically patch the customer in-list so the change is instant,
+        // then debounce a full refresh to pick up any other fields.
+        setCustomers((prev) =>
+          prev.map((c) =>
+            c.id === row.id
+              ? { ...c, isExcluded: typeof row.is_excluded === 'boolean' ? row.is_excluded : c.isExcluded }
+              : c
+          )
+        )
+        // Also update selectedCustomer if it's the one that changed
+        setSelectedCustomer((sel) =>
+          sel && sel.id === row.id && typeof row.is_excluded === 'boolean'
+            ? { ...sel, isExcluded: row.is_excluded as boolean }
+            : sel
+        )
+        // Debounce full re-fetch so rapid multi-row updates collapse into one call
+        if (refreshTimer.current) clearTimeout(refreshTimer.current)
+        refreshTimer.current = setTimeout(() => {
+          fetchCustomers()
+        }, 1500)
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+      if (refreshTimer.current) clearTimeout(refreshTimer.current)
+    }
+  }, [fetchCustomers])
 
   const handleImportSuccess = () => {
     setShowImport(false)
