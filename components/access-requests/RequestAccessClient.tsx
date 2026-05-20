@@ -17,6 +17,7 @@ const ROLE_OPTIONS = [
   { value: 'ar_team',          label: 'AR Team' },
   { value: 'office_team',      label: 'Office Team' },
   { value: 'project_manager',  label: 'Project Manager' },
+  { value: 'sales',            label: 'Sales' },
 ]
 
 const inputStyle: React.CSSProperties = {

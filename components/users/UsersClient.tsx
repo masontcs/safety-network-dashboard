@@ -122,7 +122,7 @@ export default function UsersClient() {
 
   const branchMap = Object.fromEntries(branches.map((b) => [b.id, b.name]))
   const needsBranchScope = (role: Role) =>
-    role === 'district_manager' || role === 'branch_manager' || role === 'project_manager'
+    role === 'district_manager' || role === 'branch_manager' || role === 'project_manager' || role === 'sales'
 
   useEffect(() => {
     fetch('/api/admin/users')
