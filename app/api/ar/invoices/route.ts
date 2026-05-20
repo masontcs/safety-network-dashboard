@@ -58,10 +58,41 @@ export async function GET(request: Request): Promise<Response> {
       query = query.ilike('invoice_number', `%${search}%`)
     }
 
-    const { data, count, error } = await query
+    // When scoped to a customer, fetch the distinct branches that have invoices —
+    // used to populate the branch filter dropdown (unfiltered so the list is always complete)
+    const branchOptionsPromise = customerId
+      ? supabase
+          .from('ar_invoices')
+          .select('branch_id, branch:branches(id, name)')
+          .eq('customer_id', customerId)
+          .eq('row_type', 'invoice')
+          .not('branch_id', 'is', null)
+      : null
+
+    const [{ data, count, error }, branchRes] = await Promise.all([
+      query,
+      branchOptionsPromise ?? Promise.resolve({ data: null }),
+    ])
+
     if (error) {
       return NextResponse.json({ error: 'Failed to load invoices' }, { status: 500 })
     }
+
+    // Deduplicate branch options by id, sort by name
+    type BranchRow = { branch_id: string | null; branch: { id: string; name: string } | null }
+    const seen = new Set<string>()
+    const branchOptions = (branchRes?.data ?? [])
+      .filter((r) => {
+        const row = r as BranchRow
+        if (!row.branch_id || seen.has(row.branch_id)) return false
+        seen.add(row.branch_id)
+        return true
+      })
+      .map((r) => {
+        const row = r as BranchRow
+        return { id: row.branch_id!, name: row.branch?.name ?? row.branch_id! }
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
 
     return NextResponse.json({
       invoices: data ?? [],
@@ -69,6 +100,7 @@ export async function GET(request: Request): Promise<Response> {
       page,
       pageSize: PAGE_SIZE,
       pageCount: Math.ceil((count ?? 0) / PAGE_SIZE),
+      branchOptions,
     })
   } catch (err) {
     console.error('AR invoices error:', err)

@@ -348,6 +348,7 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
   const [invPageCount, setInvPageCount] = useState(0)
   const [invLoading, setInvLoading]     = useState(true)
   const [invBranchId, setInvBranchId]   = useState('')
+  const [invBranchOptions, setInvBranchOptions] = useState<{ id: string; name: string }[]>([])
   const [credits, setCredits]           = useState<Invoice[]>([])
   const [creditsLoading, setCreditsLoading] = useState(true)
   interface PmBranch { id: string; name: string; users: { id: string; displayName: string; role: string }[] }
@@ -396,7 +397,14 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
     if (invBranchId) p.set('branchId', invBranchId)
     fetch(`/api/ar/invoices?${p}`)
       .then((r) => r.json())
-      .then((d) => { setInvoices(d.invoices ?? []); setInvTotal(d.total ?? 0); setInvPageCount(d.pageCount ?? 0) })
+      .then((d) => {
+        setInvoices(d.invoices ?? [])
+        setInvTotal(d.total ?? 0)
+        setInvPageCount(d.pageCount ?? 0)
+        // branchOptions is returned on every fetch but only populated server-side
+        // when customerId is set; update only when unfiltered so the list stays complete
+        if (!invBranchId && Array.isArray(d.branchOptions)) setInvBranchOptions(d.branchOptions)
+      })
       .finally(() => setInvLoading(false))
   }, [customer.id, entity, invPage, invBranchId])
 
@@ -1299,14 +1307,14 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
           {invTotal > 0 && <span style={{ fontSize: 11, color: '#555' }}>{invTotal} total</span>}
           <span style={{ fontSize: 11, color: '#444' }}>· click row for notes &amp; flags</span>
           <div style={{ flex: 1 }} />
-          {branches.length > 1 && (
+          {invBranchOptions.length > 1 && (
             <select
               value={invBranchId}
               onChange={(e) => setInvBranchId(e.target.value)}
               style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 7, color: invBranchId ? '#ccc' : '#666', padding: '4px 10px', fontSize: 12, cursor: 'pointer', outline: 'none' }}
             >
               <option value=''>All Branches</option>
-              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              {invBranchOptions.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           )}
         </div>
