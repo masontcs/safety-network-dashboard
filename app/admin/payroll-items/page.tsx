@@ -1,11 +1,28 @@
 import { redirect } from 'next/navigation'
-import { getAccessContext } from '@/lib/api/auth'
+import { createServerClient } from '@/lib/supabase/server'
+import type { Role } from '@/lib/supabase/database.types'
+import DashboardShell from '@/components/layout/DashboardShell'
 import PayrollItemsClient from './PayrollItemsClient'
 
-export default async function PayrollItemsPage() {
-  const ctx = await getAccessContext()
-  if (!ctx.ok) redirect('/login')
-  if (ctx.access.role !== 'admin') redirect('/admin')
+export const dynamic = 'force-dynamic'
 
-  return <PayrollItemsClient />
+export default async function PayrollItemsPage() {
+  const supabase = createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: profileRaw } = await supabase
+    .from('user_profiles')
+    .select('role, display_name')
+    .eq('id', user.id)
+    .single()
+
+  const profile = profileRaw as { role: Role; display_name: string } | null
+  if (!profile || profile.role !== 'admin') redirect('/dashboard')
+
+  return (
+    <DashboardShell role="admin" userName={profile.display_name}>
+      <PayrollItemsClient />
+    </DashboardShell>
+  )
 }
