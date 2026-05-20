@@ -29,8 +29,9 @@ export function guardAdminOnly(role: Role): NextResponse | null {
 }
 
 // AR administrative operations (status changes, imports, exclusions, merges)
+// admin + executive + ar_manager all have full AR admin rights
 export function guardArAdminOnly(role: Role): NextResponse | null {
-  if (role === 'admin' || role === 'ar_manager') return null
+  if (role === 'admin' || role === 'executive' || role === 'ar_manager') return null
   return NextResponse.json(
     { success: false, error: 'AR admin access required.', code: 'FORBIDDEN' },
     { status: 403 }

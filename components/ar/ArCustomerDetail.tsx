@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+// recharts removed — charts replaced with inline bar strips
 import type { Role } from '@/lib/supabase/database.types'
 import { createBrowserClient } from '@/lib/supabase/client'
 
@@ -185,42 +185,16 @@ function SectionCard({ title, children, action }: { title: string; children: Rea
   )
 }
 
-// ─── Donut chart helper ────────────────────────────────────────────────────────
-
-function DonutChart({ data, colors, centerLabel }: {
-  data: { name: string; value: number }[]
-  colors: string[]
-  centerLabel?: string
-}) {
-  const total = data.reduce((s, d) => s + d.value, 0)
-  if (total === 0) return <div style={{ fontSize: 12, color: '#555', textAlign: 'center', padding: '32px 0' }}>No data</div>
-
+// Lightweight section header used inside the sidebar card (no chrome, just a label)
+function SidebarSection({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <ResponsiveContainer width="100%" height={160}>
-      <PieChart>
-        <Pie
-          data={data}
-          cx="50%"
-          cy="50%"
-          innerRadius={55}
-          outerRadius={80}
-          paddingAngle={2}
-          dataKey="value"
-          strokeWidth={0}
-        >
-          {data.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
-        </Pie>
-        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" fill="#fff" fontSize={13} fontWeight={500}>
-          {centerLabel}
-        </text>
-        <Tooltip
-          formatter={(value: number) => fmt(value)}
-          contentStyle={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, fontSize: 12 }}
-          itemStyle={{ color: '#ccc' }}
-          labelStyle={{ color: '#fff', fontWeight: 500 }}
-        />
-      </PieChart>
-    </ResponsiveContainer>
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <span style={{ fontSize: 10, color: '#555', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{title}</span>
+        {action}
+      </div>
+      {children}
+    </div>
   )
 }
 
@@ -356,9 +330,11 @@ function ContactForm({ customerId, onSaved, onCancel }: { customerId: string; on
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export default function ArCustomerDetail({ customer, entity, role, branches, onBack, onRefresh }: Props) {
-  const isAdmin      = role === 'admin'
-  const isArAdmin    = role === 'admin' || role === 'ar_manager'
-  const canManagePMs = role === 'admin' || role === 'executive' || role === 'district_manager' || role === 'branch_manager'
+  const isAdmin            = role === 'admin'
+  const isArAdmin          = role === 'admin' || role === 'ar_manager'
+  // AR team/manager + executive + admin can change all customer statuses and mark as excluded
+  const canManageStatuses  = role === 'admin' || role === 'executive' || role === 'ar_manager' || role === 'ar_team'
+  const canManagePMs       = role === 'admin' || role === 'executive' || role === 'district_manager' || role === 'branch_manager'
 
   // All roles see both note sections; write access differs
   const canWriteCollectionNotes = isAdmin || role === 'ar_manager' || role === 'ar_team' || role === 'office_team' || role === 'executive'
@@ -735,17 +711,6 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
     setArAssignments((prev) => prev.filter((a) => a.userId !== userId))
   }
 
-  // Chart data
-  const agingChartData = [
-    { name: 'Current', value: customer.current },
-    { name: '1-30',    value: customer.d30     },
-    { name: '31-60',   value: customer.d60     },
-    { name: '61-90',   value: customer.d90     },
-    { name: '>90',     value: customer.d90plus },
-  ].filter((d) => d.value > 0)
-
-  const branchChartData = (profile?.branchBreakdown ?? []).map((b) => ({ name: b.name, value: b.total }))
-
   const assignedPmIds = new Set(profile?.pmAssignments.map((pm) => pm.userId) ?? [])
 
   // Build branch groups with assigned users removed and duplicates collapsed
@@ -761,8 +726,24 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
     }))
     .filter((b) => b.users.length > 0)
 
-  const assignedArIds       = new Set(arAssignments.map((a) => a.userId))
+  const assignedArIds        = new Set(arAssignments.map((a) => a.userId))
   const availableArTeamUsers = arTeamUsers.filter((u) => !assignedArIds.has(u.id))
+
+  // AR Team dropdown groups
+  const arManagers    = availableArTeamUsers.filter((u) => u.role === 'ar_manager')
+  const arTeamMembers = availableArTeamUsers.filter((u) => u.role === 'ar_team')
+  const officeTeam    = availableArTeamUsers.filter((u) => u.role === 'office_team')
+  const hasAvailableAr = availableArTeamUsers.length > 0
+
+  const roleBadge = (r: string) => {
+    const label = r === 'ar_manager' ? 'Manager' : r === 'ar_team' ? 'AR Team' : r === 'office_team' ? 'Office' : r
+    const color = r === 'ar_manager' ? '#ff6b00' : '#666666'
+    return (
+      <span style={{ fontSize: 10, color, background: 'rgba(255,255,255,0.06)', borderRadius: 3, padding: '1px 5px', fontWeight: 500 }}>
+        {label}
+      </span>
+    )
+  }
 
   const custStatusMeta  = getCustomerStatusMeta(profile?.customerStatus ?? 'active')
   const collStatusMeta  = getCollectionStatusMeta(profile?.collectionStatus ?? 'none')
@@ -771,321 +752,148 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* Header */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {/* Back + name + download row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      {/* ── HERO HEADER ─────────────────────────────────────────────────────── */}
+      <div style={{ background: '#1a1a1a', borderRadius: 12, border: '1px solid #2a2a2a', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* Row 1: Back / Name / Excluded badge / Download */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={onBack}
             style={{ background: '#2a2a2a', border: 'none', borderRadius: 8, color: '#ccc', padding: '6px 12px', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
             ← Back
           </button>
-          <div style={{ fontSize: 18, fontWeight: 500, color: profile?.isExcluded ? '#666' : '#fff', minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ flex: 1, fontSize: 20, fontWeight: 500, color: profile?.isExcluded ? '#666' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {customer.displayName}
           </div>
+          {profile?.isExcluded && (
+            <span style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 6, color: '#555', padding: '3px 10px', fontSize: 11, flexShrink: 0 }}>
+              Excluded
+            </span>
+          )}
           <DownloadStatementButton customerId={customer.id} />
         </div>
-        {/* Status row — labeled controls for AR admins */}
+
+        {/* Row 2: Status controls — flowing, no heavy box */}
         {profile && (
-          <div style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 10, padding: '10px 14px' }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 20px', alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 20px', alignItems: 'flex-end' }}>
 
-              {/* Account Status */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>Account Status</span>
-                {isAdmin ? (
-                  <select value={profile.customerStatus} onChange={(e) => handleCustomerStatusChange(e.target.value)}
-                    style={{ background: `${custStatusMeta.color}18`, border: `1px solid ${custStatusMeta.color}`, borderRadius: 7, color: custStatusMeta.color, padding: '5px 10px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
-                    {CUSTOMER_STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                ) : (
-                  <span style={{ background: `${custStatusMeta.color}18`, border: `1px solid ${custStatusMeta.color}`, borderRadius: 7, color: custStatusMeta.color, padding: '5px 10px', fontSize: 12 }}>
-                    {custStatusMeta.label}
-                  </span>
-                )}
-              </div>
-
-              {/* Collection Issue */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>Collection Issue</span>
-                {isArAdmin ? (
-                  <select value={profile.collectionStatus} onChange={(e) => handleCollectionStatusChange(e.target.value)}
-                    style={{ background: `${collStatusMeta.color}18`, border: `1px solid ${collStatusMeta.color}`, borderRadius: 7, color: collStatusMeta.color, padding: '5px 10px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
-                    {COLLECTION_STATUS_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.value === 'none' ? 'No Issue' : `${o.label}${o.priority > 0 ? ` · P${o.priority}` : ''}`}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <span style={{ background: `${collStatusMeta.color}18`, border: `1px solid ${collStatusMeta.color}`, borderRadius: 7, color: collStatusMeta.color, padding: '5px 10px', fontSize: 12 }}>
-                    {profile.collectionStatus === 'none' ? 'No Issue' : collStatusMeta.label}
-                  </span>
-                )}
-              </div>
-
-              {/* Escalation Level */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>Escalation Level</span>
-                {isArAdmin ? (
-                  <select value={profile.collectionPhase} onChange={(e) => handleCollectionPhaseChange(e.target.value)}
-                    style={{ background: `${collPhaseMeta.color}18`, border: `1px solid ${collPhaseMeta.color}55`, borderRadius: 7, color: collPhaseMeta.color, padding: '5px 10px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
-                    {COLLECTION_PHASE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                ) : (
-                  <span style={{ background: `${collPhaseMeta.color}18`, border: `1px solid ${collPhaseMeta.color}55`, borderRadius: 7, color: collPhaseMeta.color, padding: '5px 10px', fontSize: 12 }}>
-                    {collPhaseMeta.label}
-                  </span>
-                )}
-              </div>
-
-              {/* Contact Frequency */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>Contact Frequency</span>
-                {isArAdmin ? (
-                  <select value={profile.contactFrequency ?? ''} onChange={(e) => handleContactFrequencyChange(e.target.value)}
-                    style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 7, color: profile.contactFrequency ? '#cccccc' : '#555', padding: '5px 10px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
-                    <option value=''>Not Set</option>
-                    {CONTACT_FREQUENCY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                ) : (
-                  <span style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 7, color: '#888', padding: '5px 10px', fontSize: 12 }}>
-                    {profile.contactFrequency ? getFrequencyLabel(profile.contactFrequency) : 'Not Set'}
-                  </span>
-                )}
-              </div>
-
-              {isAdmin && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>Visibility</span>
-                  <button onClick={handleExcludeToggle} disabled={togglingExclude}
-                    style={{ background: profile.isExcluded ? '#2a2a2a' : 'rgba(204,68,68,0.12)', border: `1px solid ${profile.isExcluded ? '#333' : '#663333'}`, borderRadius: 7, color: profile.isExcluded ? '#888' : '#cc4444', padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}>
-                    {profile.isExcluded ? 'Restore' : 'Exclude'}
-                  </button>
-                </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Account</span>
+              {canManageStatuses ? (
+                <select value={profile.customerStatus} onChange={(e) => handleCustomerStatusChange(e.target.value)}
+                  style={{ background: `${custStatusMeta.color}18`, border: `1px solid ${custStatusMeta.color}`, borderRadius: 7, color: custStatusMeta.color, padding: '4px 9px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
+                  {CUSTOMER_STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              ) : (
+                <span style={{ background: `${custStatusMeta.color}18`, border: `1px solid ${custStatusMeta.color}`, borderRadius: 7, color: custStatusMeta.color, padding: '4px 9px', fontSize: 12 }}>
+                  {custStatusMeta.label}
+                </span>
               )}
             </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Collection Issue</span>
+              {canManageStatuses ? (
+                <select value={profile.collectionStatus} onChange={(e) => handleCollectionStatusChange(e.target.value)}
+                  style={{ background: `${collStatusMeta.color}18`, border: `1px solid ${collStatusMeta.color}`, borderRadius: 7, color: collStatusMeta.color, padding: '4px 9px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
+                  {COLLECTION_STATUS_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.value === 'none' ? 'No Issue' : `${o.label}${o.priority > 0 ? ` · P${o.priority}` : ''}`}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span style={{ background: `${collStatusMeta.color}18`, border: `1px solid ${collStatusMeta.color}`, borderRadius: 7, color: collStatusMeta.color, padding: '4px 9px', fontSize: 12 }}>
+                  {profile.collectionStatus === 'none' ? 'No Issue' : collStatusMeta.label}
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Escalation</span>
+              {canManageStatuses ? (
+                <select value={profile.collectionPhase} onChange={(e) => handleCollectionPhaseChange(e.target.value)}
+                  style={{ background: `${collPhaseMeta.color}18`, border: `1px solid ${collPhaseMeta.color}55`, borderRadius: 7, color: collPhaseMeta.color, padding: '4px 9px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
+                  {COLLECTION_PHASE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              ) : (
+                <span style={{ background: `${collPhaseMeta.color}18`, border: `1px solid ${collPhaseMeta.color}55`, borderRadius: 7, color: collPhaseMeta.color, padding: '4px 9px', fontSize: 12 }}>
+                  {collPhaseMeta.label}
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Contact Freq.</span>
+              {canManageStatuses ? (
+                <select value={profile.contactFrequency ?? ''} onChange={(e) => handleContactFrequencyChange(e.target.value)}
+                  style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 7, color: profile.contactFrequency ? '#cccccc' : '#555', padding: '4px 9px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
+                  <option value=''>Not Set</option>
+                  {CONTACT_FREQUENCY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              ) : (
+                <span style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 7, color: '#888', padding: '4px 9px', fontSize: 12 }}>
+                  {profile.contactFrequency ? getFrequencyLabel(profile.contactFrequency) : 'Not Set'}
+                </span>
+              )}
+            </div>
+
+            {canManageStatuses && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <span style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Visibility</span>
+                <button onClick={handleExcludeToggle} disabled={togglingExclude}
+                  style={{ background: profile.isExcluded ? '#2a2a2a' : 'rgba(204,68,68,0.12)', border: `1px solid ${profile.isExcluded ? '#333' : '#663333'}`, borderRadius: 7, color: profile.isExcluded ? '#888' : '#cc4444', padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}>
+                  {profile.isExcluded ? 'Restore' : 'Exclude'}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Aging cards row */}
-      <div className="ar-aging-grid">
-        <div style={{ background: profile?.isExcluded ? '#2a2a2a' : '#ff6b00', borderRadius: 12, padding: 16 }}>
-          <div style={{ fontSize: 11, color: profile?.isExcluded ? '#555' : 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Total AR</div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: profile?.isExcluded ? '#666' : '#fff' }}>{fmt(customer.totalAr)}</div>
-        </div>
-        {AGING_BUCKETS.map((b) => {
-          const val = { Current: customer.current, '1-30': customer.d30, '31-60': customer.d60, '61-90': customer.d90, '>90': customer.d90plus }[b]
-          return (
-            <div key={b} style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>{b} days</div>
-              <div style={{ fontSize: 20, fontWeight: 500, color: val > 0 && !profile?.isExcluded ? BUCKET_COLORS[b] : '#444' }}>{fmt(val)}</div>
-            </div>
-          )
-        })}
-      </div>
+      {/* ── ANALYTICS STRIP ─────────────────────────────────────────────────── */}
+      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: '16px 20px' }}>
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
 
-      {/* Charts row */}
-      <div className="ar-detail-grid">
-        <SectionCard title="Aging Breakdown">
-          <DonutChart
-            data={agingChartData}
-            colors={agingChartData.map((d) => BUCKET_COLORS[d.name] ?? '#888')}
-            centerLabel={fmt(customer.totalAr)}
-          />
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginTop: 8 }}>
-            {agingChartData.map((d) => (
-              <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: BUCKET_COLORS[d.name] ?? '#888', flexShrink: 0 }} />
-                <span style={{ color: '#888' }}>{d.name}</span>
-                <span style={{ color: '#ccc' }}>{customer.totalAr > 0 ? ((d.value / customer.totalAr) * 100).toFixed(1) + '%' : '—'}</span>
-              </div>
-            ))}
+          {/* Total AR — hero number */}
+          <div style={{ flexShrink: 0, minWidth: 110 }}>
+            <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Total AR</div>
+            <div style={{ fontSize: 28, fontWeight: 600, color: profile?.isExcluded ? '#555' : '#ff6b00', lineHeight: 1 }}>{fmt(customer.totalAr)}</div>
+            <div style={{ fontSize: 11, color: '#555', marginTop: 5 }}>{customer.invoiceCount} invoice{customer.invoiceCount !== 1 ? 's' : ''}</div>
           </div>
-        </SectionCard>
 
-        <SectionCard title="Branch Share">
-          {profileLoading ? (
-            <div style={{ fontSize: 12, color: '#555', textAlign: 'center', padding: '64px 0' }}>Loading…</div>
-          ) : (
-            <>
-              <DonutChart data={branchChartData} colors={BRANCH_PALETTE} />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginTop: 8 }}>
-                {branchChartData.map((d, i) => (
-                  <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: 2, background: BRANCH_PALETTE[i % BRANCH_PALETTE.length], flexShrink: 0 }} />
-                    <span style={{ color: '#888' }}>{d.name}</span>
-                    <span style={{ color: '#ccc' }}>{customer.totalAr > 0 ? ((d.value / customer.totalAr) * 100).toFixed(1) + '%' : '—'}</span>
+          <div style={{ width: 1, alignSelf: 'stretch', background: '#2a2a2a', flexShrink: 0 }} />
+
+          {/* Aging breakdown — numbers + bar */}
+          <div style={{ flex: 1, minWidth: 280 }}>
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 10 }}>
+              {AGING_BUCKETS.map((b) => {
+                const val = { Current: customer.current, '1-30': customer.d30, '31-60': customer.d60, '61-90': customer.d90, '>90': customer.d90plus }[b]
+                return (
+                  <div key={b}>
+                    <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 3 }}>{b}</div>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: (val ?? 0) > 0 && !profile?.isExcluded ? BUCKET_COLORS[b] : '#333' }}>{fmt(val ?? 0)}</div>
                   </div>
-                ))}
+                )
+              })}
+            </div>
+            {/* Horizontal aging bar */}
+            {customer.totalAr > 0 && (
+              <div style={{ height: 5, borderRadius: 3, display: 'flex', overflow: 'hidden', gap: 1 }}>
+                {AGING_BUCKETS.map((b) => {
+                  const val = { Current: customer.current, '1-30': customer.d30, '31-60': customer.d60, '61-90': customer.d90, '>90': customer.d90plus }[b] ?? 0
+                  if (val <= 0) return null
+                  return <div key={b} style={{ flex: val / customer.totalAr, background: profile?.isExcluded ? '#2a2a2a' : BUCKET_COLORS[b] }} />
+                })}
               </div>
-            </>
-          )}
-        </SectionCard>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Profile sections grid */}
-      <div className="ar-detail-grid">
+      {/* ── Main content: 2-column asymmetric layout ───────────────────────── */}
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
 
-        {/* Entity Links */}
-        <SectionCard title="Entity Links"
-          action={isAdmin ? (
-            <button onClick={() => setShowMerge(true)}
-              style={{ background: '#2a2a2a', border: 'none', borderRadius: 6, color: '#ff6b00', padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>
-              + Link customer
-            </button>
-          ) : undefined}>
-          {profileLoading ? <div style={{ fontSize: 12, color: '#555' }}>Loading…</div>
-            : (profile?.entityRefs ?? []).length === 0 ? <div style={{ fontSize: 12, color: '#555' }}>No entity refs found.</div>
-            : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {(profile?.entityRefs ?? []).map((ref, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                    <span style={{ fontSize: 11, color: '#ff6b00', fontWeight: 500, minWidth: 32 }}>{ref.entityCode}</span>
-                    <span style={{ fontSize: 12, color: '#888' }}>{ref.quickbooksName}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-        </SectionCard>
-
-        {/* Project Managers */}
-        <SectionCard title="Project Managers"
-          action={canManagePMs && availablePmBranches.length > 0 ? (
-            <select value="" onChange={(e) => { if (e.target.value) handleAssignPm(e.target.value) }}
-              style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 6, color: '#ff6b00', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>
-              <option value="">+ Assign PM</option>
-              {availablePmBranches.map((branch) => (
-                <optgroup key={branch.id} label={branch.name}>
-                  {branch.users.map((u) => (
-                    <option key={u.id} value={u.id}>{u.displayName}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          ) : undefined}>
-          {profileLoading ? <div style={{ fontSize: 12, color: '#555' }}>Loading…</div>
-            : (profile?.pmAssignments ?? []).length === 0 ? <div style={{ fontSize: 12, color: '#555' }}>No PMs assigned.</div>
-            : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {(profile?.pmAssignments ?? []).map((pm) => (
-                  <div key={pm.userId} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 12, color: '#ccc' }}>{pm.displayName}</div>
-                      <div style={{ fontSize: 11, color: '#555' }}>{pm.role.replace(/_/g, ' ')}</div>
-                    </div>
-                    {canManagePMs && (
-                      <button onClick={() => handleRemovePm(pm.userId)}
-                        style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}
-                        onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                        onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-        </SectionCard>
-
-        {/* AR Team Assignments — visible to all; manage controls for admin/ar_manager only */}
-        {(() => {
-          // Group available users by role for the dropdown
-          const arManagers   = availableArTeamUsers.filter((u) => u.role === 'ar_manager')
-          const arTeam       = availableArTeamUsers.filter((u) => u.role === 'ar_team')
-          const officeTeam   = availableArTeamUsers.filter((u) => u.role === 'office_team')
-          const hasAvailable = availableArTeamUsers.length > 0
-
-          const roleBadge = (r: string) => {
-            const label = r === 'ar_manager' ? 'Manager' : r === 'ar_team' ? 'AR Team' : r === 'office_team' ? 'Office' : r
-            const color = r === 'ar_manager' ? '#ff6b00' : '#666666'
-            return (
-              <span style={{ fontSize: 10, color, background: 'rgba(255,255,255,0.06)', borderRadius: 3, padding: '1px 5px', fontWeight: 500 }}>
-                {label}
-              </span>
-            )
-          }
-
-          return (
-            <SectionCard title="AR Team"
-              action={isArAdmin && hasAvailable ? (
-                <select value="" onChange={(e) => { if (e.target.value) handleAssignAr(e.target.value) }}
-                  style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 6, color: '#ff6b00', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>
-                  <option value="">+ Assign</option>
-                  {arManagers.length > 0 && (
-                    <optgroup label="AR Manager">
-                      {arManagers.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
-                    </optgroup>
-                  )}
-                  {arTeam.length > 0 && (
-                    <optgroup label="AR Team">
-                      {arTeam.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
-                    </optgroup>
-                  )}
-                  {officeTeam.length > 0 && (
-                    <optgroup label="Office Team">
-                      {officeTeam.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
-                    </optgroup>
-                  )}
-                </select>
-              ) : undefined}>
-              {arAssignments.length === 0 ? (
-                <div style={{ fontSize: 12, color: '#555' }}>No team members assigned.</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {arAssignments.map((a) => (
-                    <div key={a.userId} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 12, color: '#ccc' }}>{a.displayName}</span>
-                        {roleBadge(a.role)}
-                      </div>
-                      {isArAdmin && (
-                        <button onClick={() => handleRemoveAr(a.userId)}
-                          style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </SectionCard>
-          )
-        })()}
-
-        {/* Contacts */}
-        <SectionCard title="Contacts"
-          action={!showAddContact ? (
-            <button onClick={() => setShowAddContact(true)}
-              style={{ background: '#2a2a2a', border: 'none', borderRadius: 6, color: '#ff6b00', padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>+ Add</button>
-          ) : undefined}>
-          {showAddContact && <div style={{ marginBottom: 12 }}><ContactForm customerId={customer.id} onSaved={handleContactSaved} onCancel={() => setShowAddContact(false)} /></div>}
-          {profileLoading ? <div style={{ fontSize: 12, color: '#555' }}>Loading…</div>
-            : (profile?.contacts ?? []).length === 0 && !showAddContact ? <div style={{ fontSize: 12, color: '#555' }}>No contacts yet.</div>
-            : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {(profile?.contacts ?? []).map((c) => (
-                  <div key={c.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, paddingBottom: 10, borderBottom: '1px solid #2a2a2a' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 13, color: '#ccc', fontWeight: 500 }}>{c.name}</span>
-                        {c.isPrimary && <span style={{ fontSize: 10, color: '#ff6b00', background: 'rgba(255,107,0,0.12)', borderRadius: 4, padding: '1px 6px' }}>Primary</span>}
-                      </div>
-                      {c.title && <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{c.title}</div>}
-                      <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
-                        {c.email && <a href={`mailto:${c.email}`} style={{ fontSize: 11, color: '#888', textDecoration: 'none' }}>{c.email}</a>}
-                        {c.phone && <span style={{ fontSize: 11, color: '#888' }}>{c.phone}</span>}
-                      </div>
-                    </div>
-                    {isArAdmin && (
-                      <button onClick={() => handleDeleteContact(c.id)}
-                        style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
-                        onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                        onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-        </SectionCard>
+        {/* Left column — Notes (wider) */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* Collection Notes — write: admin/ar_manager/ar_team/executive; read-only: all other roles */}
         <SectionCard title="Collection Notes">
@@ -1299,7 +1107,190 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
                 )
               })()}
         </SectionCard>
-      </div>
+
+        </div>{/* end left column */}
+
+        {/* Right column — Details sidebar */}
+        <div style={{ width: 290, flexShrink: 0 }}>
+          <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16, display: 'flex', flexDirection: 'column' }}>
+
+            {/* Entity Links */}
+            <SidebarSection title="Entity Links"
+              action={isAdmin ? (
+                <button onClick={() => setShowMerge(true)}
+                  style={{ background: 'none', border: 'none', color: '#ff6b00', fontSize: 11, cursor: 'pointer', padding: 0 }}>
+                  + Link
+                </button>
+              ) : undefined}>
+              {profileLoading ? <div style={{ fontSize: 12, color: '#555' }}>Loading…</div>
+                : (profile?.entityRefs ?? []).length === 0 ? <div style={{ fontSize: 12, color: '#555' }}>No entity refs found.</div>
+                : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {(profile?.entityRefs ?? []).map((ref, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                        <span style={{ fontSize: 11, color: '#ff6b00', fontWeight: 500, minWidth: 32 }}>{ref.entityCode}</span>
+                        <span style={{ fontSize: 11, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ref.quickbooksName}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+            </SidebarSection>
+
+            <div style={{ height: 1, background: '#2a2a2a', margin: '14px 0' }} />
+
+            {/* Contacts */}
+            <SidebarSection title="Contacts"
+              action={!showAddContact ? (
+                <button onClick={() => setShowAddContact(true)}
+                  style={{ background: 'none', border: 'none', color: '#ff6b00', fontSize: 11, cursor: 'pointer', padding: 0 }}>+ Add</button>
+              ) : undefined}>
+              {showAddContact && <div style={{ marginBottom: 10 }}><ContactForm customerId={customer.id} onSaved={handleContactSaved} onCancel={() => setShowAddContact(false)} /></div>}
+              {profileLoading ? <div style={{ fontSize: 12, color: '#555' }}>Loading…</div>
+                : (profile?.contacts ?? []).length === 0 && !showAddContact ? <div style={{ fontSize: 12, color: '#555' }}>No contacts yet.</div>
+                : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {(profile?.contacts ?? []).map((c) => (
+                      <div key={c.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 12, color: '#ccc', fontWeight: 500 }}>{c.name}</span>
+                            {c.isPrimary && <span style={{ fontSize: 9, color: '#ff6b00', background: 'rgba(255,107,0,0.12)', borderRadius: 3, padding: '1px 5px' }}>Primary</span>}
+                          </div>
+                          {c.title && <div style={{ fontSize: 11, color: '#555', marginTop: 1 }}>{c.title}</div>}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 3 }}>
+                            {c.email && <a href={`mailto:${c.email}`} style={{ fontSize: 11, color: '#777', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.email}</a>}
+                            {c.phone && <span style={{ fontSize: 11, color: '#777' }}>{c.phone}</span>}
+                          </div>
+                        </div>
+                        {isArAdmin && (
+                          <button onClick={() => handleDeleteContact(c.id)}
+                            style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 14, padding: '1px 3px', flexShrink: 0 }}
+                            onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
+                            onMouseLeave={(e) => (e.currentTarget.style.color = '#444')}>×</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+            </SidebarSection>
+
+            <div style={{ height: 1, background: '#2a2a2a', margin: '14px 0' }} />
+
+            {/* Project Managers */}
+            <SidebarSection title="Project Managers"
+              action={canManagePMs && availablePmBranches.length > 0 ? (
+                <select value="" onChange={(e) => { if (e.target.value) handleAssignPm(e.target.value) }}
+                  style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 5, color: '#ff6b00', padding: '2px 6px', fontSize: 10, cursor: 'pointer', outline: 'none' }}>
+                  <option value="">+ Assign</option>
+                  {availablePmBranches.map((branch) => (
+                    <optgroup key={branch.id} label={branch.name}>
+                      {branch.users.map((u) => (
+                        <option key={u.id} value={u.id}>{u.displayName}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              ) : undefined}>
+              {profileLoading ? <div style={{ fontSize: 12, color: '#555' }}>Loading…</div>
+                : (profile?.pmAssignments ?? []).length === 0 ? <div style={{ fontSize: 12, color: '#555' }}>No PMs assigned.</div>
+                : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                    {(profile?.pmAssignments ?? []).map((pm) => (
+                      <div key={pm.userId} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 12, color: '#ccc' }}>{pm.displayName}</div>
+                          <div style={{ fontSize: 10, color: '#555' }}>{pm.role.replace(/_/g, ' ')}</div>
+                        </div>
+                        {canManagePMs && (
+                          <button onClick={() => handleRemovePm(pm.userId)}
+                            style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 14, padding: '1px 3px' }}
+                            onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
+                            onMouseLeave={(e) => (e.currentTarget.style.color = '#444')}>×</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+            </SidebarSection>
+
+            <div style={{ height: 1, background: '#2a2a2a', margin: '14px 0' }} />
+
+            {/* AR Team */}
+            <SidebarSection title="AR Team"
+              action={isArAdmin && hasAvailableAr ? (
+                <select value="" onChange={(e) => { if (e.target.value) handleAssignAr(e.target.value) }}
+                  style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 5, color: '#ff6b00', padding: '2px 6px', fontSize: 10, cursor: 'pointer', outline: 'none' }}>
+                  <option value="">+ Assign</option>
+                  {arManagers.length > 0 && (
+                    <optgroup label="AR Manager">
+                      {arManagers.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
+                    </optgroup>
+                  )}
+                  {arTeamMembers.length > 0 && (
+                    <optgroup label="AR Team">
+                      {arTeamMembers.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
+                    </optgroup>
+                  )}
+                  {officeTeam.length > 0 && (
+                    <optgroup label="Office Team">
+                      {officeTeam.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
+                    </optgroup>
+                  )}
+                </select>
+              ) : undefined}>
+              {arAssignments.length === 0 ? (
+                <div style={{ fontSize: 12, color: '#555' }}>No team members assigned.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  {arAssignments.map((a) => (
+                    <div key={a.userId} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                        <span style={{ fontSize: 12, color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.displayName}</span>
+                        {roleBadge(a.role)}
+                      </div>
+                      {isArAdmin && (
+                        <button onClick={() => handleRemoveAr(a.userId)}
+                          style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 14, padding: '1px 3px', flexShrink: 0 }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = '#444')}>×</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </SidebarSection>
+
+            {/* Branch Breakdown — only when multiple branches */}
+            {(profile?.branchBreakdown?.length ?? 0) > 0 && (
+              <>
+                <div style={{ height: 1, background: '#2a2a2a', margin: '14px 0' }} />
+                <SidebarSection title="By Branch">
+                  {(() => {
+                    const total = (profile?.branchBreakdown ?? []).reduce((s, b) => s + b.total, 0)
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {(profile?.branchBreakdown ?? []).map((b, i) => (
+                          <div key={b.name}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                              <span style={{ fontSize: 11, color: '#888' }}>{b.name}</span>
+                              <span style={{ fontSize: 11, color: '#ccc', fontVariantNumeric: 'tabular-nums' }}>{fmt(b.total)}</span>
+                            </div>
+                            <div style={{ height: 3, borderRadius: 2, background: '#2a2a2a', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', borderRadius: 2, background: BRANCH_PALETTE[i % BRANCH_PALETTE.length], width: `${total > 0 ? (b.total / total) * 100 : 0}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
+                </SidebarSection>
+              </>
+            )}
+
+          </div>
+        </div>{/* end right column */}
+
+      </div>{/* end 2-column layout */}
 
       {/* Invoice table */}
       <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', overflow: 'hidden' }}>

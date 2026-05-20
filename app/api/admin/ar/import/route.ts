@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
+import { getAccessContext, guardArAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { parseArFile } from '@/lib/ar/parser'
 
@@ -14,7 +14,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardAdminOnly(ctx.access.role)
+    const guard = guardArAdminOnly(ctx.access.role)
     if (guard) return guard
 
     const form = await request.formData()
