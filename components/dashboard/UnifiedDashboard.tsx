@@ -386,12 +386,12 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
   const [allocationOn, setAllocationOn] = useState<boolean>(false)
 
   // ── Active tab ──────────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<Tab>('overview')
+  const [activeTab, setActiveTab] = useState<Tab>(role === 'project_manager' ? 'revenue' : 'overview')
 
   useEffect(() => {
     // Read initial tab from URL on mount (e.g. arriving via /dashboard?tab=fuel)
     const t = new URLSearchParams(window.location.search).get('tab')
-    if (t && VALID_TABS.includes(t as Tab)) setActiveTab(t as Tab)
+    if (t && VALID_TABS.includes(t as Tab) && tabs.some((x) => x.key === t)) setActiveTab(t as Tab)
 
     // Listen for in-page tab switches dispatched by the sidebar
     function onTabSwitch(e: Event) {
@@ -494,15 +494,15 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
   // ── Available years from fiscal months ──────────────────────────────────────
   const availableYears = useMemo(() => [...new Set(sortedMonths.map((m) => m.year))].sort(), [sortedMonths])
 
-  // ── Saturdays in selected month (for revenue target table) ──────────────────
+  // ── Saturdays in selected month (only used in month view) ───────────────────
   const monthSaturdays = useMemo(() => {
-    if (!selectedMonth) return []
+    if (viewMode !== 'month' || !selectedMonth) return []
     return getSaturdaysInMonth(selectedMonth.startDate, selectedMonth.endDate)
-  }, [selectedMonth])
+  }, [viewMode, selectedMonth])
 
   // ── Tab config (filtered by role) ────────────────────────────────────────────
   const allTabs: Array<{ key: Tab; label: string; roles?: Role[] }> = [
-    { key: 'overview', label: 'Overview' },
+    { key: 'overview', label: 'Overview', roles: ['admin', 'executive', 'district_manager', 'branch_manager'] },
     { key: 'revenue',  label: 'Revenue' },
     { key: 'payroll',  label: 'Payroll',  roles: ['admin', 'executive', 'district_manager', 'branch_manager'] },
     { key: 'fuel',     label: 'Fuel',     roles: ['admin', 'executive', 'district_manager', 'branch_manager'] },
