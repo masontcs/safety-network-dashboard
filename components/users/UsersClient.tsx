@@ -377,7 +377,7 @@ export default function UsersClient() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Name', 'Email', 'Role', 'Branches', ''].map((h) => (
+                  {['Access', 'Name', 'Email', 'Role', 'Branches', ''].map((h) => (
                     <th
                       key={h}
                       className="table-header"
@@ -393,42 +393,40 @@ export default function UsersClient() {
                   const isEditing = editing === user.id
                   return (
                     <tr key={user.id} style={{ borderBottom: '1px solid #2a2a2a', opacity: user.isActive ? 1 : 0.45 }}>
-                      {/* Name + active toggle */}
-                      <td className="table-body" style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          {/* Toggle pill */}
-                          <button
-                            onClick={() => handleToggleActive(user.id, !user.isActive)}
-                            title={user.isActive ? 'Deactivate user' : 'Activate user'}
-                            style={{
-                              flexShrink: 0,
-                              width: 30,
-                              height: 17,
-                              borderRadius: 9,
-                              background: user.isActive ? '#4caf50' : '#444',
-                              border: 'none',
-                              cursor: 'pointer',
-                              position: 'relative',
-                              transition: 'background 0.18s',
-                              padding: 0,
-                            }}
-                          >
-                            <span style={{
-                              position: 'absolute',
-                              width: 13,
-                              height: 13,
-                              borderRadius: '50%',
-                              background: '#fff',
-                              top: 2,
-                              left: user.isActive ? 15 : 2,
-                              transition: 'left 0.18s',
-                              display: 'block',
-                            }} />
-                          </button>
-                          <span style={{ color: user.isActive ? '#ffffff' : '#888888' }}>
-                            {user.displayName || '—'}
-                          </span>
-                        </div>
+                      {/* Access toggle */}
+                      <td style={{ padding: '12px 16px', width: 64, textAlign: 'center' }}>
+                        <button
+                          onClick={() => handleToggleActive(user.id, !user.isActive)}
+                          title={user.isActive ? 'Deactivate user' : 'Activate user'}
+                          style={{
+                            width: 30,
+                            height: 17,
+                            borderRadius: 9,
+                            background: user.isActive ? '#4caf50' : '#444',
+                            border: 'none',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            transition: 'background 0.18s',
+                            padding: 0,
+                          }}
+                        >
+                          <span style={{
+                            position: 'absolute',
+                            width: 13,
+                            height: 13,
+                            borderRadius: '50%',
+                            background: '#fff',
+                            top: 2,
+                            left: user.isActive ? 15 : 2,
+                            transition: 'left 0.18s',
+                            display: 'block',
+                          }} />
+                        </button>
+                      </td>
+
+                      {/* Name */}
+                      <td className="table-body" style={{ padding: '12px 16px', whiteSpace: 'nowrap', color: user.isActive ? '#ffffff' : '#888888' }}>
+                        {user.displayName || '—'}
                       </td>
 
                       {/* Email */}
