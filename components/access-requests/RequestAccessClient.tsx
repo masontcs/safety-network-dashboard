@@ -10,9 +10,12 @@ interface Branch {
 }
 
 const ROLE_OPTIONS = [
-  { value: 'branch_manager', label: 'Branch Manager' },
+  { value: 'branch_manager',   label: 'Branch Manager' },
   { value: 'district_manager', label: 'District Manager' },
-  { value: 'executive', label: 'Executive' },
+  { value: 'executive',        label: 'Executive' },
+  { value: 'ar_manager',       label: 'AR Manager' },
+  { value: 'ar_team',          label: 'AR Team' },
+  { value: 'project_manager',  label: 'Project Manager' },
 ]
 
 const inputStyle: React.CSSProperties = {
