@@ -9,7 +9,7 @@ import type { Role } from '@/lib/supabase/database.types'
 interface Contact { id: string; name: string; title: string | null; email: string | null; phone: string | null; isPrimary: boolean }
 interface Note    { id: string; content: string; noteType: 'collection' | 'operation'; createdAt: string; createdByName: string | null }
 interface PmAssignment { userId: string; displayName: string; role: string }
-interface ArAssignment { userId: string; displayName: string }
+interface ArAssignment { userId: string; displayName: string; role: string }
 interface EntityRef { entityCode: string; quickbooksName: string }
 interface BranchSlice { name: string; total: number }
 
@@ -289,7 +289,7 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
   const canManagePMs = role === 'admin' || role === 'executive' || role === 'district_manager' || role === 'branch_manager'
 
   // All roles see both note sections; write access differs
-  const canWriteCollectionNotes = isAdmin || role === 'ar_manager' || role === 'ar_team' || role === 'executive'
+  const canWriteCollectionNotes = isAdmin || role === 'ar_manager' || role === 'ar_team' || role === 'office_team' || role === 'executive'
   const canWriteOperationNotes  = isAdmin || role === 'executive' || role === 'district_manager' || role === 'branch_manager' || role === 'project_manager'
 
   const [profile, setProfile]           = useState<CustomerProfile | null>(null)
@@ -303,7 +303,7 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
   const [creditsLoading, setCreditsLoading] = useState(true)
   interface PmBranch { id: string; name: string; users: { id: string; displayName: string; role: string }[] }
   const [pmBranches, setPmBranches] = useState<PmBranch[]>([])
-  const [arTeamUsers, setArTeamUsers]   = useState<{ id: string; displayName: string }[]>([])
+  const [arTeamUsers, setArTeamUsers]   = useState<{ id: string; displayName: string; role: string }[]>([])
   const [arAssignments, setArAssignments] = useState<ArAssignment[]>([])
   const [showMerge, setShowMerge]       = useState(false)
   const [showAddContact, setShowAddContact] = useState(false)
@@ -444,7 +444,7 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
     })
     if (res.ok) {
       const { assignment } = await res.json()
-      setArAssignments((prev) => [...prev, { userId: assignment.userId, displayName: assignment.displayName }])
+      setArAssignments((prev) => [...prev, { userId: assignment.userId, displayName: assignment.displayName, role: assignment.role }])
     }
   }
 
@@ -655,32 +655,69 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
         </SectionCard>
 
         {/* AR Team Assignments — visible to all; manage controls for admin/ar_manager only */}
-        <SectionCard title="AR Team"
-          action={isArAdmin && availableArTeamUsers.length > 0 ? (
-            <select value="" onChange={(e) => { if (e.target.value) handleAssignAr(e.target.value) }}
-              style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 6, color: '#ff6b00', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>
-              <option value="">+ Assign</option>
-              {availableArTeamUsers.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
-            </select>
-          ) : undefined}>
-          {arAssignments.length === 0 ? (
-            <div style={{ fontSize: 12, color: '#555' }}>No AR team members assigned.</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {arAssignments.map((a) => (
-                <div key={a.userId} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ flex: 1, fontSize: 12, color: '#ccc' }}>{a.displayName}</div>
-                  {isArAdmin && (
-                    <button onClick={() => handleRemoveAr(a.userId)}
-                      style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}
-                      onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                      onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
+        {(() => {
+          // Group available users by role for the dropdown
+          const arManagers   = availableArTeamUsers.filter((u) => u.role === 'ar_manager')
+          const arTeam       = availableArTeamUsers.filter((u) => u.role === 'ar_team')
+          const officeTeam   = availableArTeamUsers.filter((u) => u.role === 'office_team')
+          const hasAvailable = availableArTeamUsers.length > 0
+
+          const roleBadge = (r: string) => {
+            const label = r === 'ar_manager' ? 'Manager' : r === 'ar_team' ? 'AR Team' : r === 'office_team' ? 'Office' : r
+            const color = r === 'ar_manager' ? '#ff6b00' : '#666666'
+            return (
+              <span style={{ fontSize: 10, color, background: 'rgba(255,255,255,0.06)', borderRadius: 3, padding: '1px 5px', fontWeight: 500 }}>
+                {label}
+              </span>
+            )
+          }
+
+          return (
+            <SectionCard title="AR Team"
+              action={isArAdmin && hasAvailable ? (
+                <select value="" onChange={(e) => { if (e.target.value) handleAssignAr(e.target.value) }}
+                  style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 6, color: '#ff6b00', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>
+                  <option value="">+ Assign</option>
+                  {arManagers.length > 0 && (
+                    <optgroup label="AR Manager">
+                      {arManagers.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
+                    </optgroup>
                   )}
+                  {arTeam.length > 0 && (
+                    <optgroup label="AR Team">
+                      {arTeam.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
+                    </optgroup>
+                  )}
+                  {officeTeam.length > 0 && (
+                    <optgroup label="Office Team">
+                      {officeTeam.map((u) => <option key={u.id} value={u.id}>{u.displayName}</option>)}
+                    </optgroup>
+                  )}
+                </select>
+              ) : undefined}>
+              {arAssignments.length === 0 ? (
+                <div style={{ fontSize: 12, color: '#555' }}>No team members assigned.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {arAssignments.map((a) => (
+                    <div key={a.userId} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 12, color: '#ccc' }}>{a.displayName}</span>
+                        {roleBadge(a.role)}
+                      </div>
+                      {isArAdmin && (
+                        <button onClick={() => handleRemoveAr(a.userId)}
+                          style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </SectionCard>
+              )}
+            </SectionCard>
+          )
+        })()}
 
         {/* Contacts */}
         <SectionCard title="Contacts"

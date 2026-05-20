@@ -23,10 +23,10 @@ export async function GET(request: Request): Promise<Response> {
 
     const showAll = searchParams.get('showAll') === 'true'
 
-    // ar_team: resolve assigned customer IDs before fetching invoices (unless showing all)
+    // ar_team / office_team: resolve assigned customer IDs before fetching (unless showing all)
     const { role } = ctx.access
     let arTeamCustomerIds: string[] | null = null
-    if (role === 'ar_team' && !showAll) {
+    if ((role === 'ar_team' || role === 'office_team') && !showAll) {
       const ids = await getArTeamCustomerIds(ctx.access.userId)
       arTeamCustomerIds = ids.length > 0 ? ids : []
       if (arTeamCustomerIds.length === 0) return NextResponse.json({ customers: [] })

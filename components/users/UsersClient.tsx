@@ -24,6 +24,7 @@ const ROLE_LABELS: Record<Role, string> = {
   branch_manager:   'Branch Manager',
   ar_manager:       'AR Manager',
   ar_team:          'AR Team',
+  office_team:      'Office Team',
   project_manager:  'Project Manager',
 }
 
@@ -34,6 +35,7 @@ const ROLE_COLORS: Record<Role, string> = {
   branch_manager:   '#cccccc',
   ar_manager:       '#cccccc',
   ar_team:          '#cccccc',
+  office_team:      '#cccccc',
   project_manager:  '#cccccc',
 }
 

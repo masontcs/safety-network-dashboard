@@ -6,7 +6,7 @@ const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/
 
 const VALID_ROLES = [
   'branch_manager', 'district_manager', 'executive',
-  'ar_manager', 'ar_team', 'project_manager',
+  'ar_manager', 'ar_team', 'office_team', 'project_manager',
 ]
 
 export async function POST(request: Request): Promise<NextResponse> {

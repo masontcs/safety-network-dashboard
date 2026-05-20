@@ -9,9 +9,9 @@ type AccessResult =
 
 // ── Role sets ──────────────────────────────────────────────────────────────────
 
-const NO_PAYROLL_ROLES: Role[] = ['ar_manager', 'ar_team', 'project_manager']
-const NO_FUEL_ROLES:    Role[] = ['ar_manager', 'ar_team', 'project_manager']
-const NO_REVENUE_ROLES: Role[] = ['ar_manager', 'ar_team']
+const NO_PAYROLL_ROLES: Role[] = ['ar_manager', 'ar_team', 'office_team', 'project_manager']
+const NO_FUEL_ROLES:    Role[] = ['ar_manager', 'ar_team', 'office_team', 'project_manager']
+const NO_REVENUE_ROLES: Role[] = ['ar_manager', 'ar_team', 'office_team']
 
 // ── Guard helpers ──────────────────────────────────────────────────────────────
 
@@ -95,7 +95,7 @@ export async function getAccessContext(): Promise<AccessResult> {
   const role = profile.role as Role
 
   // Roles with null branchIds — either full access or customer-scoped (handled per AR route)
-  if (role === 'admin' || role === 'executive' || role === 'ar_manager' || role === 'ar_team') {
+  if (role === 'admin' || role === 'executive' || role === 'ar_manager' || role === 'ar_team' || role === 'office_team') {
     return { ok: true, access: { userId: user.id, role, branchIds: null } }
   }
 

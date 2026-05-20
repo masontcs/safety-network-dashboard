@@ -56,15 +56,15 @@ export async function POST(
 
     const supabase = createServiceClient()
 
-    // Verify the user being assigned has the ar_team role
+    // Verify the user being assigned has an AR-eligible role
     const { data: prof } = await supabase
       .from('user_profiles')
       .select('id, display_name, role')
       .eq('id', userId)
       .single()
     if (!prof) return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    if (prof.role !== 'ar_team' && prof.role !== 'ar_manager') {
-      return NextResponse.json({ error: 'User must be an AR team member or AR manager' }, { status: 400 })
+    if (!['ar_team', 'ar_manager', 'office_team'].includes(prof.role as string)) {
+      return NextResponse.json({ error: 'User must be an AR team member, AR manager, or Office Team member' }, { status: 400 })
     }
 
     const { error } = await supabase

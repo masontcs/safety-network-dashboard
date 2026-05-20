@@ -2,7 +2,7 @@
 // Regenerate after schema changes:
 //   npx supabase gen types typescript --project-id zobgzhgwgduziszzevzp > lib/supabase/database.types.ts
 
-export type Role = 'admin' | 'executive' | 'district_manager' | 'branch_manager' | 'ar_manager' | 'ar_team' | 'project_manager'
+export type Role = 'admin' | 'executive' | 'district_manager' | 'branch_manager' | 'ar_manager' | 'ar_team' | 'office_team' | 'project_manager'
 export type LaborType =
   | 'direct'
   | 'admin_hourly'

@@ -11,6 +11,7 @@ const DASHBOARD_ROUTES: Record<Role, string> = {
   branch_manager:   '/dashboard',
   ar_manager:       '/ar',
   ar_team:          '/ar',
+  office_team:      '/ar',
   project_manager:  '/dashboard',
 }
 

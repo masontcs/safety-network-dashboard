@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import type { Role } from '@/lib/supabase/database.types'
 
 // Write access per note type
-const COLLECTION_WRITE_ROLES: Role[] = ['admin', 'ar_manager', 'ar_team', 'executive']
+const COLLECTION_WRITE_ROLES: Role[] = ['admin', 'ar_manager', 'ar_team', 'office_team', 'executive']
 const OPERATION_WRITE_ROLES: Role[]  = ['admin', 'executive', 'district_manager', 'branch_manager', 'project_manager']
 
 export async function POST(

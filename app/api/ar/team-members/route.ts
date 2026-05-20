@@ -13,11 +13,16 @@ export async function GET(): Promise<Response> {
     const { data } = await supabase
       .from('user_profiles')
       .select('id, display_name, role')
-      .in('role', ['ar_team', 'ar_manager'])
+      .in('role', ['ar_team', 'ar_manager', 'office_team'])
+      .eq('is_active', true)
       .order('display_name')
 
     return NextResponse.json({
-      users: (data ?? []).map((u) => ({ id: u.id as string, displayName: u.display_name as string })),
+      users: (data ?? []).map((u) => ({
+        id:          u.id as string,
+        displayName: u.display_name as string,
+        role:        u.role as string,
+      })),
     })
   } catch (err) {
     console.error('AR team-members GET error:', err)

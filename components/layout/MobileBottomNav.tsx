@@ -151,6 +151,12 @@ const NAV_CONFIG: Record<Role, NavConfig> = {
     ],
     more: [],
   },
+  office_team: {
+    primary: [
+      { href: '/ar', label: 'AR', icon: (a) => <ArIcon a={a} /> },
+    ],
+    more: [],
+  },
   project_manager: {
     primary: [
       { href: '/dashboard', label: 'Dashboard', icon: (a) => <GridIcon a={a} />, exact: true },
