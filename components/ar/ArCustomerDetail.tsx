@@ -7,7 +7,10 @@ import type { Role } from '@/lib/supabase/database.types'
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface Contact { id: string; name: string; title: string | null; email: string | null; phone: string | null; isPrimary: boolean }
-interface Note    { id: string; content: string; noteType: 'collection' | 'operation'; createdAt: string; createdByName: string | null }
+interface Note    {
+  id: string; content: string; noteType: 'collection' | 'operation'; createdAt: string; createdByName: string | null
+  communicationType: string | null; contactName: string | null; outcome: string | null
+}
 interface PmAssignment { userId: string; displayName: string; role: string }
 interface ArAssignment { userId: string; displayName: string; role: string }
 interface EntityRef { entityCode: string; quickbooksName: string }
@@ -19,6 +22,8 @@ interface CustomerProfile {
   isExcluded: boolean
   customerStatus: string
   collectionStatus: string
+  collectionPhase: string
+  contactFrequency: string | null
   entityRefs: EntityRef[]
   contacts: Contact[]
   notes: Note[]
@@ -70,11 +75,58 @@ const COLLECTION_STATUS_OPTIONS = [
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Critical', 2: 'High', 3: 'Low', 0: '' }
 
+const COLLECTION_PHASE_OPTIONS = [
+  { value: 'collection_team',  label: 'Collection Team',  color: '#888888' },
+  { value: 'branch_manager',   label: 'Branch Manager',   color: '#cc9900' },
+  { value: 'vp_high_level',    label: 'VP / High Level',  color: '#ff6b00' },
+  { value: 'do_not_contact',   label: 'Do Not Contact',   color: '#cc4444' },
+  { value: 'pending_write_off', label: 'Pending Write-Off', color: '#555555' },
+]
+
+const CONTACT_FREQUENCY_OPTIONS = [
+  { value: 'weekly',        label: 'Weekly'         },
+  { value: 'bi_weekly',     label: 'Bi-Weekly'      },
+  { value: 'monthly',       label: 'Monthly'        },
+  { value: 'portal',        label: 'Portal'         },
+  { value: 'paid_when_paid', label: 'Paid When Paid' },
+  { value: 'do_not_call',   label: 'Do Not Call'    },
+]
+
+const COMMUNICATION_TYPE_OPTIONS = [
+  { value: 'email',      label: 'Email'      },
+  { value: 'phone_call', label: 'Phone Call' },
+  { value: 'text',       label: 'Text'       },
+  { value: 'in_person',  label: 'In Person'  },
+  { value: 'portal',     label: 'Portal'     },
+]
+
+const OUTCOME_OPTIONS = [
+  { value: 'positive',        label: 'Positive',         color: '#4caf50' },
+  { value: 'needs_follow_up', label: 'Needs Follow-Up',  color: '#cc9900' },
+  { value: 'promise_to_pay',  label: 'Promise to Pay',   color: '#ff6b00' },
+  { value: 'no_answer',       label: 'No Answer',        color: '#555555' },
+  { value: 'unproductive',    label: 'Unproductive',     color: '#666666' },
+  { value: 'roadblock',       label: 'Roadblock',        color: '#cc4444' },
+  { value: 'escalated',       label: 'Escalated',        color: '#cc4444' },
+]
+
 function getCustomerStatusMeta(v: string) {
   return CUSTOMER_STATUS_OPTIONS.find((o) => o.value === v) ?? CUSTOMER_STATUS_OPTIONS[0]
 }
 function getCollectionStatusMeta(v: string) {
   return COLLECTION_STATUS_OPTIONS.find((o) => o.value === v) ?? COLLECTION_STATUS_OPTIONS[0]
+}
+function getCollectionPhaseMeta(v: string) {
+  return COLLECTION_PHASE_OPTIONS.find((o) => o.value === v) ?? COLLECTION_PHASE_OPTIONS[0]
+}
+function getOutcomeMeta(v: string) {
+  return OUTCOME_OPTIONS.find((o) => o.value === v) ?? null
+}
+function getCommTypeLabel(v: string) {
+  return COMMUNICATION_TYPE_OPTIONS.find((o) => o.value === v)?.label ?? v
+}
+function getFrequencyLabel(v: string) {
+  return CONTACT_FREQUENCY_OPTIONS.find((o) => o.value === v)?.label ?? v
 }
 
 // ─── Chart palette ─────────────────────────────────────────────────────────────
@@ -312,6 +364,10 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
   const [addingCollectionNote, setAddingCollectionNote] = useState(false)
   const [addingOperationNote, setAddingOperationNote]   = useState(false)
   const [togglingExclude, setTogglingExclude] = useState(false)
+  // Collection note form extras
+  const [collCommType, setCollCommType]   = useState('')
+  const [collContactName, setCollContactName] = useState('')
+  const [collOutcome, setCollOutcome]     = useState('')
 
   const fetchProfile = useCallback(async () => {
     setProfileLoading(true)
@@ -385,6 +441,17 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
     setProfile((p) => p ? { ...p, collectionStatus: v } : p)
   }
 
+  const handleCollectionPhaseChange = async (v: string) => {
+    await patchCustomer({ collectionPhase: v })
+    setProfile((p) => p ? { ...p, collectionPhase: v } : p)
+  }
+
+  const handleContactFrequencyChange = async (v: string) => {
+    const val = v || null
+    await patchCustomer({ contactFrequency: val })
+    setProfile((p) => p ? { ...p, contactFrequency: val } : p)
+  }
+
   const handleAddNote = async (noteType: 'collection' | 'operation') => {
     const text = noteType === 'collection' ? collectionNoteText : operationNoteText
     if (!text.trim()) return
@@ -392,13 +459,27 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
     else setAddingOperationNote(true)
     const res = await fetch(`/api/ar/customers/${customer.id}/notes`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: text.trim(), noteType }),
+      body: JSON.stringify({
+        content: text.trim(),
+        noteType,
+        ...(noteType === 'collection' ? {
+          communicationType: collCommType || null,
+          contactName:       collContactName.trim() || null,
+          outcome:           collOutcome || null,
+        } : {}),
+      }),
     })
     if (res.ok) {
       const { note } = await res.json()
       setProfile((p) => p ? { ...p, notes: [note, ...p.notes] } : p)
-      if (noteType === 'collection') setCollectionNoteText('')
-      else setOperationNoteText('')
+      if (noteType === 'collection') {
+        setCollectionNoteText('')
+        setCollCommType('')
+        setCollContactName('')
+        setCollOutcome('')
+      } else {
+        setOperationNoteText('')
+      }
     }
     if (noteType === 'collection') setAddingCollectionNote(false)
     else setAddingOperationNote(false)
@@ -482,8 +563,9 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
   const assignedArIds       = new Set(arAssignments.map((a) => a.userId))
   const availableArTeamUsers = arTeamUsers.filter((u) => !assignedArIds.has(u.id))
 
-  const custStatusMeta = getCustomerStatusMeta(profile?.customerStatus ?? 'active')
-  const collStatusMeta = getCollectionStatusMeta(profile?.collectionStatus ?? 'none')
+  const custStatusMeta  = getCustomerStatusMeta(profile?.customerStatus ?? 'active')
+  const collStatusMeta  = getCollectionStatusMeta(profile?.collectionStatus ?? 'none')
+  const collPhaseMeta   = getCollectionPhaseMeta(profile?.collectionPhase ?? 'collection_team')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -527,6 +609,32 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
               {collStatusMeta.label}
             </span>
           )}
+
+          {/* Collection phase */}
+          {isArAdmin && profile ? (
+            <select value={profile.collectionPhase} onChange={(e) => handleCollectionPhaseChange(e.target.value)}
+              style={{ background: `${collPhaseMeta.color}18`, border: `1px solid ${collPhaseMeta.color}55`, borderRadius: 8, color: collPhaseMeta.color, padding: '5px 10px', fontSize: 12, cursor: 'pointer' }}>
+              {COLLECTION_PHASE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          ) : profile && profile.collectionPhase !== 'collection_team' && (
+            <span style={{ background: `${collPhaseMeta.color}18`, border: `1px solid ${collPhaseMeta.color}55`, borderRadius: 8, color: collPhaseMeta.color, padding: '5px 10px', fontSize: 12 }}>
+              {collPhaseMeta.label}
+            </span>
+          )}
+
+          {/* Contact frequency */}
+          {isArAdmin && profile ? (
+            <select value={profile.contactFrequency ?? ''} onChange={(e) => handleContactFrequencyChange(e.target.value)}
+              style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: profile.contactFrequency ? '#cccccc' : '#555', padding: '5px 10px', fontSize: 12, cursor: 'pointer' }}>
+              <option value=''>Frequency…</option>
+              {CONTACT_FREQUENCY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          ) : profile?.contactFrequency && (
+            <span style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#888', padding: '5px 10px', fontSize: 12 }}>
+              {getFrequencyLabel(profile.contactFrequency)}
+            </span>
+          )}
+
           {isAdmin && (
             <button onClick={handleExcludeToggle} disabled={togglingExclude}
               style={{ background: profile?.isExcluded ? '#2a2a2a' : 'rgba(204,68,68,0.12)', border: `1px solid ${profile?.isExcluded ? '#333' : '#663333'}`, borderRadius: 8, color: profile?.isExcluded ? '#888' : '#cc4444', padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}>
@@ -758,10 +866,31 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
         {/* Collection Notes — write: admin/ar_manager/ar_team/executive; read-only: all other roles */}
         <SectionCard title="Collection Notes">
           {canWriteCollectionNotes && (
-            <div style={{ marginBottom: 12 }}>
+            <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {/* Row 1: comm type + contact name */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <select value={collCommType} onChange={(e) => setCollCommType(e.target.value)}
+                  style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: collCommType ? '#ccc' : '#555', padding: '6px 10px', fontSize: 12, outline: 'none' }}>
+                  <option value=''>How contacted…</option>
+                  {COMMUNICATION_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <input
+                  placeholder='Contact name (optional)'
+                  value={collContactName}
+                  onChange={(e) => setCollContactName(e.target.value)}
+                  style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '6px 10px', fontSize: 12, outline: 'none' }}
+                />
+              </div>
+              {/* Row 2: outcome */}
+              <select value={collOutcome} onChange={(e) => setCollOutcome(e.target.value)}
+                style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: collOutcome ? (getOutcomeMeta(collOutcome)?.color ?? '#ccc') : '#555', padding: '6px 10px', fontSize: 12, outline: 'none' }}>
+                <option value=''>Outcome…</option>
+                {OUTCOME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              {/* Row 3: note text */}
               <textarea placeholder="Add a collection note…" value={collectionNoteText} onChange={(e) => setCollectionNoteText(e.target.value)} rows={3}
                 style={{ width: '100%', background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button onClick={() => handleAddNote('collection')} disabled={addingCollectionNote || !collectionNoteText.trim()}
                   style={{ background: '#ff6b00', border: 'none', borderRadius: 6, color: '#fff', padding: '5px 14px', fontSize: 12, cursor: addingCollectionNote || !collectionNoteText.trim() ? 'default' : 'pointer', opacity: addingCollectionNote || !collectionNoteText.trim() ? 0.5 : 1 }}>
                   {addingCollectionNote ? 'Saving…' : 'Add Note'}
@@ -777,20 +906,39 @@ export default function ArCustomerDetail({ customer, entity, role, onBack, onRef
                 if (shown.length === 0) return <div style={{ fontSize: 12, color: '#555' }}>No collection notes yet.</div>
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {shown.map((n) => (
-                      <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid #2a2a2a' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                          <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
-                          {isArAdmin && (
-                            <button onClick={() => handleDeleteNote(n.id)}
-                              style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
-                              onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                              onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
-                          )}
+                    {shown.map((n) => {
+                      const outcomeMeta = n.outcome ? getOutcomeMeta(n.outcome) : null
+                      return (
+                        <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid #2a2a2a' }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                            <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
+                            {isArAdmin && (
+                              <button onClick={() => handleDeleteNote(n.id)}
+                                style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
+                                onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
+                                onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
+                            )}
+                          </div>
+                          {/* Note metadata row */}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 5 }}>
+                            {outcomeMeta && (
+                              <span style={{ fontSize: 10, fontWeight: 600, color: outcomeMeta.color, background: `${outcomeMeta.color}18`, borderRadius: 4, padding: '1px 6px' }}>
+                                {outcomeMeta.label}
+                              </span>
+                            )}
+                            {n.communicationType && (
+                              <span style={{ fontSize: 10, color: '#666', background: '#2a2a2a', borderRadius: 4, padding: '1px 6px' }}>
+                                {getCommTypeLabel(n.communicationType)}
+                              </span>
+                            )}
+                            {n.contactName && (
+                              <span style={{ fontSize: 10, color: '#555' }}>w/ {n.contactName}</span>
+                            )}
+                            <span style={{ fontSize: 11, color: '#555', marginLeft: 'auto' }}>{n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}</span>
+                          </div>
                         </div>
-                        <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>{n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}</div>
-                      </div>
-                    ))}
+                      )
+                    })}
                     {extra > 0 && (
                       <div style={{ fontSize: 11, color: '#444', textAlign: 'center', paddingTop: 2 }}>
                         {extra} older note{extra !== 1 ? 's' : ''} not shown

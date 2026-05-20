@@ -23,10 +23,10 @@ export async function GET(
       { data: pmRows },
       { data: branchInvoices },
     ] = await Promise.all([
-      supabase.from('ar_customers').select('id, display_name, is_excluded, customer_status, collection_status').eq('id', id).single(),
+      supabase.from('ar_customers').select('id, display_name, is_excluded, customer_status, collection_status, collection_phase, contact_frequency').eq('id', id).single(),
       supabase.from('ar_customer_entity_refs').select('entity_code, quickbooks_name').eq('customer_id', id),
       supabase.from('ar_customer_contacts').select('id, name, title, email, phone, is_primary, created_at').eq('customer_id', id).order('is_primary', { ascending: false }).order('created_at'),
-      supabase.from('ar_customer_notes').select('id, content, created_by, created_at, note_type').eq('customer_id', id).order('created_at', { ascending: false }),
+      supabase.from('ar_customer_notes').select('id, content, created_by, created_at, note_type, communication_type, contact_name, outcome').eq('customer_id', id).order('created_at', { ascending: false }),
       supabase.from('ar_customer_pm_assignments').select('user_id').eq('customer_id', id),
       supabase.from('ar_invoices').select('branch_id, open_balance').eq('customer_id', id).eq('row_type', 'invoice'),
     ])
@@ -78,14 +78,19 @@ export async function GET(
         isExcluded:       customer.is_excluded,
         customerStatus:   customer.customer_status ?? 'active',
         collectionStatus: customer.collection_status ?? 'none',
+        collectionPhase:  customer.collection_phase ?? 'collection_team',
+        contactFrequency: customer.contact_frequency ?? null,
         entityRefs:       (refs ?? []).map((r) => ({ entityCode: r.entity_code, quickbooksName: r.quickbooks_name })),
         contacts:         (contacts ?? []).map((c) => ({ id: c.id, name: c.name, title: c.title, email: c.email, phone: c.phone, isPrimary: c.is_primary })),
         notes: (notes ?? []).map((n) => ({
-            id:            n.id,
-            content:       n.content,
-            noteType:      (n.note_type as string) ?? 'collection',
-            createdAt:     n.created_at,
-            createdByName: n.created_by ? (profileMap.get(n.created_by)?.display_name ?? null) : null,
+            id:                n.id,
+            content:           n.content,
+            noteType:          (n.note_type as string) ?? 'collection',
+            createdAt:         n.created_at,
+            createdByName:     n.created_by ? (profileMap.get(n.created_by)?.display_name ?? null) : null,
+            communicationType: n.communication_type ?? null,
+            contactName:       n.contact_name ?? null,
+            outcome:           n.outcome ?? null,
           })),
         pmAssignments: (pmRows ?? []).map((p) => {
           const prof = profileMap.get(p.user_id)
@@ -111,7 +116,7 @@ export async function PATCH(
     if (guard) return guard
 
     const body = await request.json()
-    type CustomerUpdate = { is_excluded?: boolean; customer_status?: string; collection_status?: string }
+    type CustomerUpdate = { is_excluded?: boolean; customer_status?: string; collection_status?: string; collection_phase?: string; contact_frequency?: string | null }
     const update: CustomerUpdate = {}
 
     if (typeof body.isExcluded === 'boolean') update.is_excluded = body.isExcluded
@@ -126,6 +131,18 @@ export async function PATCH(
       const VALID = ['none', 'promise_to_pay', 'payment_plan', 'on_hold', 'dispute', 'legal', 'collections', 'write_off']
       if (!VALID.includes(body.collectionStatus)) return NextResponse.json({ error: 'Invalid collectionStatus' }, { status: 400 })
       update.collection_status = body.collectionStatus
+    }
+
+    if (typeof body.collectionPhase === 'string') {
+      const VALID = ['collection_team', 'branch_manager', 'vp_high_level', 'do_not_contact', 'pending_write_off']
+      if (!VALID.includes(body.collectionPhase)) return NextResponse.json({ error: 'Invalid collectionPhase' }, { status: 400 })
+      update.collection_phase = body.collectionPhase
+    }
+
+    if ('contactFrequency' in body) {
+      const VALID = ['weekly', 'bi_weekly', 'monthly', 'portal', 'paid_when_paid', 'do_not_call']
+      if (body.contactFrequency !== null && !VALID.includes(body.contactFrequency)) return NextResponse.json({ error: 'Invalid contactFrequency' }, { status: 400 })
+      update.contact_frequency = body.contactFrequency ?? null
     }
 
     if (Object.keys(update).length === 0) {
