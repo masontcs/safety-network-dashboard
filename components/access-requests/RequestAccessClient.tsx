@@ -39,11 +39,14 @@ const labelStyle: React.CSSProperties = {
   fontWeight: 400,
 }
 
+const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/
+
 export default function RequestAccessClient({ branches }: { branches: Branch[] }) {
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
     email: '',
+    username: '',
     branchId: '',
     requestedRole: '',
     notes: '',
@@ -59,12 +62,20 @@ export default function RequestAccessClient({ branches }: { branches: Branch[] }
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+
+    // Validate username format before submitting
+    const uname = form.username.trim().toLowerCase()
+    if (!USERNAME_REGEX.test(uname)) {
+      setError('Username must be 3–20 characters and contain only lowercase letters, numbers, or underscores.')
+      return
+    }
+
     setSubmitting(true)
     try {
       const res = await fetch('/api/access-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, username: uname }),
       })
       const json = await res.json()
       if (!json.success) {
@@ -190,6 +201,26 @@ export default function RequestAccessClient({ branches }: { branches: Branch[] }
                 placeholder="you@safetynetwork.com"
                 style={inputStyle}
               />
+            </div>
+
+            <div>
+              <label style={labelStyle}>Username *</label>
+              <input
+                type="text"
+                value={form.username}
+                onChange={(e) => set('username', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                required
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="e.g. jsmith or john_smith"
+                maxLength={20}
+                style={inputStyle}
+              />
+              <div style={{ fontSize: 11, color: '#555555', marginTop: 4 }}>
+                3–20 characters · lowercase letters, numbers, underscores only · used to log in
+              </div>
             </div>
 
             <div>

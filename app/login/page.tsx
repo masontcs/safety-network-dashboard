@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { createBrowserClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('') // username or email
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -15,17 +15,43 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
 
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+    try {
+      const trimmed = identifier.trim()
+      let email = trimmed
 
-    if (authError) {
-      setError('Invalid email or password.')
+      // If no "@" treat it as a username — resolve to email first
+      if (!trimmed.includes('@')) {
+        const res = await fetch(`/api/auth/resolve-username?username=${encodeURIComponent(trimmed.toLowerCase())}`)
+        const json = await res.json() as { success: boolean; email?: string }
+        if (!json.success || !json.email) {
+          setError('Invalid username or password.')
+          return
+        }
+        email = json.email
+      }
+
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
+      if (authError) {
+        setError('Invalid username or password.')
+        return
+      }
+
+      // Full navigation so cookies are committed before middleware reads them
+      window.location.href = '/'
+    } finally {
       setLoading(false)
-      return
     }
+  }
 
-    // Full navigation so cookies are committed before the middleware reads them.
-    // router.push() is a soft RSC fetch that can race with cookie writes.
-    window.location.href = '/'
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    background: '#2a2a2a',
+    border: '1px solid #333333',
+    borderRadius: 8,
+    padding: '8px 12px',
+    fontSize: 13,
+    color: '#ffffff',
+    outline: 'none',
   }
 
   return (
@@ -46,24 +72,19 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 11, color: '#888888', marginBottom: 6 }}>
-              Email
+              Username or Email
             </label>
             <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              type="text"
+              value={identifier}
+              onChange={e => setIdentifier(e.target.value)}
               required
-              autoComplete="email"
-              style={{
-                width: '100%',
-                background: '#2a2a2a',
-                border: '1px solid #333333',
-                borderRadius: 8,
-                padding: '8px 12px',
-                fontSize: 13,
-                color: '#ffffff',
-                outline: 'none',
-              }}
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="username or email address"
+              style={inputStyle}
             />
           </div>
 
@@ -77,16 +98,7 @@ export default function LoginPage() {
               onChange={e => setPassword(e.target.value)}
               required
               autoComplete="current-password"
-              style={{
-                width: '100%',
-                background: '#2a2a2a',
-                border: '1px solid #333333',
-                borderRadius: 8,
-                padding: '8px 12px',
-                fontSize: 13,
-                color: '#ffffff',
-                outline: 'none',
-              }}
+              style={inputStyle}
             />
           </div>
 

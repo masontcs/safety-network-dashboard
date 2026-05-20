@@ -39,5 +39,16 @@ next-env.d.ts
 # claude code session files
 .claude/
 
+# raw payroll / AR source files — sensitive, never commit
+"Payroll Reports/"
+Payroll Reports/
+*.xlsx
+*.xlsm
+*.xls
+
+# local scripts with credentials
+scripts/
+audit_payroll.js
+
 # supabase CLI local state (contains org/project IDs)
 supabase/.temp/

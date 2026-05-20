@@ -68,9 +68,9 @@ export type Database = {
         Relationships: []
       }
       user_profiles: {
-        Row: { id: string; role: Role; display_name: string; must_change_password: boolean; is_active: boolean }
-        Insert: { id: string; role: Role; display_name?: string; must_change_password?: boolean; is_active?: boolean }
-        Update: { id?: string; role?: Role; display_name?: string; must_change_password?: boolean; is_active?: boolean }
+        Row: { id: string; role: Role; display_name: string; must_change_password: boolean; is_active: boolean; username: string | null }
+        Insert: { id: string; role: Role; display_name?: string; must_change_password?: boolean; is_active?: boolean; username?: string | null }
+        Update: { id?: string; role?: Role; display_name?: string; must_change_password?: boolean; is_active?: boolean; username?: string | null }
         Relationships: []
       }
       user_branch_assignments: {
@@ -164,9 +164,9 @@ export type Database = {
         Relationships: []
       }
       access_requests: {
-        Row: { id: string; first_name: string; last_name: string; email: string; branch_id: string | null; requested_role: string; notes: string | null; status: string; reviewed_by: string | null; reviewed_at: string | null; created_at: string }
-        Insert: { id?: string; first_name: string; last_name: string; email: string; branch_id?: string | null; requested_role: string; notes?: string | null; status?: string; reviewed_by?: string | null; reviewed_at?: string | null; created_at?: string }
-        Update: { id?: string; first_name?: string; last_name?: string; email?: string; branch_id?: string | null; requested_role?: string; notes?: string | null; status?: string; reviewed_by?: string | null; reviewed_at?: string | null }
+        Row: { id: string; first_name: string; last_name: string; email: string; username: string | null; branch_id: string | null; requested_role: string; notes: string | null; status: string; reviewed_by: string | null; reviewed_at: string | null; created_at: string }
+        Insert: { id?: string; first_name: string; last_name: string; email: string; username?: string | null; branch_id?: string | null; requested_role: string; notes?: string | null; status?: string; reviewed_by?: string | null; reviewed_at?: string | null; created_at?: string }
+        Update: { id?: string; first_name?: string; last_name?: string; email?: string; username?: string | null; branch_id?: string | null; requested_role?: string; notes?: string | null; status?: string; reviewed_by?: string | null; reviewed_at?: string | null }
         Relationships: []
       }
       payroll_staged_transactions: {

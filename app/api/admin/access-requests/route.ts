@@ -15,7 +15,7 @@ export async function GET(): Promise<NextResponse> {
     const [requestsRes, branchesRes] = await Promise.all([
       supabase
         .from('access_requests')
-        .select('id, first_name, last_name, email, branch_id, requested_role, notes, status, reviewed_at, created_at')
+        .select('id, first_name, last_name, email, username, branch_id, requested_role, notes, status, reviewed_at, created_at')
         .order('created_at', { ascending: false }),
       supabase
         .from('branches')
@@ -34,6 +34,7 @@ export async function GET(): Promise<NextResponse> {
       firstName: r.first_name,
       lastName: r.last_name,
       email: r.email,
+      username: r.username ?? null,
       branchId: r.branch_id,
       branchName: r.branch_id ? (branchMap[r.branch_id] ?? null) : null,
       requestedRole: r.requested_role,

@@ -12,6 +12,7 @@ interface AccessRequest {
   firstName: string
   lastName: string
   email: string
+  username: string | null
   branchId: string | null
   branchName: string | null
   requestedRole: string
@@ -22,15 +23,22 @@ interface AccessRequest {
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  branch_manager: 'Branch Manager',
+  branch_manager:   'Branch Manager',
   district_manager: 'District Manager',
-  executive: 'Executive',
+  executive:        'Executive',
+  ar_manager:       'AR Manager',
+  ar_team:          'AR Team',
+  project_manager:  'Project Manager',
+  admin:            'Admin',
 }
 
 const APPROVABLE_ROLES = [
-  { value: 'branch_manager', label: 'Branch Manager' },
+  { value: 'branch_manager',   label: 'Branch Manager' },
   { value: 'district_manager', label: 'District Manager' },
-  { value: 'executive', label: 'Executive' },
+  { value: 'executive',        label: 'Executive' },
+  { value: 'ar_manager',       label: 'AR Manager' },
+  { value: 'ar_team',          label: 'AR Team' },
+  { value: 'project_manager',  label: 'Project Manager' },
 ]
 
 function fmtDate(dateStr: string): string {
@@ -63,6 +71,7 @@ export default function AccessRequestsClient() {
   const [modal, setModal] = useState<ModalState>(null)
   const [actionRole, setActionRole] = useState('')
   const [actionBranchIds, setActionBranchIds] = useState<string[]>([])
+  const [actionUsername, setActionUsername] = useState('')
   const [tmpPassword, setTmpPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [copied, setCopied] = useState(false)
@@ -110,6 +119,7 @@ export default function AccessRequestsClient() {
     setModal({ type: 'approve', request: req })
     setActionRole(req.requestedRole)
     setActionBranchIds(req.branchId ? [req.branchId] : [])
+    setActionUsername(req.username ?? '')
     setTmpPassword('')
     setConfirmPassword('')
     setCopied(false)
@@ -124,6 +134,7 @@ export default function AccessRequestsClient() {
   function closeModal() {
     setModal(null)
     setActionBranchIds([])
+    setActionUsername('')
     setTmpPassword('')
     setConfirmPassword('')
     setCopied(false)
@@ -141,7 +152,7 @@ export default function AccessRequestsClient() {
       const res = await fetch(`/api/admin/access-requests/${modal.request.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'approve', role: actionRole, branchIds: actionBranchIds, temporaryPassword: tmpPassword }),
+        body: JSON.stringify({ action: 'approve', role: actionRole, branchIds: actionBranchIds, temporaryPassword: tmpPassword, username: actionUsername }),
       })
       const json = await res.json()
       if (!json.success) { setActionError(json.error); return }
@@ -227,7 +238,7 @@ export default function AccessRequestsClient() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Name', 'Email', 'Branch', 'Role Requested', 'Submitted', 'Notes', ''].map((h) => (
+                  {['Name', 'Email', 'Username', 'Branch', 'Role Requested', 'Submitted', 'Notes', ''].map((h) => (
                     <th key={h} style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 400, fontSize: 11, color: '#666666', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #2a2a2a' }}>
                       {h}
                     </th>
@@ -241,6 +252,9 @@ export default function AccessRequestsClient() {
                       {r.firstName} {r.lastName}
                     </td>
                     <td style={{ padding: '11px 16px', fontSize: 12, color: '#cccccc' }}>{r.email}</td>
+                    <td style={{ padding: '11px 16px', fontSize: 12, color: '#888888', fontFamily: 'monospace' }}>
+                      {r.username ?? <span style={{ color: '#555555' }}>—</span>}
+                    </td>
                     <td style={{ padding: '11px 16px', fontSize: 12, color: '#cccccc', whiteSpace: 'nowrap' }}>
                       {r.branchName ?? <span style={{ color: '#555555' }}>—</span>}
                     </td>
@@ -361,6 +375,26 @@ export default function AccessRequestsClient() {
                   <div>
                     <div style={{ fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Email</div>
                     <div style={{ fontSize: 13, color: '#cccccc' }}>{modal.request.email}</div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                      Username
+                    </label>
+                    <input
+                      type="text"
+                      value={actionUsername}
+                      onChange={(e) => setActionUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                      placeholder="e.g. jsmith"
+                      maxLength={20}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      style={{ ...selectStyle, fontFamily: 'monospace', letterSpacing: '0.04em' }}
+                    />
+                    <div style={{ fontSize: 11, color: '#555555', marginTop: 4 }}>
+                      3–20 chars · lowercase letters, numbers, underscores · used to log in
+                    </div>
                   </div>
 
                   <div>

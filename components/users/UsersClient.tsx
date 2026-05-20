@@ -12,7 +12,10 @@ interface User {
   role: Role
   branchIds: string[]
   isActive: boolean
+  username: string | null
 }
+
+const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/
 
 const ROLE_LABELS: Record<Role, string> = {
   admin:            'Admin',
@@ -79,6 +82,7 @@ export default function UsersClient() {
   const [editing, setEditing] = useState<string | null>(null)
   const [editRole, setEditRole] = useState<Role>('branch_manager')
   const [editBranches, setEditBranches] = useState<string[]>([])
+  const [editUsername, setEditUsername] = useState('')
   const [saving, setSaving] = useState(false)
 
   // Reset password modal state
@@ -103,6 +107,7 @@ export default function UsersClient() {
   const [showCreate, setShowCreate] = useState(false)
   const [createName, setCreateName] = useState('')
   const [createEmail, setCreateEmail] = useState('')
+  const [createUsername, setCreateUsername] = useState('')
   const [createRole, setCreateRole] = useState<Role>('branch_manager')
   const [createBranches, setCreateBranches] = useState<string[]>([])
   const [createPassword, setCreatePassword] = useState('')
@@ -184,6 +189,7 @@ export default function UsersClient() {
     setEditing(user.id)
     setEditRole(user.role)
     setEditBranches(user.branchIds)
+    setEditUsername(user.username ?? '')
   }
 
   function cancelEdit() {
@@ -191,17 +197,22 @@ export default function UsersClient() {
   }
 
   async function saveEdit(userId: string) {
+    const uname = editUsername.trim().toLowerCase()
+    if (uname && !USERNAME_REGEX.test(uname)) {
+      alert('Username must be 3–20 characters: lowercase letters, numbers, underscores only.')
+      return
+    }
     setSaving(true)
     try {
       const res = await fetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: editRole, branchIds: editBranches }),
+        body: JSON.stringify({ role: editRole, branchIds: editBranches, username: uname || null }),
       })
       const json = await res.json()
       if (!json.success) throw new Error(json.error)
       setUsers((prev) =>
-        prev.map((u) => u.id === userId ? { ...u, role: editRole, branchIds: editBranches } : u),
+        prev.map((u) => u.id === userId ? { ...u, role: editRole, branchIds: editBranches, username: uname || null } : u),
       )
       setEditing(null)
     } catch (err) {
@@ -292,6 +303,7 @@ export default function UsersClient() {
   function openCreate() {
     setCreateName('')
     setCreateEmail('')
+    setCreateUsername('')
     setCreateRole('branch_manager')
     setCreateBranches([])
     setCreatePassword('')
@@ -322,6 +334,11 @@ export default function UsersClient() {
   async function handleCreate() {
     if (!createName.trim()) { setCreateError('Display name is required.'); return }
     if (!createEmail.trim()) { setCreateError('Email is required.'); return }
+    const uname = createUsername.trim().toLowerCase()
+    if (uname && !USERNAME_REGEX.test(uname)) {
+      setCreateError('Username must be 3–20 characters: lowercase letters, numbers, underscores only.')
+      return
+    }
     if (createPassword.length < 8) { setCreateError('Password must be at least 8 characters.'); return }
     if (createPassword !== createConfirm) { setCreateError('Passwords do not match.'); return }
 
@@ -334,6 +351,7 @@ export default function UsersClient() {
         body: JSON.stringify({
           displayName: createName.trim(),
           email: createEmail.trim(),
+          username: uname || undefined,
           role: createRole,
           branchIds: createBranches,
           temporaryPassword: createPassword,
@@ -377,7 +395,7 @@ export default function UsersClient() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['Access', 'Name', 'Email', 'Role', 'Branches', ''].map((h) => (
+                  {['Access', 'Name', 'Username', 'Email', 'Role', 'Branches', ''].map((h) => (
                     <th
                       key={h}
                       className="table-header"
@@ -427,6 +445,27 @@ export default function UsersClient() {
                       {/* Name */}
                       <td className="table-body" style={{ padding: '12px 16px', whiteSpace: 'nowrap', color: user.isActive ? '#ffffff' : '#888888' }}>
                         {user.displayName || '—'}
+                      </td>
+
+                      {/* Username */}
+                      <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editUsername}
+                            onChange={(e) => setEditUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                            placeholder="username"
+                            maxLength={20}
+                            autoCapitalize="none"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            style={{ ...selectStyle, width: 120, fontFamily: 'monospace', fontSize: 12 }}
+                          />
+                        ) : user.username ? (
+                          <span style={{ fontSize: 12, color: '#888888', fontFamily: 'monospace' }}>{user.username}</span>
+                        ) : (
+                          <span style={{ fontSize: 12, color: '#3a3a3a' }}>—</span>
+                        )}
                       </td>
 
                       {/* Email */}
@@ -742,6 +781,27 @@ export default function UsersClient() {
                   autoComplete="off"
                   style={inputStyle}
                 />
+              </div>
+
+              {/* Username */}
+              <div>
+                <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                  Username <span style={{ color: '#444444', textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={createUsername}
+                  onChange={(e) => setCreateUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                  placeholder="e.g. jsmith"
+                  maxLength={20}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  style={{ ...inputStyle, fontFamily: 'monospace' }}
+                />
+                <div style={{ fontSize: 11, color: '#444444', marginTop: 4 }}>
+                  3–20 chars · lowercase letters, numbers, underscores · used to log in instead of email
+                </div>
               </div>
 
               {/* Role */}

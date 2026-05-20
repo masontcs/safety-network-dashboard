@@ -16,7 +16,7 @@ export async function GET(): Promise<NextResponse> {
     const supabase = createServiceClient()
 
     const [profilesRes, assignmentsRes, branchesRes, authRes] = await Promise.all([
-      supabase.from('user_profiles').select('id, role, display_name, is_active'),
+      supabase.from('user_profiles').select('id, role, display_name, is_active, username'),
       supabase.from('user_branch_assignments').select('user_id, branch_id'),
       supabase.from('branches').select('id, name, is_revenue_generating').eq('is_active', true).order('name'),
       supabase.auth.admin.listUsers(),
@@ -25,7 +25,7 @@ export async function GET(): Promise<NextResponse> {
     if (profilesRes.error) throw new Error(profilesRes.error.message)
     if (assignmentsRes.error) throw new Error(assignmentsRes.error.message)
 
-    const profiles = (profilesRes.data ?? []) as { id: string; role: Role; display_name: string; is_active: boolean }[]
+    const profiles = (profilesRes.data ?? []) as { id: string; role: Role; display_name: string; is_active: boolean; username: string | null }[]
     const branches = (branchesRes.data ?? []) as { id: string; name: string; is_revenue_generating: boolean }[]
     const authUsers = authRes.data?.users ?? []
 
@@ -48,6 +48,7 @@ export async function GET(): Promise<NextResponse> {
         role:        p.role,
         branchIds:   branchMap[p.id] ?? [],
         isActive:    p.is_active ?? true,
+        username:    p.username ?? null,
       }))
       .sort((a, b) => {
         // Active users first, then alphabetical by name
@@ -71,17 +72,22 @@ export async function POST(request: Request): Promise<NextResponse> {
     const body = await request.json() as {
       displayName?: string
       email?: string
+      username?: string
       role?: Role
       branchIds?: string[]
       temporaryPassword?: string
     }
-    const { displayName, email, role, branchIds, temporaryPassword } = body
+    const { displayName, email, username, role, branchIds, temporaryPassword } = body
 
     if (!displayName?.trim()) {
       return NextResponse.json({ success: false, error: 'Display name is required', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
     if (!email?.trim()) {
       return NextResponse.json({ success: false, error: 'Email is required', code: 'VALIDATION_ERROR' }, { status: 400 })
+    }
+    const uname = username?.trim().toLowerCase() || null
+    if (uname && !/^[a-z0-9_]{3,20}$/.test(uname)) {
+      return NextResponse.json({ success: false, error: 'Invalid username format', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
     if (!role || !VALID_ROLES.includes(role)) {
       return NextResponse.json({ success: false, error: 'A valid role is required', code: 'VALIDATION_ERROR' }, { status: 400 })
@@ -93,6 +99,21 @@ export async function POST(request: Request): Promise<NextResponse> {
     const ids = branchIds ?? []
 
     const supabase = createServiceClient()
+
+    // Check username uniqueness before creating auth user
+    if (uname) {
+      const { data: taken } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('username', uname)
+        .maybeSingle()
+      if (taken) {
+        return NextResponse.json(
+          { success: false, error: `Username "${uname}" is already taken`, code: 'CONFLICT' },
+          { status: 409 },
+        )
+      }
+    }
 
     const { data: createData, error: createErr } = await supabase.auth.admin.createUser({
       email: email.trim(),
@@ -117,7 +138,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const { error: profileErr } = await supabase
       .from('user_profiles')
-      .insert({ id: userId, role, display_name: displayName.trim(), must_change_password: true })
+      .insert({ id: userId, role, display_name: displayName.trim(), must_change_password: true, ...(uname ? { username: uname } : {}) })
 
     if (profileErr) {
       await supabase.auth.admin.deleteUser(userId)
