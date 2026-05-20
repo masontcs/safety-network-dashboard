@@ -84,7 +84,12 @@ function fmtRelative(iso: string) {
   return `${days}d ago`
 }
 
-function MetaDetails({ metadata, action }: { metadata: Record<string, unknown>; action: string }) {
+function resolveBranches(ids: unknown, branchMap: Record<string, string>): string {
+  if (!Array.isArray(ids) || ids.length === 0) return '—'
+  return ids.map((id) => branchMap[String(id)] ?? String(id).slice(0, 8) + '…').join(', ')
+}
+
+function MetaDetails({ metadata, action, branchMap }: { metadata: Record<string, unknown>; action: string; branchMap: Record<string, string> }) {
   if (!metadata || Object.keys(metadata).length === 0) return null
 
   const items: { label: string; value: string }[] = []
@@ -92,16 +97,19 @@ function MetaDetails({ metadata, action }: { metadata: Record<string, unknown>; 
   if (action === 'user.create') {
     if (metadata.email) items.push({ label: 'Email', value: String(metadata.email) })
     if (metadata.role) items.push({ label: 'Role', value: ROLE_LABELS[String(metadata.role)] ?? String(metadata.role) })
+    if (metadata.branchIds) items.push({ label: 'Branches', value: resolveBranches(metadata.branchIds, branchMap) })
   } else if (action === 'user.update') {
     const changes = metadata.changes as Record<string, unknown> | undefined
     if (changes) {
       if (changes.role) items.push({ label: 'New role', value: ROLE_LABELS[String(changes.role)] ?? String(changes.role) })
       if (typeof changes.isActive === 'boolean') items.push({ label: 'Active', value: changes.isActive ? 'Yes' : 'No' })
+      if (changes.branchIds) items.push({ label: 'Branches', value: resolveBranches(changes.branchIds, branchMap) })
     }
   } else if (action === 'access_request.approve') {
     if (metadata.email) items.push({ label: 'Email', value: String(metadata.email) })
     if (metadata.requestedRole) items.push({ label: 'Requested', value: ROLE_LABELS[String(metadata.requestedRole)] ?? String(metadata.requestedRole) })
     if (metadata.approvedRole) items.push({ label: 'Approved as', value: ROLE_LABELS[String(metadata.approvedRole)] ?? String(metadata.approvedRole) })
+    if (metadata.branchIds) items.push({ label: 'Branches', value: resolveBranches(metadata.branchIds, branchMap) })
   } else if (action === 'access_request.archive') {
     if (metadata.email) items.push({ label: 'Email', value: String(metadata.email) })
     if (metadata.requestedRole) items.push({ label: 'Requested', value: ROLE_LABELS[String(metadata.requestedRole)] ?? String(metadata.requestedRole) })
@@ -134,7 +142,7 @@ function MetaDetails({ metadata, action }: { metadata: Record<string, unknown>; 
   } else if (action === 'payroll.view') {
     if (metadata.startDate) items.push({ label: 'From', value: String(metadata.startDate) })
     if (metadata.endDate) items.push({ label: 'To', value: String(metadata.endDate) })
-    if (metadata.branchId) items.push({ label: 'Branch', value: String(metadata.branchId).slice(0, 8) + '…' })
+    if (metadata.branchId) items.push({ label: 'Branch', value: branchMap[String(metadata.branchId)] ?? String(metadata.branchId).slice(0, 8) + '…' })
   }
 
   if (items.length === 0) return null
@@ -154,11 +162,12 @@ function MetaDetails({ metadata, action }: { metadata: Record<string, unknown>; 
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function AuditClient() {
-  const [logs, setLogs]       = useState<AuditLog[]>([])
-  const [users, setUsers]     = useState<AuditUser[]>([])
-  const [total, setTotal]     = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [page, setPage]       = useState(1)
+  const [logs, setLogs]         = useState<AuditLog[]>([])
+  const [users, setUsers]       = useState<AuditUser[]>([])
+  const [branchMap, setBranchMap] = useState<Record<string, string>>({})
+  const [total, setTotal]       = useState(0)
+  const [loading, setLoading]   = useState(true)
+  const [page, setPage]         = useState(1)
   const limit = 50
 
   const [filterUserId,   setFilterUserId]   = useState('')
@@ -196,6 +205,20 @@ export default function AuditClient() {
   }, [page, filterUserId, filterCategory, filterPeriod])
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
+
+  // Load branches once for ID → name resolution
+  useEffect(() => {
+    fetch('/api/branches')
+      .then((r) => r.json())
+      .then((d) => {
+        const map: Record<string, string> = {}
+        for (const b of d.branches ?? d.data ?? []) {
+          if (b.id && b.name) map[b.id] = b.name
+        }
+        setBranchMap(map)
+      })
+      .catch(() => {})
+  }, [])
 
   // Reset to page 1 when filters change
   useEffect(() => { setPage(1) }, [filterUserId, filterCategory, filterPeriod])
@@ -310,7 +333,7 @@ export default function AuditClient() {
                         <span style={{ fontSize: 12, color: '#cccccc' }}>{log.resource_label}</span>
                       )}
                     </div>
-                    <MetaDetails metadata={log.metadata} action={log.action} />
+                    <MetaDetails metadata={log.metadata} action={log.action} branchMap={branchMap} />
                   </div>
 
                   {/* IP */}
