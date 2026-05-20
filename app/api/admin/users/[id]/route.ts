@@ -4,7 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/utils/errors'
 import type { Role } from '@/lib/supabase/database.types'
 
-const VALID_ROLES: Role[] = ['admin', 'executive', 'district_manager', 'branch_manager']
+const VALID_ROLES: Role[] = ['admin', 'executive', 'district_manager', 'branch_manager', 'ar_manager', 'ar_team', 'project_manager']
 
 export async function PATCH(
   request: Request,
@@ -16,8 +16,8 @@ export async function PATCH(
     const guard = guardAdminOnly(ctx.access.role)
     if (guard) return guard
 
-    const body = await request.json() as { role?: Role; branchIds?: string[] }
-    const { role, branchIds } = body
+    const body = await request.json() as { role?: Role; branchIds?: string[]; isActive?: boolean }
+    const { role, branchIds, isActive } = body
 
     if (role && !VALID_ROLES.includes(role)) {
       return NextResponse.json(
@@ -28,6 +28,7 @@ export async function PATCH(
 
     const supabase = createServiceClient()
 
+    // ── Role ──────────────────────────────────────────────────────────────────
     if (role) {
       const { error } = await supabase
         .from('user_profiles')
@@ -36,8 +37,8 @@ export async function PATCH(
       if (error) throw new Error(error.message)
     }
 
+    // ── Branch assignments ────────────────────────────────────────────────────
     if (branchIds !== undefined) {
-      // Replace all branch assignments atomically
       const { error: delError } = await supabase
         .from('user_branch_assignments')
         .delete()
@@ -50,6 +51,22 @@ export async function PATCH(
           .insert(branchIds.map((branch_id) => ({ user_id: params.id, branch_id })))
         if (insError) throw new Error(insError.message)
       }
+    }
+
+    // ── Active / deactivate ───────────────────────────────────────────────────
+    if (typeof isActive === 'boolean') {
+      // Update profile flag
+      const { error: profileErr } = await supabase
+        .from('user_profiles')
+        .update({ is_active: isActive })
+        .eq('id', params.id)
+      if (profileErr) throw new Error(profileErr.message)
+
+      // Ban or unban the auth user so they cannot log in while deactivated
+      const { error: authErr } = await supabase.auth.admin.updateUserById(params.id, {
+        ban_duration: isActive ? 'none' : '876000h', // ~100 years = effectively permanent
+      })
+      if (authErr) throw new Error(authErr.message)
     }
 
     return NextResponse.json({ success: true })

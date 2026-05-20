@@ -16,7 +16,7 @@ export async function GET(): Promise<NextResponse> {
     const supabase = createServiceClient()
 
     const [profilesRes, assignmentsRes, branchesRes, authRes] = await Promise.all([
-      supabase.from('user_profiles').select('id, role, display_name'),
+      supabase.from('user_profiles').select('id, role, display_name, is_active'),
       supabase.from('user_branch_assignments').select('user_id, branch_id'),
       supabase.from('branches').select('id, name, is_revenue_generating').eq('is_active', true).order('name'),
       supabase.auth.admin.listUsers(),
@@ -25,7 +25,7 @@ export async function GET(): Promise<NextResponse> {
     if (profilesRes.error) throw new Error(profilesRes.error.message)
     if (assignmentsRes.error) throw new Error(assignmentsRes.error.message)
 
-    const profiles = (profilesRes.data ?? []) as { id: string; role: Role; display_name: string }[]
+    const profiles = (profilesRes.data ?? []) as { id: string; role: Role; display_name: string; is_active: boolean }[]
     const branches = (branchesRes.data ?? []) as { id: string; name: string; is_revenue_generating: boolean }[]
     const authUsers = authRes.data?.users ?? []
 
@@ -40,13 +40,20 @@ export async function GET(): Promise<NextResponse> {
       }, []),
     )
 
-    const users = profiles.map((p) => ({
-      id: p.id,
-      displayName: p.display_name,
-      email: emailMap[p.id] ?? '',
-      role: p.role,
-      branchIds: branchMap[p.id] ?? [],
-    }))
+    const users = profiles
+      .map((p) => ({
+        id:          p.id,
+        displayName: p.display_name,
+        email:       emailMap[p.id] ?? '',
+        role:        p.role,
+        branchIds:   branchMap[p.id] ?? [],
+        isActive:    p.is_active ?? true,
+      }))
+      .sort((a, b) => {
+        // Active users first, then alphabetical by name
+        if (a.isActive !== b.isActive) return a.isActive ? -1 : 1
+        return (a.displayName ?? '').localeCompare(b.displayName ?? '')
+      })
 
     return NextResponse.json({ success: true, data: { users, branches } })
   } catch (err) {

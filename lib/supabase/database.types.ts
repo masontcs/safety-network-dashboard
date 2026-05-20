@@ -68,9 +68,9 @@ export type Database = {
         Relationships: []
       }
       user_profiles: {
-        Row: { id: string; role: Role; display_name: string; must_change_password: boolean }
-        Insert: { id: string; role: Role; display_name?: string; must_change_password?: boolean }
-        Update: { id?: string; role?: Role; display_name?: string; must_change_password?: boolean }
+        Row: { id: string; role: Role; display_name: string; must_change_password: boolean; is_active: boolean }
+        Insert: { id: string; role: Role; display_name?: string; must_change_password?: boolean; is_active?: boolean }
+        Update: { id?: string; role?: Role; display_name?: string; must_change_password?: boolean; is_active?: boolean }
         Relationships: []
       }
       user_branch_assignments: {

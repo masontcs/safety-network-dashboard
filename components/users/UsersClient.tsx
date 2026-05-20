@@ -11,6 +11,7 @@ interface User {
   email: string
   role: Role
   branchIds: string[]
+  isActive: boolean
 }
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -210,6 +211,28 @@ export default function UsersClient() {
     }
   }
 
+  // ── Active toggle ─────────────────────────────────────────────────────────
+
+  async function handleToggleActive(userId: string, nextActive: boolean) {
+    // Optimistic update
+    setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, isActive: nextActive } : u))
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: nextActive }),
+      })
+      const json = await res.json() as { success: boolean; error?: string }
+      if (!json.success) {
+        setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, isActive: !nextActive } : u))
+        alert(json.error ?? 'Failed to update user')
+      }
+    } catch {
+      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, isActive: !nextActive } : u))
+      alert('Network error — please try again')
+    }
+  }
+
   // ── Reset password handlers ────────────────────────────────────────────────
 
   function openReset(user: User) {
@@ -369,10 +392,43 @@ export default function UsersClient() {
                 {users.map((user) => {
                   const isEditing = editing === user.id
                   return (
-                    <tr key={user.id} style={{ borderBottom: '1px solid #2a2a2a' }}>
-                      {/* Name */}
-                      <td className="table-body" style={{ padding: '12px 16px', color: '#ffffff', whiteSpace: 'nowrap' }}>
-                        {user.displayName || '—'}
+                    <tr key={user.id} style={{ borderBottom: '1px solid #2a2a2a', opacity: user.isActive ? 1 : 0.45 }}>
+                      {/* Name + active toggle */}
+                      <td className="table-body" style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          {/* Toggle pill */}
+                          <button
+                            onClick={() => handleToggleActive(user.id, !user.isActive)}
+                            title={user.isActive ? 'Deactivate user' : 'Activate user'}
+                            style={{
+                              flexShrink: 0,
+                              width: 30,
+                              height: 17,
+                              borderRadius: 9,
+                              background: user.isActive ? '#4caf50' : '#444',
+                              border: 'none',
+                              cursor: 'pointer',
+                              position: 'relative',
+                              transition: 'background 0.18s',
+                              padding: 0,
+                            }}
+                          >
+                            <span style={{
+                              position: 'absolute',
+                              width: 13,
+                              height: 13,
+                              borderRadius: '50%',
+                              background: '#fff',
+                              top: 2,
+                              left: user.isActive ? 15 : 2,
+                              transition: 'left 0.18s',
+                              display: 'block',
+                            }} />
+                          </button>
+                          <span style={{ color: user.isActive ? '#ffffff' : '#888888' }}>
+                            {user.displayName || '—'}
+                          </span>
+                        </div>
                       </td>
 
                       {/* Email */}
