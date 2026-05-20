@@ -6,10 +6,10 @@ const BRANCH_A = 'branch-a'
 const BRANCH_B = 'branch-b'
 const OTHER_BRANCH = 'branch-other'
 
-const admin: UserAccess = { userId: 'u', role: 'admin', branchIds: null }
-const executive: UserAccess = { userId: 'u', role: 'executive', branchIds: null }
-const district: UserAccess = { userId: 'u', role: 'district_manager', branchIds: [BRANCH_A, BRANCH_B] }
-const branch: UserAccess = { userId: 'u', role: 'branch_manager', branchIds: [BRANCH_A] }
+const admin: UserAccess = { userId: 'u', role: 'admin', displayName: '', branchIds: null }
+const executive: UserAccess = { userId: 'u', role: 'executive', displayName: '', branchIds: null }
+const district: UserAccess = { userId: 'u', role: 'district_manager', displayName: '', branchIds: [BRANCH_A, BRANCH_B] }
+const branch: UserAccess = { userId: 'u', role: 'branch_manager', displayName: '', branchIds: [BRANCH_A] }
 
 describe('revenue/summary — branch access (canAccessBranch)', () => {
   it('admin can access any branch', () => {

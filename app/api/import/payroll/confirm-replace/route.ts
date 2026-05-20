@@ -9,6 +9,7 @@ import {
   triggerAiForPayroll,
 } from '@/lib/payroll/import-helpers'
 import { apiError } from '@/lib/utils/errors'
+import { logAudit, getClientIp } from '@/lib/audit/log'
 
 const VALID_ENTITY_CODES = ['INC', 'TCS', 'STS'] as const
 type EntityCode = (typeof VALID_ENTITY_CODES)[number]
@@ -142,6 +143,18 @@ export async function POST(request: Request): Promise<Response> {
 
             const newEmployees = resolved.filter((r) => r.isNew)
             triggerAiForPayroll(newEmployees, entity.id, counts.newItemNames, supabase)
+
+            await logAudit({
+              userId:          ctx.access.userId,
+              userDisplayName: ctx.access.displayName,
+              userRole:        ctx.access.role,
+              action:          'import.payroll.replace',
+              resourceType:    'payroll_import',
+              resourceId:      importRecord.id,
+              resourceLabel:   `${entityCode} — ${periodDate}`,
+              metadata:        { entityCode, periodDate, replacedImportId: replaceImportId, transactionCount: counts.txnCount },
+              ipAddress:       getClientIp(request),
+            })
 
             send({
               type: 'done',

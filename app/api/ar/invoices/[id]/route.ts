@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAccessContext, guardArAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { logAudit, getClientIp } from '@/lib/audit/log'
 
 const VALID_INVOICE_STATUSES = ['disputed', 'short_pay', 'payment_pending', 'lien_filed', 'in_legal', 'write_off']
 
@@ -26,12 +27,37 @@ export async function PATCH(
     }
 
     const supabase = createServiceClient()
+
+    // Fetch invoice details for audit label (best-effort)
+    const { data: inv } = await supabase
+      .from('ar_invoices')
+      .select('invoice_number, invoice_status, customer_id')
+      .eq('id', params.id)
+      .single()
+
     const { error } = await supabase
       .from('ar_invoices')
       .update({ invoice_status: invoiceStatus })
       .eq('id', params.id)
 
     if (error) return NextResponse.json({ error: 'Failed to update invoice' }, { status: 500 })
+
+    await logAudit({
+      userId:          ctx.access.userId,
+      userDisplayName: ctx.access.displayName,
+      userRole:        ctx.access.role,
+      action:          'ar.invoice.flag',
+      resourceType:    'ar_invoice',
+      resourceId:      params.id,
+      resourceLabel:   (inv as { invoice_number: string | null } | null)?.invoice_number ?? params.id,
+      metadata:        {
+        customerId:  (inv as { customer_id: string } | null)?.customer_id,
+        from:        (inv as { invoice_status: string | null } | null)?.invoice_status ?? null,
+        to:          invoiceStatus,
+      },
+      ipAddress:       getClientIp(request),
+    })
+
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('AR invoice PATCH error:', err)

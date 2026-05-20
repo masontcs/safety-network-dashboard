@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAccessContext } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { Role } from '@/lib/supabase/database.types'
+import { logAudit, getClientIp } from '@/lib/audit/log'
 
 // Write access per note type
 const COLLECTION_WRITE_ROLES: Role[] = ['admin', 'ar_manager', 'ar_team', 'office_team', 'executive']
@@ -14,6 +15,7 @@ export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ): Promise<Response> {
+  const ip = getClientIp(request)
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
@@ -63,6 +65,22 @@ export async function POST(
       .single()
 
     if (error) return NextResponse.json({ error: 'Failed to add note' }, { status: 500 })
+
+    // Resolve customer name for the audit label (best-effort)
+    const { data: customer } = await supabase
+      .from('ar_customers').select('display_name').eq('id', params.id).single()
+
+    await logAudit({
+      userId:          ctx.access.userId,
+      userDisplayName: ctx.access.displayName,
+      userRole:        ctx.access.role,
+      action:          'ar.note.add',
+      resourceType:    'ar_customer',
+      resourceId:      params.id,
+      resourceLabel:   (customer as { display_name: string } | null)?.display_name ?? params.id,
+      metadata:        { noteType, snippet: content.slice(0, 120) },
+      ipAddress:       ip,
+    })
 
     const { data: profile } = data.created_by
       ? await supabase.from('user_profiles').select('display_name').eq('id', data.created_by).single()

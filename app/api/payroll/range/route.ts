@@ -8,6 +8,7 @@ import { canAccessBranch } from '@/lib/utils/access'
 import { apiError } from '@/lib/utils/errors'
 import { resolveEmployeeAllocation, type AllocationOverride, type EmployeeAllocation } from '@/lib/allocation/employee-allocation'
 import { isValidDate } from '@/lib/utils/date'
+import { logAudit, getClientIp } from '@/lib/audit/log'
 
 function r2(v: number): number {
   return Math.round(v * 100) / 100
@@ -286,6 +287,15 @@ export async function GET(request: Request): Promise<NextResponse> {
     const allDirectItems = Object.values(directByPeriod).flat()
     const allAdminItems = Object.values(adminByPeriod).flat()
     const shaped = applyPayrollSumRule(allDirectItems, allAdminItems, totalTaxes, access)
+
+    await logAudit({
+      userId:          access.userId,
+      userDisplayName: access.displayName,
+      userRole:        access.role,
+      action:          'payroll.view',
+      metadata:        { startDate, endDate, branchId: branchId ?? null },
+      ipAddress:       getClientIp(request),
+    })
 
     return NextResponse.json({
       success: true,

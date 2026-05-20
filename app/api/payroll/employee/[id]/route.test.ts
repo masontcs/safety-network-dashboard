@@ -3,10 +3,10 @@ import { canAccessEmployeeByLaborType } from '@/lib/utils/access'
 import type { UserAccess } from '@/lib/utils/access'
 import type { LaborType } from '@/lib/supabase/database.types'
 
-const admin: UserAccess = { userId: 'u', role: 'admin', branchIds: null }
-const executive: UserAccess = { userId: 'u', role: 'executive', branchIds: null }
-const district: UserAccess = { userId: 'u', role: 'district_manager', branchIds: ['b1'] }
-const branch: UserAccess = { userId: 'u', role: 'branch_manager', branchIds: ['b1'] }
+const admin: UserAccess = { userId: 'u', role: 'admin', displayName: '', branchIds: null }
+const executive: UserAccess = { userId: 'u', role: 'executive', displayName: '', branchIds: null }
+const district: UserAccess = { userId: 'u', role: 'district_manager', displayName: '', branchIds: ['b1'] }
+const branch: UserAccess = { userId: 'u', role: 'branch_manager', displayName: '', branchIds: ['b1'] }
 
 const directTypes: LaborType[] = ['direct']
 const adminTypes: LaborType[] = ['admin_hourly', 'admin_salary']

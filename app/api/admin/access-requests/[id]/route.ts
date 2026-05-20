@@ -3,6 +3,7 @@ import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/utils/errors'
 import type { Role } from '@/lib/supabase/database.types'
+import { logAudit, getClientIp } from '@/lib/audit/log'
 
 const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/
 
@@ -57,6 +58,17 @@ export async function PATCH(
         .update({ status: 'denied', reviewed_by: ctx.access.userId, reviewed_at: new Date().toISOString() })
         .eq('id', id)
       if (error) throw new Error(error.message)
+      await logAudit({
+        userId:          ctx.access.userId,
+        userDisplayName: ctx.access.displayName,
+        userRole:        ctx.access.role,
+        action:          'access_request.archive',
+        resourceType:    'access_request',
+        resourceId:      id,
+        resourceLabel:   `${req.first_name} ${req.last_name}`,
+        metadata:        { email: req.email, requestedRole: req.requested_role },
+        ipAddress:       getClientIp(request),
+      })
       return NextResponse.json({ success: true })
     }
 
@@ -150,6 +162,18 @@ export async function PATCH(
       .update({ status: 'approved', reviewed_by: ctx.access.userId, reviewed_at: new Date().toISOString() })
       .eq('id', id)
     if (updateErr) throw new Error(updateErr.message)
+
+    await logAudit({
+      userId:          ctx.access.userId,
+      userDisplayName: ctx.access.displayName,
+      userRole:        ctx.access.role,
+      action:          'access_request.approve',
+      resourceType:    'access_request',
+      resourceId:      id,
+      resourceLabel:   displayName,
+      metadata:        { email: req.email, requestedRole: req.requested_role, approvedRole: role, branchIds },
+      ipAddress:       getClientIp(request),
+    })
 
     return NextResponse.json({ success: true, data: { userId } })
   } catch (err) {

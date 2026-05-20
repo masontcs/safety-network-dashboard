@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAccessContext, guardArAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { logAudit, getClientIp } from '@/lib/audit/log'
 
 export async function PATCH(
   request: Request,
@@ -33,7 +34,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: { id: string; noteId: string } }
 ): Promise<Response> {
   try {
@@ -43,6 +44,11 @@ export async function DELETE(
     if (guard) return guard
 
     const supabase = createServiceClient()
+
+    // Fetch customer name before deleting (for the audit label)
+    const { data: customer } = await supabase
+      .from('ar_customers').select('display_name').eq('id', params.id).single()
+
     const { error } = await supabase
       .from('ar_customer_notes')
       .delete()
@@ -50,6 +56,19 @@ export async function DELETE(
       .eq('customer_id', params.id)
 
     if (error) return NextResponse.json({ error: 'Failed to delete note' }, { status: 500 })
+
+    await logAudit({
+      userId:          ctx.access.userId,
+      userDisplayName: ctx.access.displayName,
+      userRole:        ctx.access.role,
+      action:          'ar.note.delete',
+      resourceType:    'ar_customer',
+      resourceId:      params.id,
+      resourceLabel:   (customer as { display_name: string } | null)?.display_name ?? params.id,
+      metadata:        { noteId: params.noteId },
+      ipAddress:       getClientIp(request),
+    })
+
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('AR note DELETE error:', err)

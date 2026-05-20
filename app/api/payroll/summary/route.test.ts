@@ -13,10 +13,10 @@ const adminItems: PayrollLineItem[] = [
   { employeeId: 'e4', displayName: 'Dan Brown', laborType: 'admin_hourly', amount: 800, hours: 20, rate: 40 },
 ]
 
-const adminAccess: UserAccess = { userId: 'u', role: 'admin', branchIds: null }
-const executiveAccess: UserAccess = { userId: 'u', role: 'executive', branchIds: null }
-const districtAccess: UserAccess = { userId: 'u', role: 'district_manager', branchIds: ['b1', 'b2'] }
-const branchAccess: UserAccess = { userId: 'u', role: 'branch_manager', branchIds: ['b1'] }
+const adminAccess: UserAccess = { userId: 'u', role: 'admin', displayName: '', branchIds: null }
+const executiveAccess: UserAccess = { userId: 'u', role: 'executive', displayName: '', branchIds: null }
+const districtAccess: UserAccess = { userId: 'u', role: 'district_manager', displayName: '', branchIds: ['b1', 'b2'] }
+const branchAccess: UserAccess = { userId: 'u', role: 'branch_manager', displayName: '', branchIds: ['b1'] }
 
 describe('payroll/summary — admin payroll sum rule (applyPayrollSumRule)', () => {
   describe('admin role', () => {

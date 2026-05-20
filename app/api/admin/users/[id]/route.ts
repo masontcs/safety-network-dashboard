@@ -3,8 +3,9 @@ import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/utils/errors'
 import type { Role } from '@/lib/supabase/database.types'
+import { logAudit, getClientIp } from '@/lib/audit/log'
 
-const VALID_ROLES: Role[] = ['admin', 'executive', 'district_manager', 'branch_manager', 'ar_manager', 'ar_team', 'office_team', 'project_manager']
+const VALID_ROLES: Role[] = ['admin', 'executive', 'district_manager', 'branch_manager', 'ar_manager', 'ar_team', 'office_team', 'project_manager', 'sales']
 const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/
 
 export async function PATCH(
@@ -111,6 +112,32 @@ export async function PATCH(
         .eq('id', params.id)
       if (unameErr) throw new Error(unameErr.message)
     }
+
+    // Build change summary for the audit log
+    const changes: Record<string, unknown> = {}
+    if (role) changes.role = role
+    if (branchIds !== undefined) changes.branchIds = branchIds
+    if (typeof isActive === 'boolean') changes.isActive = isActive
+    if (resolvedUsername !== undefined) changes.username = resolvedUsername
+
+    // Fetch target user's display name for the resource label
+    const { data: targetProfile } = await supabase
+      .from('user_profiles')
+      .select('display_name')
+      .eq('id', params.id)
+      .single()
+
+    await logAudit({
+      userId:          ctx.access.userId,
+      userDisplayName: ctx.access.displayName,
+      userRole:        ctx.access.role,
+      action:          'user.update',
+      resourceType:    'user',
+      resourceId:      params.id,
+      resourceLabel:   (targetProfile as { display_name: string } | null)?.display_name ?? params.id,
+      metadata:        { changes },
+      ipAddress:       getClientIp(request),
+    })
 
     return NextResponse.json({ success: true })
   } catch (err) {

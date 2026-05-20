@@ -8,6 +8,7 @@ import {
   buildRevenueCodeMap,
   insertRevenueData,
 } from '@/lib/revenue/import-helpers'
+import { logAudit, getClientIp } from '@/lib/audit/log'
 import { DuplicateImportError, apiError } from '@/lib/utils/errors'
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -72,6 +73,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     const { insertedCount, skippedCount, warnings: insertWarnings } = await insertRevenueData(
       importRecord.id, periodDate, records, branchMap, entityMap, revenueCodeMap, supabase
     )
+
+    await logAudit({
+      userId:          ctx.access.userId,
+      userDisplayName: ctx.access.displayName,
+      userRole:        ctx.access.role,
+      action:          'import.revenue',
+      resourceType:    'revenue_import',
+      resourceId:      importRecord.id,
+      resourceLabel:   periodDate,
+      metadata:        { periodDate, insertedCount },
+      ipAddress:       getClientIp(request),
+    })
 
     return NextResponse.json({
       success: true,

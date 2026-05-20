@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest'
 import { canAccessBranch, requiresBranchFilter, isAdmin } from '@/lib/utils/access'
 import type { UserAccess } from '@/lib/utils/access'
 
-const admin: UserAccess = { userId: 'u', role: 'admin', branchIds: null }
-const executive: UserAccess = { userId: 'u', role: 'executive', branchIds: null }
-const district: UserAccess = { userId: 'u', role: 'district_manager', branchIds: ['b1', 'b2'] }
-const branch: UserAccess = { userId: 'u', role: 'branch_manager', branchIds: ['b1'] }
+const admin: UserAccess = { userId: 'u', role: 'admin', displayName: '', branchIds: null }
+const executive: UserAccess = { userId: 'u', role: 'executive', displayName: '', branchIds: null }
+const district: UserAccess = { userId: 'u', role: 'district_manager', displayName: '', branchIds: ['b1', 'b2'] }
+const branch: UserAccess = { userId: 'u', role: 'branch_manager', displayName: '', branchIds: ['b1'] }
 
 describe('employees — branch scope (requiresBranchFilter)', () => {
   it('admin sees all employees — no branch filter', () => {

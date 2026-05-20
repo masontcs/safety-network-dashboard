@@ -3,6 +3,7 @@ import type { LaborType, Role } from '@/lib/supabase/database.types'
 export type UserAccess = {
   userId: string
   role: Role
+  displayName: string
   branchIds: string[] | null  // null = all access (admin / executive)
 }
 

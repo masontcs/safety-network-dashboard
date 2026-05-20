@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { parseFuelFile } from '@/lib/fuel/parser'
 import { resolveCardAssignments, insertFuelData } from '@/lib/fuel/import-helpers'
 import { apiError } from '@/lib/utils/errors'
+import { logAudit, getClientIp } from '@/lib/audit/log'
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
@@ -93,6 +94,18 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // 9. Insert transactions
     const { insertedCount } = await insertFuelData(importRecord.id, transactions, cardMap, vendor, supabase)
+
+    await logAudit({
+      userId:          ctx.access.userId,
+      userDisplayName: ctx.access.displayName,
+      userRole:        ctx.access.role,
+      action:          'import.fuel',
+      resourceType:    'fuel_import',
+      resourceId:      importRecord.id,
+      resourceLabel:   `${vendor} ${dateRangeStart}–${dateRangeEnd}`,
+      metadata:        { vendor, dateRangeStart, dateRangeEnd, insertedCount },
+      ipAddress:       getClientIp(request),
+    })
 
     return NextResponse.json({
       success: true,

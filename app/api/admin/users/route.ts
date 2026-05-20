@@ -3,8 +3,9 @@ import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/utils/errors'
 import type { Role } from '@/lib/supabase/database.types'
+import { logAudit, getClientIp } from '@/lib/audit/log'
 
-const VALID_ROLES: Role[] = ['admin', 'executive', 'district_manager', 'branch_manager', 'ar_manager', 'ar_team', 'office_team', 'project_manager']
+const VALID_ROLES: Role[] = ['admin', 'executive', 'district_manager', 'branch_manager', 'ar_manager', 'ar_team', 'office_team', 'project_manager', 'sales']
 
 export async function GET(): Promise<NextResponse> {
   try {
@@ -156,6 +157,18 @@ export async function POST(request: Request): Promise<NextResponse> {
         throw new Error(assignErr.message)
       }
     }
+
+    await logAudit({
+      userId:          ctx.access.userId,
+      userDisplayName: ctx.access.displayName,
+      userRole:        ctx.access.role,
+      action:          'user.create',
+      resourceType:    'user',
+      resourceId:      userId,
+      resourceLabel:   displayName.trim(),
+      metadata:        { email: email.trim(), role, branchIds: ids },
+      ipAddress:       getClientIp(request),
+    })
 
     return NextResponse.json({ success: true, data: { userId } }, { status: 201 })
   } catch (err) {

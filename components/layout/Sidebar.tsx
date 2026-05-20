@@ -136,6 +136,13 @@ const LogOutIcon = () => (
   </svg>
 )
 
+const AuditIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <polyline points="9 12 11 14 15 10" />
+  </svg>
+)
+
 const ArIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
     <rect x="2" y="5" width="20" height="14" rx="2" />
@@ -163,6 +170,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/allocations',     label: 'Allocations',     icon: <SplitIcon />,    roles: ['admin', 'executive'] },
   { href: '/admin/access-requests',   label: 'Access Requests',   icon: <InboxIcon />,   roles: ['admin'] },
   { href: '/admin/users',          label: 'Users',          icon: <UsersIcon />,    roles: ['admin'] },
+  { href: '/admin/audit',          label: 'Audit Log',      icon: <AuditIcon />,    roles: ['admin'] },
   { href: '/admin/settings',       label: 'Settings',       icon: <SettingsIcon />, roles: ['admin'] },
 ]
 

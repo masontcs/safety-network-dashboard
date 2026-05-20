@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAccessContext, guardArAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import { logAudit, getClientIp } from '@/lib/audit/log'
 
 export async function GET(
   _request: Request,
@@ -151,8 +152,25 @@ export async function PATCH(
     }
 
     const supabase = createServiceClient()
+
+    // Fetch customer name for audit label (best-effort)
+    const { data: customer } = await supabase
+      .from('ar_customers').select('display_name').eq('id', params.id).single()
+
     const { error } = await supabase.from('ar_customers').update(update).eq('id', params.id)
     if (error) return NextResponse.json({ error: 'Failed to update customer' }, { status: 500 })
+
+    await logAudit({
+      userId:          ctx.access.userId,
+      userDisplayName: ctx.access.displayName,
+      userRole:        ctx.access.role,
+      action:          'ar.customer.update',
+      resourceType:    'ar_customer',
+      resourceId:      params.id,
+      resourceLabel:   (customer as { display_name: string } | null)?.display_name ?? params.id,
+      metadata:        { changes: update },
+      ipAddress:       getClientIp(request),
+    })
 
     return NextResponse.json({ success: true })
   } catch (err) {

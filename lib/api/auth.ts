@@ -78,7 +78,7 @@ export async function getAccessContext(): Promise<AccessResult> {
 
   const { data: profile, error: profileError } = await supabase
     .from('user_profiles')
-    .select('id, role')
+    .select('id, role, display_name')
     .eq('id', user.id)
     .single()
 
@@ -93,10 +93,11 @@ export async function getAccessContext(): Promise<AccessResult> {
   }
 
   const role = profile.role as Role
+  const displayName = (profile as unknown as { display_name: string | null }).display_name ?? ''
 
   // Roles with null branchIds — either full access or customer-scoped (handled per AR route)
   if (role === 'admin' || role === 'executive' || role === 'ar_manager' || role === 'ar_team' || role === 'office_team') {
-    return { ok: true, access: { userId: user.id, role, branchIds: null } }
+    return { ok: true, access: { userId: user.id, role, displayName, branchIds: null } }
   }
 
   // sales, project_manager, district_manager, branch_manager: branch-scoped via assignments
@@ -117,7 +118,7 @@ export async function getAccessContext(): Promise<AccessResult> {
 
   const branchIds = (assignments ?? []).map((a) => a.branch_id)
 
-  return { ok: true, access: { userId: user.id, role, branchIds } }
+  return { ok: true, access: { userId: user.id, role, displayName, branchIds } }
 }
 
 // ── AR team customer scope helper ──────────────────────────────────────────────
