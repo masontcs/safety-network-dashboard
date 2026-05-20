@@ -57,9 +57,9 @@ export async function POST(
         content,
         created_by:         userId ?? null,
         note_type:          noteType,
-        communication_type: noteType === 'collection' ? communicationType : null,
-        contact_name:       noteType === 'collection' ? contactName : null,
-        outcome:            noteType === 'collection' ? outcome : null,
+        communication_type: communicationType,
+        contact_name:       contactName,
+        outcome:            outcome,
       })
       .select('id, content, created_by, created_at, note_type, communication_type, contact_name, outcome')
       .single()

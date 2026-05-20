@@ -389,6 +389,10 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
   const [collCommType, setCollCommType]   = useState('')
   const [collContactName, setCollContactName] = useState('')
   const [collOutcome, setCollOutcome]     = useState('')
+  // Operation note form extras
+  const [opCommType, setOpCommType]       = useState('')
+  const [opContactName, setOpContactName] = useState('')
+  const [opOutcome, setOpOutcome]         = useState('')
 
   // Invoice notes expansion
   const [expandedInvId, setExpandedInvId]   = useState<string | null>(null)
@@ -601,11 +605,9 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
       body: JSON.stringify({
         content: text.trim(),
         noteType,
-        ...(noteType === 'collection' ? {
-          communicationType: collCommType || null,
-          contactName:       collContactName.trim() || null,
-          outcome:           collOutcome || null,
-        } : {}),
+        communicationType: noteType === 'collection' ? (collCommType || null) : (opCommType || null),
+        contactName:       noteType === 'collection' ? (collContactName.trim() || null) : (opContactName.trim() || null),
+        outcome:           noteType === 'collection' ? (collOutcome || null) : (opOutcome || null),
       }),
     })
     if (res.ok) {
@@ -619,6 +621,9 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
         setCollOutcome('')
       } else {
         setOperationNoteText('')
+        setOpCommType('')
+        setOpContactName('')
+        setOpOutcome('')
       }
     }
     if (noteType === 'collection') setAddingCollectionNote(false)
@@ -1206,10 +1211,40 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
         {/* Operation Notes — write: admin/executive/district_manager/branch_manager/project_manager; read-only: ar_team/ar_manager */}
         <SectionCard title="Operation Notes">
           {canWriteOperationNotes && (
-            <div style={{ marginBottom: 12 }}>
+            <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {/* Row 1: comm type + contact name */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em' }}>How Contacted</span>
+                  <select value={opCommType} onChange={(e) => setOpCommType(e.target.value)}
+                    style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: opCommType ? '#ccc' : '#555', padding: '6px 10px', fontSize: 12, outline: 'none' }}>
+                    <option value=''>Not specified</option>
+                    {COMMUNICATION_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact Name</span>
+                  <input
+                    placeholder='Who did you speak with?'
+                    value={opContactName}
+                    onChange={(e) => setOpContactName(e.target.value)}
+                    style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '6px 10px', fontSize: 12, outline: 'none' }}
+                  />
+                </div>
+              </div>
+              {/* Row 2: outcome */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <span style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Outcome</span>
+                <select value={opOutcome} onChange={(e) => setOpOutcome(e.target.value)}
+                  style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: opOutcome ? (getOutcomeMeta(opOutcome)?.color ?? '#ccc') : '#555', padding: '6px 10px', fontSize: 12, outline: 'none' }}>
+                  <option value=''>Select outcome…</option>
+                  {OUTCOME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+              {/* Row 3: note text */}
               <textarea placeholder="Add an operation note…" value={operationNoteText} onChange={(e) => setOperationNoteText(e.target.value)} rows={3}
                 style={{ width: '100%', background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button onClick={() => handleAddNote('operation')} disabled={addingOperationNote || !operationNoteText.trim()}
                   style={{ background: '#ff6b00', border: 'none', borderRadius: 6, color: '#fff', padding: '5px 14px', fontSize: 12, cursor: addingOperationNote || !operationNoteText.trim() ? 'default' : 'pointer', opacity: addingOperationNote || !operationNoteText.trim() ? 0.5 : 1 }}>
                   {addingOperationNote ? 'Saving…' : 'Add Note'}
@@ -1225,20 +1260,36 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
                 if (shown.length === 0) return <div style={{ fontSize: 12, color: '#555' }}>No operation notes yet.</div>
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {shown.map((n) => (
-                      <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid #2a2a2a' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                          <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
-                          {isAdmin && (
-                            <button onClick={() => handleDeleteNote(n.id)}
-                              style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
-                              onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                              onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
-                          )}
+                    {shown.map((n) => {
+                      const outcomeMeta = n.outcome ? getOutcomeMeta(n.outcome) : null
+                      return (
+                        <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid #2a2a2a' }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                            <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
+                            {isAdmin && (
+                              <button onClick={() => handleDeleteNote(n.id)}
+                                style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
+                                onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
+                                onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 5 }}>
+                            {outcomeMeta && (
+                              <span style={{ fontSize: 10, fontWeight: 600, color: outcomeMeta.color, background: `${outcomeMeta.color}18`, borderRadius: 4, padding: '1px 6px' }}>
+                                {outcomeMeta.label}
+                              </span>
+                            )}
+                            {n.communicationType && (
+                              <span style={{ fontSize: 10, color: '#666', background: '#2a2a2a', borderRadius: 4, padding: '1px 6px' }}>
+                                {getCommTypeLabel(n.communicationType)}
+                              </span>
+                            )}
+                            {n.contactName && <span style={{ fontSize: 10, color: '#555' }}>w/ {n.contactName}</span>}
+                            <span style={{ fontSize: 11, color: '#555', marginLeft: 'auto' }}>{n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}</span>
+                          </div>
                         </div>
-                        <div style={{ fontSize: 11, color: '#555', marginTop: 4 }}>{n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}</div>
-                      </div>
-                    ))}
+                      )
+                    })}
                     {extra > 0 && (
                       <div style={{ fontSize: 11, color: '#444', textAlign: 'center', paddingTop: 2 }}>
                         {extra} older note{extra !== 1 ? 's' : ''} not shown
