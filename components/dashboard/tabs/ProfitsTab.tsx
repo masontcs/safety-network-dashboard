@@ -263,7 +263,8 @@ function GoalsByBranch({
         actual: actualMap.get(id) ?? null,
         target: targetMap.get(id) ?? null,
       }))
-      .filter((r) => r.target) // only show branches that have a target set
+      // Show all branches that have actuals OR targets — no branch with real revenue is hidden
+      .filter((r) => r.actual !== null || r.target !== null)
       .sort((a, b) => (b.actual?.revenue ?? 0) - (a.actual?.revenue ?? 0))
 
     if (rows.length === 0) return null

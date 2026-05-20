@@ -417,7 +417,13 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
     } else if (viewMode === 'quarter') {
       return getQuarterRange(sortedMonths, selectedQuarterIdx)
     } else {
-      return getYearRange(selectedYear)
+      // Year view: use actual data-bounded range so targets only sum months that have data
+      const yearMonths = sortedMonths.filter((m) => m.year === selectedYear)
+      if (yearMonths.length === 0) return getYearRange(selectedYear)
+      return {
+        startDate: yearMonths[0].startDate,
+        endDate: yearMonths[yearMonths.length - 1].endDate,
+      }
     }
   }, [viewMode, selectedMonthId, selectedQuarterIdx, selectedYear, sortedMonths])
 

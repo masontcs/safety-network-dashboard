@@ -556,7 +556,8 @@ function OverviewGoals({
     const actualMap = new Map(adminByBranch.map((b) => [b.branchId, b]))
     const rows = allIds
       .map((id) => ({ id, name: branchNameMap[id] ?? id, actual: actualMap.get(id) ?? null, target: targetMap.get(id) ?? null }))
-      .filter((row) => row.target)
+      // Show all branches with actuals OR targets — branches without goals show "—" but their revenue counts toward totals
+      .filter((row) => row.actual !== null || row.target !== null)
       .sort((a, b) => (b.actual?.revenue ?? 0) - (a.actual?.revenue ?? 0))
     if (rows.length === 0) return null
 
@@ -636,7 +637,7 @@ function OverviewGoals({
   if (!isAdminOrExec && managerByBranch.length > 1) {
     const rows = managerByBranch
       .map((b) => ({ id: b.id, name: branchNameMap[b.id] ?? b.id, revActual: b.revenue, target: targetMap.get(b.id) ?? null }))
-      .filter((r) => r.target)
+      // Show all branches with actuals — branches without goals show "—" but their revenue counts toward totals
       .sort((a, b) => b.revActual - a.revActual)
     if (rows.length === 0) return null
 
