@@ -11,6 +11,7 @@ interface Payment {
   memo: string | null
   customer_name: string
   customer_id: string | null
+  payment_type: string | null
   unmatched: boolean
 }
 
@@ -209,11 +210,18 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
                       )}
                     </td>
                     <td style={{ padding: '9px 12px', fontSize: 11, color: '#888' }}>
-                      <span style={{
-                        background: '#2a2a2a', borderRadius: 4,
-                        padding: '2px 7px', fontWeight: 500, color: '#aaa',
-                      }}>
-                        {pmt.entity_code}
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{
+                          background: '#2a2a2a', borderRadius: 4,
+                          padding: '2px 7px', fontWeight: 500, color: '#aaa',
+                        }}>
+                          {pmt.entity_code}
+                        </span>
+                        {pmt.payment_type === 'deposit' && (
+                          <span style={{ fontSize: 10, background: '#2a2010', color: '#cc9900', borderRadius: 4, padding: '1px 5px', fontWeight: 500 }}>
+                            DEPOSIT
+                          </span>
+                        )}
                       </span>
                     </td>
                     <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>

@@ -18,7 +18,7 @@ export async function GET(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let query = (supabase as any)
       .from('ar_payments')
-      .select('id, entity_code, payment_date, reference_number, amount, memo, qb_customer_name')
+      .select('id, entity_code, payment_date, reference_number, amount, memo, qb_customer_name, payment_type')
       .eq('customer_id', params.id)
       .order('payment_date', { ascending: false })
       .limit(200)

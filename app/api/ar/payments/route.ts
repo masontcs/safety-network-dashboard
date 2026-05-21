@@ -21,7 +21,7 @@ export async function GET(request: Request): Promise<Response> {
     let query = (supabase as any)
       .from('ar_payments')
       .select(
-        'id, entity_code, payment_date, reference_number, amount, memo, qb_customer_name, customer_id, ar_customers!customer_id(display_name)',
+        'id, entity_code, payment_date, reference_number, amount, memo, qb_customer_name, customer_id, payment_type, ar_customers!customer_id(display_name)',
         { count: 'exact' }
       )
       .order('payment_date', { ascending: false })
@@ -60,6 +60,7 @@ export async function GET(request: Request): Promise<Response> {
       memo: string | null
       qb_customer_name: string
       customer_id: string | null
+      payment_type: string | null
       ar_customers: { display_name: string } | null
     }
 
@@ -72,6 +73,7 @@ export async function GET(request: Request): Promise<Response> {
       memo:             r.memo,
       customer_name:    r.ar_customers?.display_name ?? r.qb_customer_name,
       customer_id:      r.customer_id,
+      payment_type:     r.payment_type ?? 'payment',
       unmatched:        !r.customer_id,
     }))
 

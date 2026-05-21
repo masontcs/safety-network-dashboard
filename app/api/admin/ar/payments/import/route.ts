@@ -103,6 +103,7 @@ export async function POST(request: Request): Promise<Response> {
               amount:           p.amount,
               memo:             p.memo,
               qb_customer_name: p.qbCustomerName,
+              payment_type:     p.paymentType,
             }
           })
 

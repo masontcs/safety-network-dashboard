@@ -63,6 +63,7 @@ interface CustomerSummary {
 interface Payment {
   id: string; entity_code: string; payment_date: string
   reference_number: string | null; amount: number; memo: string | null
+  payment_type?: string | null
 }
 
 interface SearchResult { id: string; displayName: string; entityRefs: EntityRef[] }
@@ -1600,7 +1601,14 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
                   : payments.map((p) => (
                     <tr key={p.id} style={{ borderBottom: '1px solid #222', background: 'rgba(76,175,80,0.03)' }}>
                       <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>{fmtDate(p.payment_date)}</td>
-                      <td style={{ padding: '9px 12px', fontSize: 12, color: '#888' }}>{p.entity_code}</td>
+                      <td style={{ padding: '9px 12px', fontSize: 12, color: '#888' }}>
+                        {p.entity_code}
+                        {p.payment_type === 'deposit' && (
+                          <span style={{ marginLeft: 6, fontSize: 10, background: '#2a2010', color: '#cc9900', borderRadius: 4, padding: '1px 5px', fontWeight: 500 }}>
+                            DEPOSIT
+                          </span>
+                        )}
+                      </td>
                       <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', fontFamily: 'monospace' }}>{p.reference_number ?? '—'}</td>
                       <td style={{ padding: '9px 12px', fontSize: 12, color: '#666', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.memo ?? '—'}</td>
                       <td style={{ padding: '9px 12px', fontSize: 12, color: '#4caf50', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
