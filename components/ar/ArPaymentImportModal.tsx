@@ -17,6 +17,7 @@ type ImportState =
       paymentCount: number
       matched: number
       unmatched: number
+      unmatchedNames: string[]
       skipped: number
       dateFrom: string
       dateTo: string
@@ -125,16 +126,16 @@ export default function ArPaymentImportModal({ onClose, onSuccess }: Props) {
       }
 
       setState({
-        status:       'success',
-        paymentCount: finalData.paymentCount as number,
-        matched:      finalData.matched as number,
-        unmatched:    finalData.unmatched as number,
-        skipped:      finalData.skipped as number,
-        dateFrom:     finalData.dateFrom as string,
-        dateTo:       finalData.dateTo as string,
+        status:         'success',
+        paymentCount:   finalData.paymentCount as number,
+        matched:        finalData.matched as number,
+        unmatched:      finalData.unmatched as number,
+        unmatchedNames: (finalData.unmatchedNames as string[]) ?? [],
+        skipped:        finalData.skipped as number,
+        dateFrom:       finalData.dateFrom as string,
+        dateTo:         finalData.dateTo as string,
       })
-
-      setTimeout(onSuccess, 1800)
+      // Do not auto-close — user needs to read the results
     } catch {
       setState({ status: 'error', message: 'Network error — please try again' })
     }
@@ -243,35 +244,70 @@ export default function ArPaymentImportModal({ onClose, onSuccess }: Props) {
 
         {/* Success summary */}
         {state.status === 'success' && (
-          <div style={{
-            marginBottom: 16,
-            padding: '12px 14px',
-            borderRadius: 8,
-            background: 'rgba(76,175,80,0.08)',
-            border: '1px solid #2d5a2d',
-          }}>
-            <div style={{ fontSize: 12, color: '#4caf50', fontWeight: 500, marginBottom: 8 }}>
-              ✓ Import complete
+          <div style={{ marginBottom: 16 }}>
+            {/* Main stats */}
+            <div style={{
+              padding: '12px 14px',
+              borderRadius: state.unmatched > 0 ? '8px 8px 0 0' : 8,
+              background: 'rgba(76,175,80,0.08)',
+              border: '1px solid #2d5a2d',
+              borderBottom: state.unmatched > 0 ? 'none' : '1px solid #2d5a2d',
+            }}>
+              <div style={{ fontSize: 12, color: '#4caf50', fontWeight: 500, marginBottom: 8 }}>
+                ✓ Import complete
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
+                {([
+                  ['Payments found',       state.paymentCount],
+                  ['Matched to customers', state.matched],
+                  ['Skipped (duplicates)', state.skipped],
+                  ['Unmatched',            state.unmatched],
+                ] as [string, number][]).map(([label, val]) => (
+                  <div key={label} style={{ fontSize: 12, color: '#888' }}>
+                    <span style={{ color: val > 0 && label === 'Unmatched' ? '#ff9800' : '#ccc' }}>{val}</span>{' '}
+                    {label}
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 11, color: '#555', marginTop: 8 }}>
+                {state.dateFrom} → {state.dateTo}
+              </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
-              {[
-                ['Payments found',  state.paymentCount],
-                ['Matched to customers', state.matched],
-                ['Skipped (duplicates)', state.skipped],
-                ['Unmatched customers', state.unmatched],
-              ].map(([label, val]) => (
-                <div key={label as string} style={{ fontSize: 12, color: '#888' }}>
-                  <span style={{ color: '#ccc' }}>{val}</span>{' '}
-                  {label}
-                </div>
-              ))}
-            </div>
-            <div style={{ fontSize: 11, color: '#555', marginTop: 8 }}>
-              {state.dateFrom} → {state.dateTo}
-            </div>
+
+            {/* Unmatched names — collapsible list */}
             {state.unmatched > 0 && (
-              <div style={{ fontSize: 11, color: '#ff9800', marginTop: 6 }}>
-                {state.unmatched} payment{state.unmatched !== 1 ? 's' : ''} could not be matched to a customer. Check QuickBooks names in customer entity refs.
+              <div style={{
+                border: '1px solid #2d5a2d',
+                borderTop: '1px solid #333',
+                borderRadius: '0 0 8px 8px',
+                background: '#181818',
+                padding: '10px 14px',
+              }}>
+                <div style={{ fontSize: 11, color: '#ff9800', marginBottom: 6, fontWeight: 500 }}>
+                  {state.unmatched} QB name{state.unmatched !== 1 ? 's' : ''} not found in this entity's customer list:
+                </div>
+                <div style={{
+                  maxHeight: 130,
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
+                }}>
+                  {state.unmatchedNames.map((name) => (
+                    <div key={name} style={{
+                      fontSize: 11,
+                      color: '#999',
+                      padding: '2px 0',
+                      borderBottom: '1px solid #222',
+                      fontFamily: 'monospace',
+                    }}>
+                      {name}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 10, color: '#555', marginTop: 6 }}>
+                  Payments were still saved. To match them, add these QB names to the customer's entity ref in the customer detail page.
+                </div>
               </div>
             )}
           </div>

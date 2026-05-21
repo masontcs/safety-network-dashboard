@@ -88,12 +88,12 @@ export async function POST(request: Request): Promise<Response> {
 
           // Build insert rows — resolve customer_id by QB name, skip duplicates via ON CONFLICT DO NOTHING
           let matched = 0
-          let unmatched = 0
           let skipped = 0
+          const unmatchedNames = new Set<string>()
 
           const rows = payments.map((p) => {
             const customerId = refMap.get(p.qbCustomerName.toLowerCase()) ?? null
-            if (customerId) matched++; else unmatched++
+            if (customerId) matched++; else unmatchedNames.add(p.qbCustomerName)
             return {
               import_id:        (importRecord as { id: string }).id,
               customer_id:      customerId,
@@ -126,13 +126,15 @@ export async function POST(request: Request): Promise<Response> {
             skipped += batch.length - (count ?? batch.length)
           }
 
+          const unmatchedList = [...unmatchedNames].sort()
           send({
             type: 'done',
             data: {
-              importId:      (importRecord as { id: string }).id,
-              paymentCount:  payments.length,
+              importId:       (importRecord as { id: string }).id,
+              paymentCount:   payments.length,
               matched,
-              unmatched,
+              unmatched:      unmatchedNames.size,
+              unmatchedNames: unmatchedList,
               skipped,
               dateFrom,
               dateTo,
