@@ -29,11 +29,12 @@ interface Props {
 }
 
 export default function ArPaymentsView({ onSelectCustomer }: Props) {
-  const [entity,   setEntity]   = useState('')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo,   setDateTo]   = useState('')
-  const [search,   setSearch]   = useState('')
-  const [page,     setPage]     = useState(1)
+  const [entity,        setEntity]        = useState('')
+  const [dateFrom,      setDateFrom]      = useState('')
+  const [dateTo,        setDateTo]        = useState('')
+  const [searchInput,   setSearchInput]   = useState('')   // what the user is typing
+  const [searchDebounced, setSearchDebounced] = useState('') // what we actually query
+  const [page,          setPage]          = useState(1)
 
   const [payments, setPayments] = useState<Payment[]>([])
   const [total,    setTotal]    = useState(0)
@@ -41,13 +42,19 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
 
   const PAGE_SIZE = 100
 
+  // Debounce: wait 350ms after the user stops typing before fetching
+  useEffect(() => {
+    const t = setTimeout(() => setSearchDebounced(searchInput), 350)
+    return () => clearTimeout(t)
+  }, [searchInput])
+
   const fetchPayments = useCallback(async () => {
     setLoading(true)
     const p = new URLSearchParams()
-    if (entity)   p.set('entity',   entity)
-    if (dateFrom) p.set('dateFrom', dateFrom)
-    if (dateTo)   p.set('dateTo',   dateTo)
-    if (search)   p.set('search',   search)
+    if (entity)          p.set('entity',   entity)
+    if (dateFrom)        p.set('dateFrom', dateFrom)
+    if (dateTo)          p.set('dateTo',   dateTo)
+    if (searchDebounced) p.set('search',   searchDebounced)
     p.set('page', String(page))
 
     const res = await fetch(`/api/ar/payments?${p}`)
@@ -57,18 +64,18 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
       setTotal(data.total ?? 0)
     }
     setLoading(false)
-  }, [entity, dateFrom, dateTo, search, page])
+  }, [entity, dateFrom, dateTo, searchDebounced, page])
 
   useEffect(() => { fetchPayments() }, [fetchPayments])
 
   // Reset page when filters change
-  useEffect(() => { setPage(1) }, [entity, dateFrom, dateTo, search])
+  useEffect(() => { setPage(1) }, [entity, dateFrom, dateTo, searchDebounced])
 
   const clearFilters = () => {
-    setEntity(''); setDateFrom(''); setDateTo(''); setSearch(''); setPage(1)
+    setEntity(''); setDateFrom(''); setDateTo(''); setSearchInput(''); setSearchDebounced(''); setPage(1)
   }
 
-  const hasFilters = entity || dateFrom || dateTo || search
+  const hasFilters = entity || dateFrom || dateTo || searchInput
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
   // Compute total of visible payments
@@ -82,8 +89,8 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
         <input
           type="text"
           placeholder="Search customer…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
           style={{
             background: '#2a2a2a', border: '1px solid #333', borderRadius: 8,
             color: '#ccc', padding: '7px 12px', fontSize: 12, outline: 'none', width: 200,

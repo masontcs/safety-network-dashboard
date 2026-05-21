@@ -32,8 +32,14 @@ export async function GET(request: Request): Promise<Response> {
     if (dateTo)   query = query.lte('payment_date', dateTo)
 
     // Push search into the DB so pagination applies to filtered results.
-    // qb_customer_name covers both matched and unmatched payments (it's always populated).
-    if (search)   query = query.ilike('qb_customer_name', `%${search}%`)
+    // Split into words and AND each one — "lasar const" matches "LASAR CONSTRUCTION"
+    // without needing the exact full name. qb_customer_name is always populated.
+    if (search) {
+      const words = search.trim().split(/\s+/).filter(Boolean)
+      for (const word of words) {
+        query = query.ilike('qb_customer_name', `%${word}%`)
+      }
+    }
 
     // Apply pagination after all filters
     query = query.range((page - 1) * pageSize, page * pageSize - 1)
