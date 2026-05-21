@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 // Invoice interface only used by ArCustomerDetail now — kept here for the Customer list type
 import type { Role } from '@/lib/supabase/database.types'
 import ArImportModal from './ArImportModal'
+import ArPaymentImportModal from './ArPaymentImportModal'
 import ArCustomerDetail from './ArCustomerDetail'
 import ArMeetingDashboard from './ArMeetingDashboard'
 import { createBrowserClient } from '@/lib/supabase/client'
@@ -186,7 +187,8 @@ export default function ArDashboard({ role, branches }: Props) {
   const [loadingCustomers, setLoadingCustomers] = useState(true)
 
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
-  const [showImport, setShowImport]             = useState(false)
+  const [showImport, setShowImport]               = useState(false)
+  const [showPaymentImport, setShowPaymentImport] = useState(false)
 
   const fetchSummary = useCallback(async () => {
     setLoadingSummary(true)
@@ -389,21 +391,37 @@ export default function ArDashboard({ role, branches }: Props) {
             </div>
           )}
           {isAdmin && (
-            <button
-              onClick={() => setShowImport(true)}
-              style={{
-                background: '#ff6b00', color: '#fff', border: 'none',
-                borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500,
-                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              Import AR
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setShowPaymentImport(true)}
+                style={{
+                  background: '#2a2a2a', color: '#ccc', border: '1px solid #333',
+                  borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 400,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <rect x="2" y="5" width="20" height="14" rx="2" />
+                  <path d="M2 10h20" />
+                </svg>
+                Import Payments
+              </button>
+              <button
+                onClick={() => setShowImport(true)}
+                style={{
+                  background: '#ff6b00', color: '#fff', border: 'none',
+                  borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                Import AR
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -574,6 +592,9 @@ export default function ArDashboard({ role, branches }: Props) {
 
       {showImport && (
         <ArImportModal onClose={() => setShowImport(false)} onSuccess={handleImportSuccess} />
+      )}
+      {showPaymentImport && (
+        <ArPaymentImportModal onClose={() => setShowPaymentImport(false)} onSuccess={() => setShowPaymentImport(false)} />
       )}
     </div>
   )
