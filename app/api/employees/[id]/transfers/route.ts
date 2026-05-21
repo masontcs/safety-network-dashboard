@@ -20,7 +20,7 @@ type PayrollCodeRow = {
 
 type ActiveAssignmentRow = {
   id: string; payroll_code_id: string | null; raw_name_in_report: string
-  effective_from: string; created_at: string
+  effective_from: string
   payroll_codes: { branch_id: string | null } | null
 }
 
@@ -217,12 +217,11 @@ export async function POST(
     // the most recent as the canonical source and close all of them on transfer.
     const { data: activeRows, error: assignErr } = await supabase
       .from('employee_entity_assignments')
-      .select('id, payroll_code_id, raw_name_in_report, effective_from, created_at, payroll_codes(branch_id)')
+      .select('id, payroll_code_id, raw_name_in_report, effective_from, payroll_codes(branch_id)')
       .eq('employee_id', employeeId)
       .eq('entity_id', toCode.entity_id)
       .is('effective_to', null)
       .order('effective_from', { ascending: false })
-      .order('created_at', { ascending: false })
 
     if (assignErr || !activeRows || activeRows.length === 0) {
       return NextResponse.json(
