@@ -8,12 +8,12 @@ export async function GET(request: Request): Promise<Response> {
     if (!ctx.ok) return ctx.response
 
     const { searchParams } = new URL(request.url)
-    const entity    = searchParams.get('entity') || null
-    const dateFrom  = searchParams.get('dateFrom') || null
-    const dateTo    = searchParams.get('dateTo') || null
-    const search    = searchParams.get('search') || null
-    const page      = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
-    const pageSize  = 100
+    const entity   = searchParams.get('entity') || null
+    const dateFrom = searchParams.get('dateFrom') || null
+    const dateTo   = searchParams.get('dateTo') || null
+    const search   = searchParams.get('search') || null
+    const page     = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
+    const pageSize = 100
 
     const supabase = createServiceClient()
 
@@ -26,11 +26,17 @@ export async function GET(request: Request): Promise<Response> {
       )
       .order('payment_date', { ascending: false })
       .order('created_at',   { ascending: false })
-      .range((page - 1) * pageSize, page * pageSize - 1)
 
     if (entity)   query = query.eq('entity_code', entity)
     if (dateFrom) query = query.gte('payment_date', dateFrom)
     if (dateTo)   query = query.lte('payment_date', dateTo)
+
+    // Push search into the DB so pagination applies to filtered results.
+    // qb_customer_name covers both matched and unmatched payments (it's always populated).
+    if (search)   query = query.ilike('qb_customer_name', `%${search}%`)
+
+    // Apply pagination after all filters
+    query = query.range((page - 1) * pageSize, page * pageSize - 1)
 
     const { data, error, count } = await query
 
@@ -39,8 +45,6 @@ export async function GET(request: Request): Promise<Response> {
       return NextResponse.json({ error: 'Failed to load payments' }, { status: 500 })
     }
 
-    // Apply customer name search in-memory (after DB fetch so we can search both
-    // the matched display_name and the raw qb_customer_name for unmatched payments)
     type PaymentRow = {
       id: string
       entity_code: string
@@ -53,24 +57,16 @@ export async function GET(request: Request): Promise<Response> {
       ar_customers: { display_name: string } | null
     }
 
-    const rows = (data ?? []) as PaymentRow[]
-    const filtered = search
-      ? rows.filter((r) => {
-          const name = r.ar_customers?.display_name ?? r.qb_customer_name
-          return name.toLowerCase().includes(search.toLowerCase())
-        })
-      : rows
-
-    const payments = filtered.map((r) => ({
-      id:              r.id,
-      entity_code:     r.entity_code,
-      payment_date:    r.payment_date,
+    const payments = ((data ?? []) as PaymentRow[]).map((r) => ({
+      id:               r.id,
+      entity_code:      r.entity_code,
+      payment_date:     r.payment_date,
       reference_number: r.reference_number,
-      amount:          r.amount,
-      memo:            r.memo,
-      customer_name:   r.ar_customers?.display_name ?? r.qb_customer_name,
-      customer_id:     r.customer_id,
-      unmatched:       !r.customer_id,
+      amount:           r.amount,
+      memo:             r.memo,
+      customer_name:    r.ar_customers?.display_name ?? r.qb_customer_name,
+      customer_id:      r.customer_id,
+      unmatched:        !r.customer_id,
     }))
 
     return NextResponse.json({
