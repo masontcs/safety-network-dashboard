@@ -7,6 +7,7 @@ import ArImportModal from './ArImportModal'
 import ArPaymentImportModal from './ArPaymentImportModal'
 import ArCustomerDetail from './ArCustomerDetail'
 import ArMeetingDashboard from './ArMeetingDashboard'
+import ArPaymentsView from './ArPaymentsView'
 import { createBrowserClient } from '@/lib/supabase/client'
 
 interface Branch { id: string; name: string }
@@ -49,7 +50,7 @@ interface Invoice {
 
 interface Props { role: Role; branches: Branch[] }
 
-type ViewMode = 'ar' | 'meeting'
+type ViewMode = 'ar' | 'payments' | 'meeting'
 type SortKey = 'displayName' | 'current' | 'd30' | 'd60' | 'd90' | 'd90plus' | 'totalAr' | 'invoiceCount'
 type SortDir = 'asc' | 'desc'
 
@@ -358,25 +359,41 @@ export default function ArDashboard({ role, branches }: Props) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {role === 'ar_team' ? (
-            /* ar_team: scope toggle — My Customers vs All AR */
-            <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 3, gap: 2 }}>
-              {([false, true] as const).map((all) => (
-                <button key={String(all)} onClick={() => setShowAll(all)}
-                  style={{
-                    background: showAll === all ? '#ff6b00' : 'transparent',
-                    color: showAll === all ? '#fff' : '#888',
-                    border: 'none', borderRadius: 6,
-                    padding: '5px 14px', fontSize: 12, fontWeight: 500,
-                    cursor: 'pointer',
-                  }}>
-                  {all ? 'All AR' : 'My Customers'}
-                </button>
-              ))}
+            /* ar_team: scope toggle + Payments tab */
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {view !== 'payments' && (
+                <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 3, gap: 2 }}>
+                  {([false, true] as const).map((all) => (
+                    <button key={String(all)} onClick={() => setShowAll(all)}
+                      style={{
+                        background: showAll === all ? '#ff6b00' : 'transparent',
+                        color: showAll === all ? '#fff' : '#888',
+                        border: 'none', borderRadius: 6,
+                        padding: '5px 14px', fontSize: 12, fontWeight: 500,
+                        cursor: 'pointer',
+                      }}>
+                      {all ? 'All AR' : 'My Customers'}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => setView(view === 'payments' ? 'ar' : 'payments')}
+                style={{
+                  background: view === 'payments' ? '#ff6b00' : '#2a2a2a',
+                  color: view === 'payments' ? '#fff' : '#888',
+                  border: 'none', borderRadius: 8,
+                  padding: '5px 14px', fontSize: 12, fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                Payments
+              </button>
             </div>
           ) : (
-            /* other roles: AR / Meeting view toggle */
+            /* other roles: AR / Payments / Meeting view toggle */
             <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 3, gap: 2 }}>
-              {(['ar', 'meeting'] as ViewMode[]).map((v) => (
+              {(['ar', 'payments', 'meeting'] as ViewMode[]).map((v) => (
                 <button key={v} onClick={() => setView(v)}
                   style={{
                     background: view === v ? '#ff6b00' : 'transparent',
@@ -385,7 +402,7 @@ export default function ArDashboard({ role, branches }: Props) {
                     padding: '5px 14px', fontSize: 12, fontWeight: 500,
                     cursor: 'pointer',
                   }}>
-                  {v === 'ar' ? 'AR' : 'Meeting'}
+                  {v === 'ar' ? 'AR' : v === 'payments' ? 'Payments' : 'Meeting'}
                 </button>
               ))}
             </div>
@@ -425,6 +442,16 @@ export default function ArDashboard({ role, branches }: Props) {
           )}
         </div>
       </div>
+
+      {/* Payments view */}
+      {view === 'payments' && (
+        <ArPaymentsView
+          onSelectCustomer={(customerId) => {
+            const cust = customers.find((c) => c.id === customerId)
+            if (cust) { setView('ar'); setSelectedCustomer(cust) }
+          }}
+        />
+      )}
 
       {/* Meeting dashboard view */}
       {view === 'meeting' && (
