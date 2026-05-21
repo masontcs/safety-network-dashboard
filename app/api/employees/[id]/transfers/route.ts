@@ -20,7 +20,7 @@ type PayrollCodeRow = {
 
 type ActiveAssignmentRow = {
   id: string; payroll_code_id: string | null; raw_name_in_report: string
-  effective_from: string
+  effective_from: string; created_at: string
   payroll_codes: { branch_id: string | null } | null
 }
 
@@ -211,22 +211,31 @@ export async function POST(
       )
     }
 
-    // Find current active assignment for this employee + entity
-    const { data: currentRaw, error: assignErr } = await supabase
+    // Find all current active assignments for this employee + entity
+    // NOTE: .single() is intentionally NOT used here — duplicate open-ended assignments
+    // can exist due to a historical data integrity issue in the review queue. We pick
+    // the most recent as the canonical source and close all of them on transfer.
+    const { data: activeRows, error: assignErr } = await supabase
       .from('employee_entity_assignments')
-      .select('id, payroll_code_id, raw_name_in_report, effective_from, payroll_codes(branch_id)')
+      .select('id, payroll_code_id, raw_name_in_report, effective_from, created_at, payroll_codes(branch_id)')
       .eq('employee_id', employeeId)
       .eq('entity_id', toCode.entity_id)
       .is('effective_to', null)
-      .single()
+      .order('effective_from', { ascending: false })
+      .order('created_at', { ascending: false })
 
-    if (assignErr || !currentRaw) {
+    if (assignErr || !activeRows || activeRows.length === 0) {
       return NextResponse.json(
         { success: false, error: 'No active assignment found for this employee in the same entity', code: 'NOT_FOUND' },
         { status: 404 },
       )
     }
-    const current = currentRaw as unknown as ActiveAssignmentRow
+
+    const allActive = activeRows as unknown as ActiveAssignmentRow[]
+    // Use the most recent assignment as the canonical source
+    const current = allActive[0]
+    // Any extras are duplicates — collect their IDs to close them too
+    const duplicateIds = allActive.slice(1).map((r) => r.id)
 
     const fromBranchId = current.payroll_codes?.branch_id ?? null
     const toBranchId = toCode.branch_id
@@ -252,11 +261,12 @@ export async function POST(
 
     const fromPayrollCodeId = current.payroll_code_id!
 
-    // 1. Close current assignment
+    // 1. Close current assignment (and any duplicates that share the same open-ended state)
+    const idsToClose = [current.id, ...duplicateIds]
     const { error: closeErr } = await supabase
       .from('employee_entity_assignments')
       .update({ effective_to: effectiveDate })
-      .eq('id', current.id)
+      .in('id', idsToClose)
 
     if (closeErr) throw new Error(`Failed to close current assignment: ${closeErr.message}`)
 
