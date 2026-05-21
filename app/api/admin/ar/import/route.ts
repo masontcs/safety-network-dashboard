@@ -193,6 +193,25 @@ export async function POST(request: Request): Promise<Response> {
             }
           }
 
+          // Re-apply any saved invoice date overrides to the newly inserted rows
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: dateOverrides } = await (supabase as any)
+            .from('ar_invoice_date_overrides')
+            .select('invoice_number, override_date')
+            .eq('entity_code', entityCode)
+
+          type DateOverride = { invoice_number: string; override_date: string }
+          if (dateOverrides && (dateOverrides as DateOverride[]).length > 0) {
+            for (const ov of dateOverrides as DateOverride[]) {
+              await supabase
+                .from('ar_invoices')
+                .update({ invoice_date: ov.override_date })
+                .eq('import_id', (importRecord as { id: string }).id)
+                .eq('entity_code', entityCode)
+                .eq('invoice_number', ov.invoice_number)
+            }
+          }
+
           send({ type: 'step', label: 'Replacing previous import…', progress: 95 })
 
           // Delete old invoices for this entity — new data fully written first
@@ -200,7 +219,7 @@ export async function POST(request: Request): Promise<Response> {
             .from('ar_invoices')
             .delete()
             .eq('entity_code', entityCode)
-            .neq('import_id', importRecord.id)
+            .neq('import_id', (importRecord as { id: string }).id)
 
           send({
             type: 'done',

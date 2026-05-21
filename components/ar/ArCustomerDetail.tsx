@@ -385,6 +385,33 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
   const [invNoteText, setInvNoteText]       = useState('')
   const [addingInvNote, setAddingInvNote]   = useState(false)
 
+  // Invoice date override editing
+  const [editingDateInvId, setEditingDateInvId] = useState<string | null>(null)
+  const [editingDateValue, setEditingDateValue]  = useState('')
+  const [savingDate, setSavingDate]              = useState(false)
+
+  const handleSaveInvoiceDate = async (inv: Invoice) => {
+    if (!editingDateValue) return
+    setSavingDate(true)
+    try {
+      const res = await fetch(`/api/ar/invoices/${inv.id}/date`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: editingDateValue }),
+      })
+      if (res.ok) {
+        // Update local state immediately
+        setInvoices((prev) =>
+          prev.map((i) => i.id === inv.id ? { ...i, invoice_date: editingDateValue } : i)
+        )
+        setEditingDateInvId(null)
+        setEditingDateValue('')
+      }
+    } finally {
+      setSavingDate(false)
+    }
+  }
+
   const fetchProfile = useCallback(async () => {
     setProfileLoading(true)
     const res = await fetch(`/api/ar/customers/${customer.id}`)
@@ -1377,7 +1404,63 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
                         </td>
                         <td style={{ padding: '9px 12px', fontSize: 12, color: '#888', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.job_name ?? '—'}</td>
                         <td style={{ padding: '9px 12px', fontSize: 12, color: '#888' }}>{inv.po_number ?? '—'}</td>
-                        <td style={{ padding: '9px 12px', fontSize: 12, color: '#888', whiteSpace: 'nowrap' }}>{fmtDate(inv.invoice_date)}</td>
+                        {/* Invoice Date — editable by ar_admin roles */}
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: '#888', whiteSpace: 'nowrap' }}>
+                          {isArAdmin && inv.invoice_number && editingDateInvId === inv.id ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <input
+                                type="date"
+                                defaultValue={inv.invoice_date ?? ''}
+                                onChange={(e) => setEditingDateValue(e.target.value)}
+                                autoFocus
+                                style={{
+                                  background: '#2a2a2a', border: '1px solid #ff6b00',
+                                  borderRadius: 6, color: '#fff', padding: '3px 7px',
+                                  fontSize: 11, outline: 'none', width: 130,
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSaveInvoiceDate(inv)
+                                  if (e.key === 'Escape') { setEditingDateInvId(null); setEditingDateValue('') }
+                                }}
+                              />
+                              <button
+                                onClick={() => handleSaveInvoiceDate(inv)}
+                                disabled={savingDate || !editingDateValue}
+                                style={{ background: '#ff6b00', border: 'none', borderRadius: 4, color: '#fff', padding: '3px 8px', fontSize: 11, cursor: 'pointer', opacity: savingDate ? 0.5 : 1 }}
+                              >
+                                {savingDate ? '…' : '✓'}
+                              </button>
+                              <button
+                                onClick={() => { setEditingDateInvId(null); setEditingDateValue('') }}
+                                style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 4, color: '#888', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <span
+                              onClick={() => {
+                                if (isArAdmin && inv.invoice_number) {
+                                  setEditingDateInvId(inv.id)
+                                  setEditingDateValue(inv.invoice_date ?? '')
+                                }
+                              }}
+                              title={isArAdmin && inv.invoice_number ? 'Click to override invoice date' : undefined}
+                              style={{
+                                cursor: isArAdmin && inv.invoice_number ? 'pointer' : 'default',
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                              }}
+                            >
+                              {fmtDate(inv.invoice_date)}
+                              {isArAdmin && inv.invoice_number && (
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth={2} style={{ flexShrink: 0, opacity: 0.6 }}>
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
+                              )}
+                            </span>
+                          )}
+                        </td>
                         <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>{fmtDate(inv.due_date)}</td>
                         <td style={{ padding: '9px 12px', fontSize: 12, color: '#888' }}>{inv.terms ?? '—'}</td>
                         <td style={{ padding: '9px 12px', fontSize: 12, whiteSpace: 'nowrap' }}>
