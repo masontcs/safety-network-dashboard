@@ -4,10 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 // Invoice interface only used by ArCustomerDetail now — kept here for the Customer list type
 import type { Role } from '@/lib/supabase/database.types'
 import ArImportModal from './ArImportModal'
-import ArPaymentImportModal from './ArPaymentImportModal'
 import ArCustomerDetail from './ArCustomerDetail'
 import ArMeetingDashboard from './ArMeetingDashboard'
-import ArPaymentsView from './ArPaymentsView'
 import { createBrowserClient } from '@/lib/supabase/client'
 
 interface Branch { id: string; name: string }
@@ -50,7 +48,7 @@ interface Invoice {
 
 interface Props { role: Role; branches: Branch[] }
 
-type ViewMode = 'ar' | 'payments' | 'meeting'
+type ViewMode = 'ar' | 'meeting'
 type SortKey = 'displayName' | 'current' | 'd30' | 'd60' | 'd90' | 'd90plus' | 'totalAr' | 'invoiceCount'
 type SortDir = 'asc' | 'desc'
 
@@ -189,7 +187,6 @@ export default function ArDashboard({ role, branches }: Props) {
 
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [showImport, setShowImport]               = useState(false)
-  const [showPaymentImport, setShowPaymentImport] = useState(false)
 
   const fetchSummary = useCallback(async () => {
     setLoadingSummary(true)
@@ -359,41 +356,25 @@ export default function ArDashboard({ role, branches }: Props) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {role === 'ar_team' ? (
-            /* ar_team: scope toggle + Payments tab */
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {view !== 'payments' && (
-                <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 3, gap: 2 }}>
-                  {([false, true] as const).map((all) => (
-                    <button key={String(all)} onClick={() => setShowAll(all)}
-                      style={{
-                        background: showAll === all ? '#ff6b00' : 'transparent',
-                        color: showAll === all ? '#fff' : '#888',
-                        border: 'none', borderRadius: 6,
-                        padding: '5px 14px', fontSize: 12, fontWeight: 500,
-                        cursor: 'pointer',
-                      }}>
-                      {all ? 'All AR' : 'My Customers'}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={() => setView(view === 'payments' ? 'ar' : 'payments')}
-                style={{
-                  background: view === 'payments' ? '#ff6b00' : '#2a2a2a',
-                  color: view === 'payments' ? '#fff' : '#888',
-                  border: 'none', borderRadius: 8,
-                  padding: '5px 14px', fontSize: 12, fontWeight: 500,
-                  cursor: 'pointer',
-                }}
-              >
-                Payments
-              </button>
+            /* ar_team: My Customers / All AR scope toggle */
+            <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 3, gap: 2 }}>
+              {([false, true] as const).map((all) => (
+                <button key={String(all)} onClick={() => setShowAll(all)}
+                  style={{
+                    background: showAll === all ? '#ff6b00' : 'transparent',
+                    color: showAll === all ? '#fff' : '#888',
+                    border: 'none', borderRadius: 6,
+                    padding: '5px 14px', fontSize: 12, fontWeight: 500,
+                    cursor: 'pointer',
+                  }}>
+                  {all ? 'All AR' : 'My Customers'}
+                </button>
+              ))}
             </div>
           ) : (
-            /* other roles: AR / Payments / Meeting view toggle */
+            /* other roles: AR / Meeting view toggle */
             <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 3, gap: 2 }}>
-              {(['ar', 'payments', 'meeting'] as ViewMode[]).map((v) => (
+              {(['ar', 'meeting'] as ViewMode[]).map((v) => (
                 <button key={v} onClick={() => setView(v)}
                   style={{
                     background: view === v ? '#ff6b00' : 'transparent',
@@ -402,27 +383,13 @@ export default function ArDashboard({ role, branches }: Props) {
                     padding: '5px 14px', fontSize: 12, fontWeight: 500,
                     cursor: 'pointer',
                   }}>
-                  {v === 'ar' ? 'AR' : v === 'payments' ? 'Payments' : 'Meeting'}
+                  {v === 'ar' ? 'AR' : 'Meeting'}
                 </button>
               ))}
             </div>
           )}
           {isAdmin && (
             <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => setShowPaymentImport(true)}
-                style={{
-                  background: '#2a2a2a', color: '#ccc', border: '1px solid #333',
-                  borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 400,
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                }}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <rect x="2" y="5" width="20" height="14" rx="2" />
-                  <path d="M2 10h20" />
-                </svg>
-                Import Payments
-              </button>
               <button
                 onClick={() => setShowImport(true)}
                 style={{
@@ -442,16 +409,6 @@ export default function ArDashboard({ role, branches }: Props) {
           )}
         </div>
       </div>
-
-      {/* Payments view */}
-      {view === 'payments' && (
-        <ArPaymentsView
-          onSelectCustomer={(customerId) => {
-            const cust = customers.find((c) => c.id === customerId)
-            if (cust) { setView('ar'); setSelectedCustomer(cust) }
-          }}
-        />
-      )}
 
       {/* Meeting dashboard view */}
       {view === 'meeting' && (
@@ -619,9 +576,6 @@ export default function ArDashboard({ role, branches }: Props) {
 
       {showImport && (
         <ArImportModal onClose={() => setShowImport(false)} onSuccess={handleImportSuccess} />
-      )}
-      {showPaymentImport && (
-        <ArPaymentImportModal onClose={() => setShowPaymentImport(false)} onSuccess={() => setShowPaymentImport(false)} />
       )}
     </div>
   )
