@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
+import { getAccessContext, guardAdminOrExecutive } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/utils/errors'
 
@@ -7,9 +7,8 @@ export async function GET(): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    if (ctx.access.role !== 'admin' && ctx.access.role !== 'executive') {
-      return NextResponse.json({ success: false, error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
-    }
+    const guard = guardAdminOrExecutive(ctx.access.role)
+    if (guard) return guard
 
     const supabase = createServiceClient()
 

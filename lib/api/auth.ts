@@ -35,6 +35,15 @@ export function guardAdminOnly(role: Role): NextResponse | null {
   )
 }
 
+// Admin or executive — used for allocation management, data explorer, etc.
+export function guardAdminOrExecutive(role: Role): NextResponse | null {
+  if (role === 'admin' || role === 'executive') return null
+  return NextResponse.json(
+    { success: false, error: 'Admin or executive access required.', code: 'FORBIDDEN' },
+    { status: 403 }
+  )
+}
+
 // AR administrative operations (status changes, imports, exclusions, merges)
 // admin + executive + ar_manager all have full AR admin rights
 export function guardArAdminOnly(role: Role): NextResponse | null {

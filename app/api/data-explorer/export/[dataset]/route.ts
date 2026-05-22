@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext } from '@/lib/api/auth'
+import { getAccessContext, guardAdminOrExecutive } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/utils/errors'
 import type { Vendor } from '@/lib/supabase/database.types'
@@ -20,9 +20,8 @@ export async function GET(
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    if (ctx.access.role !== 'admin' && ctx.access.role !== 'executive') {
-      return NextResponse.json({ success: false, error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
-    }
+    const guard = guardAdminOrExecutive(ctx.access.role)
+    if (guard) return guard
 
     const { dataset } = params
     if (!['payroll', 'revenue', 'fuel'].includes(dataset)) {

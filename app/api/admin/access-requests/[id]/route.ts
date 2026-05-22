@@ -83,6 +83,19 @@ export async function PATCH(
     if (!branchIds || branchIds.length === 0) {
       return NextResponse.json({ success: false, error: 'At least one branch is required to approve', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
+
+    // Validate that every submitted branch ID actually exists — prevents assigning
+    // a user to a made-up or deleted branch ID submitted by a client.
+    const { data: validBranchRows } = await supabase.from('branches').select('id').in('id', branchIds)
+    const validBranchIds = new Set((validBranchRows ?? []).map((b) => b.id as string))
+    const invalidIds = branchIds.filter((b) => !validBranchIds.has(b))
+    if (invalidIds.length > 0) {
+      return NextResponse.json(
+        { success: false, error: `Invalid branch ID(s): ${invalidIds.join(', ')}`, code: 'VALIDATION_ERROR' },
+        { status: 400 }
+      )
+    }
+
     if (!temporaryPassword || temporaryPassword.length < 8) {
       return NextResponse.json({ success: false, error: 'A temporary password of at least 8 characters is required', code: 'VALIDATION_ERROR' }, { status: 400 })
     }
