@@ -153,6 +153,16 @@ export async function POST(request: Request): Promise<Response> {
             return
           }
 
+          // Delete old invoices for this entity BEFORE inserting new ones.
+          // A brief empty window is safer than a doubled-data window where
+          // both the old and new invoices coexist and inflate AR totals.
+          send({ type: 'step', label: 'Clearing previous import…', progress: 67 })
+          await supabase
+            .from('ar_invoices')
+            .delete()
+            .eq('entity_code', entityCode)
+            .neq('import_id', (importRecord as { id: string }).id)
+
           // Build invoice insert payload
           const invoicesToInsert = invoiceRows
             .filter((row) => refMap.has(row.qbName))
@@ -211,15 +221,6 @@ export async function POST(request: Request): Promise<Response> {
                 .eq('invoice_number', ov.invoice_number)
             }
           }
-
-          send({ type: 'step', label: 'Replacing previous import…', progress: 95 })
-
-          // Delete old invoices for this entity — new data fully written first
-          await supabase
-            .from('ar_invoices')
-            .delete()
-            .eq('entity_code', entityCode)
-            .neq('import_id', (importRecord as { id: string }).id)
 
           send({
             type: 'done',

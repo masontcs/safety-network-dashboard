@@ -36,21 +36,32 @@ export async function POST(
     if (!target) return NextResponse.json({ error: 'Target customer not found' }, { status: 404 })
     if (!source) return NextResponse.json({ error: 'Source customer not found' }, { status: 404 })
 
+    // NOTE: These steps are not wrapped in a DB transaction — if any step fails after
+    // an earlier step succeeds, some data will have moved and some won't. For a proper
+    // atomic merge this should be converted to a Postgres RPC function. The error
+    // checks below at least surface failures clearly rather than silently swallowing them.
+
     // Move entity refs
-    await supabase.from('ar_customer_entity_refs').update({ customer_id: targetId }).eq('customer_id', sourceId)
+    const { error: e1 } = await supabase.from('ar_customer_entity_refs').update({ customer_id: targetId }).eq('customer_id', sourceId)
+    if (e1) return NextResponse.json({ error: `Failed to move entity refs: ${e1.message}` }, { status: 500 })
 
     // Move invoices
-    await supabase.from('ar_invoices').update({ customer_id: targetId }).eq('customer_id', sourceId)
+    const { error: e2 } = await supabase.from('ar_invoices').update({ customer_id: targetId }).eq('customer_id', sourceId)
+    if (e2) return NextResponse.json({ error: `Failed to move invoices: ${e2.message}` }, { status: 500 })
 
     // Move contacts
-    await supabase.from('ar_customer_contacts').update({ customer_id: targetId }).eq('customer_id', sourceId)
+    const { error: e3 } = await supabase.from('ar_customer_contacts').update({ customer_id: targetId }).eq('customer_id', sourceId)
+    if (e3) return NextResponse.json({ error: `Failed to move contacts: ${e3.message}` }, { status: 500 })
 
     // Move notes
-    await supabase.from('ar_customer_notes').update({ customer_id: targetId }).eq('customer_id', sourceId)
+    const { error: e4 } = await supabase.from('ar_customer_notes').update({ customer_id: targetId }).eq('customer_id', sourceId)
+    if (e4) return NextResponse.json({ error: `Failed to move notes: ${e4.message}` }, { status: 500 })
 
     // Move PM assignments — skip any that would create a duplicate (UNIQUE constraint)
-    const { data: sourcePms } = await supabase.from('ar_customer_pm_assignments').select('user_id').eq('customer_id', sourceId)
-    const { data: targetPms } = await supabase.from('ar_customer_pm_assignments').select('user_id').eq('customer_id', targetId)
+    const { data: sourcePms, error: e5 } = await supabase.from('ar_customer_pm_assignments').select('user_id').eq('customer_id', sourceId)
+    if (e5) return NextResponse.json({ error: `Failed to read source PM assignments: ${e5.message}` }, { status: 500 })
+    const { data: targetPms, error: e6 } = await supabase.from('ar_customer_pm_assignments').select('user_id').eq('customer_id', targetId)
+    if (e6) return NextResponse.json({ error: `Failed to read target PM assignments: ${e6.message}` }, { status: 500 })
     const existingUserIds = new Set((targetPms ?? []).map((p) => p.user_id as string))
 
     const toInsert = (sourcePms ?? [])
@@ -58,11 +69,13 @@ export async function POST(
       .map((p) => ({ customer_id: targetId, user_id: p.user_id as string }))
 
     if (toInsert.length > 0) {
-      await supabase.from('ar_customer_pm_assignments').insert(toInsert)
+      const { error: e7 } = await supabase.from('ar_customer_pm_assignments').insert(toInsert)
+      if (e7) return NextResponse.json({ error: `Failed to move PM assignments: ${e7.message}` }, { status: 500 })
     }
 
     // Delete source (cascades remaining source-owned rows like duplicate PM rows)
-    await supabase.from('ar_customers').delete().eq('id', sourceId)
+    const { error: e8 } = await supabase.from('ar_customers').delete().eq('id', sourceId)
+    if (e8) return NextResponse.json({ error: `Failed to delete source customer: ${e8.message}` }, { status: 500 })
 
     return NextResponse.json({ success: true, mergedName: source.display_name })
   } catch (err) {

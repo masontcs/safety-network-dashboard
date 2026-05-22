@@ -126,19 +126,34 @@ export async function POST(request: Request): Promise<Response> {
             total: confirmedTxnTotal,
           })
 
-          const counts = await insertPayrollData(
-            importRecord.id, entity.id, periodDate, resolved, employees, itemNameToId, supabase,
-            (done, total) => {
-              const pct = 58 + Math.round((done / total) * 33)
-              send({
-                type: 'step',
-                label: `Writing transactions (${done}/${total})…`,
-                progress: pct,
-                current: done,
-                total,
-              })
-            }
-          )
+          // insertPayrollData writes multiple tables in a loop with no DB transaction.
+          // If it throws mid-way, we clean up all partial data before re-throwing
+          // so the import record isn't left in a corrupt half-written state.
+          let counts: Awaited<ReturnType<typeof insertPayrollData>>
+          try {
+            counts = await insertPayrollData(
+              importRecord.id, entity.id, periodDate, resolved, employees, itemNameToId, supabase,
+              (done, total) => {
+                const pct = 58 + Math.round((done / total) * 33)
+                send({
+                  type: 'step',
+                  label: `Writing transactions (${done}/${total})…`,
+                  progress: pct,
+                  current: done,
+                  total,
+                })
+              }
+            )
+          } catch (insertErr) {
+            // Clean up any partial writes before surfacing the error
+            await supabase.from('payroll_transactions').delete().eq('import_id', importRecord.id)
+            await supabase.from('payroll_taxes').delete().eq('import_id', importRecord.id)
+            await supabase.from('payroll_staged_transactions').delete().eq('import_id', importRecord.id)
+            await supabase.from('payroll_staged_taxes').delete().eq('import_id', importRecord.id)
+            await supabase.from('payroll_item_staged_transactions').delete().eq('import_id', importRecord.id)
+            await supabase.from('payroll_imports').delete().eq('id', importRecord.id)
+            throw insertErr
+          }
 
           // Non-blocking AI — fire and forget, don't delay the response
           const newEmployees = resolved.filter((r) => r.isNew)
