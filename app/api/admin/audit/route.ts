@@ -53,11 +53,13 @@ export async function GET(request: Request): Promise<NextResponse> {
     const { data: logs, error, count } = await query
     if (error) throw new Error(error.message)
 
-    // Fetch distinct users for the filter dropdown
+    // Fetch distinct users for the filter dropdown — cap at 5000 rows to prevent
+    // a full-table scan as audit_logs grows; only distinct users are needed.
     const { data: users } = await db
       .from('audit_logs')
       .select('user_id, user_display_name, user_role')
       .order('user_display_name')
+      .limit(5000)
 
     // Deduplicate by user_id
     const userMap = new Map<string, { userId: string; displayName: string; role: string }>()

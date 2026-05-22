@@ -20,14 +20,22 @@ export async function resolveEmployees(
   entityId: string,
   supabase: SupabaseClient
 ): Promise<ResolvedEmployee[]> {
+  // Pre-fetch ALL assignments for this entity in one query instead of one per employee.
+  // Case-insensitive lookup in JS mirrors the ILIKE behaviour used previously.
+  const { data: entityAssignments, error: fetchErr } = await supabase
+    .from('employee_entity_assignments')
+    .select('id, employee_id, payroll_code_id, is_confirmed, business_tag, raw_name_in_report')
+    .eq('entity_id', entityId)
+  if (fetchErr) throw new Error(`Failed to load entity assignments: ${fetchErr.message}`)
+
+  const assignmentByName = new Map<string, NonNullable<typeof entityAssignments>[number]>()
+  for (const a of entityAssignments ?? []) {
+    assignmentByName.set(a.raw_name_in_report.toLowerCase(), a)
+  }
+
   const resolved: ResolvedEmployee[] = []
   for (const emp of parsedEmployees) {
-    const escapedName = emp.rawName.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
-    const { data: existing, error } = await supabase
-      .from('employee_entity_assignments')
-      .select('id, employee_id, payroll_code_id, is_confirmed, business_tag')
-      .ilike('raw_name_in_report', escapedName).eq('entity_id', entityId).limit(1).maybeSingle()
-    if (error) throw new Error(`Failed to lookup employee "${emp.rawName}": ${error.message}`)
+    const existing = assignmentByName.get(emp.rawName.toLowerCase()) ?? null
     if (existing) {
       resolved.push({
         rawName: emp.rawName,
@@ -92,14 +100,17 @@ export async function resolvePayrollItems(
   if (error) throw new Error(`Failed to load payroll_items: ${error.message}`)
   const map = new Map<string, ResolvedItem>()
   const existing = new Map((items ?? []).map((i) => [i.name, { id: i.id, isConfirmed: i.is_confirmed }]))
+
+  // Fetch the "Other" group ID once before the loop — avoids one round-trip per new item.
+  const { data: otherGroup, error: grpErr } = await supabase
+    .from('payroll_item_groups').select('id').eq('name', 'Other').maybeSingle()
+  if (grpErr) throw new Error(`Failed to lookup Other group: ${grpErr.message}`)
+
   for (const name of itemNames) {
     if (existing.has(name)) { map.set(name, existing.get(name)!); continue }
-    const { data: grp, error: grpErr } = await supabase
-      .from('payroll_item_groups').select('id').eq('name', 'Other').maybeSingle()
-    if (grpErr) throw new Error(`Failed to lookup Other group: ${grpErr.message}`)
-    if (!grp?.id) { map.set(name, { id: null, isConfirmed: false }); continue }
+    if (!otherGroup?.id) { map.set(name, { id: null, isConfirmed: false }); continue }
     const { data: ni, error: ie } = await supabase
-      .from('payroll_items').insert({ name, group_id: grp.id, is_confirmed: false }).select('id').single()
+      .from('payroll_items').insert({ name, group_id: otherGroup.id, is_confirmed: false }).select('id').single()
     map.set(name, ie || !ni ? { id: null, isConfirmed: false } : { id: ni.id, isConfirmed: false })
   }
   return map

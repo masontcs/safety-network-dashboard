@@ -125,15 +125,19 @@ export async function GET(request: Request): Promise<NextResponse> {
       assignmentsByEmployee[a.employee_id].push(a)
     }
 
-    // Fetch latest payroll date per employee — paginate to get all transactions
+    // Fetch latest payroll date per employee — scoped to the employees in this result
+    // set to avoid a full-table scan. The ideal fix is MAX(period_date) GROUP BY employee_id
+    // pushed to Postgres via an RPC, but scoping by ID is a significant improvement already.
+    const allEmployeeIds = allEmployees.map((e) => e.id)
     const PAGE_SIZE = 1000
     const payrollTxns: Array<{ employee_id: string; period_date: string }> = []
-    {
+    if (allEmployeeIds.length > 0) {
       let from = 0
       while (true) {
         const { data, error } = await supabase
           .from('payroll_transactions')
           .select('employee_id, period_date')
+          .in('employee_id', allEmployeeIds)
           .order('period_date', { ascending: false })
           .range(from, from + PAGE_SIZE - 1)
         if (error) throw new Error(`Failed to load payroll transactions: ${error.message}`)
