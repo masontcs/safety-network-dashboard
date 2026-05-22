@@ -16,6 +16,7 @@ export type AuditAction =
   | 'import.fuel'
   // AR
   | 'ar.note.add'
+  | 'ar.note.edit'
   | 'ar.note.delete'
   | 'ar.invoice.flag'
   | 'ar.customer.update'

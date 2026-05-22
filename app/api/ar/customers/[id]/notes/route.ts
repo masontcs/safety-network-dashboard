@@ -92,6 +92,8 @@ export async function POST(
         content:           data.content,
         noteType:          data.note_type,
         createdAt:         data.created_at,
+        editedAt:          null,
+        createdBy:         data.created_by ?? null,
         createdByName:     profile?.display_name ?? null,
         communicationType: data.communication_type ?? null,
         contactName:       data.contact_name ?? null,

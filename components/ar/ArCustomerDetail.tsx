@@ -10,6 +10,7 @@ import { createBrowserClient } from '@/lib/supabase/client'
 interface Contact { id: string; name: string; title: string | null; email: string | null; phone: string | null; isPrimary: boolean }
 interface Note    {
   id: string; content: string; noteType: 'collection' | 'operation'; createdAt: string; createdByName: string | null
+  createdBy: string | null; editedAt: string | null
   communicationType: string | null; contactName: string | null; outcome: string | null; isPinned: boolean
 }
 interface InvoiceNote {
@@ -372,6 +373,17 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
   const [opContactName, setOpContactName] = useState('')
   const [opOutcome, setOpOutcome]         = useState('')
 
+  // Current logged-in user ID (for note ownership checks)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  useEffect(() => {
+    createBrowserClient().auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null))
+  }, [])
+
+  // Note inline editing state
+  const [editingNoteId, setEditingNoteId]         = useState<string | null>(null)
+  const [editingNoteContent, setEditingNoteContent] = useState('')
+  const [savingNoteEdit, setSavingNoteEdit]         = useState(false)
+
   // Invoice notes expansion
   const [expandedInvId, setExpandedInvId]   = useState<string | null>(null)
   const [invNotes, setInvNotes]             = useState<Record<string, InvoiceNote[]>>({})
@@ -503,6 +515,8 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
             content:           row.content as string,
             noteType:          (row.note_type as 'collection' | 'operation') ?? 'collection',
             createdAt:         row.created_at as string,
+            editedAt:          (row.edited_at as string | null) ?? null,
+            createdBy:         (row.created_by as string | null) ?? null,
             createdByName,
             communicationType: (row.communication_type as string | null) ?? null,
             contactName:       (row.contact_name as string | null) ?? null,
@@ -513,7 +527,7 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
         })
       })
 
-      // ── Note updated (pin/unpin) by another user ──────────────────────────
+      // ── Note updated (pin/unpin or content edit) by another user ─────────
       .on('postgres_changes', {
         event:  'UPDATE',
         schema: 'public',
@@ -523,7 +537,12 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
         const row = payload.new as Record<string, unknown>
         setProfile((p) => p ? {
           ...p,
-          notes: p.notes.map((n) => n.id === row.id ? { ...n, isPinned: !!row.is_pinned } : n),
+          notes: p.notes.map((n) => n.id === row.id ? {
+            ...n,
+            isPinned: !!row.is_pinned,
+            content:  (row.content as string) ?? n.content,
+            editedAt: (row.edited_at as string | null) ?? n.editedAt,
+          } : n),
         } : p)
       })
 
@@ -625,7 +644,12 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
     if (res.ok) {
       const { note } = await res.json()
       const noteWithPin = { ...note, isPinned: note.isPinned ?? false }
-      setProfile((p) => p ? { ...p, notes: [noteWithPin, ...p.notes] } : p)
+      // Realtime may have already inserted this note — deduplicate
+      setProfile((p) => {
+        if (!p) return p
+        if (p.notes.some((n) => n.id === noteWithPin.id)) return p
+        return { ...p, notes: [noteWithPin, ...p.notes] }
+      })
       if (noteType === 'collection') {
         setCollectionNoteText('')
         setCollCommType('')
@@ -640,6 +664,25 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
     }
     if (noteType === 'collection') setAddingCollectionNote(false)
     else setAddingOperationNote(false)
+  }
+
+  const handleEditNote = async (noteId: string) => {
+    const content = editingNoteContent.trim()
+    if (!content) return
+    setSavingNoteEdit(true)
+    const res = await fetch(`/api/ar/customers/${customer.id}/notes/${noteId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    })
+    if (res.ok) {
+      const { editedAt } = await res.json()
+      setProfile((p) => p ? {
+        ...p,
+        notes: p.notes.map((n) => n.id === noteId ? { ...n, content, editedAt: editedAt ?? new Date().toISOString() } : n),
+      } : p)
+      setEditingNoteId(null)
+    }
+    setSavingNoteEdit(false)
   }
 
   const handleDeleteNote = async (noteId: string) => {
@@ -985,41 +1028,75 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
 
                 const NoteRow = ({ n, isPinnedSection }: { n: typeof allCollection[0]; isPinnedSection: boolean }) => {
                   const outcomeMeta = n.outcome ? getOutcomeMeta(n.outcome) : null
+                  const isEditing   = editingNoteId === n.id
+                  const isOwnNote   = !!currentUserId && n.createdBy === currentUserId
                   return (
                     <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid #2a2a2a' }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                        <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
-                        {isArAdmin && (
-                          <>
-                            <button
-                              onClick={() => handlePinNote(n.id, !n.isPinned)}
-                              title={n.isPinned ? 'Unpin note' : 'Pin note to top'}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: '2px 4px', flexShrink: 0, color: isPinnedSection ? '#ff6b00' : '#444', transition: 'color 0.15s' }}
-                              onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6b00')}
-                              onMouseLeave={(e) => (e.currentTarget.style.color = isPinnedSection ? '#ff6b00' : '#444')}>
-                              📌
+                      {isEditing ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <textarea
+                            autoFocus
+                            value={editingNoteContent}
+                            onChange={(e) => setEditingNoteContent(e.target.value)}
+                            rows={3}
+                            style={{ width: '100%', background: '#2a2a2a', border: '1px solid #ff6b00', borderRadius: 8, color: '#ccc', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                          />
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <button onClick={() => setEditingNoteId(null)} style={{ background: 'none', border: '1px solid #333', borderRadius: 6, color: '#888', padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+                            <button onClick={() => handleEditNote(n.id)} disabled={savingNoteEdit || !editingNoteContent.trim()}
+                              style={{ background: '#ff6b00', border: 'none', borderRadius: 6, color: '#fff', padding: '4px 12px', fontSize: 12, cursor: savingNoteEdit ? 'default' : 'pointer', opacity: savingNoteEdit || !editingNoteContent.trim() ? 0.6 : 1 }}>
+                              {savingNoteEdit ? 'Saving…' : 'Save'}
                             </button>
-                            <button onClick={() => handleDeleteNote(n.id)}
-                              style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
-                              onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                              onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
-                          </>
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 5 }}>
-                        {outcomeMeta && (
-                          <span style={{ fontSize: 10, fontWeight: 600, color: outcomeMeta.color, background: `${outcomeMeta.color}18`, borderRadius: 4, padding: '1px 6px' }}>
-                            {outcomeMeta.label}
-                          </span>
-                        )}
-                        {n.communicationType && (
-                          <span style={{ fontSize: 10, color: '#666', background: '#2a2a2a', borderRadius: 4, padding: '1px 6px' }}>
-                            {getCommTypeLabel(n.communicationType)}
-                          </span>
-                        )}
-                        {n.contactName && <span style={{ fontSize: 10, color: '#555' }}>w/ {n.contactName}</span>}
-                        <span style={{ fontSize: 11, color: '#555', marginLeft: 'auto' }}>{n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}</span>
-                      </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                            <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
+                            {isOwnNote && (
+                              <button
+                                onClick={() => { setEditingNoteId(n.id); setEditingNoteContent(n.content) }}
+                                title="Edit note"
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '2px 4px', flexShrink: 0, color: '#444' }}
+                                onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6b00')}
+                                onMouseLeave={(e) => (e.currentTarget.style.color = '#444')}>✎</button>
+                            )}
+                            {isArAdmin && (
+                              <>
+                                <button
+                                  onClick={() => handlePinNote(n.id, !n.isPinned)}
+                                  title={n.isPinned ? 'Unpin note' : 'Pin note to top'}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: '2px 4px', flexShrink: 0, color: isPinnedSection ? '#ff6b00' : '#444', transition: 'color 0.15s' }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6b00')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.color = isPinnedSection ? '#ff6b00' : '#444')}>
+                                  📌
+                                </button>
+                                <button onClick={() => handleDeleteNote(n.id)}
+                                  style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
+                              </>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 5 }}>
+                            {outcomeMeta && (
+                              <span style={{ fontSize: 10, fontWeight: 600, color: outcomeMeta.color, background: `${outcomeMeta.color}18`, borderRadius: 4, padding: '1px 6px' }}>
+                                {outcomeMeta.label}
+                              </span>
+                            )}
+                            {n.communicationType && (
+                              <span style={{ fontSize: 10, color: '#666', background: '#2a2a2a', borderRadius: 4, padding: '1px 6px' }}>
+                                {getCommTypeLabel(n.communicationType)}
+                              </span>
+                            )}
+                            {n.contactName && <span style={{ fontSize: 10, color: '#555' }}>w/ {n.contactName}</span>}
+                            <span style={{ fontSize: 11, color: '#555', marginLeft: 'auto' }}>
+                              {n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}
+                              {n.editedAt && <span style={{ color: '#444', fontStyle: 'italic' }}> · edited</span>}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )
                 }
@@ -1106,31 +1183,65 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {shown.map((n) => {
                       const outcomeMeta = n.outcome ? getOutcomeMeta(n.outcome) : null
+                      const isEditing   = editingNoteId === n.id
+                      const isOwnNote   = !!currentUserId && n.createdBy === currentUserId
                       return (
                         <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid #2a2a2a' }}>
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                            <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
-                            {isAdmin && (
-                              <button onClick={() => handleDeleteNote(n.id)}
-                                style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
-                                onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                                onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
-                            )}
-                          </div>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 5 }}>
-                            {outcomeMeta && (
-                              <span style={{ fontSize: 10, fontWeight: 600, color: outcomeMeta.color, background: `${outcomeMeta.color}18`, borderRadius: 4, padding: '1px 6px' }}>
-                                {outcomeMeta.label}
-                              </span>
-                            )}
-                            {n.communicationType && (
-                              <span style={{ fontSize: 10, color: '#666', background: '#2a2a2a', borderRadius: 4, padding: '1px 6px' }}>
-                                {getCommTypeLabel(n.communicationType)}
-                              </span>
-                            )}
-                            {n.contactName && <span style={{ fontSize: 10, color: '#555' }}>w/ {n.contactName}</span>}
-                            <span style={{ fontSize: 11, color: '#555', marginLeft: 'auto' }}>{n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}</span>
-                          </div>
+                          {isEditing ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              <textarea
+                                autoFocus
+                                value={editingNoteContent}
+                                onChange={(e) => setEditingNoteContent(e.target.value)}
+                                rows={3}
+                                style={{ width: '100%', background: '#2a2a2a', border: '1px solid #ff6b00', borderRadius: 8, color: '#ccc', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                              />
+                              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                <button onClick={() => setEditingNoteId(null)} style={{ background: 'none', border: '1px solid #333', borderRadius: 6, color: '#888', padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+                                <button onClick={() => handleEditNote(n.id)} disabled={savingNoteEdit || !editingNoteContent.trim()}
+                                  style={{ background: '#ff6b00', border: 'none', borderRadius: 6, color: '#fff', padding: '4px 12px', fontSize: 12, cursor: savingNoteEdit ? 'default' : 'pointer', opacity: savingNoteEdit || !editingNoteContent.trim() ? 0.6 : 1 }}>
+                                  {savingNoteEdit ? 'Saving…' : 'Save'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
+                                {isOwnNote && (
+                                  <button
+                                    onClick={() => { setEditingNoteId(n.id); setEditingNoteContent(n.content) }}
+                                    title="Edit note"
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '2px 4px', flexShrink: 0, color: '#444' }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6b00')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.color = '#444')}>✎</button>
+                                )}
+                                {isAdmin && (
+                                  <button onClick={() => handleDeleteNote(n.id)}
+                                    style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
+                                )}
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 5 }}>
+                                {outcomeMeta && (
+                                  <span style={{ fontSize: 10, fontWeight: 600, color: outcomeMeta.color, background: `${outcomeMeta.color}18`, borderRadius: 4, padding: '1px 6px' }}>
+                                    {outcomeMeta.label}
+                                  </span>
+                                )}
+                                {n.communicationType && (
+                                  <span style={{ fontSize: 10, color: '#666', background: '#2a2a2a', borderRadius: 4, padding: '1px 6px' }}>
+                                    {getCommTypeLabel(n.communicationType)}
+                                  </span>
+                                )}
+                                {n.contactName && <span style={{ fontSize: 10, color: '#555' }}>w/ {n.contactName}</span>}
+                                <span style={{ fontSize: 11, color: '#555', marginLeft: 'auto' }}>
+                                  {n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}
+                                  {n.editedAt && <span style={{ color: '#444', fontStyle: 'italic' }}> · edited</span>}
+                                </span>
+                              </div>
+                            </>
+                          )}
                         </div>
                       )
                     })}

@@ -27,7 +27,8 @@ export async function GET(
       supabase.from('ar_customers').select('id, display_name, is_excluded, customer_status, collection_status, collection_phase, contact_frequency').eq('id', id).single(),
       supabase.from('ar_customer_entity_refs').select('entity_code, quickbooks_name').eq('customer_id', id),
       supabase.from('ar_customer_contacts').select('id, name, title, email, phone, is_primary, created_at').eq('customer_id', id).order('is_primary', { ascending: false }).order('created_at'),
-      supabase.from('ar_customer_notes').select('id, content, created_by, created_at, note_type, communication_type, contact_name, outcome, is_pinned').eq('customer_id', id).order('created_at', { ascending: false }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any).from('ar_customer_notes').select('id, content, created_by, created_at, edited_at, note_type, communication_type, contact_name, outcome, is_pinned').eq('customer_id', id).order('created_at', { ascending: false }),
       supabase.from('ar_customer_pm_assignments').select('user_id').eq('customer_id', id),
       supabase.from('ar_invoices').select('branch_id, open_balance').eq('customer_id', id).eq('row_type', 'invoice'),
     ])
@@ -61,8 +62,9 @@ export async function GET(
     ].sort((a, b) => b.total - a.total)
 
     // Resolve author names for notes and PM display names
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const authorIds = [...new Set([
-      ...(notes ?? []).map((n) => n.created_by).filter(Boolean),
+      ...((notes ?? []) as any[]).map((n: any) => n.created_by).filter(Boolean),
       ...(pmRows ?? []).map((p) => p.user_id),
     ])] as string[]
 
@@ -83,11 +85,14 @@ export async function GET(
         contactFrequency: customer.contact_frequency ?? null,
         entityRefs:       (refs ?? []).map((r) => ({ entityCode: r.entity_code, quickbooksName: r.quickbooks_name })),
         contacts:         (contacts ?? []).map((c) => ({ id: c.id, name: c.name, title: c.title, email: c.email, phone: c.phone, isPrimary: c.is_primary })),
-        notes: (notes ?? []).map((n) => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        notes: ((notes ?? []) as any[]).map((n) => ({
             id:                n.id,
             content:           n.content,
-            noteType:          (n.note_type as string) ?? 'collection',
+            noteType:          n.note_type ?? 'collection',
             createdAt:         n.created_at,
+            editedAt:          n.edited_at ?? null,
+            createdBy:         n.created_by ?? null,
             createdByName:     n.created_by ? (profileMap.get(n.created_by)?.display_name ?? null) : null,
             communicationType: n.communication_type ?? null,
             contactName:       n.contact_name ?? null,
