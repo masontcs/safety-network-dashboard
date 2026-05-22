@@ -340,10 +340,13 @@ export default function ArDashboard({ role, branches }: Props) {
   // ── Customer detail view ───────────────────────────────────────────────────
 
   if (selectedCustomer) {
+    const selectedBranchName = branchId ? (branches.find((b) => b.id === branchId)?.name ?? '') : ''
     return (
       <ArCustomerDetail
         customer={selectedCustomer}
         entity={entity}
+        branchId={branchId}
+        branchName={selectedBranchName}
         role={role}
         branches={branches}
         onBack={() => setSelectedCustomer(null)}

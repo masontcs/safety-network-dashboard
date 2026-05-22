@@ -68,7 +68,9 @@ interface Branch { id: string; name: string }
 
 interface Props {
   customer: CustomerSummary
-  entity: string
+  entity: string      // initial entity filter inherited from the list view
+  branchId: string    // initial branch filter inherited from the list view ('' = none)
+  branchName: string  // display name for the bubble ('' if no branch filter)
   role: Role
   branches: Branch[]
   onBack: () => void
@@ -331,7 +333,7 @@ function ContactForm({ customerId, onSaved, onCancel }: { customerId: string; on
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
-export default function ArCustomerDetail({ customer, entity, role, branches, onBack, onRefresh }: Props) {
+export default function ArCustomerDetail({ customer, entity, branchId: initialBranchId, branchName: initialBranchName, role, branches, onBack, onRefresh }: Props) {
   const isAdmin            = role === 'admin'
   const isArAdmin          = role === 'admin' || role === 'ar_manager' || role === 'ar_team'
   // AR team/manager + executive + admin can change all customer statuses and mark as excluded
@@ -344,12 +346,17 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
 
   const [profile, setProfile]           = useState<CustomerProfile | null>(null)
   const [profileLoading, setProfileLoading] = useState(true)
+  // localEntity / invBranchId: start from the parent's current filter so the detail
+  // page shows the same scoped data the user was looking at in the list.
+  const [localEntity, setLocalEntity]   = useState(entity)
   const [invoices, setInvoices]         = useState<Invoice[]>([])
   const [invTotal, setInvTotal]         = useState(0)
   const [invPage, setInvPage]           = useState(1)
   const [invPageCount, setInvPageCount] = useState(0)
   const [invLoading, setInvLoading]     = useState(true)
-  const [invBranchId, setInvBranchId]   = useState('')
+  const [invBranchId, setInvBranchId]   = useState(initialBranchId)
+  // Display name for the active branch pill (tracks the last known name for the selected id)
+  const [invBranchName, setInvBranchName] = useState(initialBranchName)
   const [invBranchOptions, setInvBranchOptions] = useState<{ id: string; name: string }[]>([])
   const [credits, setCredits]           = useState<Invoice[]>([])
   const [creditsLoading, setCreditsLoading] = useState(true)
@@ -427,13 +434,13 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
 
   useEffect(() => { fetchProfile() }, [fetchProfile])
 
-  // Reset page when branch filter changes
-  useEffect(() => { setInvPage(1) }, [invBranchId])
+  // Reset page when any invoice filter changes
+  useEffect(() => { setInvPage(1) }, [localEntity, invBranchId])
 
   useEffect(() => {
     setInvLoading(true)
     const p = new URLSearchParams({ customerId: customer.id, page: String(invPage) })
-    if (entity)      p.set('entity', entity)
+    if (localEntity) p.set('entity', localEntity)
     if (invBranchId) p.set('branchId', invBranchId)
     fetch(`/api/ar/invoices?${p}`)
       .then((r) => r.json())
@@ -441,23 +448,29 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
         setInvoices(d.invoices ?? [])
         setInvTotal(d.total ?? 0)
         setInvPageCount(d.pageCount ?? 0)
-        // branchOptions is returned on every fetch but only populated server-side
-        // when customerId is set; update only when unfiltered so the list stays complete
-        if (!invBranchId && Array.isArray(d.branchOptions)) setInvBranchOptions(d.branchOptions)
+        // branchOptions is fetched unfiltered server-side — always update to keep the list complete
+        if (Array.isArray(d.branchOptions)) {
+          setInvBranchOptions(d.branchOptions)
+          // Keep invBranchName in sync with the branch options list
+          if (invBranchId) {
+            const found = (d.branchOptions as { id: string; name: string }[]).find((b) => b.id === invBranchId)
+            if (found) setInvBranchName(found.name)
+          }
+        }
       })
       .finally(() => setInvLoading(false))
-  }, [customer.id, entity, invPage, invBranchId])
+  }, [customer.id, localEntity, invPage, invBranchId])
 
   useEffect(() => {
     setCreditsLoading(true)
     const p = new URLSearchParams({ customerId: customer.id, rowType: 'credit_memo' })
-    if (entity)      p.set('entity', entity)
+    if (localEntity) p.set('entity', localEntity)
     if (invBranchId) p.set('branchId', invBranchId)
     fetch(`/api/ar/invoices?${p}`)
       .then((r) => r.json())
       .then((d) => setCredits(d.invoices ?? []))
       .finally(() => setCreditsLoading(false))
-  }, [customer.id, entity, invBranchId])
+  }, [customer.id, localEntity, invBranchId])
 
   useEffect(() => {
     if (!canManagePMs) return
@@ -967,6 +980,80 @@ export default function ArCustomerDetail({ customer, entity, role, branches, onB
           </div>
         </div>
       </div>
+
+      {/* ── Filter context bubble — shows when inherited filters from the list view are active ── */}
+      {(localEntity || invBranchId) && (
+        <div style={{
+          background: 'rgba(255,107,0,0.07)',
+          border: '1px solid rgba(255,107,0,0.22)',
+          borderRadius: 10,
+          padding: '9px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 11, color: '#888', whiteSpace: 'nowrap' }}>Filtered view</span>
+
+          {/* Entity filter pill */}
+          {localEntity && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 1, background: 'rgba(255,107,0,0.13)', borderRadius: 6, padding: '2px 4px 2px 8px' }}>
+              <span style={{ fontSize: 12, color: '#ff6b00', marginRight: 4 }}>Entity</span>
+              <select
+                value={localEntity}
+                onChange={(e) => setLocalEntity(e.target.value)}
+                style={{ background: 'transparent', border: 'none', color: '#ff6b00', fontSize: 12, fontWeight: 500, cursor: 'pointer', outline: 'none', padding: 0 }}
+              >
+                <option value='INC'>INC</option>
+                <option value='TCS'>TCS</option>
+                <option value='STS'>STS</option>
+              </select>
+              <button
+                onClick={() => setLocalEntity('')}
+                title='Remove entity filter'
+                style={{ background: 'none', border: 'none', color: '#cc5500', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: '0 2px', display: 'flex', alignItems: 'center' }}
+              >✕</button>
+            </div>
+          )}
+
+          {/* Branch filter pill */}
+          {invBranchId && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 1, background: 'rgba(255,107,0,0.13)', borderRadius: 6, padding: '2px 4px 2px 8px' }}>
+              <span style={{ fontSize: 12, color: '#ff6b00', marginRight: 4 }}>Branch</span>
+              <select
+                value={invBranchId}
+                onChange={(e) => {
+                  const id = e.target.value
+                  setInvBranchId(id)
+                  const found = invBranchOptions.find((b) => b.id === id)
+                  if (found) setInvBranchName(found.name)
+                }}
+                style={{ background: 'transparent', border: 'none', color: '#ff6b00', fontSize: 12, fontWeight: 500, cursor: 'pointer', outline: 'none', padding: 0 }}
+              >
+                {invBranchOptions.length > 0
+                  ? invBranchOptions.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)
+                  : <option value={invBranchId}>{invBranchName || invBranchId}</option>
+                }
+              </select>
+              <button
+                onClick={() => { setInvBranchId(''); setInvBranchName('') }}
+                title='Remove branch filter'
+                style={{ background: 'none', border: 'none', color: '#cc5500', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: '0 2px', display: 'flex', alignItems: 'center' }}
+              >✕</button>
+            </div>
+          )}
+
+          {/* Clear all — only show when both are active */}
+          {localEntity && invBranchId && (
+            <button
+              onClick={() => { setLocalEntity(''); setInvBranchId(''); setInvBranchName('') }}
+              style={{ background: 'none', border: 'none', color: '#555', fontSize: 11, cursor: 'pointer', padding: '0 2px', marginLeft: 2, textDecoration: 'underline' }}
+            >
+              Clear all
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ── Main content: 2-column asymmetric layout ───────────────────────── */}
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
