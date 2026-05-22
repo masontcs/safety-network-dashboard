@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardArAdminOnly } from '@/lib/api/auth'
+import { getAccessContext } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 
 // PATCH /api/ar/invoices/[id]/date
@@ -13,8 +13,11 @@ export async function PATCH(
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardArAdminOnly(ctx.access.role)
-    if (guard) return guard
+    // ar_team can also override invoice dates (in addition to admin/executive/ar_manager)
+    const { role } = ctx.access
+    if (role !== 'admin' && role !== 'executive' && role !== 'ar_manager' && role !== 'ar_team') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const body = await request.json()
     const date: string | null = body?.date ?? null

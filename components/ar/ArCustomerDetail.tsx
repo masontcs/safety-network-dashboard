@@ -333,7 +333,7 @@ function ContactForm({ customerId, onSaved, onCancel }: { customerId: string; on
 
 export default function ArCustomerDetail({ customer, entity, role, branches, onBack, onRefresh }: Props) {
   const isAdmin            = role === 'admin'
-  const isArAdmin          = role === 'admin' || role === 'ar_manager'
+  const isArAdmin          = role === 'admin' || role === 'ar_manager' || role === 'ar_team'
   // AR team/manager + executive + admin can change all customer statuses and mark as excluded
   const canManageStatuses  = role === 'admin' || role === 'executive' || role === 'ar_manager' || role === 'ar_team'
   const canManagePMs       = role === 'admin' || role === 'executive' || role === 'district_manager' || role === 'branch_manager'
