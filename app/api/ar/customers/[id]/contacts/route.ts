@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getAccessContext } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
+import type { Role } from '@/lib/supabase/database.types'
+
+// Roles allowed to add/modify AR customer contacts
+const CONTACT_WRITE_ROLES: Role[] = ['admin', 'executive', 'ar_manager', 'ar_team']
 
 export async function POST(
   request: Request,
@@ -9,6 +13,9 @@ export async function POST(
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
+    if (!CONTACT_WRITE_ROLES.includes(ctx.access.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const body = await request.json()
     const { name, title, email, phone, isPrimary } = body

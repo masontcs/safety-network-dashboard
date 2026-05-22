@@ -38,8 +38,8 @@ export async function GET(request: Request): Promise<Response> {
       query = query.in('branch_id', effectiveBranchIds)
     }
 
-    // ar_team: scope to assigned customers only unless showAll is requested
-    if (role === 'ar_team' && !showAll) {
+    // ar_team + office_team: scope to assigned customers only unless showAll is requested
+    if ((role === 'ar_team' || role === 'office_team') && !showAll) {
       const assignedIds = await getArTeamCustomerIds(ctx.access.userId)
       const ids = assignedIds.length > 0 ? assignedIds : ['00000000-0000-0000-0000-000000000000']
       query = query.in('customer_id', ids)

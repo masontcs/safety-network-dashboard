@@ -7,6 +7,13 @@ type AccessResult =
   | { ok: true; access: UserAccess }
   | { ok: false; response: NextResponse }
 
+// ── Valid roles — used for runtime validation of DB values ─────────────────────
+
+const VALID_ROLES: Role[] = [
+  'admin', 'executive', 'ar_manager', 'ar_team', 'office_team',
+  'district_manager', 'branch_manager', 'project_manager', 'sales',
+]
+
 // ── Role sets ──────────────────────────────────────────────────────────────────
 
 const NO_PAYROLL_ROLES: Role[] = ['ar_manager', 'ar_team', 'office_team', 'project_manager', 'sales']
@@ -93,6 +100,15 @@ export async function getAccessContext(): Promise<AccessResult> {
     }
   }
 
+  if (!VALID_ROLES.includes(profile.role as Role)) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { success: false, error: 'Unrecognized user role.', code: 'FORBIDDEN' },
+        { status: 401 }
+      ),
+    }
+  }
   const role = profile.role as Role
   const displayName = (profile as unknown as { display_name: string | null }).display_name ?? ''
 

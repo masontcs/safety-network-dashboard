@@ -24,7 +24,12 @@ const TEST_ACCOUNTS = [
   },
 ]
 
-const PASSWORD = 'TestPass2026!'
+// Set TEST_ACCOUNT_PASSWORD in .env.local — never hardcode passwords in source
+function getTestPassword(): string {
+  const pw = process.env.TEST_ACCOUNT_PASSWORD
+  if (!pw) throw new Error('TEST_ACCOUNT_PASSWORD environment variable is not set')
+  return pw
+}
 
 export async function GET(): Promise<NextResponse> {
   try {
@@ -78,7 +83,7 @@ export async function POST(): Promise<NextResponse> {
 
       const { data: createData, error: createErr } = await supabase.auth.admin.createUser({
         email: account.email,
-        password: PASSWORD,
+        password: getTestPassword(),
         email_confirm: true,
         user_metadata: { must_change_password: false },
       })

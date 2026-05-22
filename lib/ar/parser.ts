@@ -27,7 +27,13 @@ type ParseResult =
 
 function excelDateToIso(serial: unknown): string | null {
   if (typeof serial !== 'number' || serial < 1) return null
-  return new Date((serial - 25569) * 86400 * 1000).toISOString().split('T')[0]
+  // Use explicit UTC component extraction — avoids off-by-one on non-UTC servers
+  const d = new Date(Math.round((serial - 25569) * 86400 * 1000))
+  const y = d.getUTCFullYear()
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(d.getUTCDate()).padStart(2, '0')
+  if (y < 2000 || y > 2100) return null
+  return `${y}-${m}-${day}`
 }
 
 const BUCKET_HEADER_MAP: Record<string, ArInvoiceRow['agingBucket']> = {

@@ -9,6 +9,8 @@ export async function GET(
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
+    const guard = guardArAdminOnly(ctx.access.role)
+    if (guard) return guard
 
     const supabase = createServiceClient()
     const { data, error } = await supabase
