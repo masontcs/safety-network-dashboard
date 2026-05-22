@@ -23,17 +23,32 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const showAll = searchParams.get('showAll') === 'true'
+    const assignedUserId = searchParams.get('assignedUserId') || null
 
     // sales: bypass branch filter — see all AR regardless of branch assignments
     const { role } = ctx.access
     const effectiveBranchIds = role === 'sales' ? null : branchIds
 
-    // ar_team / office_team: resolve assigned customer IDs before fetching (unless showing all)
+    // ar_team / office_team: resolve their own assigned customer IDs (unless showing all)
     let arTeamCustomerIds: string[] | null = null
     if ((role === 'ar_team' || role === 'office_team') && !showAll) {
       const ids = await getArTeamCustomerIds(ctx.access.userId)
       arTeamCustomerIds = ids.length > 0 ? ids : []
       if (arTeamCustomerIds.length === 0) return NextResponse.json({ customers: [] })
+    }
+
+    // Admin/manager: filter by a specific AR team member's assigned customers
+    if (assignedUserId && arTeamCustomerIds === null) {
+      if (role !== 'admin' && role !== 'executive' && role !== 'ar_manager') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+      const { data: userAssignments } = await supabase
+        .from('ar_customer_assignments')
+        .select('customer_id')
+        .eq('user_id', assignedUserId)
+      const ids = (userAssignments ?? []).map((a) => a.customer_id as string)
+      if (ids.length === 0) return NextResponse.json({ customers: [] })
+      arTeamCustomerIds = ids
     }
 
     // Paginate through all invoices and aggregate by customer

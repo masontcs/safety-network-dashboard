@@ -46,6 +46,8 @@ interface Invoice {
   customer: { id: string; display_name: string } | null
 }
 
+interface TeamMember { id: string; displayName: string }
+
 interface Props { role: Role; branches: Branch[] }
 
 type ViewMode = 'ar' | 'meeting'
@@ -168,17 +170,21 @@ function AgingCards({
 // ─── Main dashboard ────────────────────────────────────────────────────────────
 
 export default function ArDashboard({ role, branches }: Props) {
-  const isAdmin = role === 'admin'
+  const isAdmin   = role === 'admin'
+  // Roles that can filter by AR team member
+  const isArAdmin = role === 'admin' || role === 'executive' || role === 'ar_manager'
 
-  const [view, setView]               = useState<ViewMode>('ar')
-  const [showAll, setShowAll]         = useState(false)
-  const [entity, setEntity]           = useState('')
-  const [branchId, setBranchId]       = useState('')
-  const [bucket, setBucket]           = useState('')
-  const [search, setSearch]           = useState('')
-  const [showExcluded, setShowExcluded] = useState(false)
-  const [sortKey, setSortKey]         = useState<SortKey>('totalAr')
-  const [sortDir, setSortDir]         = useState<SortDir>('desc')
+  const [view, setView]                   = useState<ViewMode>('ar')
+  const [showAll, setShowAll]             = useState(false)
+  const [entity, setEntity]               = useState('')
+  const [branchId, setBranchId]           = useState('')
+  const [bucket, setBucket]               = useState('')
+  const [search, setSearch]               = useState('')
+  const [showExcluded, setShowExcluded]   = useState(false)
+  const [sortKey, setSortKey]             = useState<SortKey>('totalAr')
+  const [sortDir, setSortDir]             = useState<SortDir>('desc')
+  const [assignedUserId, setAssignedUserId] = useState('')
+  const [teamMembers, setTeamMembers]     = useState<TeamMember[]>([])
 
   const [summary, setSummary]               = useState<AgingSummary | null>(null)
   const [customers, setCustomers]           = useState<Customer[]>([])
@@ -188,37 +194,48 @@ export default function ArDashboard({ role, branches }: Props) {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [showImport, setShowImport]               = useState(false)
 
+  // Fetch AR team members for the assignee dropdown (admin/exec/ar_manager only)
+  useEffect(() => {
+    if (!isArAdmin) return
+    fetch('/api/ar/team-members')
+      .then((r) => r.ok ? r.json() : { members: [] })
+      .then((d) => setTeamMembers(d.members ?? []))
+      .catch(() => {})
+  }, [isArAdmin])
+
   const fetchSummary = useCallback(async () => {
     setLoadingSummary(true)
     const p = new URLSearchParams()
-    if (entity)   p.set('entity', entity)
-    if (branchId) p.set('branchId', branchId)
-    if (showAll)  p.set('showAll', 'true')
+    if (entity)         p.set('entity', entity)
+    if (branchId)       p.set('branchId', branchId)
+    if (showAll)        p.set('showAll', 'true')
+    if (assignedUserId) p.set('assignedUserId', assignedUserId)
     const res = await fetch(`/api/ar/summary?${p}`)
     if (res.ok) setSummary(await res.json())
     setLoadingSummary(false)
-  }, [entity, branchId, showAll])
+  }, [entity, branchId, showAll, assignedUserId])
 
   const fetchCustomers = useCallback(async () => {
     setLoadingCustomers(true)
     const p = new URLSearchParams()
-    if (entity)       p.set('entity', entity)
-    if (branchId)     p.set('branchId', branchId)
-    if (showExcluded) p.set('includeExcluded', 'true')
-    if (showAll)      p.set('showAll', 'true')
+    if (entity)         p.set('entity', entity)
+    if (branchId)       p.set('branchId', branchId)
+    if (showExcluded)   p.set('includeExcluded', 'true')
+    if (showAll)        p.set('showAll', 'true')
+    if (assignedUserId) p.set('assignedUserId', assignedUserId)
     const res = await fetch(`/api/ar/customers?${p}`)
     if (res.ok) {
       const data = await res.json()
       setCustomers(data.customers ?? [])
     }
     setLoadingCustomers(false)
-  }, [entity, branchId, showExcluded, showAll])
+  }, [entity, branchId, showExcluded, showAll, assignedUserId])
 
   useEffect(() => { fetchSummary() }, [fetchSummary])
   useEffect(() => { fetchCustomers() }, [fetchCustomers])
 
   // Reset selected customer when filters change
-  useEffect(() => { setSelectedCustomer(null) }, [entity, branchId])
+  useEffect(() => { setSelectedCustomer(null) }, [entity, branchId, assignedUserId])
 
   // ── Realtime: live customer status / exclude updates ───────────────────────
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -458,6 +475,17 @@ export default function ArDashboard({ role, branches }: Props) {
             </select>
           )}
 
+          {isArAdmin && teamMembers.length > 0 && (
+            <select
+              value={assignedUserId}
+              onChange={(e) => setAssignedUserId(e.target.value)}
+              style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
+            >
+              <option value="">All Assignees</option>
+              {teamMembers.map((m) => <option key={m.id} value={m.id}>{m.displayName}</option>)}
+            </select>
+          )}
+
           {isAdmin && (
             <button
               onClick={() => setShowExcluded((v) => !v)}
@@ -472,9 +500,9 @@ export default function ArDashboard({ role, branches }: Props) {
             </button>
           )}
 
-          {(entity || branchId || bucket || search) && (
+          {(entity || branchId || bucket || search || assignedUserId) && (
             <button
-              onClick={() => { setEntity(''); setBranchId(''); setBucket(''); setSearch('') }}
+              onClick={() => { setEntity(''); setBranchId(''); setBucket(''); setSearch(''); setAssignedUserId('') }}
               style={{ background: 'transparent', border: '1px solid #333', borderRadius: 8, color: '#888', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
             >
               Clear

@@ -14,6 +14,7 @@ export async function GET(request: Request): Promise<Response> {
     const branchId   = searchParams.get('branchId') || null
 
     const showAll = searchParams.get('showAll') === 'true'
+    const assignedUserId = searchParams.get('assignedUserId') || null
 
     const supabase = createServiceClient()
     const { branchIds, role } = ctx.access
@@ -38,11 +39,25 @@ export async function GET(request: Request): Promise<Response> {
       query = query.in('branch_id', effectiveBranchIds)
     }
 
-    // ar_team + office_team: scope to assigned customers only unless showAll is requested
+    // ar_team + office_team: scope to their own assigned customers (unless showAll)
     if ((role === 'ar_team' || role === 'office_team') && !showAll) {
       const assignedIds = await getArTeamCustomerIds(ctx.access.userId)
       const ids = assignedIds.length > 0 ? assignedIds : ['00000000-0000-0000-0000-000000000000']
       query = query.in('customer_id', ids)
+    }
+
+    // Admin/manager: filter by a specific AR team member's assigned customers
+    if (assignedUserId && role !== 'ar_team' && role !== 'office_team') {
+      if (role !== 'admin' && role !== 'executive' && role !== 'ar_manager') {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+      const { data: userAssignments } = await supabase
+        .from('ar_customer_assignments')
+        .select('customer_id')
+        .eq('user_id', assignedUserId)
+      const ids = (userAssignments ?? []).map((a) => a.customer_id as string)
+      const sentinel = ids.length > 0 ? ids : ['00000000-0000-0000-0000-000000000000']
+      query = query.in('customer_id', sentinel)
     }
 
     // Excluded customers are removed from all totals and KPIs
