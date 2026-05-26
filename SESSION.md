@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 13, 2026 — Session: Weekly chart accuracy + month dropdown fixes
+## Last updated: May 26, 2026 — Session: Fuel card employee linking + health check fixes + AR features
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -9,783 +9,387 @@
 
 ## 1. CURRENT PROJECT STATE
 
-A private, role-scoped operations dashboard for Safety Network (3 entities: INC, TCS, STS) built on Next.js 14 App Router + TypeScript, Supabase (PostgreSQL + Auth), Tailwind CSS, Recharts, and the Anthropic Claude API. The app ingests weekly payroll (.xlsm), revenue (.xls), and fuel (.csv/.xlsx) files and presents analytics dashboards locked to each user's assigned branches across four roles (admin, executive, district_manager, branch_manager). All four role dashboards are fully built and rendering with live data. The employee list + detail views are complete for all roles. The import pipeline, review queue, and all admin tools are fully operational.
+A private, role-scoped operations dashboard for Safety Network (3 entities: INC, TCS, STS) built on Next.js 14 App Router + TypeScript, Supabase (PostgreSQL + Auth), Tailwind CSS, Recharts, and the Anthropic Claude API. The app ingests weekly payroll (.xlsm), revenue (.xls), and fuel (.csv/.xlsx) files and presents analytics dashboards locked to each user's assigned branches across ten roles. A full Accounts Receivable module is live and operational. All imports, review queue, admin tools, and AR collection workflows are fully built. A 12-bug health-check pass was completed and all fixes are committed.
 
 ---
 
 ## 2. WHAT IS FULLY BUILT AND WORKING
 
+### User Roles — Ten Levels
+
+```
+admin            → All branches + full employee detail + imports + user management
+executive        → All SN branches + full employee detail + full allocation + data explorer
+district_manager → Multiple assigned branches + direct labor detail + admin payroll SUM ONLY
+branch_manager   → Single assigned branch + direct labor detail + admin payroll SUM ONLY
+sales            → All AR data regardless of branch; no payroll/fuel access
+ar_manager       → All AR data + approve/deny AR team assignments
+ar_team          → Assigned customers only (or all with showAll toggle) + AR workflows
+office_team      → Same scope as ar_team; AR-only access
+project_manager  → Scoped to AR customers in their assigned branches
+```
+
 ### Database (Supabase)
-- [x] 20 tables across 9 migrations (applied to production project)
-- [x] Migration 1: reference tables (businesses, branches, entities, payroll_codes, revenue_codes, payroll_item_groups, payroll_items)
-- [x] Migration 2: user tables (user_profiles, user_branch_assignments)
-- [x] Migration 3: employee tables (employees, employee_entity_assignments, fuel_card_assignments)
-- [x] Migration 4: import header tables (payroll_imports, revenue_imports, fuel_imports)
-- [x] Migration 5: transaction tables (payroll_transactions, payroll_taxes, revenue_transactions, fuel_transactions)
-- [x] Migration 6: RLS policies on all tables
-- [x] Migration 7: fiscal_months table
-- [x] Migration 8: fiscal_quarters + fiscal_quarter_months tables
-- [x] Migration 9 (20260506000001): fiscal_month_targets redesign
-- [x] Migration 10 (20260506000002): fiscal_quarters + fiscal_quarter_months
-- [x] Migration 11 (20260506000003): access_requests table + RLS
-- [x] Migration 12 (20260506000004): backfill fuel_transaction branches
-- [x] Migration 13 (20260506000005): fuel_imports UNIQUE(vendor, date_range_start, date_range_end) constraint
-- [x] Migration 14 (20260506000006): user_profiles.must_change_password boolean NOT NULL DEFAULT false
-- [x] Migration 15 (20260507000001): corrects period_date year bug — updates payroll_transactions, payroll_taxes, payroll_imports where EXTRACT(year) < 100 to add 2000 years
-- [x] Migration 16 (20260507000002): employee_allocations + employee_allocation_overrides tables — percentage splits, effective dates, status workflow, RLS, indexes
-- [x] Migration 17 (20260507000003): business_tag column on employee_entity_assignments — CHECK ('western_highways', 'signs')
-- [x] Migration 18 (20260508000001): payroll_staged_transactions + payroll_staged_taxes tables — staging layer for pending employees, CASCADE delete on assignment, RLS admin-only
-- [x] Migration 19 (20260508000002): payroll_item_staged_transactions — staging layer for confirmed employees with unconfirmed payroll items, CASCADE delete on payroll_item, index on payroll_item_id, RLS admin-only
-- [x] Migration 20 (20260508000003): payroll_transactions gets business_tag + payroll_code_id made nullable; payroll_taxes gets business_tag — enables WH/Signs data storage
-- [x] Seed data: 3 businesses, 3 entities, 7 branches, 12 payroll item groups, 87 payroll codes, 196 payroll items, 17 revenue codes
+
+- [x] 20 core tables across 19+ migrations (applied to production)
+- [x] Core schema: businesses, branches, entities, payroll_codes, revenue_codes, payroll_item_groups, payroll_items, user_profiles, user_branch_assignments, employees, employee_entity_assignments, fuel_card_assignments, payroll_imports, revenue_imports, fuel_imports, payroll_transactions, payroll_taxes, revenue_transactions, fuel_transactions, fiscal_months, fiscal_quarters, fiscal_quarter_months, access_requests, employee_allocations, employee_allocation_overrides, employee_branch_transfers, payroll_staged_transactions, payroll_staged_taxes, payroll_item_staged_transactions
+- [x] AR tables: ar_customers, ar_invoices, ar_imports, ar_customer_assignments, ar_customer_contacts, ar_customer_notes, ar_customer_payments, ar_credits
+- [x] Staging tables (payroll_staged_transactions, payroll_staged_taxes, payroll_item_staged_transactions)
+- [x] RLS policies on all tables
+- [x] Seed data: 3 businesses, 3 entities, 7 branches (Sacramento merged into Modesto), 12 payroll item groups, 87 payroll codes, 196 payroll items, 17 revenue codes
 
 ### File Parsers (`/lib/`)
-- [x] Payroll parser — parses QuickBooks .xlsm, splits "LAST, FIRST M" names, handles hyphenated surnames, dynamic payroll item discovery, period date calculation (subtract 1 day → Saturday); rejects 2-digit years with a clear ParseError
-- [x] Revenue parser — parses .xls Invoice Summary; dynamic " Sales" suffix stripping (any branch); Sacramento → Modesto merge map (MERGED_BRANCHES — easy to extend); entity code mapping; uses END date of range
-- [x] Fuel parser — Interstate (.csv) and Flyers (.xlsx), site parsing, WH tagging, calculated totals for both vendors
 
-### API Routes (`/app/api/`)
-- [x] `POST /api/import/payroll` + `confirm-replace` — admin only, duplicate detection, AI triggers
+- [x] Payroll parser — parses QuickBooks .xlsm; splits "LAST, FIRST M" names; dynamic payroll item discovery; period date calculation (subtract 1 day → Saturday); auto-corrects 2-digit years with warning; rejects corrupt dates
+- [x] Revenue parser — parses .xls Invoice Summary; dynamic " Sales" suffix stripping; Sacramento → Modesto merge map; entity code mapping; uses END date of range
+- [x] Fuel parser — Interstate (.csv) and Flyers (.xlsx); site parsing; WH tagging; calculated totals
+- [x] AR import parser — QuickBooks AR export (.xlsm); class code mapping to entity + branch; customer-centric row grouping; aging bucket assignment; exclusion list
+- [x] AR payment parser — QuickBooks payment export; multi-word fuzzy matching against customer names; handles header rows above column names; QB Deposit type support
+
+### API Routes — Payroll / Revenue / Fuel
+
+- [x] `POST /api/import/payroll` + `confirm-replace` (streaming NDJSON) — admin only; staging system; AI triggers; rollback on failure
 - [x] `POST /api/import/revenue` + `confirm-replace`
-- [x] `POST /api/import/fuel` + `confirm-replace` — duplicate check scoped by vendor (Interstate and Flyers are independent)
-- [x] `GET /api/payroll/summary` — admin sum rule enforced (managers get total only, no detail)
+- [x] `POST /api/import/fuel` + `confirm-replace` — duplicate check scoped by vendor
+- [x] `GET /api/import/history` — admin/exec; returns imports by type with entity/vendor details
+- [x] `GET /api/payroll/summary` — admin sum rule enforced
 - [x] `GET /api/payroll/employee/[id]` — 403 for managers on admin-coded employees
-- [x] `GET /api/employees/[id]/detail` — admin/executive only; returns employee info, all payroll history (paginated, with item+group names), all fuel history (paginated)
-- [x] `GET /api/revenue/summary` — `.limit(50000)` applied
-- [x] `GET /api/fuel/summary` — paginated with PAGE_SIZE loop
+- [x] `GET /api/payroll/hours-by-week`, `direct-labor-detail`, `overtime-summary`
+- [x] `GET /api/revenue/summary`
+- [x] `GET /api/fuel/summary`, `by-week`, `top-consumers`
+- [x] `GET /api/fuel/cards`, `fuel/cards/[id]` — branch-scoped; employee + branch names resolved
 - [x] `GET /api/allocation/summary` — exec/admin only
-- [x] `GET|PATCH /api/employees` + `[id]/name` — display_name computed, raw_name never returned
-- [x] `GET /api/periods/available` + `latest`
+- [x] `GET /api/admin/overview` — all-branch aggregate with employer taxes; paginated with ORDER BY
+- [x] `GET /api/periods/available`, `latest`, `years`
 - [x] `GET|POST /api/fiscal-months` + `[id]`
 - [x] `GET|POST /api/fiscal-quarters` + `PATCH|DELETE /api/fiscal-quarters/[id]`
+- [x] `GET|POST /api/targets` + `PATCH /api/targets/[id]`; `GET /api/targets/weekly`
+
+### API Routes — Employees & Users
+
+- [x] `GET /api/employees` — rich filtering (search, branchId, entityCode, laborType), sorting, pagination; scope by role
+- [x] `GET /api/employees/[id]/detail` — full history; employer taxes; paginated payroll + fuel; branch-access guard
+- [x] `PATCH /api/employees/[id]/name` — admin only; never touches raw_name_in_report
+- [x] `PATCH /api/employees/[id]/labor-type` — admin only; optional retroactive backfill
+- [x] `GET|POST /api/employees/[id]/allocations` + `PATCH|DELETE /api/employees/[id]/allocations/[id]`
+- [x] `POST /api/employees/[id]/allocation-overrides` + `PATCH /api/employees/[id]/allocation-overrides/[id]`
+- [x] `GET|POST /api/employees/[id]/transfers` + `DELETE /api/employees/[id]/transfers/[id]`
 - [x] `GET|POST /api/admin/users` + `[id]`
-- [x] `GET|POST /api/admin/review` + action routes for employee assignments, fuel cards, payroll items; review queue returns all active employees with entity assignments for the search dropdown
-- [x] `GET|POST /api/admin/access-requests` — GET returns requests + all active branches (grouped); POST creates a pending request
-- [x] `PATCH /api/admin/access-requests/[id]` — approve (creates auth user with temp password, sets must_change_password=true) or deny
-- [x] `POST /api/auth/clear-must-change-password` — clears must_change_password flag for the current user after first login password change
-- [x] `GET /api/data-explorer/payroll`, `revenue`, `fuel`, `export` — admin/executive only; filter + paginate + CSV export
-- [x] `GET /api/payroll/hours-by-week`, `direct-labor-detail`, `overtime-summary` — `.limit(50000)` applied to payroll_transactions queries
-- [x] `GET /api/employees/[id]/detail` — returns `taxHistory: [{ periodDate, amount }]`
-- [x] `GET /api/periods/years` — returns available calendar years with imported data
-- [x] `GET /api/employees/[id]/allocations` — returns default allocations + weekly overrides (last 52) for an employee
-- [x] `POST /api/employees/[id]/allocations` — admin-only; validates splits sum to 100, effectiveFrom is Saturday; closes previous open allocation, inserts new group auto-approved
-- [x] `PATCH /api/employees/[id]/allocations/[allocationId]` — approve or deny entire group atomically (by employee_id + effective_from)
-- [x] `DELETE /api/employees/[id]/allocations/[allocationId]` — pending-only delete; blocks deleting approved allocations
-- [x] `POST /api/employees/[id]/allocation-overrides` — admin-only; weekly override, upserts by (employee_id, period_date, branch_id)
-- [x] `PATCH /api/employees/[id]/allocation-overrides/[overrideId]` — approve or deny entire period group atomically
-- [x] `GET /api/admin/allocations` — returns pendingAllocations, pendingOverrides, activeAllocations with displayName + branchName
-- [x] `GET /api/admin/allocations/pending-count` — sum of pending allocations + overrides (used for sidebar badge)
-- [x] `GET /api/branches` — all active branches (used for allocation form dropdowns)
+- [x] `GET|POST /api/admin/access-requests` + `PATCH /api/admin/access-requests/[id]` — validates branch IDs against DB before approving
+- [x] `POST /api/auth/clear-must-change-password`
 
-### AI Integration (`/lib/ai/`)
-- [x] Employee name matching (payroll + fuel imports)
+### API Routes — AR Module
+
+- [x] `POST /api/admin/ar/import` (streaming NDJSON) — admin only; upserts customers + invoices; clears previous invoices before inserting new batch; exclusion list applied
+- [x] `GET /api/ar/summary` — aging buckets, total, last import; supports entity/branch/assignedUserId filters; excludes excluded customers; paginated
+- [x] `GET /api/ar/customers` — customer list with aging, contact info, collection status; branch-scoped; supports assignedUserId filter
+- [x] `GET /api/ar/customers/[id]` — full customer detail: contacts, notes, invoices, payments, credits
+- [x] `GET|POST /api/ar/customers/[id]/contacts`
+- [x] `GET|POST /api/ar/customers/[id]/notes` — operation notes and meeting notes; role-scoped write rules
+- [x] `PATCH /api/ar/customers/[id]/notes/[noteId]` — edit (ar_team can edit own notes)
+- [x] `GET|POST /api/ar/customers/[id]/payments`
+- [x] `POST /api/ar/customers/[id]/merge` — merges two customer records with error checking on each step
+- [x] `GET /api/ar/customers/[id]/statement` — generates PDF AR statement (clean Apple-style layout)
+- [x] `PATCH /api/ar/customers/[id]/exclude` — admin/ar_manager only; toggles is_excluded
+- [x] `GET|POST /api/ar/customers/[id]/credits`
+- [x] `GET /api/ar/team-members` — returns users with active ar_customer_assignments (for filter dropdown)
+- [x] `POST /api/ar/payments/import` (streaming NDJSON) — imports QB payment export; fuzzy name matching; shows unmatched names in summary
+- [x] `PATCH /api/ar/invoices/[id]/date` — ar_team can override invoice dates (persisted)
+- [x] `GET /api/ar/customers/[id]/assignments` — shows AR team members assigned to customer
+- [x] `POST|DELETE /api/ar/customers/[id]/assignments`
+
+### API Routes — Admin Tools
+
+- [x] `GET /api/admin/review` — returns all queues + reference data; employees include branchId in entityAssignments
+- [x] `PATCH /api/admin/review/employee-assignments/[id]` — new_employee / link_existing / skip / tag_business modes; deploys staged data on confirm
+- [x] `PATCH /api/admin/review/fuel-cards/[id]` — branchId / businessTag / employeeId; retroactive backfill of transactions
+- [x] `PATCH /api/admin/review/payroll-items/[id]` — deploys staged item transactions on confirm
+- [x] `GET|POST /api/admin/payroll-items` + `PATCH /api/admin/payroll-items/[id]`
+- [x] `GET /api/admin/allocations` + `GET /api/admin/allocations/pending-count`
+- [x] `GET /api/branches`
+- [x] `GET|POST /api/admin/settings/hq-allocation` + `PATCH`
+- [x] `GET|POST|DELETE /api/admin/test-accounts`
+- [x] `GET /api/admin/audit` — audit log with user, action, table, record_id; limit 5000 for filter dropdown
+- [x] `GET|POST /api/data-explorer/payroll`, `revenue`, `fuel`, `export` — admin/exec only (guardAdminOrExecutive)
+
+### AI Integration
+
+- [x] Employee name matching (payroll + fuel imports) — module-level Anthropic client (single instance)
 - [x] Payroll item group suggestion
-- [x] Prompts in `/lib/ai/prompts.ts`, non-blocking, results stored for human review
+- [x] Prompts in `/lib/ai/prompts.ts`; non-blocking; results stored for human review
 
-### Allocation Engine (`/lib/allocation/`)
-- [x] Corp (100% to SN) and HQ (78.13% SN / 18.52% WH / 3.35% Signs) allocation math
-- [x] Zero-revenue guard, rounding with `round2()`, percentages read from DB
-- [x] `lib/allocation/employee-allocation.ts` — pure resolution logic: `resolveEmployeeAllocation` (priority: approved override > approved active default > 100% home branch), `validateSplitTotal` (±0.01 tolerance), `isSaturday`
-- [x] All 6 financial routes now apply per-employee allocation splits: admin/overview, payroll/summary, fuel/summary, payroll/hours-by-week, payroll/direct-labor-detail, fuel/top-consumers
+### Allocation Engine
 
-### Frontend
-- [x] Landing page (`/`) — animated canvas dot grid (pulsing opacity, 28px grid desktop / sparse mobile); Safety Network logo; Sign In + Request Access CTAs; fully mobile responsive
-- [x] Login page (`/login`) — mobile responsive card
-- [x] `/change-password` — required on first login; masked fields; blocks same-as-temp password; clears flag on success; middleware enforces (cannot skip)
-- [x] `/request-access` — branch dropdown shows all active branches grouped: Operations / Corporate
-- [x] `DashboardShell` — dark sidebar (desktop) + `MobileBottomNav` (mobile); role-aware; sidebar hidden on mobile
-- [x] `MobileBottomNav` — fixed bottom nav with role-aware items; slide-up drawer for overflow admin items; 44px tap targets
-- [x] `ManagerDashboard` — fiscal month dropdown + YTD button; defaults to most recent fiscal month with data; weekly bar chart (Revenue/Payroll/Fuel grouped bars) with click-to-inspect direct labor panel; payroll breakdown card (Direct/Admin/Taxes stacked bar); Revenue Breakdown table (Labor/Rental/One-Time/Total by week); mobile 2×2 metric grid + revenue-only chart
-- [x] `AdminDashboard` — all-branches aggregate with branch selector, full allocation visible; month/quarter/year toggle (year mode uses `/api/periods/years`); Direct Payroll card shows wages + employer taxes breakdown; mobile: 2×2 metric cards, revenue-only chart, compact variance row, branch list; desktop: unchanged
-- [x] `ExecutiveDashboard` — all 7 branches side by side, full direct + admin payroll detail, Corp/HQ allocation breakdown, net after overhead, missing revenue alerts, 13-week trend, waterfall, collapsible payroll detail tables; Month/Quarter/Year toggle; employee names clickable to detail pages
-- [x] `DistrictDashboard` — fiscal month dropdown + YTD button + branch selector; aggregate = branch comparison cards (using `BranchPerformanceCard`) + district totals table; single branch = manager-style layout (bar chart, payroll breakdown card, revenue breakdown table); employee names clickable; mobile branch list or revenue table per mode
-- [x] `BranchPerformanceCard` (`components/ui/BranchPerformanceCard.tsx`) — shared card with 3-line Recharts LineChart (Revenue #ff6b00, Payroll #888888, Fuel #cc4444); dots, hover tooltip, right-aligned legend; used in Admin and District branch lists
-- [x] `EmployeeListClient` (`components/employees/EmployeeListClient.tsx`) — debounced search, filter bar (branch, entity, labor type), sortable table, pagination, status/entity pills, skeleton loading; all roles with proper scope
-- [x] `EmployeeDetailClient` — all roles with branch-access guard; preferred name + legal name display; inline Edit Name form; assignment pills; payroll history table + charts (with per-period employer tax rows in `#cc4444`); "Employer Taxes" summary card; weekly employer taxes bar chart; Rate History table (25/page); Fuel Cost per Week + Gallons charts; fuel transaction table with $/Gal column; branch history + transfer form
-- [x] `EmployeeDetailClient` — Branch Allocation section (admin only): shows active default allocations table + weekly overrides (last 52 weeks); "+ Set Allocation" form with multi-branch splits, percentage inputs, effective-from date, notes; auto-closes previous open allocation on save
-- [x] `AllocationsClient` (`components/allocations/AllocationsClient.tsx`) — Pending and Active tabs; Pending tab: two sub-tables (Default Allocations, Weekly Overrides) with Approve/Deny buttons; Active tab: currently open approved allocations
-- [x] `/admin/allocations` page — admin-only server component wrapping `AllocationsClient`
-- [x] `ReviewClient` — 4th section "Pending Allocations" added; fetches from `/api/admin/allocations` on mount; inline Approve/Deny for both allocations and overrides; `totalPending` now includes allocation counts
-- [x] `Sidebar` — Allocations nav item (SplitIcon) added for admin role; orange dot badge when `allocationCount > 0`; fetches `/api/admin/allocations/pending-count` in parallel with access-requests count
-- [x] Admin pages: `/admin/import`, `/admin/review`, `/admin/users`, `/admin/employees`, `/admin/fiscal-months`, `/admin/targets`, `/admin/fiscal-quarters`, `/admin/access-requests`, `/admin/data-explorer`, `/admin/allocations`
-- [x] Executive pages: `/executive/data-explorer`, `/executive/employees`
-- [x] Manager/District employee pages: `/manager/employees/[id]`, `/district/employees/[id]` — detail view scoped to direct labor in assigned branches
-- [x] `AccessRequestsClient` — pending/reviewed tables; approve modal with temp password field (unmasked, Generate button, Copy button, confirm field, hint note); deny modal; branch dropdown grouped Operations/Corporate
-- [x] `DataExplorerClient` — filter bar (dataset, branch, entity, date range, vendor); summary metric cards per dataset; sortable paginated table (50 rows/page); CSV export
-- [x] `TargetVarianceRow` component — weekly and compact (mobile) variants; green/yellow/red thresholds
-- [x] Chart components: `BarChart`, `TrendLineChart`, `WaterfallChart`
-- [x] UI components: `MetricCard`, `Skeleton`, `StatusPill`, `BranchSelector`, `DateRangePicker`, `ThreeDotMenu`
-- [x] Middleware: protects all routes; redirects unauthenticated users to /login; redirects users with must_change_password=true to /change-password regardless of path; /change-password blocked after flag cleared
+- [x] Corp (100%) + HQ (78.13% SN / 18.52% WH / 3.35% Signs) allocation math; settings editable via UI
+- [x] `lib/allocation/employee-allocation.ts` — `resolveEmployeeAllocation`, `validateSplitTotal`, `isSaturday`
+- [x] All 6 financial routes apply per-employee allocation splits
 
-### Utilities
-- [x] `lib/utils/access.ts` — `UserAccess` type, `canAccessBranch()`
-- [x] `lib/utils/errors.ts` — `AppError`, `ParseError`, `AuthError`, `DuplicateImportError`, `NotFoundError`
+### Frontend — Operations Dashboards
+
+- [x] Landing page — animated canvas dot grid; mobile responsive; Request Access CTA
+- [x] `/login` — username or email login; mobile responsive
+- [x] `/change-password` — required on first login; blocks same-as-temp; middleware enforced
+- [x] `/request-access` — all active branches grouped Operations / Corporate; all 10 roles available
+- [x] `DashboardShell` — animated expand-on-hover sidebar (48px → 220px); `MobileBottomNav`; role-aware
+- [x] `AdminDashboard` — month/quarter/year toggle; direct payroll card with employer taxes; branch selector; allocation toggle; mobile responsive
+- [x] `ExecutiveDashboard` — all 7 branches side by side; full payroll detail; allocation toggle; month/quarter/year toggle; employee names clickable
+- [x] `DistrictDashboard` — fiscal month selector; branch selector; aggregate vs single-branch modes; employee names clickable
+- [x] `ManagerDashboard` — fiscal month selector; weekly bar chart with click-to-inspect; payroll breakdown; revenue breakdown table; mobile responsive
+- [x] `BranchPerformanceCard` — shared Recharts LineChart (Revenue / Payroll / Fuel); used in Admin + District
+- [x] Unified dashboard at `/dashboard` — routes all roles through one entry point; month dropdown filters to months with actual data only
+
+### Frontend — Employee Pages
+
+- [x] `EmployeeListClient` — debounced search, filter bar, sortable table, pagination, status/entity pills
+- [x] `EmployeeDetailClient` — preferred + legal name; inline Edit Name; assignment pills; labor type change; payroll + fuel history charts and tables; employer taxes card; weekly taxes chart; Rate History; Fuel per Week; branch history + transfer form; allocation section (admin only)
+- [x] `/admin/employees`, `/executive/employees`, `/manager/employees/[id]`, `/district/employees/[id]`
+
+### Frontend — AR Module
+
+- [x] `ArDashboard` — aging summary KPI cards; aging bar chart; customer list (sortable, paginated); entity / branch / assigned AR team member filter bar with filter bubble display; clear button resets all filters
+- [x] `ArCustomerDetail` — full customer detail page with filter context bubble (entity + branch inherited from list, independently adjustable or clearable); tabs: Invoices, Payments, Credits, Contacts, Notes
+  - Invoices tab: sortable table; persistent date override (ar_team can edit invoice dates); invoice flags/notes; PDF statement download
+  - Payments tab: payment history table
+  - Credits tab: credit memos table
+  - Contacts tab: contact list + add contact form
+  - Notes tab: operation notes + meeting notes; role-scoped write; inline edit
+- [x] AR Meeting Dashboard — real-time aggregate AR view for management meetings; aging totals unaffected by collection phase filter
+- [x] AR Customer Exclusion — admin/ar_manager can hide internal/in-house customers from all AR data
+- [x] Realtime updates via Supabase Realtime — live AR updates across all users
+- [x] AR Statement PDF — Apple-style clean layout; download from customer detail
+- [x] Customer merge UI
+
+### Frontend — Admin Tools
+
+- [x] `ReviewClient` — Employee Matches, Unknown Payroll Items, Unassigned Fuel Cards (with employee link mode), Pending Allocations; totalPending badge
+  - Fuel card rows: "Link to existing employee" toggle; employee search autocomplete; auto-fills branch from employee's assignments; branch override select; sends `{ employeeId, branchId }` to PATCH
+- [x] `/admin/import` — payroll + revenue + fuel upload sections; animated progress bar; import history panel; streaming confirm-replace
+- [x] `/admin/review` — review queue
+- [x] `/admin/users` — user table; deactivation toggle; test accounts panel; username + email columns
+- [x] `/admin/employees` — employee list + detail
+- [x] `/admin/fiscal-months` — CRUD
+- [x] `/admin/fiscal-quarters` — CRUD
+- [x] `/admin/targets` — fiscal month dropdown; targets per branch
+- [x] `/admin/access-requests` — pending + reviewed tables; approve modal (temp password, generate/copy); deny modal; all 10 roles
+- [x] `/admin/data-explorer` — filter bar, summary cards, paginated table, CSV export
+- [x] `/admin/allocations` — pending + active tabs; approve/deny
+- [x] `/admin/payroll-items` — group assignment; inline edit; spending by date range
+- [x] `/admin/settings` — HQ allocation percentages (editable)
+- [x] `/admin/audit` — audit log viewer with user/action/table filters
+- [x] Sidebar — all nav items; animated badge dots; Allocations, Pay Items, Settings, Audit, AR nav items for relevant roles; `guardAdminOrExecutive` helper used across data explorer, allocations, and admin overview routes
+
+### Frontend — Fuel Pages
+
+- [x] `/fuel` — KPI cards; weekly cost chart; top consumers table; period/branch filter
+- [x] `/fuel/cards` — card list with status tabs (All / Linked / General / Unlinked / WH/Signs)
+- [x] `/fuel/cards/[id]` — card detail; admin assignment panel (Link to Employee / Mark as General); transaction history
+
+### Utilities & Library
+
+- [x] `lib/utils/access.ts` — `UserAccess`, `canAccessBranch()`
+- [x] `lib/utils/errors.ts` — `AppError`, `ParseError`, `AuthError`, `DuplicateImportError`, `NotFoundError`; `AuthError` correctly uses 403 + `'FORBIDDEN'` code
 - [x] `lib/utils/format.ts` — `formatCurrency`, `formatPercent`, `round2`
-- [x] `lib/utils/date.ts` — `getDateRange`, `getTrendStart`, `getMostRecentSaturday`, etc.
+- [x] `lib/utils/date.ts` — `getDateRange`, `isValidDate()`, `getMostRecentSaturday`, etc.
+- [x] `lib/utils/payroll-totals.ts` — `calcTotalPayroll`, `calcGrossProfit`, `calcGrossProfitPct`
+- [x] `lib/api/auth.ts` — `getAccessContext`, `guardAdminOnly`, `guardAdminOrExecutive`, `guardPayrollAccess`, `guardArAdminOnly`, `getArTeamCustomerIds`
+- [x] `components/ui/` — MetricCard, Skeleton, StatusPill, BranchSelector, DateRangePicker, ThreeDotMenu, BranchPerformanceCard
 
 ---
 
 ## 3. WHAT IS IN PROGRESS / PARTIALLY BUILT
 
-Nothing currently in progress. All 20 migrations applied to production.
+Nothing currently in progress.
 
 ---
 
-## 3a. RECENT CHANGES (May 13, 2026) — Weekly chart accuracy + month dropdown fixes
+## 3a. RECENT CHANGES (May 26, 2026) — Fuel card employee linking + AR filter features
 
-### Critical: Pagination ORDER BY Bug in Weekly Chart (`app/api/admin/overview/route.ts`)
+### Fuel Card "Link to Existing Employee" (Review Queue)
 
-**Root cause:** All five paginated transaction queries in `admin/overview/route.ts` used `.range()` without `.order()`. PostgreSQL returns rows in physical heap order (often grouped by index key like `payroll_code_id`) when no ORDER BY is given. With 1000-row pages, adjacent pages could contain rows from completely different weeks — causing the per-week `byPeriod` buckets to be scrambled. Monthly totals (KPI cards) were always correct because all rows were fetched. Only the per-week breakdown in the trend chart was affected.
+`components/review/ReviewClient.tsx`:
+- Extracted `FuelCardRow` component — each fuel card now has per-card state (mirrors `EmployeeMatchRow` pattern)
+- "Link to existing employee" checkbox toggles between branch/tag assignment mode (existing) and employee link mode (new)
+- Employee link mode: type ≥2 chars to search employees by name; dropdown shows branch name hints; selecting an employee auto-fills the card's branch from their first confirmed assignment's `branchId`; branch override select shown after employee chosen
+- Sends `{ employeeId, branchId }` to `PATCH /api/admin/review/fuel-cards/[id]`; API retroactively backfills all historical transactions
+- `Employee` interface: `entityAssignments` now includes `branchId: string | null`
+- `app/api/admin/review/route.ts`: `empEntityMap` updated to include `branchId` in each entity assignment entry
 
-**Symptom:** Feb 28 tooltip showed "Payroll: $96,809" when actual weekly payroll was ~$153k. Other weeks showed correspondingly inflated numbers to compensate (all-rows total remained accurate).
+### AR Dashboard — Filter by Assigned AR Team Member
 
-**Fix:** Added `.order('period_date')` to direct payroll, admin payroll, and tax queries; `.order('transaction_date')` to the revenue and fuel queries. This ensures each 1000-row page contains a contiguous date range, so the per-week accumulation in `periodPayroll`, `periodAdminPayroll`, etc. is correct.
+`app/api/ar/team-members/route.ts`:
+- Returns users who have active `ar_customer_assignments`; resolves display names from `user_profiles`
 
-**Same fix applied to `app/api/fuel/summary/route.ts`:** Added `.order('transaction_date')` to the paginated fuel query loop.
+`app/api/ar/customers/route.ts` + `app/api/ar/summary/route.ts`:
+- Added `assignedUserId` param support; scopes data to that user's assigned customers
+- Restricted to admin/executive/ar_manager roles
 
-### Month Dropdown Fixes (`app/dashboard/page.tsx`, `components/dashboard/UnifiedDashboard.tsx`)
+`components/ar/ArDashboard.tsx`:
+- "All Assignees" dropdown in filter bar (visible to isArAdmin roles only)
+- `assignedUserId` passed into both `fetchSummary` and `fetchCustomers`
+- Clear button resets all filters including assignedUserId
 
-**Problem 1 — Cluttered dropdown with empty months:** Fiscal months with no imported data appeared in the dropdown. Fixed by fetching all imported dates from `payroll_imports`, `revenue_imports`, and `fuel_imports` in parallel in `app/dashboard/page.tsx`, then filtering `fiscalMonths` server-side to only those containing at least one imported date.
+### AR Filter Context Carrythrough into Customer Detail
 
-**Problem 2 — Duplicate year in labels:** Month labels showed "December 2025 2025" because `m.name` already contained the year (e.g., "December 2025") and the dropdown appended `{m.year}`. Fixed by removing the `{m.year}` interpolation from the `<option>` label in `UnifiedDashboard.tsx`.
+`components/ar/ArDashboard.tsx`:
+- Passes `branchId` and `branchName` to `ArCustomerDetail` when navigating to a customer
 
-**Problem 3 — Wrong default month:** The month sort used `a.sortOrder - b.sortOrder` (sort position 1–12, not globally unique across years), so December 2025 (sortOrder=12) could sort after January 2026 (sortOrder=1). Fixed by using year-first sort: `a.year !== b.year ? a.year - b.year : a.sortOrder - b.sortOrder`. The default selected month is `sortedMonths[sortedMonths.length - 1]` — now always the latest month with actual imported data.
-
-### TCS Payroll Discontinuation (context, not a code change)
-TCS entity was intentionally discontinued after the March 7, 2026 import. Former TCS employees moved to STS. No TCS payroll imports will exist after that date — this is expected and correct, not a data gap.
-
----
-
-## 3a. RECENT CHANGES (May 8, 2026) — Payroll import robustness + employee/item management
-
-### Payroll Import — Name Lookup Robustness (`lib/payroll/import-helpers.ts`)
-
-**Problem 1 — duplicate row crash:** `.maybeSingle()` throws when multiple `employee_entity_assignments` rows exist for the same `(raw_name_in_report, entity_id)`. Fixed by adding `.limit(1)` before `.maybeSingle()` so the import always takes the first matching row and never crashes on duplicates.
-
-**Problem 2 — case mismatch causes repeat review queue entries:** QuickBooks changed casing between STS exports ("GUTIERREZ, SYLVIA" in one import, "Gutierrez, Sylvia" in the next). The case-sensitive `.eq()` lookup missed the existing confirmed assignment and created a new unconfirmed one — landing the employee back in the review queue on every subsequent import.
-Fix: changed entity-scoped lookup from `.eq('raw_name_in_report', ...)` to `.ilike('raw_name_in_report', ...)` (case-insensitive exact match, no wildcards).
-
-**Problem 3 — cross-entity lookup also case-sensitive:** The nameVariants array for the cross-entity dedup check now includes `.toUpperCase()` and `.toLowerCase()` variants in addition to the existing trailing-period variants.
-
-### DB Cleanup — Duplicate Assignments
-
-**Raul Minor (STS):** Two confirmed `employee_entity_assignments` rows for the same `(raw_name_in_report, entity_id)` — one pointed to Bakersfield (no transactions, spurious), one to Orange County (18 transactions, $8,704). Spurious Bakersfield row deleted.
-
-**Sylvia Gutierrez (STS):** Confirmed STS assignment stored as `"GUTIERREZ, SYLVIA"` (from prior import). Current import created a second unconfirmed row as `"Gutierrez, Sylvia"` (case mismatch). Staged 4.11 data ($8.75 + $1,099 wages, $85.12 tax) deployed to live transactions under the confirmed STFCH payroll code; spurious unconfirmed assignment deleted.
-
-### Labor Type Change — Employee Detail Page (`components/employees/EmployeeDetailClient.tsx`)
-
-Admins can now change an employee's labor type for any entity assignment directly from the employee detail page, with optional retroactive backfill.
-
-**New API route: `PATCH /api/employees/[id]/labor-type`** (admin only)
-- Body: `{ entityId, newLaborType, retroactiveFrom? }`
-- Finds the current active assignment → looks up the new payroll code (same branch + entity + new labor type) → updates `employee_entity_assignments.payroll_code_id`
-- If `retroactiveFrom` is set, batch-updates all `payroll_transactions` in that date range to the new `payroll_code_id`
-- Returns `{ updatedTransactions, newCode }`
-
-**UI in `EmployeeDetailClient`:**
-- Each assignment pill shows a "Change" button; clicking opens an inline form for that entity
-- Form: labor type select (all 7 types), radio for "From now on" vs "Retroactive", date picker when retroactive; Save/Cancel
-- Inline success/error feedback; form dismissed on success
-
-### Payroll Items Management (`/admin/payroll-items`)
-
-New admin page to manage payroll item group assignments and view spending by date range.
-
-**New API routes:**
-- `GET /api/admin/payroll-items` — all items with group name, is_confirmed, staged transaction count; accepts `?startDate=&endDate=` to add per-item spending totals for the date range
-- `PATCH /api/admin/payroll-items/[id]` — change `group_id` only (no staging deploy)
-
-**`app/admin/payroll-items/PayrollItemsClient.tsx`:**
-- Date range filter (Apply re-fetches with spending column)
-- Search, group filter, status filter (All / Confirmed / Pending)
-- Sortable columns: Name, Group, Amount
-- Inline group editing: click group label → select → Save button appears only when dirty
-- Pending items show AI-suggested group + confidence + staged transaction count
-
-**Sidebar:** "Pay Items" nav item added for admin role (TagIcon).
-
-### Fuel Dashboard — General Branch Cards Included (`app/api/fuel/top-consumers/route.ts`)
-
-General branch cards (no `employee_id`, only `branch_id`) were excluded from the top-consumers list. Fix: removed the `.not('employee_id', 'is', null)` filter. Aggregation now has two paths:
-- Employee rows → allocation splits applied as before
-- General card rows → grouped by `branch_id` as "General Card" (muted/italic in the table)
-
-`FuelDashboard.tsx` updated: `Consumer.employeeId` typed as `string | null`; general card row key uses `c.employeeId ?? 'general'`; italic + gray styling for `isGeneral` rows.
-
-### Fuel Card Assignment — Corporate Branches Visible (`app/fuel/cards/[id]/page.tsx`)
-
-Branch dropdown for card assignment was filtered to `is_revenue_generating = true`, hiding corporate branches. Changed to `is_active = true` so corporate branches appear as valid assignment targets.
-
-### Pre-Allocation Toggle Fix (`AdminDashboard.tsx`, `ExecutiveDashboard.tsx`)
-
-Corp/HQ overhead breakdown was guarded by `overheadTotal > 0` — when no corp/hq payroll had been imported, toggling the button showed no visual change. Removed that guard from both dashboards; breakdown lines now always render when `allocationOn = true`, even at $0.
-
-### DB Cleanup — Duplicate Employees (Jason Westerfield, David Rios)
-
-Both employees existed as two separate `employees` records due to the cross-entity lookup missing a case-variant or trailing-period mismatch before the import-helpers fix. Orphaned records re-pointed to the canonical employee_id; orphaned `employees` rows deleted; stranded staged data deployed to `payroll_transactions` with `business_tag = 'western_highways'`.
+`components/ar/ArCustomerDetail.tsx`:
+- Accepts `branchId` and `branchName` as props (initialized from list view filter)
+- Local state (`localEntity`, `invBranchId`, `invBranchName`) initialized from props — filter carries forward but can be adjusted independently
+- Filter bubble rendered below hero header when entity or branch filter is active; shows orange-tinted pills with entity/branch selects and ✕ to clear each; "Clear all" when both active
 
 ---
 
-## 3a. RECENT CHANGES (May 8, 2026) — Back button, sidebar active state, allocation toggle fixes
+## 3b. RECENT CHANGES (May 26, 2026) — 12-bug Health Check Fix Plan
 
-### Back Button Fix (`components/employees/EmployeeDetailClient.tsx`)
-Both back arrow buttons (top and bottom of detail page) changed from `router.push(returnPath)` to `router.back()`. This uses browser history so the user lands back at their exact scroll position on the employee list, not the dashboard root.
+A cold code review identified 12 bugs. All were fixed across 5 passes:
 
-### Sidebar Active State Fix (`components/layout/Sidebar.tsx`)
-Added `exactMatch?: boolean` to the `NavItem` interface. All four Dashboard nav items (admin, executive, district_manager, branch_manager) now set `exactMatch: true`. The `isActive` logic now uses exact path comparison for those items instead of `startsWith`, so the Dashboard item no longer stays highlighted on sub-pages like `/admin/employees` or `/admin/review`.
+### Pass 1 — Quick Wins
+- **Double redirect on login:** `app/page.tsx` — all `DASHBOARD_ROUTES` entries changed to `'/dashboard'` directly (was redirecting to `/admin` which then redirected to `/dashboard`)
+- **Wrong HTTP error code:** `lib/utils/errors.ts` — `AuthError` code changed from `'UNAUTHORIZED'` to `'FORBIDDEN'` to match the 403 status
+- **Anthropic client re-instantiated per request:** `lib/ai/match.ts` — moved `new Anthropic()` to module level (single instance across all requests)
 
-Also added `FuelIcon` SVG and Fuel nav items for all four roles (after Dashboard, before Data Explorer for non-admin roles).
+### Pass 2 — Data Safety
+- **business_tag bleed on payroll_taxes:** Added `.is('business_tag', null)` to every `payroll_taxes` query in `app/api/payroll/summary/route.ts`, `app/api/payroll/range/route.ts`, `app/api/admin/overview/route.ts`, `app/api/data-explorer/payroll/route.ts` — prevents WH/Signs employer taxes from appearing in SN numbers
+- **No file size limit on imports:** Added `MAX_FILE_SIZE = 10MB` check before `arrayBuffer()` in all three import routes (payroll, revenue, fuel) — returns 413 on oversized files
+- **No date parameter validation:** Added `isValidDate(s: string): boolean` to `lib/utils/date.ts`; validated in all routes that accept `startDate`, `endDate`, or `periodDate` — returns 400 on malformed dates
 
-### Pre-Allocation Toggle Fix (`AdminDashboard.tsx`, `ExecutiveDashboard.tsx`)
-The Corp/HQ overhead breakdown section was guarded with `overheadTotal > 0`. When no corp/hq payroll data exists, `overheadTotal = 0`, the block never rendered, and toggling the button appeared to do nothing (no visual feedback, numbers unchanged).
+### Pass 3 — Data Integrity
+- **Non-atomic AR re-import:** `app/api/admin/ar/import/route.ts` — moved `DELETE ar_invoices` to BEFORE the new invoice insert loop (brief empty window is safer than doubled-data window); "Clearing previous import…" progress step added
+- **Non-atomic payroll confirm-replace:** `app/api/import/payroll/route.ts` — wrapped `insertPayrollData` in try/catch with explicit cleanup (deletes transactions, taxes, staged data, and the import record) if insert fails
+- **Merge error handling:** `app/api/ar/customers/[id]/merge/route.ts` — each update/delete step now checks for error and returns 500 with specific message if any step fails
+- **SQL injection via unescaped ILIKE:** `lib/payroll/import-helpers.ts` — escapes `%`, `_`, `\` in `rawName` before interpolating into `.ilike()` pattern
 
-Fix: removed the `overheadTotal > 0` guard in both `AdminDashboard.tsx` (line 936) and `ExecutiveDashboard.tsx` (line 890). Corp and HQ breakdown lines now always render when `allocationOn = true`, even showing $0, so the user can confirm the feature is active and understand why numbers aren't changing (no corp/hq data imported yet).
+### Pass 4 — Performance
+- **N+1 entity assignment lookups:** `lib/payroll/import-helpers.ts` — pre-fetches ALL entity assignments once before the employee loop; builds a Map keyed by lowercased `raw_name_in_report`; eliminates one DB round-trip per employee per import
+- **N+1 "Other" group fetch in payroll items:** `lib/payroll/import-helpers.ts` — fetches "Other" group ID once before the items loop; previously queried DB once per unknown payroll item
+- **Employee route full table scan:** `app/api/employees/route.ts` — `payroll_transactions` query scoped to `.in('employee_id', allEmployeeIds)` (was scanning entire table)
+- **Audit log unbounded user fetch:** `app/api/admin/audit/route.ts` — added `.limit(5000)` to user fetch for filter dropdown
 
----
-
-## 3a. RECENT CHANGES (May 8, 2026) — Fuel dashboard + card list
-
-### Fuel Dashboard (`/fuel`, `/fuel/cards`, `/fuel/cards/[id]`)
-
-Full fuel analytics section accessible to all four roles (branch-scoped).
-
-**Navigation:** `FuelIcon` + "Fuel" nav item added to `Sidebar.tsx` for all roles. Admin entry appears after Dashboard; non-admin entry appears after Dashboard (before Data Explorer for executive).
-
-**New API routes:**
-- `GET /api/fuel/cards` — branch-scoped list of all `fuel_card_assignments` with joined employee display name and branch name. Non-admin/exec users see only cards whose `branch_id` is in their assigned branches.
-- `GET /api/fuel/cards/[id]` — single card detail with the last 100 transactions. Branch-access checked against card's `branch_id`; unconfirmed cards (no branch) are admin/exec only.
-
-**New pages:**
-- `app/fuel/page.tsx` + `app/fuel/FuelDashboard.tsx` — KPI cards (Total Cost, Gallons, Avg $/Gal, Unlinked Card count), weekly cost bar chart (using existing `/api/fuel/by-week`), top consumers table (using existing `/api/fuel/top-consumers`). Period filter: Month / Quarter / Year with month/quarter/year selectors. Branch filter shown for district_manager, executive, and admin.
-- `app/fuel/cards/page.tsx` + `app/fuel/cards/CardList.tsx` — table of all fuel cards with status filter tabs (All / Linked / General / Unlinked / WH/Signs), live card-name search, clickable rows.
-- `app/fuel/cards/[id]/page.tsx` + `app/fuel/cards/[id]/CardDetail.tsx` — card header with current assignment display; admin-only assignment panel with two modes:
-  - "Link to Employee" — searchable employee dropdown + optional branch selector; calls existing `PATCH /api/admin/review/fuel-cards/[id]` (no changes to that route)
-  - "Mark as General Branch Card" — branch selector only; same PATCH call with `branchId` and no `employeeId`; produces `is_confirmed = true, employee_id = null, branch_id = X` (already supported by existing schema + PATCH route)
-  - Transaction history table (last 100 rows): Date / Site / Location / Gallons / $/Gal / Total
-
-**"General branch card" concept:** Structurally already supported (`employee_id = null, branch_id = X, is_confirmed = true`). The card detail page makes this assignable via UI for the first time.
+### Pass 5 — Auth & Guards
+- **`guardAdminOrExecutive` helper:** Added to `lib/api/auth.ts` — used by 7 routes: `allocations`, `allocations/pending-count`, `data-explorer/payroll`, `data-explorer/revenue`, `data-explorer/fuel`, `data-explorer/export`, (import history uses `guardAdminOnly`)
+- **Branch ID validation on access request approval:** `app/api/admin/access-requests/[id]/route.ts` — validates all `branchIds` against the `branches` table before creating accounts; returns 400 with specific invalid IDs if any are bogus
+- **Role validation and scoping fixes:** `office_team` role now correctly scoped to assigned customers; UTC date parsing fixes; additional role guards
 
 ---
 
-## 3b. RECENT CHANGES (May 8, 2026) — Duplicate employee fix
+## 3c. RECENT CHANGES (May 13–25, 2026) — AR module + payments + audit + new roles
 
-### Root Cause
-`resolveEmployees` in `lib/payroll/import-helpers.ts` looked up assignments by `(raw_name_in_report, entity_id)`. When importing a new entity (e.g., STS) for the first time, every employee's lookup returned null → a brand-new `employees` row was created for each person, duplicating everyone.
+### Accounts Receivable Module (built May 13–25)
 
-### Fix (`lib/payroll/import-helpers.ts` — `resolveEmployees`)
-After the entity-scoped lookup returns null, now performs a cross-entity lookup:
-```typescript
-const { data: crossEntityAssign } = await supabase
-  .from('employee_entity_assignments')
-  .select('employee_id')
-  .eq('raw_name_in_report', emp.rawName)
-  .limit(1)
-  .maybeSingle()
-```
-If a match is found, reuses that `employee_id` and only inserts a new `employee_entity_assignments` row for the new entity. Only creates a new `employees` row if no cross-entity match exists.
+Full AR collection workflow system. See the "AR Module" sections in Section 2 for complete API + UI inventory.
 
-### DB Cleanup (ran manually in Supabase SQL editor)
-```sql
--- Step 1: Re-point duplicate STS assignments to correct existing employee
-UPDATE employee_entity_assignments sts_assign
-SET employee_id = correct.employee_id
-FROM (...) correct
-WHERE sts_assign.raw_name_in_report = correct.raw_name_in_report
-  AND sts_assign.employee_id IN (orphan employees);
+Key components:
+- `components/ar/ArDashboard.tsx` — aging KPIs, customer list, filter bar
+- `components/ar/ArCustomerDetail.tsx` — full customer detail with 5 tabs
+- `app/api/admin/ar/import/route.ts` — streaming AR import with clear-then-insert pattern
+- `app/api/ar/` — full REST surface for customers, invoices, payments, credits, contacts, notes, assignments, statements, team-members
 
--- Step 2: Delete employees with no remaining assignments
-DELETE FROM employees
-WHERE id NOT IN (SELECT DISTINCT employee_id FROM employee_entity_assignments);
-```
+### AR Payment Import Pipeline
 
-**Note:** The cleanup was run while some STS assignments were still in the review queue (unconfirmed). Employees assigned via "link_existing" after the cleanup may still have left orphaned placeholder records. A second run of Step 2 is likely needed after all review queue items are processed.
+- `POST /api/ar/payments/import` (streaming NDJSON) — imports QB payment export CSV; multi-word fuzzy customer name matching; unmatched names shown in summary (not silently dropped); Deposit type supported
+- Payments tab in `ArCustomerDetail` with payment history table
+- QB payment parser handles header rows above column names
 
----
+### AR Statement PDF
 
-## 3a. RECENT CHANGES (May 8, 2026) — WH/Signs payroll data preservation
+- `GET /api/ar/customers/[id]/statement` — generates PDF with Apple-style clean layout: customer info, aging summary, open invoice table; downloadable from customer detail page
 
-### Problem Fixed
-WH/Signs employees showed $0 on their employee detail pages because `insertPayrollData` had `if (res.businessTag) continue` — silently dropping all their transactions and taxes. Additionally, if an employee was staged before being tagged in the review queue, `tag_business` mode never deployed that staged data, leaving it orphaned.
+### Supabase Realtime
 
-### Fix
+- `app/api/ar/customers/[id]` — Supabase Realtime subscription on `ar_invoices` for live updates across all users viewing the same customer
 
-**`lib/payroll/import-helpers.ts`:**
-- Removed `if (res.businessTag) continue`
-- Added WH/Signs branch: inserts transactions into `payroll_transactions` with `payroll_code_id = null` and `business_tag = res.businessTag`; inserts taxes into `payroll_taxes` with `business_tag` set
-- SN dashboards are unaffected — all existing queries filter `WHERE payroll_code_id IN (specific SN codes)`, so null-code WH/Signs rows are naturally excluded
+### New Roles
 
-**`app/api/admin/review/employee-assignments/[id]/route.ts`:**
-- `tag_business` mode now deploys any staged transactions/taxes for the employee (with `payroll_code_id = null, business_tag`) before clearing the staging rows — data that accumulated before tagging is no longer lost
+Ten roles now supported (was four). Added: `sales`, `ar_manager`, `ar_team`, `office_team`, `project_manager`.
+- `sales` — bypasses branch filter; sees all AR regardless of branch assignments; no payroll/fuel access
+- `ar_manager` — all AR + can approve AR team assignments + can toggle showAll
+- `ar_team` — scoped to assigned customers by default; showAll toggle; can edit own notes; can override invoice dates
+- `office_team` — same AR scope as ar_team; AR-only
+- `project_manager` — scoped to AR customers in assigned branches
 
-**`lib/supabase/database.types.ts`:**
-- `payroll_transactions.payroll_code_id`: `string` → `string | null`
-- `payroll_transactions`: added `business_tag: BusinessTag | null`
-- `payroll_taxes`: added `business_tag: BusinessTag | null`
+All new roles available in: access request form, admin user creation, middleware routing.
 
-**Migration (`supabase/migrations/20260508000003_wh_signs_payroll_storage.sql`):**
-- `ALTER TABLE payroll_transactions ADD COLUMN business_tag …, ALTER COLUMN payroll_code_id DROP NOT NULL`
-- `ALTER TABLE payroll_taxes ADD COLUMN business_tag …`
-- Applied to production
+### Audit Log System
 
----
+- `app/api/admin/audit/route.ts` — full audit log query with user/action/table/record filters; `.limit(5000)` on user fetch
+- `app/admin/audit/` — audit log viewer with filter bar; uses `DashboardShell` (sidebar)
+- Sidebar: Audit nav item for admin role
 
-## 3b. RECENT CHANGES (May 8, 2026) — Staged payroll items + streaming confirm-replace
+### Username Login
 
-### Staged Payroll Item Transactions
+- Auth flow updated to support username or email login; username stored in `user_profiles`; middleware and auth helpers updated
 
-Unknown payroll items now follow the same staging pattern as unknown employees: transactions are held in a staging table until the item is reviewed and confirmed in the review queue, at which point they deploy automatically.
+### User Management Enhancements
 
-**Why this matters:** Previously, transactions for unconfirmed items were inserted into `payroll_transactions` with an uncategorized or null `payroll_item_id`. Now they are properly staged and only deployed once the item has the correct group assignment.
+- User deactivation toggle in admin users table
+- Username + Access columns in users table
+- Test accounts panel (executive, district, manager test accounts)
+- All 10 roles available in admin user creation
 
-**New table (`supabase/migrations/20260508000002_payroll_item_staged_transactions.sql`):**
-- `payroll_item_staged_transactions` — holds transactions for confirmed employees whose payroll item is unconfirmed; keyed by `payroll_item_id` (CASCADE delete if item deleted); indexed on `payroll_item_id`
-- RLS admin-only
+### Goals System
 
-**`lib/payroll/import-helpers.ts`:**
-- `resolvePayrollItems` now returns `Map<string, { id: string | null; isConfirmed: boolean }>` — existing confirmed items: `isConfirmed: true`; existing unconfirmed or newly created: `isConfirmed: false`
-- `insertPayrollData`: confirmed employee + unconfirmed item (`isConfirmed: false`, `id !== null`) → inserts into `payroll_item_staged_transactions` instead of `payroll_transactions`; null-id fallback still inserts live with `payroll_item_id: null`
-- Return type gains `stagedItemTxnCount: number` and `newItemNames: string[]` (replaces the old `unknownItemNames` which only tracked null IDs; now tracks all newly staged items for AI group suggestions)
-- AI suggestion now correctly fires for newly created items (previously only fired for null-id failures)
+- Revenue + GP% goals on Overview and Revenue tabs; Goals by Branch breakdown with actual vs target
+- Four distinct goal states with color coding
+- Combined revenue + GP% goal status indicator
 
-**`app/api/admin/review/payroll-items/[id]/route.ts`:**
-- On item confirmation: fetches all `payroll_item_staged_transactions` for the item, deploys them to `payroll_transactions`, deletes the staged rows; returns `deployedCount` in response
+### Fiscal Month Dropdown Fix (Unified Dashboard)
 
-### Streaming Confirm-Replace
+- Month dropdown filters to months with actual imported data only
+- Fixed duplicate year in labels ("December 2025 2025" bug)
+- Fixed wrong default month (year-first sort)
 
-**`app/api/import/payroll/confirm-replace/route.ts`:**
-- Converted from a single blocking `NextResponse.json` response to NDJSON streaming (same pattern as the main import route)
-- Auth, validation, file parsing, import-exists check all happen before the stream starts (return normal JSON errors if they fail)
-- Stream events: "Deleting previous import…" → "Resolving X pay items…" → "Matching X employees…" → "Writing X transactions…" → "Writing transactions (N/Total)…" → done
+### Other Notable Fixes
 
-**`components/import/ImportClient.tsx`:**
-- `handleConfirmReplace`: immediately switches to `uploading` state and reads the NDJSON stream (same reader loop as `handleUpload`)
-- `buildPayrollSuccessLines` helper extracted (shared by both upload and replace paths) — surfaces `stagedItemTxnCount` in the summary: *"4 transactions staged — 1 new item needs review"*
-
-## 3b. RECENT CHANGES (May 8, 2026) — Import progress bar
-
-### Animated Progress Bar During File Upload (`components/import/ImportClient.tsx`)
-
-Replaced the static spinner with a meaningful progress bar that fills over time while the import runs server-side.
-
-**New `UploadingState` component:**
-- Orange (#ff6b00) progress bar fills from 0% → ~88% using an exponential deceleration curve (fast at start, slows as it approaches the limit — honest UX, never claims completion before the server responds)
-- Cycling status labels at timed intervals: **Parsing file…** (0s) → **Validating data…** (2s) → **Inserting records…** (5s) → **Finalizing…** (9s)
-- Percentage counter underneath the bar
-- Applies to all three import sections (Payroll, Revenue, Fuel) since they all share the same `DropZone` component
-- Removed the old `SpinnerIcon` function (no longer referenced)
-
----
-
-## 3b. RECENT CHANGES (May 8, 2026) — Staged payroll transactions for pending employees
-
-### Problem Solved
-When a payroll import encountered a new/unknown employee, their transaction and tax data was discarded. Admin confirmed them in the review queue (giving them a payroll code), but the data from the original import was already gone — requiring a full re-import.
-
-### Fix: Staging System
-
-**New tables (`supabase/migrations/20260508000001_payroll_staged_transactions.sql`):**
-- `payroll_staged_transactions` — holds line items for pending employees, keyed by `assignment_id`
-- `payroll_staged_taxes` — holds tax amounts for pending employees
-- Both cascade-delete if the assignment is deleted
-- Indexed on `assignment_id` for fast lookup at confirmation time
-
-**`lib/payroll/import-helpers.ts`:**
-- `ResolvedEmployee` gains `assignmentId: string` (the `employee_entity_assignments.id`)
-- `resolveEmployees` now selects `id` from existing assignments and uses `.select('id').single()` on new inserts to return the assignment ID
-- `insertPayrollData`: pending employees (`payrollCodeId === null`) now have all line items written to `payroll_staged_transactions` and taxes to `payroll_staged_taxes` instead of being discarded. The `pendingCount` still increments so the review queue badge updates correctly.
-
-**`app/api/admin/review/employee-assignments/[id]/route.ts`:**
-- New `deployStaged(employeeId, entityId, payrollCodeId)` helper: fetches all staged rows for the assignment, inserts them into `payroll_transactions` / `payroll_taxes` with the confirmed `employee_id` and `payroll_code_id`, then deletes the staged rows.
-- `new_employee` mode: calls `deployStaged` after confirming the assignment
-- `link_existing` mode: calls `deployStaged` with `existingEmployeeId` (the final employee_id) so data lands under the right person even if the import created a placeholder record
-
-### Result
-Import once → pending employees are staged → confirm in review queue → data deploys automatically. Re-importing to capture new employees is no longer necessary.
-
-### Note on existing data
-The Feb 2026 imports (4 weeks, imported 2026-05-08) have no staged data — they were imported before this fix. Direct employees from those imports still need one re-import to populate their transactions. After that, future imports will stage correctly.
-
----
-
-## 3b. RECENT CHANGES (May 7, 2026) — WH/Signs employee business tag
-
-### WH/Signs Employee Business Tag Feature
-
-Employees in the import review queue can now be tagged as belonging to **Western Highways** or **Signs Fabrication** so they are permanently excluded from Safety Network reports.
-
-**Migration (`supabase/migrations/20260507000003_employee_business_tag.sql`):**
-- Adds `business_tag text CHECK ('western_highways', 'signs')` to `employee_entity_assignments`
-- **Pending manual application in Supabase SQL editor**
-
-**`lib/supabase/database.types.ts`:** `employee_entity_assignments` Row/Insert/Update updated with `business_tag: BusinessTag | null`
-
-**`lib/payroll/import-helpers.ts`:**
-- `ResolvedEmployee` type: added `businessTag: string | null` field
-- `resolveEmployees`: fetches `business_tag` from existing assignments and propagates it
-- `insertPayrollData`: skips business-tagged employees entirely — no transactions, no taxes, no `pendingCount` increment. These employees remain in the DB for future reference but never appear in SN reports.
-
-**`app/api/admin/review/employee-assignments/[id]/route.ts`:**
-- New `tag_business` mode: validates `businessTag ∈ {'western_highways', 'signs'}`, sets `business_tag` + `is_confirmed = true` on the assignment
-
-**`components/review/ReviewClient.tsx`:**
-- `EmployeeMatchRow` now has **"Tag: Western Hwy"** and **"Tag: Signs"** buttons (beside Skip and Confirm) that immediately tag and dismiss the item from the queue
-
----
-
-## 3b. RECENT CHANGES (May 7, 2026) — Import history panel
-
-### New API route: `GET /api/import/history`
-Admin-only. Accepts `?type=payroll|revenue|fuel`. Returns all imports sorted by period date descending.
-- **Payroll:** resolves `entity_id` → entity code (INC/TCS/STS) via `entities` table; returns `{ id, periodDate, entityCode, importedAt, status }`
-- **Revenue:** returns `{ id, periodDate, importedAt, status }`
-- **Fuel:** returns `{ id, vendor, dateRangeStart, dateRangeEnd, importedAt, status }`
-
-### Import History panel (`components/import/ImportClient.tsx`)
-New card below the three upload sections with **Payroll / Revenue / Fuel** tab switcher. Switching tabs fetches that type's history on demand. After each successful upload the panel auto-switches to the relevant tab and refreshes so the new import is immediately visible. Each tab shows a table with columns appropriate to the data type (entity pill for payroll, vendor pill for fuel).
-
-- **Commit:** `f172700`
-
----
-
-## 3b. RECENT CHANGES (May 7, 2026) — 2-digit year payroll import fix
-
-### Problem
-QuickBooks sometimes exports dates with 2-digit years ("Week of Mar 1, 26" instead of "Mar 1, 2026"). A prior session added strict validation that threw a `ParseError` and blocked the import entirely.
-
-### Fix (`lib/payroll/parse-helpers.ts`, `lib/payroll/parser.ts`)
-`extractPeriodDate` now auto-corrects 2-digit years (getFullYear < 100) by adding 2000, then pushes a warning to the optional `warnings` array instead of throwing. The parser.ts call site passes the existing `warnings` array through so the correction message surfaces in the import response. Test updated from "expect throw" to "expect corrected date + warning."
-
-- **225 tests passing, 0 failing** (updated from prior count)
-- **Commit:** `b02025c`
-
----
-
-## 3b. RECENT CHANGES (May 7, 2026) — Admin payroll district/manager dashboard fix
-
-### Root cause
-Each branch has admin payroll codes under **three different entities** (INC/TCS/STS). Only one entity has actual transactions for a given import. The previous code resolved a single entity per branch from `payroll_codes` and used it to scope the admin codes query (`WHERE entity_id = resolvedEntityId`). If the resolved entity was one of the two that had no transactions, the code returned 0 results and admin payroll showed $0. No amount of "prefer admin codes" prioritization could fix this because all three entities have admin salary codes per branch — the pick was inherently arbitrary.
-
-### Fix: branch-scoped admin code lookup in `app/api/payroll/summary/route.ts`
-Step 3 now splits on whether `branchId` is present:
-- **With `branchId`:** queries admin codes by `branch_id` + `is_active` (all entities). The transaction query returns only rows with actual data regardless of entity.
-- **Without `branchId`** (admin/executive cross-branch view): continues using `entity_id` scoping as before.
-
-Tax query updated to match: when `branchId` is present, filters by `employee_id` + `period_date` only (no entity filter). When entity-scoped (no branchId), entity filter is kept to prevent cross-entity double-counting.
-
-### Supporting fixes (less critical, applied first)
-- `app/district/page.tsx` — entity resolution now queries admin salary codes first, falls back to any active code. Became less relevant after the route fix but is still cleaner.
-- `app/manager/page.tsx` — same admin-first entity resolution pattern.
-- Route auto-resolve (when `entityId` param is empty) — also prefers admin salary codes.
-
-### Verification
-- Bakersfield: $10,951.55 admin salary + $1,221.29 taxes = **$12,172.84** ✓ matches dashboard
-- Fresno: $7,728.66 admin salary + $993.06 taxes = **$8,721.72** ✓ matches dashboard
-- All data is under entity `8c0aa308` (TCS), period_date `2026-03-07`
-
----
-
-## 3b. RECENT CHANGES (May 7, 2026) — Payroll consistency + dashboard fixes
-
-### Animated Expand-on-Hover Sidebar
-- `components/layout/Sidebar.tsx` fully rewritten: 48px collapsed → 220px expanded on `onMouseEnter`/`onMouseLeave`; `width` + `min-width` CSS transition 200ms ease-in-out; `overflow: hidden` keeps sibling `<main>` filling the gap
-- Branding: 36×36 orange "SN" badge always visible; "Safety Network" label fades in with 100ms opacity delay when expanding
-- Nav labels: `opacity: expanded ? 1 : 0`, 100ms transition, 100ms delay on expand / instant on collapse
-- Badges: full count pill when expanded; 8px orange dot when collapsed
-- Added `LogOutIcon` + Sign Out button at bottom (calls `supabase.auth.signOut()`)
-- `app/globals.css`: replaced old `.sidebar-icon` rules with `.sidebar-link` / `.sidebar-link-active` classes matching new flex-row layout
-- **Commits:** `23a24b3`, `e77d3f5`
-
-### HQ Allocation Settings Page (`/admin/settings`)
-- `GET /api/admin/settings/hq-allocation` — fetches `hq_allocation_pct` from `businesses` for SN, WH, SIGNS; returns `{ safetyNetwork, westernHighways, signs }` as percentages
-- `PATCH /api/admin/settings/hq-allocation` — validates sum = 1.0 ± 0.0001; updates all three rows atomically with `Promise.all`
-- `components/settings/SettingsClient.tsx` — three `<input type="number">` fields; live running total; "✓ Ready to save" / "must equal exactly 100%" feedback; Save button disabled until total is valid; converts display % ↔ stored decimal
-- `app/admin/settings/page.tsx` — server component, admin-only gate
-- Sidebar: Settings gear icon added to admin nav items
-
-### Test Accounts Panel (in /admin/users)
-- `GET|POST|DELETE /api/admin/test-accounts` — manages three pre-defined test accounts: `test-executive@safetynetwork.com` (executive), `test-district@safetynetwork.com` (district_manager, Bakersfield+Fresno), `test-manager@safetynetwork.com` (branch_manager, Bakersfield); password `TestPass2026!`; `must_change_password: false`
-- POST is idempotent (skips already-existing accounts); branch IDs resolved dynamically by name; DELETE cleans up assignments → profile → auth user in sequence
-- `UsersClient` — new card with amber "Development / Testing Only" badge; per-account status dots; Create Test Accounts / Delete Test Accounts buttons; refreshes both test account list and main users list after each action
-- **Commit:** `e77d3f5`
-
-### Branch Performance Card Payroll Fixes
-- `app/api/admin/overview/route.ts` — `allBranchIds` set now includes `bAdminPayroll` keys (previously missing, causing branches with only admin payroll to be excluded from branch grid)
-- `components/dashboard/AdminDashboard.tsx` — desktop `BranchPerformanceCard`: `payroll` prop now sums `directPayroll + adminPayroll + employerTaxes` (was `directPayroll` only); `noData` check now requires all three payroll types to be zero
-- `components/dashboard/AdminDashboard.tsx` — mobile branch list: same `noData` fix
-- `components/dashboard/DistrictDashboard.tsx` — `BranchComparisonCard`: `noData` requires `admin === 0` (was missing); mobile branch list: `bNoData` requires `bAdmin === 0`
-- **Commit:** `7dcd0b5`
-
-### Removed Allocation Toggle from Manager and District Dashboards
-- Per access-control design: Corp/HQ overhead allocation is for admin and executive only
-- `ManagerDashboard`: removed `allocationOn` + `branchAllocAlloc` state, allocation fetch `useEffect`, `netAfterAlloc`/`netAfterAllocPct` derived values, toggle button from `selectorBar`, all conditional GP card labels; GP card now always shows "Gross Profit" (Revenue − Total Payroll − Fuel)
-- `DistrictDashboard`: same removals (109 lines deleted total across both files)
-- **Commit:** `160c5ed`
-
-### Systemic Payroll Consistency Fix
-Three root causes fixed, all verified with 225-test suite:
-
-**1. Sparkline tooltip $0 payroll (`app/api/admin/overview/route.ts`)**
-The API tracked `bPayByPeriod` (direct payroll per branch per period) but tracked admin payroll and taxes at the branch total level only — no per-period breakdown. Result: `payrollByPeriod` was direct-only, so the sparkline tooltip showed $0 for weeks with admin-only payroll while the card header (which summed all three) showed the correct total.
-Fix: added `bAdminPayByPeriod` and `bTaxByPeriod` per-branch per-period maps; `payrollByPeriod` now returns `direct + admin + taxes` per period per branch.
-
-**2. District/branch manager $0 admin payroll (`app/api/payroll/summary/route.ts`)**
-The route gated the entire admin payroll + tax query on `if (entityId)`. The page-level entity lookup (`payroll_codes WHERE branch_id IN (branchIds)`) can return empty string if no matching code exists. Empty string is falsy → `if (entityId)` silently skips the admin payroll query entirely.
-Fix: after reading `entityId` from the request, auto-resolve it from `payroll_codes WHERE branch_id = branchId AND is_active = true LIMIT 1` when not provided or empty. Both manager and district pages still pass `entityId` as before — this is a defensive fallback for robustness.
-
-**3. `SelectedWeekPanel` wrong gross profit (`AdminDashboard.tsx`)**
-`const pay = data?.directPayroll ?? 0` → `gp = rev - pay - fuel` — ignored admin payroll and employer taxes.
-Fix: uses `calcTotalPayroll(data)` + `calcGrossProfit(...)` from the new shared utility. Label changed from "Direct Payroll" to "Total Payroll".
-
-**New shared utility (`lib/utils/payroll-totals.ts`)**
-- `calcTotalPayroll({ directPayroll, adminPayroll?, employerTaxes? }): number` — canonical formula
-- `calcGrossProfit({ revenue, directPayroll, adminPayroll?, employerTaxes?, fuel }): number`
-- `calcGrossProfitPct(grossProfit, revenue): number` — zero-guarded
-
-**Tests (`lib/utils/payroll-totals.test.ts`)**
-16 tests covering: correct sum of all three payroll components, missing optional fields default to 0, card header === sparkline formula consistency, GP = revenue − total payroll − fuel, profit % = GP / revenue × 100, zero-revenue guard.
-
-- **Commit:** `c9ec283`
-
----
-
-## 3b. RECENT CHANGES (May 7, 2026) — Employee allocation system
-
-### Employee Allocation System
-Full end-to-end split of an employee's payroll and fuel costs across multiple branches by percentage for reporting purposes. Underlying transactions are never modified — allocation is a pure reporting layer.
-
-**Resolution priority:** approved weekly override > approved active default > 100% home branch (payroll code's branch_id for payroll; fuel_transaction.branch_id for fuel)
-
-**Database (Migration 16):**
-- `employee_allocations`: default recurring split (employee_id, branch_id, percentage, effective_from/to, status)
-- `employee_allocation_overrides`: one-off weekly split (employee_id, period_date, branch_id, percentage, status)
-- Status workflow: pending → approved | denied
-- Approval is atomic per group (all rows sharing the same employee_id + effective_from / period_date)
-- UNIQUE constraints: (employee_id, branch_id, effective_from) and (employee_id, period_date, branch_id)
-
-**Pure logic library (`lib/allocation/employee-allocation.ts`):**
-- `resolveEmployeeAllocation(employeeId, periodDate, homeBranchId, overrides, defaults) → BranchSplit[]`
-- `validateSplitTotal(splits) → boolean` — ±0.01 tolerance
-- `isSaturday(dateStr) → boolean`
-- 13 tests covering all edge cases: pending ignored, date range filtering, override priority, wrong period, wrong employee
-
-**Financial route changes (6 routes):**
-- All 6 routes now fetch `employee_allocations` and `employee_allocation_overrides` after collecting employee IDs
-- Per-transaction: `resolveEmployeeAllocation` returns splits → amount multiplied by percentage and attributed to each target branch
-- For branchId-filtered requests: only the portion allocated to that branch is included
-- Payroll routes: removed branchId filter from payroll_codes query (allocation handles redistribution); kept manager access scoped by access.branchIds
-- Fuel routes: employee-linked transactions use allocation; card-linked (no employee_id) use branch_id as-is
-
-**Commit:** `1df30e7`
-
----
-
-## 3b. RECENT CHANGES (May 7, 2026) — Audit fixes + employer taxes
-
-### Employer Taxes Surfaced Everywhere
-- `app/api/admin/overview/route.ts` — fetches `payroll_taxes` with full pagination; attributes taxes to branches via `employee_entity_assignments → payroll_codes → branch_id`; `gp = rev - pay - tax - fuel`; `totals.employerTaxes` added
-- `app/api/payroll/summary/route.ts` — taxes scoped to employees with transactions in the period; returns `taxes.total` via `applyPayrollSumRule`
-- `app/api/employees/[id]/detail/route.ts` — fetches `payroll_taxes` for the employee; response includes `taxHistory: [{ periodDate, amount }]`
-- `AdminDashboard` — Direct Payroll card shows combined wages + employer taxes with breakdown sub-line; year view mode added (uses `/api/periods/years`); `grossProfit` includes employer taxes
-- `ExecutiveDashboard` — `totalPayroll = directTotal + adminTotal + employerTaxes`; `grossProfit = rev - totalPayroll - fuel`
-- `DistrictDashboard` — per-branch GP includes `tax` prop; district totals table correct
-- `ManagerDashboard` — already correct: `totalPayroll = totalDirect + totalAdmin + totalTax`; confirmed by audit
-- `EmployeeDetailClient` — "Employer Taxes" 5th summary card; weekly employer taxes bar chart (`#cc4444`); per-period tax rows injected inline after last transaction row for that period
-
-### System Audit Fixes
-- **Date parser 2-digit year (critical):** `lib/payroll/parse-helpers.ts` — after parsing, validates `parsed.getFullYear() >= 2000`; throws `ParseError` with clear message including the bad year. Test added: `"Week of Mar 8, 26"` throws with `/4-digit year/i` in `.detail`.
-- **Migration `20260507000001`:** corrects existing `period_date` values stored as year 26 CE in `payroll_transactions`, `payroll_taxes`, and `payroll_imports` (adds 2000 years where EXTRACT(year) < 100). Applied to production.
-- **1000-row cap fixes:** `.limit(50000)` added to `revenue/summary`, `payroll/direct-labor-detail`, `payroll/hours-by-week`, `payroll/overtime-summary`
-- **Manager dashboard GP verified correct** — taxes already included via `taxTotal` accumulation
-
----
-
-## 3c. RECENT CHANGES (May 6–7, 2026) — Employee list, clickable names, Executive toggle, BranchPerformanceCard, review queue
-
-### Employee List Pages + Clickable Names in Dashboards
-- `GET /api/employees` rewritten — rich filtering (search, branchId, entityCode, laborType), sorting, pagination; admin/executive get full list, managers scoped to assigned branches
-- `EmployeeListClient` — debounced search, filter bar, sortable table, pagination, status/entity pills, skeleton loading
-- `/admin/employees` and `/executive/employees` — server-component list pages
-- `/manager/employees/[id]` and `/district/employees/[id]` — detail pages; `GET /api/employees/[id]/detail` updated to allow manager roles with branch-access guard (direct labor only)
-- Employee `displayName`s in ExecutiveDashboard, ManagerDashboard, DistrictDashboard (payroll tables, direct labor panel, top consumers, OT table) are now clickable links to the detail page
-- `Sidebar` — People icon added for admin and executive roles
-- `EmployeeDetailClient` enhancements: Total Weeks replaces Fuel Cost summary card; paginated Rate History table (25/page); Payroll Items & Rate History summary table; Fuel Cost per Week bar chart alongside Gallons chart; $/Gal column in fuel table
-
-### Executive Dashboard — Month/Quarter/Year Toggle
-- Removed old weekly view navigator and `DateRangePicker`; replaced with same `[Month][Quarter][Year]` 3-button toggle used on Manager/District/Admin
-- Allocation card sub-labels now derive from `periodDate`
-
-### BranchPerformanceCard
-- New `components/ui/BranchPerformanceCard.tsx` — shared Recharts `LineChart` with 3 lines: Revenue (#ff6b00), Payroll (#888888), Fuel (#cc4444); dots, hover tooltip, right-aligned legend, 80px chart area, x-axis date labels
-- `AdminDashboard` — SVG sparkline + old BranchCard replaced with `BranchPerformanceCard`; `/api/admin/overview` extended to return `payrollByPeriod` and `fuelByPeriod` per branch
-- `DistrictDashboard` — `BranchComparisonCard` delegates to `BranchPerformanceCard`
-
-### Employee Match Review Queue Redesign
-- New assignment UI replaces raw payroll code dropdown:
-  - New employee mode: select Branch + Labor Type → server resolves payroll code
-  - Link existing mode: searchable employee dropdown with entity assignment pills; shows override Branch/Labor Type when linked employee has no assignment for the import entity
-  - Orange Confirm button (disabled until valid) + Skip on every row; inline error if no matching code exists
-- `GET /api/admin/review` — now returns all active employees with entity assignments for the search dropdown
-- `PATCH /api/admin/review/employee-assignments/[id]` — updated to accept branch + laborType and resolve payroll code server-side
-
----
-
-## 3d. RECENT CHANGES (May 6, 2026) — Manager/District Fiscal Month Selector
-
-### Manager and District Dashboard — Fiscal Month Selector
-
-Both `ManagerDashboard` and `DistrictDashboard` were fully rewritten to match the AdminDashboard's fiscal month selector pattern. The old week navigator (‹ ›) and Weekly/MTD/YTD toggle are gone.
-
-**ManagerDashboard (`components/dashboard/ManagerDashboard.tsx`)**
-- Props simplified: `{ branchId, entityId }` — `initialWeek` and `initialView` removed
-- On mount: fetches `/api/fiscal-months` and `/api/periods/available` in parallel; selects the fiscal month containing the most recently imported period date; falls back to first fiscal month
-- Fiscal month dropdown + YTD button in header; selecting a fiscal month clears YTD; clicking YTD clears the dropdown highlight
-- Date range = `selectedFiscal.start_date → selectedFiscal.end_date`; YTD = `year-01-01 → latest fiscal month end`
-- Data fetch strategy: revenue and fuel fetched as date range (single call each); payroll fetched per-Saturday (N calls for N weeks in range, all in parallel via `Promise.all`)
-- Weekly bar chart (Recharts): Revenue / Direct Payroll / Fuel grouped bars; clicking a Revenue bar opens the direct labor detail panel for that week; selected bar highlighted `#ffaa44`; `SelectedWeekPanel` dismissed via ×
-- Payroll breakdown card: horizontal stacked bar (orange = Direct, gray = Admin, dark gray = Taxes); line-item breakdown with percentages
-- Revenue Breakdown table: rows = Saturdays in fiscal month, columns = Labor / Rental / One-Time / Total
-- Period Summary card: Revenue → (Payroll) → (Fuel) → Gross Profit
-- Right column: Gross Profit, Margin, Total Cost metric cards
-- Mobile: 2×2 metric cards + revenue-only bar chart + selected-week panel + revenue table
-- Removed: TrendLineChart, WaterfallChart, TargetVarianceRow, DateRangePicker, week navigator, URL sync
-
-**DistrictDashboard (`components/dashboard/DistrictDashboard.tsx`)**
-- Props simplified: `{ branches, initialBranch }` — `initialWeek` and `initialView` removed
-- Same mount logic and fiscal month selector as Manager
-- Branch selector retained (orange text); selecting a branch or fiscal month triggers a fresh data fetch
-- Aggregate mode ("All Assigned Branches"):
-  - Revenue and fuel fetched without branchId filter (API scopes to assigned branches automatically)
-  - Payroll: N branches × M weeks calls, all parallel
-  - Branch comparison cards: revenue (large), payroll + fuel (small), gross profit + GP% pill; sorted by revenue descending; "No data" overlay for empty branches
-  - District Totals table: Branch / Revenue / Direct Pay / Admin Pay / Fuel / Gross Profit / Margin; totals row
-  - Weekly bar chart shows district-wide aggregates per week (no click-to-detail in aggregate)
-- Single branch mode: identical layout to ManagerDashboard (bar chart with click detail, payroll breakdown card, revenue breakdown table, period summary, right column)
-- Mobile: 2×2 metrics + revenue chart; aggregate shows branch list with GP%, single shows revenue table
-
-**Pages updated**
-- `app/manager/page.tsx` — removed `searchParams: { week, view }` and `initialWeek`/`initialView` prop passing
-- `app/district/page.tsx` — removed `week` and `view` from searchParams; kept `branch` for initialBranch
-
----
-
-## 3e. RECENT CHANGES (May 6, 2026) — Misc fixes (temp password, branch dropdowns, fuel dupe, revenue parser, mobile)
-
-### Temporary Password Flow for Access Request Approval
-- `PATCH /api/admin/access-requests/[id]` — switched from `inviteUserByEmail` to `createUser` with `password`, `email_confirm: true`, `user_metadata: { must_change_password: true }`; validates `temporaryPassword` (required, min 8 chars); inserts `user_profiles` with `must_change_password: true`
-- `POST /api/auth/clear-must-change-password` — any authenticated user clears their own flag via service client
-- Migration `20260506000006_must_change_password.sql` — adds `must_change_password boolean NOT NULL DEFAULT false` to `user_profiles`; applied to production
-- `database.types.ts` — updated `user_profiles` Row/Insert/Update to include `must_change_password`
-- `AccessRequestsClient` approval modal — added unmasked Temporary Password field + Confirm Password field; Generate button (12-char, letters+digits+special, shuffled); Copy button (flashes "Copied"); note "Share this temporary password…"; client-side validation (min 8 chars, must match); sends `temporaryPassword` in request body; branch dropdown now grouped Operations/Corporate
-- `/change-password` page — centered dark card (same design as login); masked New Password + Confirm fields; rejects same-as-current (tries signInWithPassword before updateUser); calls clear-flag API on success; redirects to `/` (middleware routes to role dashboard); no way to skip
-- Middleware updated — selects `must_change_password` alongside `role`; any `must_change_password=true` session redirected to `/change-password` for all paths; `/change-password` itself redirected to role dashboard when flag is false; `/change-password` added to matcher
-
-### Branch Dropdowns — All Active Branches with Grouping
-- `/request-access` page — removed `is_revenue_generating=true` filter; now fetches all active branches with `is_revenue_generating` field; branch dropdown uses `<optgroup>` labels "— Operations —" and "— Corporate —"
-- `GET /api/admin/access-requests` — same filter removal; passes `is_revenue_generating` to client
-- `AccessRequestsClient` and `RequestAccessClient` — `Branch` interface updated; selects split into two optgroups
-
-### Fuel Import Duplicate Check Fix
-- `POST /api/import/fuel` — duplicate check now includes `.eq('vendor', vendor)` before the date overlap filters; error message and conflict payload include vendor
-- Migration `20260506000005_fuel_imports_vendor_unique_constraint.sql` — adds `UNIQUE(vendor, date_range_start, date_range_end)` to `fuel_imports`; applied to production
-
-### Revenue Branch Normalization Fix
-- `lib/revenue/parser.ts` — replaced hardcoded `BRANCH_MERGE` lookup with `normalizeBranchName()`:
-  - Strips `/ Sales$/i` suffix dynamically (any branch, not just Bakersfield/Fresno)
-  - `MERGED_BRANCHES` map handles consolidated branches: `'Sacramento' → 'Modesto'`
-  - `"Sacramento Sales"` → strip → `"Sacramento"` → merge → `"Modesto"`
-  - Add future merges by updating `MERGED_BRANCHES` — no other changes needed
-- `lib/revenue/parser.test.ts` — 4 new tests: Orange County Sales, Visalia Sales (dynamic rule), Sacramento → Modesto, Sacramento Sales → Modesto (193 total)
-- `lib/revenue/CLAUDE.md` — updated to reflect new normalization function and checklist
-
-### Fuel Card Assignment Retroactive Backfill Bug Fix
-- `PATCH /api/admin/review/fuel-cards/[id]` — now retroactively updates all historical `fuel_transactions` for the confirmed card (`fuel_card_assignment_id = id`) with branch_id, employee_id, and business_tag
-- Migration `20260506000004_backfill_fuel_transaction_branches.sql` — one-time backfill for cards confirmed before this fix; applied to production
-
-### Mobile Responsive Views
-- Landing page — stacked layout; 160px logo (240px desktop); full-width buttons (auto-width desktop); sparse dot grid (~40 dots mobile via 112px spacing)
-- Login page — full-width card with 16px horizontal padding on mobile; 120px logo on mobile
-- Admin Dashboard — mobile: 2×2 metric cards (no sparklines), revenue-only bar chart, compact variance row, branch list; desktop layout unchanged; `useIsMobile()` hook (SSR-safe, starts false)
-- `MobileBottomNav` — role-aware fixed bottom nav; slide-up overlay drawer for overflow items; 60px height; 44px tap targets; orange active / gray inactive
-- `DashboardShell` — sidebar hidden on mobile (`hidden md:flex`); bottom nav shown on mobile (`md:hidden`)
-- `globals.css` — `overflow-x: hidden` on html; `.table-scroll` helper; `.dashboard-main` bottom padding for nav
-
-### Data Explorer (built in prior session, included here for completeness)
-- `/admin/data-explorer` and `/executive/data-explorer` pages
-- `DataExplorerClient` — filter bar, summary cards, sortable paginated table (50 rows/page), CSV export
-- API routes: `GET /api/data-explorer/payroll`, `revenue`, `fuel`, `export`
-- Sidebar nav: Database icon added for both admin and executive roles
-
----
-
-## 3f. RECENT CHANGES (May 6, 2026) — Fiscal quarters
-
-### Fiscal Quarters System
-- Migration `20260506000002_fiscal_quarters.sql` applied to production — `fiscal_quarters` + `fiscal_quarter_months` tables, RLS policies, unique constraints
-- `GET|POST /api/fiscal-quarters` and `PATCH|DELETE /api/fiscal-quarters/[id]`
-- `FiscalQuartersClient` — full CRUD UI
-- `AdminDashboard` — Month/Quarter toggle; quarter date range = first month start → last month end
-
----
-
-## 3g. RECENT CHANGES (May 6, 2026) — Fiscal month targets
-
-### Fiscal-Month-Based Targets Redesign
-- Migration `20260506000001_fiscal_month_targets.sql` — `branch_targets` table rebuilt with `fiscal_month_id` FK
-- `GET/POST /api/targets` and `PATCH /api/targets/[id]`
-- **New: `GET /api/targets/weekly?periodDate=YYYY-MM-DD`** — pro-rated weekly targets
-- `TargetsClient` fully rewritten with fiscal month dropdown
-- `TargetVarianceRow` — calls `/api/targets/weekly`; shows fiscal month name
-
----
-
-## 3h. RECENT CHANGES (May 5, 2026) — Sacramento merge + employee transfers
-
-### Sacramento → Modesto Branch Merge
-- Migration `20260505000001_merge_sacramento_into_modesto.sql` applied to production
-- Adds `is_active` to `branches`; reassigns all Sacramento data to Modesto; deactivates Sacramento codes
-- Revenue parser: `normalizeBranchName()` maps Sacramento → Modesto (covers historical imports too)
-
-### Employee Branch Transfer History
-- Migration `20260505000002_employee_branch_transfers.sql` applied to production
-- `employee_branch_transfers` table; `employee_entity_assignments` gets `effective_from` / `effective_to`
-- `GET/POST /api/employees/[id]/transfers`, `DELETE /api/employees/[id]/transfers/[transferId]`
-- `EmployeeDetailClient` — Branch History section with transfer log and inline transfer form
-
-### Review Queue Fixes
-- Fuel card assignment dropdown grouped: Operations / Corporate / Other Businesses / Tag as Business
-- Employee assignment payroll code picker grouped by branch
+- `app/api/admin/overview/route.ts` — ORDER BY added to all paginated queries (fixed weekly chart scrambling)
+- `app/api/fuel/summary/route.ts` — ORDER BY transaction_date added to paginated loop
+- `app/api/admin/overview/route.ts` — `allBranchIds` now includes `bAdminPayroll` keys
+- `EmployeeDetailClient` — Branch Allocation section; paginated `payroll_taxes` query in employee detail route
+- Removed Payments tab from AR (was removed after adding; simplified AR layout)
+- `app/api/access-requests` — username column added; role constraint expanded for new roles
+- Mobile polish across the entire app: meeting tab, nav feedback, loading skeletons, xlsm AR import
 
 ---
 
 ## 4. WHAT HAS NOT BEEN STARTED
 
-- 13-week trend analytics (needs sufficient imported data to render)
-- Anomaly flag UI (employee payroll >3× 4-week average → tooltip warning)
-- Drill-down interactions (click payroll group → line items, click fuel total → transactions)
-- WH / Signs dashboards (explicitly deferred to V2 in spec)
+- WH / Signs dashboards (explicitly deferred to V2)
 - E2E tests with Playwright (deferred to V2)
 - API rate limiting on import endpoints
+- 13-week trend analytics (needs sufficient data to render meaningfully)
+- Anomaly flag UI (employee payroll >3× 4-week average → tooltip warning)
+- Drill-down interactions (click payroll group → line items, click fuel total → transactions)
 
 ---
 
 ## 5. KNOWN ISSUES AND DECISIONS
 
-- **Supabase 1000-row cap:** Supabase JS client defaults to 1000 rows per query. Routes that aggregate transactions use either `.range()` pagination loops (admin/overview, fuel/summary) or `.limit(50000)` (revenue/summary, payroll/hours-by-week, payroll/direct-labor-detail, payroll/overtime-summary). Always verify large-result queries don't silently cap when adding new routes.
-- **next.config.js:** Uses `serverExternalPackages: ['xlsx', 'csv-parse']` to prevent Next.js from bundling Node-only packages.
-- **Revenue parser multi-month fix:** Sums all months for the same branch+entity into one record.
-- **Fuel tax column calculation:** Interstate: `gallons × price_per_gallon`. Flyers: `TotalPrice` direct; pre-tax back-calculated as `TotalPrice - TaxTotal`. Do not swap.
-- **Payroll column A tax row fix:** "Total Employer Taxes and Contributions" identified by scanning column D (not A).
+- **Supabase 1000-row cap:** All routes that aggregate transactions use `.range()` pagination loops or `.limit(50000)`. Always verify new large-result queries.
 - **`display_name` is never stored:** Always computed as `first_name || ' ' || last_name`. No stored column.
 - **Admin payroll sum rule is a security control:** District/branch managers never receive individual admin employee rows — API returns `{ total: number }` only.
 - **`raw_name_in_report` is immutable:** Never expose a UI control that edits this field.
-- **must_change_password enforcement:** Middleware gate is the primary control. The flag lives in `user_profiles`, not just auth metadata. Clearing it requires the `/api/auth/clear-must-change-password` API route (uses service client).
+- **must_change_password enforcement:** Middleware gate + `user_profiles` flag. Clearing requires `POST /api/auth/clear-must-change-password`.
+- **AR merge is not transactional:** `POST /api/ar/customers/[id]/merge` steps are sequential with per-step error checking, but not wrapped in a DB transaction. A failure mid-merge leaves data in a partial state.
+- **next.config.js:** Uses `serverExternalPackages: ['xlsx', 'csv-parse']`.
+- **TCS payroll ended March 2026:** No TCS imports after Mar 7, 2026. Intentional — employees moved to STS.
+
+### Pending SQL (must be run manually in Supabase SQL editor)
+
+1. **Note editing column:**
+   ```sql
+   ALTER TABLE ar_customer_notes ADD COLUMN IF NOT EXISTS edited_at timestamptz;
+   ```
+
+2. **Josie Sanchez customer assignments** (assigns ~337 customers):
+   ```
+   /Users/masondoty/Documents/sn_project/scripts/assign_josie.sql
+   ```
 
 ---
 
 ## 6. CURRENT TEST COUNT
 
-**209 tests passing, 0 failing** (as of May 7, 2026)
+**~209 tests passing, 0 failing** (last verified May 13, 2026)
 13 test files across parsers, allocation engine, and API access control.
 
 ```bash
@@ -797,11 +401,13 @@ npx vitest run
 ## 7. DEPLOYMENT
 
 ### Git / GitHub
+
 - Remote: GitHub (private repo `masontcs/safety-network-dashboard`)
-- `.gitignore` excludes: `.env.local`, `node_modules`, `.next`, `.claude/`, `supabase/.temp/`
+- `.gitignore` excludes: `.env.local`, `node_modules`, `.next`, `.claude/`, `supabase/.temp/`, `*.csv` (combined AR CSV)
 - Current branch: `main`
 
 ### Vercel
+
 - Connected to GitHub repo; auto-deploys on push to `main`
 - Framework: Next.js (auto-detected), build: `npm run build`
 - Environment variables in Vercel Project Settings:
@@ -811,24 +417,30 @@ npx vitest run
   - `ANTHROPIC_API_KEY` — **Sensitive**
 
 ### Production URL
+
 - https://safety-network-dashboard.vercel.app/login
 
-### All migrations applied to production (17 total)
-- `20260101000001` through `20260101000007` — core schema
+### All migrations applied to production (19 total)
+
+- `20260101000001` through `20260101000007` — core schema + RLS
 - `20260101000008` — branch_targets
 - `20260505000001` — Sacramento merge + is_active
 - `20260505000002` — employee branch transfers
 - `20260506000001` — fiscal_month_targets redesign
 - `20260506000002` — fiscal_quarters + fiscal_quarter_months
-- `20260506000003` — access_requests table
+- `20260506000003` — access_requests table + RLS
 - `20260506000004` — backfill fuel_transaction branches
 - `20260506000005` — fuel_imports vendor unique constraint
 - `20260506000006` — user_profiles.must_change_password
 - `20260507000001` — fix period_date year bug (year 26 CE → 2026)
+- `20260507000002` — employee_allocations + employee_allocation_overrides
 - `20260507000003` — business_tag column on employee_entity_assignments
 - `20260508000001` — payroll_staged_transactions + payroll_staged_taxes
 - `20260508000002` — payroll_item_staged_transactions
 - `20260508000003` — business_tag on payroll_transactions/taxes; payroll_code_id nullable
+- AR migrations — ar_customers, ar_invoices, ar_imports, ar_customer_assignments, ar_customer_contacts, ar_customer_notes, ar_customer_payments, ar_credits, ar_class_codes (applied to production)
+- Role constraint migration — expanded CHECK on user_profiles.role for new roles
+- Username migration — username column on user_profiles
 
 ---
 
@@ -842,14 +454,14 @@ npm run dev
 
 TypeScript check (run before committing):
 ```bash
-npm run typecheck
-# or
 npx tsc --noEmit
 ```
 
 ---
 
-## 9. OPEN QUESTIONS
+## 9. OPEN QUESTIONS / DEFERRED ITEMS
 
-- **Review queue badge count:** Unresolved review queue item count in top nav — not yet implemented.
-- **Executive/Admin allocation for MTD/YTD:** Allocation fetched for selected periodDate only. Summing allocation across multiple weeks is deferred.
+- **Review queue badge count:** Total unresolved items in top nav — not yet implemented.
+- **AR merge transactionality:** Merge steps are sequential, not in a DB transaction. Consider Postgres function or RPC for atomicity.
+- **Pending SQL:** Two SQL statements need to be run manually (see Section 5).
+- **Test count:** Rerun `npx vitest run` to get accurate count — may have changed with new features.
