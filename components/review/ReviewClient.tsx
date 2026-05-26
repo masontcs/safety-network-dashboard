@@ -55,7 +55,7 @@ interface PayrollCode {
 interface Employee {
   id: string
   displayName: string
-  entityAssignments: Array<{ entityCode: string; branchName: string; laborType: string }>
+  entityAssignments: Array<{ entityCode: string; branchId: string | null; branchName: string; laborType: string }>
 }
 
 interface PendingAllocation {
@@ -768,123 +768,368 @@ function PayrollItemsSection({
   )
 }
 
-// ─── Unassigned Fuel Cards section ────────────────────────────────────────────
+// ─── Fuel Card Row ────────────────────────────────────────────────────────────
 
-function FuelCardsSection({
-  cards,
+function FuelCardRow({
+  card,
   branches,
+  employees,
   onDismiss,
 }: {
-  cards: FuelCard[]
+  card: FuelCard
   branches: Branch[]
+  employees: Employee[]
   onDismiss: (id: string) => void
 }) {
-  const [busy, setBusy] = useState<string | null>(null)
-  const [selected, setSelected] = useState<Record<string, string>>({})
+  const [linkEmpMode, setLinkEmpMode] = useState(false)
+  // Branch/tag mode
+  const [selectedValue, setSelectedValue] = useState('')
+  // Employee link mode
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
+  const [empBranchId, setEmpBranchId] = useState('')
+
+  const [busy, setBusy] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [rowError, setRowError] = useState<string | null>(null)
+  const searchRef = useRef<HTMLDivElement>(null)
 
   const snOperations = branches.filter((b) => b.isRevenueGenerating && b.businessCode === 'SN')
   const snCorporate = branches.filter((b) => b.isCorporate && b.businessCode === 'SN')
   const otherBiz = branches.filter((b) => b.businessCode !== 'SN')
 
-  async function handleAssign(card: FuelCard) {
-    const val = selected[card.id]
-    if (!val) return
-    setBusy(card.id)
+  const filteredEmployees =
+    searchQuery.length >= 2
+      ? employees.filter((e) => e.displayName.toLowerCase().includes(searchQuery.toLowerCase()))
+      : []
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleOutside(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutside)
+    return () => document.removeEventListener('mousedown', handleOutside)
+  }, [])
+
+  function handleSelectEmployee(emp: Employee) {
+    setSelectedEmployee(emp)
+    setSearchQuery('')
+    setSearchOpen(false)
+    // Auto-fill branch from their first non-null assignment
+    const firstBranch = emp.entityAssignments.find((ea) => ea.branchId !== null)
+    setEmpBranchId(firstBranch?.branchId ?? '')
+  }
+
+  const isValid = linkEmpMode ? !!(selectedEmployee && empBranchId) : !!selectedValue
+
+  async function handleConfirm() {
+    if (!isValid || busy) return
+    setBusy(true)
+    setRowError(null)
     try {
       const body: Record<string, string> = {}
-      if (val.startsWith('tag:')) {
-        body.businessTag = val.slice(4)
+      if (linkEmpMode) {
+        body.employeeId = selectedEmployee!.id
+        body.branchId = empBranchId
+      } else if (selectedValue.startsWith('tag:')) {
+        body.businessTag = selectedValue.slice(4)
       } else {
-        body.branchId = val
+        body.branchId = selectedValue
       }
       const res = await fetch(`/api/admin/review/fuel-cards/${card.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      if (res.ok) onDismiss(card.id)
+      const json = await res.json() as { success: boolean; error?: string }
+      if (!res.ok || !json.success) {
+        setRowError(json.error ?? 'Failed to save')
+        return
+      }
+      setSaved(true)
+      setTimeout(() => onDismiss(card.id), 700)
     } finally {
-      setBusy(null)
+      setBusy(false)
     }
   }
 
+  return (
+    <div style={{ padding: '14px 0', borderTop: '1px solid #2a2a2a' }}>
+      {/* Card info */}
+      <div style={{ fontSize: 12, color: '#ffffff', fontWeight: 500, marginBottom: 4 }}>
+        &ldquo;{card.cardName}&rdquo;{' '}
+        <span style={{ color: '#555555', fontWeight: 400 }}>({card.vendor})</span>
+      </div>
+      {card.currentEmployeeName && (
+        <div style={{ fontSize: 12, color: '#888888', marginBottom: 4 }}>
+          Linked employee:{' '}
+          <span style={{ color: '#ff6b00' }}>{card.currentEmployeeName}</span>
+        </div>
+      )}
+      {card.businessTag && (
+        <div style={{ fontSize: 11, color: '#555555', marginBottom: 4 }}>
+          Tagged: {card.businessTag}
+        </div>
+      )}
+
+      {/* Toggle: link to employee */}
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 12,
+          color: '#cccccc',
+          cursor: 'pointer',
+          marginBottom: 12,
+          userSelect: 'none',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={linkEmpMode}
+          onChange={(e) => {
+            setLinkEmpMode(e.target.checked)
+            setSelectedValue('')
+            setSelectedEmployee(null)
+            setSearchQuery('')
+            setEmpBranchId('')
+            setRowError(null)
+          }}
+          style={{ accentColor: '#ff6b00' }}
+        />
+        Link to existing employee
+      </label>
+
+      {/* Branch / tag assignment mode */}
+      {!linkEmpMode && (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 12 }}>
+          <select
+            value={selectedValue}
+            onChange={(e) => setSelectedValue(e.target.value)}
+            style={selectStyle}
+          >
+            <option value="">— assign branch or tag —</option>
+            {snOperations.length > 0 && (
+              <optgroup label="Operations">
+                {snOperations.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </optgroup>
+            )}
+            {snCorporate.length > 0 && (
+              <optgroup label="Corporate">
+                {snCorporate.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </optgroup>
+            )}
+            {otherBiz.length > 0 && (
+              <optgroup label="Other Businesses">
+                {otherBiz.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </optgroup>
+            )}
+            <optgroup label="Tag as Business">
+              <option value="tag:western_highways">Tag as Western Highways</option>
+              <option value="tag:signs">Tag as Signs</option>
+            </optgroup>
+          </select>
+        </div>
+      )}
+
+      {/* Employee link mode */}
+      {linkEmpMode && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, color: '#666666', marginBottom: 4 }}>Search employee</div>
+          <div ref={searchRef} style={{ position: 'relative', display: 'inline-block' }}>
+            <input
+              type="text"
+              value={selectedEmployee ? selectedEmployee.displayName : searchQuery}
+              onChange={(e) => {
+                if (selectedEmployee) {
+                  setSelectedEmployee(null)
+                  setEmpBranchId('')
+                }
+                setSearchQuery(e.target.value)
+                setSearchOpen(true)
+              }}
+              onFocus={() => setSearchOpen(true)}
+              placeholder="Type to search by name…"
+              style={inputStyle}
+            />
+            {searchOpen && !selectedEmployee && searchQuery.length >= 2 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  minWidth: '100%',
+                  background: '#2a2a2a',
+                  border: '1px solid #333333',
+                  borderRadius: 6,
+                  marginTop: 2,
+                  maxHeight: 220,
+                  overflowY: 'auto',
+                  zIndex: 20,
+                }}
+              >
+                {filteredEmployees.length === 0 ? (
+                  <div style={{ padding: '8px 12px', fontSize: 12, color: '#555555' }}>
+                    No employees found
+                  </div>
+                ) : (
+                  filteredEmployees.map((emp) => {
+                    const branchNames = [
+                      ...new Set(
+                        emp.entityAssignments
+                          .filter((ea) => ea.branchId !== null)
+                          .map((ea) => ea.branchName),
+                      ),
+                    ]
+                    return (
+                      <button
+                        key={emp.id}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => handleSelectEmployee(emp)}
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          textAlign: 'left',
+                          background: 'none',
+                          border: 'none',
+                          borderBottom: '1px solid #333333',
+                          padding: '8px 12px',
+                          fontSize: 12,
+                          color: '#cccccc',
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        <span style={{ color: '#ffffff', fontWeight: 500 }}>{emp.displayName}</span>
+                        {branchNames.length > 0 && (
+                          <span style={{ color: '#666666', marginLeft: 8, fontSize: 11 }}>
+                            {branchNames.join(', ')}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            )}
+          </div>
+
+          {selectedEmployee && (
+            <button
+              onClick={() => {
+                setSelectedEmployee(null)
+                setSearchQuery('')
+                setEmpBranchId('')
+              }}
+              style={{
+                marginLeft: 8,
+                background: 'none',
+                border: 'none',
+                color: '#666666',
+                fontSize: 11,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              ✕ clear
+            </button>
+          )}
+
+          {/* Branch select for cost allocation — shown after employee is chosen */}
+          {selectedEmployee && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 11, color: '#666666', marginBottom: 4 }}>
+                Card branch (for cost allocation)
+              </div>
+              <select
+                value={empBranchId}
+                onChange={(e) => setEmpBranchId(e.target.value)}
+                style={selectStyle}
+              >
+                <option value="">— select branch —</option>
+                {snOperations.length > 0 && (
+                  <optgroup label="Operations">
+                    {snOperations.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {snCorporate.length > 0 && (
+                  <optgroup label="Corporate">
+                    {snCorporate.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+              {empBranchId && (
+                <span style={{ fontSize: 11, color: '#555555', marginLeft: 8 }}>
+                  auto-filled from employee
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {rowError && (
+        <div style={{ fontSize: 12, color: '#cc4444', marginBottom: 8 }}>{rowError}</div>
+      )}
+      {saved && (
+        <div style={{ fontSize: 12, color: '#4caf50', marginBottom: 8 }}>Saved</div>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+        <ActionBtn
+          label={linkEmpMode ? 'Link' : 'Assign'}
+          variant="primary"
+          disabled={!isValid || busy || saved}
+          onClick={handleConfirm}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ─── Unassigned Fuel Cards section ────────────────────────────────────────────
+
+function FuelCardsSection({
+  cards,
+  branches,
+  employees,
+  onDismiss,
+}: {
+  cards: FuelCard[]
+  branches: Branch[]
+  employees: Employee[]
+  onDismiss: (id: string) => void
+}) {
   return (
     <div className="card">
       <SectionHeader title="Unassigned Fuel Cards" count={cards.length} />
       {cards.length === 0 ? (
         <EmptyQueue message="No unassigned fuel cards." />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div>
           {cards.map((card) => (
-            <div
+            <FuelCardRow
               key={card.id}
-              style={{
-                padding: '12px 0',
-                borderTop: '1px solid #2a2a2a',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12,
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, color: '#ffffff', fontWeight: 500 }}>
-                  &ldquo;{card.cardName}&rdquo;{' '}
-                  <span style={{ color: '#555555', fontWeight: 400 }}>({card.vendor})</span>
-                </div>
-                {card.currentEmployeeName && (
-                  <div style={{ fontSize: 12, color: '#888888', marginTop: 3 }}>
-                    Linked employee:{' '}
-                    <span style={{ color: '#ff6b00' }}>{card.currentEmployeeName}</span>
-                  </div>
-                )}
-                {card.businessTag && (
-                  <div style={{ fontSize: 11, color: '#555555', marginTop: 3 }}>
-                    Tagged: {card.businessTag}
-                  </div>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-                <select
-                  value={selected[card.id] ?? ''}
-                  onChange={(e) => setSelected((s) => ({ ...s, [card.id]: e.target.value }))}
-                  style={selectStyle}
-                >
-                  <option value="">— assign branch or tag —</option>
-                  {snOperations.length > 0 && (
-                    <optgroup label="Operations">
-                      {snOperations.map((b) => (
-                        <option key={b.id} value={b.id}>{b.name}</option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {snCorporate.length > 0 && (
-                    <optgroup label="Corporate">
-                      {snCorporate.map((b) => (
-                        <option key={b.id} value={b.id}>{b.name}</option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {otherBiz.length > 0 && (
-                    <optgroup label="Other Businesses">
-                      {otherBiz.map((b) => (
-                        <option key={b.id} value={b.id}>{b.name}</option>
-                      ))}
-                    </optgroup>
-                  )}
-                  <optgroup label="Tag as Business">
-                    <option value="tag:western_highways">Tag as Western Highways</option>
-                    <option value="tag:signs">Tag as Signs</option>
-                  </optgroup>
-                </select>
-                <ActionBtn
-                  label="Assign"
-                  variant="primary"
-                  disabled={busy === card.id || !selected[card.id]}
-                  onClick={() => handleAssign(card)}
-                />
-              </div>
-            </div>
+              card={card}
+              branches={branches}
+              employees={employees}
+              onDismiss={onDismiss}
+            />
           ))}
         </div>
       )}
@@ -993,6 +1238,7 @@ export default function ReviewClient() {
           <FuelCardsSection
             cards={data.fuelCards}
             branches={data.branches}
+            employees={data.employees}
             onDismiss={(id) => dismiss('fuelCards', id)}
           />
           {(pendingAllocs.length > 0 || pendingOverrides.length > 0) && (
