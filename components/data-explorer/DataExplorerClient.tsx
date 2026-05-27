@@ -152,7 +152,7 @@ function colsFor(dataset: Dataset): ColDef[] {
 
 function renderCell(dataset: Dataset, col: ColDef, row: AnyRow): React.ReactNode {
   const v = (row as unknown as Record<string, unknown>)[col.key]
-  if (v === null || v === undefined || v === '') return <span style={{ color: '#555555' }}>—</span>
+  if (v === null || v === undefined || v === '') return <span style={{ color: 'var(--text-faint)' }}>—</span>
 
   if (col.key === 'branchName') {
     return <span style={{ color: '#ff6b00' }}>{String(v)}</span>
@@ -160,7 +160,7 @@ function renderCell(dataset: Dataset, col: ColDef, row: AnyRow): React.ReactNode
 
   if (col.numeric) {
     const n = typeof v === 'number' ? v : parseFloat(String(v))
-    if (isNaN(n)) return <span style={{ color: '#555555' }}>—</span>
+    if (isNaN(n)) return <span style={{ color: 'var(--text-faint)' }}>—</span>
 
     if (col.key === 'amount' || col.key === 'labor' || col.key === 'rental' ||
         col.key === 'oneTime' || col.key === 'salesTax' || col.key === 'total' ||
@@ -308,12 +308,12 @@ export default function DataExplorerClient({ branches, entities }: Props) {
   // ── Styles ───────────────────────────────────────────────────────────────────
 
   const inputStyle: React.CSSProperties = {
-    background: '#2a2a2a',
-    border: '1px solid #333333',
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border-emphasis)',
     borderRadius: 8,
     padding: '7px 10px',
     fontSize: 12,
-    color: '#cccccc',
+    color: 'var(--text-secondary)',
     fontFamily: 'inherit',
     width: '100%',
     boxSizing: 'border-box',
@@ -324,7 +324,7 @@ export default function DataExplorerClient({ branches, entities }: Props) {
   const labelStyle: React.CSSProperties = {
     display: 'block',
     fontSize: 11,
-    color: '#666666',
+    color: 'var(--text-dim)',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.04em',
     marginBottom: 5,
@@ -379,7 +379,7 @@ export default function DataExplorerClient({ branches, entities }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Page title */}
-      <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Data Explorer</div>
+      <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Data Explorer</div>
 
       {/* Filter bar */}
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -485,10 +485,10 @@ export default function DataExplorerClient({ branches, entities }: Props) {
               onClick={handleReset}
               disabled={loading}
               style={{
-                background: '#2a2a2a',
+                background: 'var(--bg-secondary)',
                 border: 'none',
                 borderRadius: 8,
-                color: '#888888',
+                color: 'var(--text-muted)',
                 fontSize: 12,
                 padding: '7px 14px',
                 cursor: 'pointer',
@@ -523,9 +523,9 @@ export default function DataExplorerClient({ branches, entities }: Props) {
         {/* Table header bar */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 16px', borderBottom: '1px solid #2a2a2a',
+          padding: '12px 16px', borderBottom: '1px solid var(--border)',
         }}>
-          <span style={{ fontSize: 12, color: '#888888' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             {loading ? 'Loading…' : `${total.toLocaleString()} row${total !== 1 ? 's' : ''}`}
           </span>
           {apiData && total > 0 && (
@@ -536,10 +536,10 @@ export default function DataExplorerClient({ branches, entities }: Props) {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
-                background: '#2a2a2a',
-                border: '1px solid #333333',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-emphasis)',
                 borderRadius: 6,
-                color: '#cccccc',
+                color: 'var(--text-secondary)',
                 fontSize: 12,
                 padding: '5px 12px',
                 textDecoration: 'none',
@@ -557,7 +557,7 @@ export default function DataExplorerClient({ branches, entities }: Props) {
             {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} height={40} />)}
           </div>
         ) : displayRows.length === 0 ? (
-          <div style={{ padding: '32px 16px', textAlign: 'center', fontSize: 12, color: '#555555' }}>
+          <div style={{ padding: '32px 16px', textAlign: 'center', fontSize: 12, color: 'var(--text-faint)' }}>
             No results for the selected filters.
           </div>
         ) : (
@@ -577,7 +577,7 @@ export default function DataExplorerClient({ branches, entities }: Props) {
                         color: sortCol === col.key ? '#ff6b00' : '#666666',
                         textTransform: 'uppercase' as const,
                         letterSpacing: '0.04em',
-                        borderBottom: '1px solid #2a2a2a',
+                        borderBottom: '1px solid var(--border)',
                         cursor: 'pointer',
                         whiteSpace: 'nowrap' as const,
                         userSelect: 'none' as const,
@@ -600,7 +600,7 @@ export default function DataExplorerClient({ branches, entities }: Props) {
                         style={{
                           padding: '9px 14px',
                           fontSize: 12,
-                          color: '#cccccc',
+                          color: 'var(--text-secondary)',
                           textAlign: col.numeric ? 'right' : 'left',
                           whiteSpace: 'nowrap' as const,
                         }}
@@ -619,13 +619,13 @@ export default function DataExplorerClient({ branches, entities }: Props) {
         {!loading && total > PAGE_SIZE && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '12px 16px', borderTop: '1px solid #2a2a2a',
+            padding: '12px 16px', borderTop: '1px solid var(--border)',
           }}>
             <button
               onClick={() => handlePageChange(page - 1)}
               disabled={page === 0}
               style={{
-                background: '#2a2a2a', border: 'none', borderRadius: 6,
+                background: 'var(--bg-secondary)', border: 'none', borderRadius: 6,
                 color: page === 0 ? '#444444' : '#cccccc',
                 fontSize: 12, padding: '6px 14px', cursor: page === 0 ? 'default' : 'pointer',
                 fontFamily: 'inherit',
@@ -633,14 +633,14 @@ export default function DataExplorerClient({ branches, entities }: Props) {
             >
               Previous
             </button>
-            <span style={{ fontSize: 12, color: '#666666' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
               Page {page + 1} of {totalPages}
             </span>
             <button
               onClick={() => handlePageChange(page + 1)}
               disabled={page >= totalPages - 1}
               style={{
-                background: '#2a2a2a', border: 'none', borderRadius: 6,
+                background: 'var(--bg-secondary)', border: 'none', borderRadius: 6,
                 color: page >= totalPages - 1 ? '#444444' : '#cccccc',
                 fontSize: 12, padding: '6px 14px',
                 cursor: page >= totalPages - 1 ? 'default' : 'pointer',
@@ -663,10 +663,10 @@ function SummaryRow({ cards }: { cards: { label: string; value: string }[] }) {
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cards.length}, 1fr)`, gap: 10 }}>
       {cards.map((c) => (
         <div key={c.label} className="card" style={{ padding: '12px 14px' }}>
-          <div style={{ fontSize: 11, color: '#888888', textTransform: 'uppercase' as const, letterSpacing: '0.04em', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.04em', marginBottom: 6 }}>
             {c.label}
           </div>
-          <div style={{ fontSize: 20, fontWeight: 500, color: '#ffffff' }}>{c.value}</div>
+          <div style={{ fontSize: 20, fontWeight: 500, color: 'var(--text-primary)' }}>{c.value}</div>
         </div>
       ))}
     </div>

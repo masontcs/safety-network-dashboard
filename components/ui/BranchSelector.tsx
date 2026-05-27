@@ -26,8 +26,8 @@ export default function BranchSelector({ branches, value, onChange }: BranchSele
       value={value}
       onChange={(e) => onChange(e.target.value)}
       style={{
-        background: '#2a2a2a',
-        border: '1px solid #333333',
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border-emphasis)',
         borderRadius: 8,
         padding: '5px 12px',
         fontSize: 13,
@@ -38,7 +38,7 @@ export default function BranchSelector({ branches, value, onChange }: BranchSele
       }}
     >
       {branches.map((b) => (
-        <option key={b.id} value={b.id} style={{ background: '#2a2a2a', color: '#ffffff' }}>
+        <option key={b.id} value={b.id} style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
           {b.name}
         </option>
       ))}

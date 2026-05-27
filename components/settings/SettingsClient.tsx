@@ -11,12 +11,12 @@ interface HqPct {
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
-  background: '#2a2a2a',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 6,
   padding: '7px 10px',
   fontSize: 13,
-  color: '#ffffff',
+  color: 'var(--text-primary)',
   outline: 'none',
   fontFamily: 'inherit',
   boxSizing: 'border-box',
@@ -89,13 +89,13 @@ export default function SettingsClient() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 560 }}>
-      <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Settings</div>
+      <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Settings</div>
 
       <div className="card">
-        <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 4 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
           HQ Allocation Percentages
         </div>
-        <div style={{ fontSize: 12, color: '#888888', marginBottom: 20 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 20 }}>
           Controls how HQ payroll overhead is split between businesses before distributing to branches by revenue share.
         </div>
 
@@ -109,7 +109,7 @@ export default function SettingsClient() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Safety Network */}
             <div>
-              <label style={{ display: 'block', fontSize: 11, color: '#888888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+              <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                 Safety Network %
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -122,13 +122,13 @@ export default function SettingsClient() {
                   onChange={(e) => { setSn(e.target.value); setSaveSuccess(false) }}
                   style={{ ...inputStyle, maxWidth: 140 }}
                 />
-                <span style={{ fontSize: 13, color: '#666666' }}>%</span>
+                <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>%</span>
               </div>
             </div>
 
             {/* Western Highways */}
             <div>
-              <label style={{ display: 'block', fontSize: 11, color: '#888888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+              <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                 Western Highways %
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -141,13 +141,13 @@ export default function SettingsClient() {
                   onChange={(e) => { setWh(e.target.value); setSaveSuccess(false) }}
                   style={{ ...inputStyle, maxWidth: 140 }}
                 />
-                <span style={{ fontSize: 13, color: '#666666' }}>%</span>
+                <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>%</span>
               </div>
             </div>
 
             {/* Signs */}
             <div>
-              <label style={{ display: 'block', fontSize: 11, color: '#888888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+              <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                 Signs %
               </label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -160,21 +160,21 @@ export default function SettingsClient() {
                   onChange={(e) => { setSigns(e.target.value); setSaveSuccess(false) }}
                   style={{ ...inputStyle, maxWidth: 140 }}
                 />
-                <span style={{ fontSize: 13, color: '#666666' }}>%</span>
+                <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>%</span>
               </div>
             </div>
 
             {/* Running total */}
             <div style={{
               padding: '10px 14px',
-              background: '#1a1a1a',
+              background: 'var(--bg-nav)',
               borderRadius: 8,
               border: `1px solid ${totalOk ? '#1a3a1a' : '#3a1a1a'}`,
               display: 'flex',
               alignItems: 'center',
               gap: 8,
             }}>
-              <span style={{ fontSize: 13, color: '#888888' }}>Total:</span>
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Total:</span>
               <span style={{ fontSize: 13, fontWeight: 500, color: totalOk ? '#4caf50' : '#cc4444' }}>
                 {total.toFixed(2)}%
               </span>

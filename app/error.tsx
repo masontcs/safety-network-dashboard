@@ -35,7 +35,7 @@ export default function GlobalError({
     <div
       style={{
         minHeight: '100vh',
-        background: '#111111',
+        background: 'var(--bg-base)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -45,8 +45,8 @@ export default function GlobalError({
       }}
     >
       <div style={{ fontSize: 32 }}>⚠️</div>
-      <div style={{ fontSize: 18, fontWeight: 500, color: '#ffffff' }}>Something went wrong</div>
-      <div style={{ fontSize: 13, color: '#888888', maxWidth: 400, textAlign: 'center' }}>
+      <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)' }}>Something went wrong</div>
+      <div style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 400, textAlign: 'center' }}>
         {error?.name === 'ChunkLoadError' || error?.message?.includes('Loading chunk')
           ? 'A new version of the app was deployed. Reloading to get the latest…'
           : 'An unexpected error occurred. Try refreshing the page.'}
@@ -61,7 +61,7 @@ export default function GlobalError({
           background: '#ff6b00',
           border: 'none',
           borderRadius: 8,
-          color: '#fff',
+          color: 'var(--text-primary)',
           padding: '8px 20px',
           fontSize: 13,
           fontWeight: 500,

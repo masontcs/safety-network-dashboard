@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createBrowserClient } from '@/lib/supabase/client'
+import { useTheme } from '@/lib/theme/ThemeContext'
 import type { Role } from '@/lib/supabase/database.types'
 
 interface NavItem {
@@ -152,6 +153,26 @@ const ArIcon = () => (
   </svg>
 )
 
+const SunIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <circle cx="12" cy="12" r="5" />
+    <line x1="12" y1="1" x2="12" y2="3" />
+    <line x1="12" y1="21" x2="12" y2="23" />
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+    <line x1="1" y1="12" x2="3" y2="12" />
+    <line x1="21" y1="12" x2="23" y2="12" />
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+  </svg>
+)
+
+const MoonIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+  </svg>
+)
+
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: <GridIcon />,  roles: ['branch_manager', 'district_manager', 'executive', 'admin', 'project_manager', 'sales'], exactMatch: true },
   { href: '/ar',        label: 'AR',         icon: <ArIcon />,    roles: ['branch_manager', 'district_manager', 'executive', 'admin', 'ar_manager', 'ar_team', 'project_manager', 'sales'] },
@@ -184,6 +205,7 @@ const EXPANDED_W = 220
 export default function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const { theme, toggle: toggleTheme } = useTheme()
   const items = NAV_ITEMS.filter((item) => item.roles.includes(role))
   const [expanded, setExpanded] = useState(false)
   const [accessRequestCount, setAccessRequestCount] = useState(0)
@@ -228,8 +250,8 @@ export default function Sidebar({ role }: SidebarProps) {
       style={{
         width: expanded ? EXPANDED_W : COLLAPSED_W,
         minWidth: expanded ? EXPANDED_W : COLLAPSED_W,
-        background: '#1a1a1a',
-        borderRight: '1px solid #2a2a2a',
+        background: 'var(--bg-nav)',
+        borderRight: '1px solid var(--border)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -245,7 +267,7 @@ export default function Sidebar({ role }: SidebarProps) {
         alignItems: 'center',
         padding: '0 6px',
         flexShrink: 0,
-        borderBottom: '1px solid #2a2a2a',
+        borderBottom: '1px solid var(--border)',
         marginBottom: 8,
       }}>
         <div style={{
@@ -258,13 +280,13 @@ export default function Sidebar({ role }: SidebarProps) {
           justifyContent: 'center',
           flexShrink: 0,
         }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.02em' }}>SN</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>SN</span>
         </div>
         <span style={{
           marginLeft: 10,
           fontSize: 13,
           fontWeight: 600,
-          color: '#ffffff',
+          color: 'var(--text-primary)',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           opacity: expanded ? 1 : 0,
@@ -327,7 +349,7 @@ export default function Sidebar({ role }: SidebarProps) {
               {showBadge && expanded && (
                 <span style={{
                   background: '#ff6b00',
-                  color: '#ffffff',
+                  color: 'var(--text-primary)',
                   fontSize: 10,
                   fontWeight: 600,
                   padding: '1px 5px',
@@ -356,8 +378,21 @@ export default function Sidebar({ role }: SidebarProps) {
         })}
       </div>
 
-      {/* Sign out */}
-      <div style={{ padding: '8px 6px', borderTop: '1px solid #2a2a2a', flexShrink: 0 }}>
+      {/* Theme toggle + Sign out */}
+      <div style={{ padding: '8px 6px', borderTop: '1px solid var(--border)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <button
+          onClick={toggleTheme}
+          className="sidebar-link"
+          title={expanded ? undefined : theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          style={{ padding: '0 9px', border: 'none', background: 'none', width: '100%', cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          <span style={{ flexShrink: 0, display: 'flex', width: 18 }}>
+            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+          </span>
+          <span style={{ ...labelStyle, textAlign: 'left' }}>
+            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+          </span>
+        </button>
         <button
           onClick={handleSignOut}
           className="sidebar-link"

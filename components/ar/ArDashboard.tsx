@@ -134,7 +134,7 @@ function AgingCards({
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
           Total AR
         </div>
-        <div style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>
+        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>
           {loading ? '—' : fmt(summary?.total ?? 0)}
         </div>
         <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>All buckets</div>
@@ -150,14 +150,14 @@ function AgingCards({
             borderRadius: 12, padding: 16, cursor: 'pointer',
           }}
         >
-          <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
             {b} days
           </div>
           <div style={{ fontSize: 20, fontWeight: 500, color: bucket === b ? BUCKET_COLORS[b] : '#fff' }}>
             {loading ? '—' : fmt(summary?.aging[b] ?? 0)}
           </div>
           {summary && (
-            <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
               {summary.total > 0 ? ((summary.aging[b] / summary.total) * 100).toFixed(1) + '%' : '0%'}
             </div>
           )}
@@ -363,9 +363,9 @@ export default function ArDashboard({ role, branches }: Props) {
       {/* Header */}
       <div className="ar-page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>Accounts Receivable</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Accounts Receivable</div>
           {view === 'ar' && summary && summary.lastImports.length > 0 && (
-            <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
               {summary.lastImports.map((imp) => (
                 <span key={imp.entity_code} style={{ marginRight: 16 }}>
                   {imp.entity_code} — {fmtDate(imp.report_date.split('T')[0])}
@@ -377,7 +377,7 @@ export default function ArDashboard({ role, branches }: Props) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {role === 'ar_team' ? (
             /* ar_team: My Customers / All AR scope toggle */
-            <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 3, gap: 2 }}>
+            <div style={{ display: 'flex', background: 'var(--bg-secondary)', borderRadius: 8, padding: 3, gap: 2 }}>
               {([false, true] as const).map((all) => (
                 <button key={String(all)} onClick={() => setShowAll(all)}
                   style={{
@@ -393,7 +393,7 @@ export default function ArDashboard({ role, branches }: Props) {
             </div>
           ) : (
             /* other roles: AR / Meeting view toggle */
-            <div style={{ display: 'flex', background: '#2a2a2a', borderRadius: 8, padding: 3, gap: 2 }}>
+            <div style={{ display: 'flex', background: 'var(--bg-secondary)', borderRadius: 8, padding: 3, gap: 2 }}>
               {(['ar', 'meeting'] as ViewMode[]).map((v) => (
                 <button key={v} onClick={() => setView(v)}
                   style={{
@@ -413,7 +413,7 @@ export default function ArDashboard({ role, branches }: Props) {
               <button
                 onClick={() => setShowImport(true)}
                 style={{
-                  background: '#ff6b00', color: '#fff', border: 'none',
+                  background: '#ff6b00', color: 'var(--text-primary)', border: 'none',
                   borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 500,
                   cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
                 }}
@@ -455,13 +455,13 @@ export default function ArDashboard({ role, branches }: Props) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="ar-filter-search"
-          style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, outline: 'none', width: 200 }}
+          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, outline: 'none', width: 200 }}
         />
         <div className="ar-filter-row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <select
             value={entity}
             onChange={(e) => setEntity(e.target.value)}
-            style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
+            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
           >
             <option value="">All Entities</option>
             {ENTITIES.map((e) => <option key={e} value={e}>{e}</option>)}
@@ -471,7 +471,7 @@ export default function ArDashboard({ role, branches }: Props) {
             <select
               value={branchId}
               onChange={(e) => setBranchId(e.target.value)}
-              style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
+              style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
             >
               <option value="">All Branches</option>
               {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -482,7 +482,7 @@ export default function ArDashboard({ role, branches }: Props) {
             <select
               value={assignedUserId}
               onChange={(e) => setAssignedUserId(e.target.value)}
-              style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
+              style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
             >
               <option value="">All Assignees</option>
               {teamMembers.map((m) => <option key={m.id} value={m.id}>{m.displayName}</option>)}
@@ -506,7 +506,7 @@ export default function ArDashboard({ role, branches }: Props) {
           {(entity || branchId || bucket || search || assignedUserId) && (
             <button
               onClick={() => { setEntity(''); setBranchId(''); setBucket(''); setSearch(''); setAssignedUserId('') }}
-              style={{ background: 'transparent', border: '1px solid #333', borderRadius: 8, color: '#888', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
+              style={{ background: 'transparent', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: 'var(--text-muted)', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
             >
               Clear
             </button>
@@ -514,18 +514,18 @@ export default function ArDashboard({ role, branches }: Props) {
         </div>
 
         {filteredCustomers.length > 0 && (
-          <span style={{ fontSize: 12, color: '#555' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>
             {filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}
           </span>
         )}
       </div>
 
       {/* Customer table — desktop */}
-      <div className="ar-table-wrap" style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', overflow: 'hidden' }}>
+      <div className="ar-table-wrap" style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 <SortTh label="Customer"   sortKey="displayName"  current={sortKey} dir={sortDir} onSort={handleSort} />
                 <SortTh label="Current"    sortKey="current"      current={sortKey} dir={sortDir} onSort={handleSort} right />
                 <SortTh label="1–30 days"  sortKey="d30"          current={sortKey} dir={sortDir} onSort={handleSort} right />
@@ -538,9 +538,9 @@ export default function ArDashboard({ role, branches }: Props) {
             </thead>
             <tbody>
               {loadingCustomers ? (
-                <tr><td colSpan={8} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>Loading…</td></tr>
+                <tr><td colSpan={8} style={{ padding: 32, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>Loading…</td></tr>
               ) : filteredCustomers.length === 0 ? (
-                <tr><td colSpan={8} style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>
+                <tr><td colSpan={8} style={{ padding: 32, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>
                   {customers.length === 0 ? 'No AR data. Import a file to get started.' : 'No customers match your filters.'}
                 </td></tr>
               ) : (
@@ -558,8 +558,8 @@ export default function ArDashboard({ role, branches }: Props) {
                     <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d60 > 0 ? BUCKET_COLORS['31-60'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.d60 > 0 ? fmt(cust.d60) : '—'}</td>
                     <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d90 > 0 ? BUCKET_COLORS['61-90'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.d90 > 0 ? fmt(cust.d90) : '—'}</td>
                     <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d90plus > 0 ? BUCKET_COLORS['>90'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.d90plus > 0 ? fmt(cust.d90plus) : '—'}</td>
-                    <td style={{ padding: '10px 12px', fontSize: 13, color: '#fff', fontWeight: 500, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmt(cust.totalAr)}</td>
-                    <td style={{ padding: '10px 12px', fontSize: 12, color: '#666', textAlign: 'right' }}>{cust.invoiceCount}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmt(cust.totalAr)}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text-dim)', textAlign: 'right' }}>{cust.invoiceCount}</td>
                   </tr>
                 ))
               )}
@@ -571,31 +571,31 @@ export default function ArDashboard({ role, branches }: Props) {
       {/* Customer cards — mobile */}
       <div className="ar-card-list">
         {loadingCustomers ? (
-          <div style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>Loading…</div>
+          <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>Loading…</div>
         ) : filteredCustomers.length === 0 ? (
-          <div style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>
+          <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>
             {customers.length === 0 ? 'No AR data. Import a file to get started.' : 'No customers match your filters.'}
           </div>
         ) : (
           filteredCustomers.map((cust) => (
             <div key={cust.id} onClick={() => setSelectedCustomer(cust)}
-              style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 14, cursor: 'pointer', opacity: cust.isExcluded ? 0.5 : 1 }}>
+              style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 14, cursor: 'pointer', opacity: cust.isExcluded ? 0.5 : 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <span style={{ fontSize: 14, fontWeight: 500, color: cust.isExcluded ? '#555' : '#ff6b00' }}>{cust.displayName}</span>
-                <span style={{ fontSize: 16, fontWeight: 500, color: '#fff' }}>{fmt(cust.totalAr)}</span>
+                <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>{fmt(cust.totalAr)}</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
                 {([['Current', cust.current, 'Current'], ['1-30', cust.d30, '1–30d'], ['31-60', cust.d60, '31–60d'], ['61-90', cust.d90, '61–90d'], ['>90', cust.d90plus, '>90d']] as [string, number, string][]).map(([key, val, label]) => (
-                  <div key={key} style={{ background: '#2a2a2a', borderRadius: 6, padding: '6px 8px' }}>
-                    <div style={{ fontSize: 10, color: '#555', marginBottom: 2 }}>{label}</div>
+                  <div key={key} style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 8px' }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-faint)', marginBottom: 2 }}>{label}</div>
                     <div style={{ fontSize: 12, color: val > 0 ? BUCKET_COLORS[key] : '#444', fontVariantNumeric: 'tabular-nums' }}>
                       {val > 0 ? fmt(val) : '—'}
                     </div>
                   </div>
                 ))}
-                <div style={{ background: '#2a2a2a', borderRadius: 6, padding: '6px 8px' }}>
-                  <div style={{ fontSize: 10, color: '#555', marginBottom: 2 }}>Invoices</div>
-                  <div style={{ fontSize: 12, color: '#888' }}>{cust.invoiceCount}</div>
+                <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 8px' }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-faint)', marginBottom: 2 }}>Invoices</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{cust.invoiceCount}</div>
                 </div>
               </div>
             </div>

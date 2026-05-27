@@ -30,16 +30,16 @@ const ACTION_META: Record<string, { label: string; color: string }> = {
   'user.create':            { label: 'Created user',       color: '#4caf50' },
   'user.update':            { label: 'Updated user',       color: '#ff9800' },
   'access_request.approve': { label: 'Approved request',   color: '#4caf50' },
-  'access_request.archive': { label: 'Archived request',   color: '#888888' },
+  'access_request.archive': { label: 'Archived request',   color: 'var(--text-muted)' },
   'import.payroll':         { label: 'Payroll import',     color: '#ff6b00' },
   'import.payroll.replace': { label: 'Replaced payroll',   color: '#cc4444' },
   'import.revenue':         { label: 'Revenue import',     color: '#ff6b00' },
   'import.fuel':            { label: 'Fuel import',        color: '#ff6b00' },
-  'ar.note.add':            { label: 'Added note',         color: '#cccccc' },
+  'ar.note.add':            { label: 'Added note',         color: 'var(--text-secondary)' },
   'ar.note.delete':         { label: 'Deleted note',       color: '#cc4444' },
   'ar.invoice.flag':        { label: 'Invoice flag',       color: '#ff9800' },
-  'ar.customer.update':     { label: 'Customer update',    color: '#cccccc' },
-  'payroll.view':           { label: 'Viewed payroll',     color: '#555555' },
+  'ar.customer.update':     { label: 'Customer update',    color: 'var(--text-secondary)' },
+  'payroll.view':           { label: 'Viewed payroll',     color: 'var(--text-faint)' },
 }
 
 const CATEGORY_OPTIONS = [
@@ -150,7 +150,7 @@ function MetaDetails({ metadata, action, branchMap }: { metadata: Record<string,
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px', marginTop: 4 }}>
       {items.map((item) => (
-        <span key={item.label} style={{ fontSize: 11, color: '#666666' }}>
+        <span key={item.label} style={{ fontSize: 11, color: 'var(--text-dim)' }}>
           <span style={{ color: '#444444' }}>{item.label}:</span>{' '}
           <span style={{ color: '#999999' }}>{item.value}</span>
         </span>
@@ -175,8 +175,8 @@ export default function AuditClient() {
   const [filterPeriod,   setFilterPeriod]   = useState('30')
 
   const selectStyle: React.CSSProperties = {
-    background: '#2a2a2a', border: '1px solid #333333', borderRadius: 6,
-    padding: '6px 10px', fontSize: 12, color: '#cccccc',
+    background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 6,
+    padding: '6px 10px', fontSize: 12, color: 'var(--text-secondary)',
     cursor: 'pointer', fontFamily: 'inherit',
   }
 
@@ -230,12 +230,12 @@ export default function AuditClient() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff', marginBottom: 2 }}>Audit Log</div>
-          <div style={{ fontSize: 12, color: '#555555' }}>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>Audit Log</div>
+          <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>
             Track user actions across the platform
           </div>
         </div>
-        <div style={{ fontSize: 12, color: '#555555' }}>
+        <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>
           {total.toLocaleString()} event{total !== 1 ? 's' : ''}
         </div>
       </div>
@@ -269,9 +269,9 @@ export default function AuditClient() {
       {/* Table */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: 32, textAlign: 'center', color: '#555555', fontSize: 13 }}>Loading…</div>
+          <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>Loading…</div>
         ) : logs.length === 0 ? (
-          <div style={{ padding: 32, textAlign: 'center', color: '#555555', fontSize: 13 }}>No events found</div>
+          <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>No events found</div>
         ) : (
           <div>
             {/* Column headers */}
@@ -279,7 +279,7 @@ export default function AuditClient() {
               display: 'grid',
               gridTemplateColumns: '160px 160px 1fr 140px',
               padding: '10px 16px',
-              borderBottom: '1px solid #2a2a2a',
+              borderBottom: '1px solid var(--border)',
               fontSize: 11, color: '#444444', fontWeight: 400,
               textTransform: 'uppercase', letterSpacing: '0.04em',
             }}>
@@ -290,7 +290,7 @@ export default function AuditClient() {
             </div>
 
             {logs.map((log, idx) => {
-              const meta = ACTION_META[log.action] ?? { label: log.action, color: '#666666' }
+              const meta = ACTION_META[log.action] ?? { label: log.action, color: 'var(--text-dim)' }
               return (
                 <div
                   key={log.id}
@@ -305,13 +305,13 @@ export default function AuditClient() {
                 >
                   {/* Time */}
                   <div>
-                    <div style={{ fontSize: 12, color: '#cccccc' }}>{fmtTime(log.created_at)}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtTime(log.created_at)}</div>
                     <div style={{ fontSize: 11, color: '#444444', marginTop: 1 }}>{fmtRelative(log.created_at)}</div>
                   </div>
 
                   {/* User */}
                   <div>
-                    <div style={{ fontSize: 12, color: '#cccccc', fontWeight: 500 }}>{log.user_display_name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>{log.user_display_name}</div>
                     <div style={{ fontSize: 11, color: '#444444', marginTop: 1 }}>
                       {ROLE_LABELS[log.user_role] ?? log.user_role}
                     </div>
@@ -330,7 +330,7 @@ export default function AuditClient() {
                         {meta.label}
                       </span>
                       {log.resource_label && (
-                        <span style={{ fontSize: 12, color: '#cccccc' }}>{log.resource_label}</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{log.resource_label}</span>
                       )}
                     </div>
                     <MetaDetails metadata={log.metadata} action={log.action} branchMap={branchMap} />
@@ -350,7 +350,7 @@ export default function AuditClient() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
-          <div style={{ fontSize: 12, color: '#555555' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>
             Page {page} of {totalPages}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>

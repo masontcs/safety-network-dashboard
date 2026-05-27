@@ -150,7 +150,7 @@ export default function CardDetail({ cardId, role, branches }: Props) {
 
   if (loading) {
     return (
-      <div style={{ padding: '20px 24px', color: '#555555', fontSize: 12 }}>Loading…</div>
+      <div style={{ padding: '20px 24px', color: 'var(--text-faint)', fontSize: 12 }}>Loading…</div>
     )
   }
 
@@ -171,17 +171,17 @@ export default function CardDetail({ cardId, role, branches }: Props) {
       {/* Back link */}
       <button
         onClick={() => router.push('/fuel/cards')}
-        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888888', fontSize: 12, padding: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 4 }}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12, padding: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 4 }}
       >
         ← Back to Cards
       </button>
 
       {/* Card header */}
-      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 20, marginBottom: 16 }}>
+      <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 20, marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff', marginBottom: 4 }}>{card.cardName}</div>
-            <div style={{ fontSize: 12, color: '#888888', textTransform: 'capitalize' }}>{card.vendor}</div>
+            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>{card.cardName}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{card.vendor}</div>
           </div>
           <span style={{
             background: card.isConfirmed ? (card.employeeId ? '#1a2a1a' : '#2a2a2a') : '#2a1a1a',
@@ -199,20 +199,20 @@ export default function CardDetail({ cardId, role, branches }: Props) {
           <div style={{ marginTop: 16, display: 'flex', gap: 32 }}>
             {card.employeeDisplayName && (
               <div>
-                <div style={{ fontSize: 11, color: '#666666', marginBottom: 2 }}>Employee</div>
-                <div style={{ fontSize: 13, color: '#cccccc' }}>{card.employeeDisplayName}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 2 }}>Employee</div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{card.employeeDisplayName}</div>
               </div>
             )}
             {card.branchName && (
               <div>
-                <div style={{ fontSize: 11, color: '#666666', marginBottom: 2 }}>Branch</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 2 }}>Branch</div>
                 <div style={{ fontSize: 13, color: '#ff6b00' }}>{card.branchName}</div>
               </div>
             )}
             {card.businessTag && (
               <div>
-                <div style={{ fontSize: 11, color: '#666666', marginBottom: 2 }}>Business</div>
-                <div style={{ fontSize: 13, color: '#cccccc', textTransform: 'capitalize' }}>{card.businessTag.replace('_', ' ')}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 2 }}>Business</div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{card.businessTag.replace('_', ' ')}</div>
               </div>
             )}
           </div>
@@ -221,8 +221,8 @@ export default function CardDetail({ cardId, role, branches }: Props) {
 
       {/* Admin assignment panel */}
       {isAdmin && (
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 20, marginBottom: 16 }}>
-          <div style={{ fontSize: 11, color: '#888888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 14 }}>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 20, marginBottom: 16 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 14 }}>
             {card.isConfirmed ? 'Update Assignment' : 'Assign Card'}
           </div>
 
@@ -235,7 +235,7 @@ export default function CardDetail({ cardId, role, branches }: Props) {
           {assignMode === 'employee' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div>
-                <div style={{ fontSize: 11, color: '#666666', marginBottom: 6 }}>Employee</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>Employee</div>
                 <input
                   type="text"
                   placeholder="Search by name…"
@@ -244,9 +244,9 @@ export default function CardDetail({ cardId, role, branches }: Props) {
                   style={inputStyle}
                 />
                 {(employees.length > 0 || empLoading) && (
-                  <div style={{ background: '#2a2a2a', borderRadius: 8, border: '1px solid #333333', marginTop: 4, maxHeight: 180, overflowY: 'auto' }}>
+                  <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, border: '1px solid var(--border-emphasis)', marginTop: 4, maxHeight: 180, overflowY: 'auto' }}>
                     {empLoading ? (
-                      <div style={{ padding: '8px 12px', fontSize: 12, color: '#555555' }}>Searching…</div>
+                      <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-faint)' }}>Searching…</div>
                     ) : employees.map((e) => (
                       <div
                         key={e.id}
@@ -262,7 +262,7 @@ export default function CardDetail({ cardId, role, branches }: Props) {
                 )}
               </div>
               <div>
-                <div style={{ fontSize: 11, color: '#666666', marginBottom: 6 }}>Branch (optional)</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>Branch (optional)</div>
                 <select value={selectedBranchId} onChange={(e) => setSelectedBranchId(e.target.value)} style={inputStyle}>
                   <option value="">— Select branch —</option>
                   {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -273,12 +273,12 @@ export default function CardDetail({ cardId, role, branches }: Props) {
 
           {assignMode === 'general' && (
             <div>
-              <div style={{ fontSize: 11, color: '#666666', marginBottom: 6 }}>Branch</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>Branch</div>
               <select value={selectedBranchId} onChange={(e) => setSelectedBranchId(e.target.value)} style={inputStyle}>
                 <option value="">— Select branch —</option>
                 {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
-              <div style={{ fontSize: 11, color: '#555555', marginTop: 6 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 6 }}>
                 This card will be tracked under the branch with no employee assigned.
               </div>
             </div>
@@ -290,7 +290,7 @@ export default function CardDetail({ cardId, role, branches }: Props) {
               disabled={saving}
               style={{
                 background: '#ff6b00',
-                color: '#ffffff',
+                color: 'var(--text-primary)',
                 border: 'none',
                 borderRadius: 8,
                 padding: '7px 18px',
@@ -309,36 +309,36 @@ export default function CardDetail({ cardId, role, branches }: Props) {
       )}
 
       {/* Transaction history */}
-      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', overflow: 'hidden' }}>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid #2a2a2a', fontSize: 11, color: '#888888', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+      <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           Transaction History ({transactions.length})
         </div>
         {transactions.length === 0 ? (
-          <div style={{ padding: 24, fontSize: 12, color: '#555555', textAlign: 'center' }}>No transactions found</div>
+          <div style={{ padding: 24, fontSize: 12, color: 'var(--text-faint)', textAlign: 'center' }}>No transactions found</div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 {['Date', 'Site', 'Location', 'Gallons', '$/Gal', 'Total'].map((h) => (
-                  <th key={h} style={{ textAlign: 'left', fontSize: 11, color: '#666666', fontWeight: 400, padding: '8px 12px' }}>{h}</th>
+                  <th key={h} style={{ textAlign: 'left', fontSize: 11, color: 'var(--text-dim)', fontWeight: 400, padding: '8px 12px' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {transactions.map((t) => (
-                <tr key={t.id} style={{ borderTop: '1px solid #2a2a2a' }}>
-                  <td style={{ padding: '8px 12px', fontSize: 12, color: '#888888', whiteSpace: 'nowrap' }}>{fmtDate(t.transaction_date)}</td>
-                  <td style={{ padding: '8px 12px', fontSize: 12, color: '#cccccc' }}>{t.site_name ?? '—'}</td>
-                  <td style={{ padding: '8px 12px', fontSize: 12, color: '#888888' }}>
+                <tr key={t.id} style={{ borderTop: '1px solid var(--border)' }}>
+                  <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{fmtDate(t.transaction_date)}</td>
+                  <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-secondary)' }}>{t.site_name ?? '—'}</td>
+                  <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-muted)' }}>
                     {[t.site_city, t.site_state].filter(Boolean).join(', ') || '—'}
                   </td>
-                  <td style={{ padding: '8px 12px', fontSize: 12, color: '#cccccc' }}>
+                  <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-secondary)' }}>
                     {t.gallons != null ? t.gallons.toFixed(3) : '—'}
                   </td>
-                  <td style={{ padding: '8px 12px', fontSize: 12, color: '#cccccc' }}>
+                  <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-secondary)' }}>
                     {t.price_per_gallon != null ? `$${t.price_per_gallon.toFixed(3)}` : '—'}
                   </td>
-                  <td style={{ padding: '8px 12px', fontSize: 12, color: '#cccccc' }}>{fmt(t.total_with_tax)}</td>
+                  <td style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-secondary)' }}>{fmt(t.total_with_tax)}</td>
                 </tr>
               ))}
             </tbody>
@@ -377,12 +377,12 @@ function modeTabStyle(active: boolean): React.CSSProperties {
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
-  background: '#2a2a2a',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 8,
   padding: '7px 12px',
   fontSize: 12,
-  color: '#cccccc',
+  color: 'var(--text-secondary)',
   outline: 'none',
   boxSizing: 'border-box',
 }

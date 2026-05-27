@@ -87,8 +87,8 @@ export default function ProfitsTab({ role, data, branches, selectedBranchId, all
       </div>
 
       {/* ── Waterfall chart ────────────────────────────────────────────────────── */}
-      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Profit Breakdown</div>
+      <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Profit Breakdown</div>
         <WaterfallChart
           revenue={revenue}
           payroll={allocationOn && isAdminOrExec ? adjPayroll : totalPayroll}
@@ -109,8 +109,8 @@ export default function ProfitsTab({ role, data, branches, selectedBranchId, all
 
       {/* ── By-branch profit table ─────────────────────────────────────────────── */}
       {byBranch.length > 1 && (
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Profits by Branch</div>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Profits by Branch</div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
@@ -135,7 +135,7 @@ export default function ProfitsTab({ role, data, branches, selectedBranchId, all
                     ? r((b.netAfterAlloc / b.revenue) * 100)
                     : 0
                   return (
-                    <tr key={b.branchId} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                    <tr key={b.branchId} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ ...td, textAlign: 'left', color: '#ff6b00' }}>{branchNameMap[b.branchId] ?? b.branchId}</td>
                       <td style={td}>{formatCurrency(b.revenue)}</td>
                       <td style={td}>{formatCurrency(branchTotalPayroll)}</td>
@@ -279,8 +279,8 @@ function GoalsByBranch({
       : null
 
     return (
-      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Goals by Branch</div>
+      <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Goals by Branch</div>
         <div className="table-scroll">
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
@@ -302,10 +302,10 @@ function GoalsByBranch({
                 const gpActual  = actual?.gpPct ?? 0
                 const revDelta  = revTarget != null ? revActual - revTarget : null
                 return (
-                  <tr key={id} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                  <tr key={id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ ...td, textAlign: 'left', color: '#ff6b00' }}>{name}</td>
                     <td style={td}>{revTarget != null ? formatCurrency(revTarget) : <span style={{ color: '#444' }}>—</span>}</td>
-                    <td style={{ ...td, color: '#ffffff' }}>{formatCurrency(revActual)}</td>
+                    <td style={{ ...td, color: 'var(--text-primary)' }}>{formatCurrency(revActual)}</td>
                     <td style={{ ...td, color: revDelta != null ? varianceColor(revActual, revTarget!) : '#666' }}>
                       {revDelta != null ? `${revDelta >= 0 ? '+' : ''}${formatCurrency(revDelta)}` : '—'}
                     </td>
@@ -321,14 +321,14 @@ function GoalsByBranch({
               })}
             </tbody>
             <tfoot>
-              <tr style={{ borderTop: '1px solid #333' }}>
-                <td style={{ ...td, textAlign: 'left', color: '#888', fontWeight: 500 }}>Total</td>
-                <td style={{ ...td, color: '#888' }}>{formatCurrency(totalRevTarget)}</td>
-                <td style={{ ...td, color: '#ffffff', fontWeight: 500 }}>{formatCurrency(totalRevActual)}</td>
+              <tr style={{ borderTop: '1px solid var(--border-emphasis)' }}>
+                <td style={{ ...td, textAlign: 'left', color: 'var(--text-muted)', fontWeight: 500 }}>Total</td>
+                <td style={{ ...td, color: 'var(--text-muted)' }}>{formatCurrency(totalRevTarget)}</td>
+                <td style={{ ...td, color: 'var(--text-primary)', fontWeight: 500 }}>{formatCurrency(totalRevActual)}</td>
                 <td style={{ ...td, color: varianceColor(totalRevActual, totalRevTarget), fontWeight: 500 }}>
                   {`${totalRevActual - totalRevTarget >= 0 ? '+' : ''}${formatCurrency(totalRevActual - totalRevTarget)}`}
                 </td>
-                <td style={{ ...td, color: '#888' }}>{avgGpGoal != null ? `${avgGpGoal}%` : '—'}</td>
+                <td style={{ ...td, color: 'var(--text-muted)' }}>{avgGpGoal != null ? `${avgGpGoal}%` : '—'}</td>
                 <td style={{ ...td, fontWeight: 500, color: avgGpGoal != null ? gpVarianceColor(blendedGpActual, avgGpGoal) : '#ffffff' }}>
                   {formatPercent(blendedGpActual)}
                 </td>
@@ -349,14 +349,14 @@ function GoalsByBranch({
     const gpTarget  = target.profitPctTarget
     const revDelta  = revTarget != null ? singleBranchRevenue - revTarget : null
     return (
-      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Goals</div>
+      <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Goals</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
           {revTarget != null && (
-            <div style={{ flex: '1 1 160px', background: '#2a2a2a', borderRadius: 10, padding: 14 }}>
-              <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Revenue vs. Target</div>
-              <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{formatCurrency(singleBranchRevenue)}</div>
-              <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Target: {formatCurrency(revTarget)}</div>
+            <div style={{ flex: '1 1 160px', background: 'var(--bg-secondary)', borderRadius: 10, padding: 14 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Revenue vs. Target</div>
+              <div style={{ fontSize: 20, fontWeight: 500, color: 'var(--text-primary)' }}>{formatCurrency(singleBranchRevenue)}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>Target: {formatCurrency(revTarget)}</div>
               <div style={{ fontSize: 13, fontWeight: 500, color: varianceColor(singleBranchRevenue, revTarget), marginTop: 6 }}>
                 {revDelta! >= 0 ? '+' : ''}{formatCurrency(revDelta!)}
               </div>
@@ -364,10 +364,10 @@ function GoalsByBranch({
             </div>
           )}
           {gpTarget != null && (
-            <div style={{ flex: '1 1 160px', background: '#2a2a2a', borderRadius: 10, padding: 14 }}>
-              <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>GP% vs. Target</div>
+            <div style={{ flex: '1 1 160px', background: 'var(--bg-secondary)', borderRadius: 10, padding: 14 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>GP% vs. Target</div>
               <div style={{ fontSize: 20, fontWeight: 500, color: gpVarianceColor(singleBranchGpPct, gpTarget) }}>{formatPercent(singleBranchGpPct)}</div>
-              <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Target: {gpTarget}%</div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>Target: {gpTarget}%</div>
               <div style={{ marginTop: 8 }}>{gpStatus(singleBranchGpPct, gpTarget)}</div>
             </div>
           )}
@@ -379,5 +379,5 @@ function GoalsByBranch({
   return null
 }
 
-const th: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', fontSize: 11, color: '#666666', fontWeight: 400 }
-const td: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', color: '#cccccc' }
+const th: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', fontSize: 11, color: 'var(--text-dim)', fontWeight: 400 }
+const td: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', color: 'var(--text-secondary)' }

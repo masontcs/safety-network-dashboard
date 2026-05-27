@@ -184,7 +184,7 @@ export default function PayrollItemsClient() {
   const totalFiltered = filtered.reduce((s, i) => s + (i.totalAmount ?? 0), 0)
 
   if (loading) {
-    return <div style={{ padding: '20px 24px', color: '#888888', fontSize: 13 }}>Loading…</div>
+    return <div style={{ padding: '20px 24px', color: 'var(--text-muted)', fontSize: 13 }}>Loading…</div>
   }
   if (error) {
     return <div style={{ padding: '20px 24px', color: '#cc4444', fontSize: 13 }}>{error}</div>
@@ -193,8 +193,8 @@ export default function PayrollItemsClient() {
   return (
     <div style={{ padding: '20px 24px', maxWidth: 1100 }}>
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff', marginBottom: 2 }}>Payroll Items</div>
-        <div style={{ fontSize: 12, color: '#888888' }}>{items.length} items · {groups.length} groups</div>
+        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>Payroll Items</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{items.length} items · {groups.length} groups</div>
       </div>
 
       {/* Filter bar */}
@@ -229,14 +229,14 @@ export default function PayrollItemsClient() {
 
         {/* Date range */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 'auto' }}>
-          <span style={{ fontSize: 11, color: '#666666' }}>Spending range:</span>
+          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Spending range:</span>
           <input
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
             style={{ ...inputStyle, width: 140 }}
           />
-          <span style={{ fontSize: 11, color: '#666666' }}>to</span>
+          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>to</span>
           <input
             type="date"
             value={endDate}
@@ -247,7 +247,7 @@ export default function PayrollItemsClient() {
             onClick={applyDateRange}
             disabled={rangeLoading || (!startDate && !endDate)}
             style={{
-              background: '#ff6b00', color: '#ffffff', border: 'none', borderRadius: 8,
+              background: '#ff6b00', color: 'var(--text-primary)', border: 'none', borderRadius: 8,
               padding: '6px 14px', fontSize: 12, cursor: rangeLoading ? 'not-allowed' : 'pointer',
               opacity: rangeLoading ? 0.6 : 1,
             }}
@@ -255,7 +255,7 @@ export default function PayrollItemsClient() {
             {rangeLoading ? 'Loading…' : 'Apply'}
           </button>
           {(appliedStart || appliedEnd) && (
-            <button onClick={clearDateRange} style={{ background: 'none', border: '1px solid #333333', borderRadius: 8, padding: '6px 10px', fontSize: 12, color: '#888888', cursor: 'pointer' }}>
+            <button onClick={clearDateRange} style={{ background: 'none', border: '1px solid var(--border-emphasis)', borderRadius: 8, padding: '6px 10px', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}>
               Clear
             </button>
           )}
@@ -263,9 +263,9 @@ export default function PayrollItemsClient() {
       </div>
 
       {/* Table */}
-      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', overflow: 'hidden' }}>
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid #2a2a2a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: '#888888', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+      <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             {filtered.length} item{filtered.length !== 1 ? 's' : ''}
           </span>
           {(appliedStart || appliedEnd) && filtered.some((i) => i.totalAmount !== null) && (
@@ -277,7 +277,7 @@ export default function PayrollItemsClient() {
 
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
+            <tr style={{ borderBottom: '1px solid var(--border)' }}>
               <SortTh label="Item Name" sortKey="name" current={sortKey} dir={sortDir} onClick={toggleSort} />
               <SortTh label="Group" sortKey="group" current={sortKey} dir={sortDir} onClick={toggleSort} />
               <th style={thStyle}>Status</th>
@@ -288,7 +288,7 @@ export default function PayrollItemsClient() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ padding: 24, textAlign: 'center', color: '#555555', fontSize: 12 }}>
+                <td colSpan={5} style={{ padding: 24, textAlign: 'center', color: 'var(--text-faint)', fontSize: 12 }}>
                   No items match your filters
                 </td>
               </tr>
@@ -297,15 +297,15 @@ export default function PayrollItemsClient() {
                 const edit = edits[item.id]
                 const isDirty = edit && edit.pendingGroupId !== item.groupId
                 return (
-                  <tr key={item.id} style={{ borderTop: '1px solid #2a2a2a' }}>
+                  <tr key={item.id} style={{ borderTop: '1px solid var(--border)' }}>
                     {/* Name */}
-                    <td style={{ padding: '10px 16px', fontSize: 12, color: '#cccccc', maxWidth: 280 }}>
+                    <td style={{ padding: '10px 16px', fontSize: 12, color: 'var(--text-secondary)', maxWidth: 280 }}>
                       <div>{item.name}</div>
                       {!item.isConfirmed && item.aiSuggestedGroup && (
-                        <div style={{ fontSize: 11, color: '#888888', marginTop: 2 }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
                           AI suggestion: <span style={{ color: '#ff6b00' }}>{item.aiSuggestedGroup}</span>
                           {item.aiConfidence != null && (
-                            <span style={{ color: '#555555' }}> ({Math.round(item.aiConfidence * 100)}%)</span>
+                            <span style={{ color: 'var(--text-faint)' }}> ({Math.round(item.aiConfidence * 100)}%)</span>
                           )}
                         </div>
                       )}
@@ -334,14 +334,14 @@ export default function PayrollItemsClient() {
                             <button
                               disabled={edit.saving}
                               onClick={() => saveGroupChange(item)}
-                              style={{ background: '#ff6b00', color: '#ffffff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: edit.saving ? 'not-allowed' : 'pointer', opacity: edit.saving ? 0.6 : 1 }}
+                              style={{ background: '#ff6b00', color: 'var(--text-primary)', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: edit.saving ? 'not-allowed' : 'pointer', opacity: edit.saving ? 0.6 : 1 }}
                             >
                               {edit.saving ? '…' : 'Save'}
                             </button>
                           )}
                           <button
                             onClick={() => cancelEdit(item.id)}
-                            style={{ background: 'none', border: 'none', color: '#666666', fontSize: 11, cursor: 'pointer', padding: '4px 6px' }}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 11, cursor: 'pointer', padding: '4px 6px' }}
                           >
                             ✕
                           </button>
@@ -353,7 +353,7 @@ export default function PayrollItemsClient() {
                           style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}
                           title="Click to change group"
                         >
-                          <span style={{ color: '#cccccc' }}>{item.groupName}</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>{item.groupName}</span>
                           <span style={{ color: '#444444', fontSize: 10, marginLeft: 6 }}>✎</span>
                         </button>
                       )}
@@ -371,7 +371,7 @@ export default function PayrollItemsClient() {
                     </td>
 
                     {/* Transaction count */}
-                    <td style={{ padding: '10px 16px', fontSize: 12, color: '#888888', textAlign: 'right' }}>
+                    <td style={{ padding: '10px 16px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'right' }}>
                       {item.transactionCount != null ? item.transactionCount.toLocaleString() : '—'}
                     </td>
 
@@ -435,22 +435,22 @@ function pillStyle(active: boolean): React.CSSProperties {
 }
 
 const inputStyle: React.CSSProperties = {
-  background: '#2a2a2a',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 8,
   padding: '6px 10px',
   fontSize: 12,
-  color: '#cccccc',
+  color: 'var(--text-secondary)',
   outline: 'none',
 }
 
 const selectStyle: React.CSSProperties = {
-  background: '#2a2a2a',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 8,
   padding: '6px 10px',
   fontSize: 12,
-  color: '#cccccc',
+  color: 'var(--text-secondary)',
   outline: 'none',
   cursor: 'pointer',
 }
@@ -458,7 +458,7 @@ const selectStyle: React.CSSProperties = {
 const thStyle: React.CSSProperties = {
   textAlign: 'left',
   fontSize: 11,
-  color: '#666666',
+  color: 'var(--text-dim)',
   fontWeight: 400,
   padding: '8px 16px',
   whiteSpace: 'nowrap',

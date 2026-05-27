@@ -83,16 +83,16 @@ function DropZone({ accept, state, onFile, label, hint }: DropZoneProps) {
       {state.status === 'idle' && (
         <>
           <UploadIcon />
-          <div style={{ fontSize: 12, color: '#888888', marginTop: 4 }}>{label}</div>
-          <div style={{ fontSize: 11, color: '#555555' }}>{hint}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{label}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{hint}</div>
         </>
       )}
 
       {state.status === 'ready' && (
         <>
           <FileIcon />
-          <div style={{ fontSize: 12, color: '#cccccc', marginTop: 4 }}>{state.file.name}</div>
-          <div style={{ fontSize: 11, color: '#555555' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>{state.file.name}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>
             {(state.file.size / 1024).toFixed(0)} KB — click to change
           </div>
         </>
@@ -314,14 +314,14 @@ function PayrollSection({ onSuccess }: { onSuccess: () => void }) {
   return (
     <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff' }}>Payroll</div>
-        <div style={{ fontSize: 11, color: '#666666', marginTop: 2 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Payroll</div>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
           QuickBooks .xlsm — one entity per upload
         </div>
       </div>
 
       <div>
-        <div style={{ fontSize: 11, color: '#888888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           Entity
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -349,7 +349,7 @@ function PayrollSection({ onSuccess }: { onSuccess: () => void }) {
       {isDuplicate && (
         <div style={{ background: '#2a1a00', border: '1px solid #ff9800', borderRadius: 8, padding: '10px 12px' }}>
           <div style={{ fontSize: 12, color: '#ff9800', fontWeight: 500, marginBottom: 4 }}>Duplicate import detected</div>
-          <div style={{ fontSize: 12, color: '#cccccc', marginBottom: 10 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>
             An import already exists for{' '}
             <strong>{state.status === 'duplicate' && state.conflict.periodDate ? formatPeriodDate(state.conflict.periodDate) : ''}</strong>
             {' '}({entity}). Replacing it will permanently delete the previous import.
@@ -358,7 +358,7 @@ function PayrollSection({ onSuccess }: { onSuccess: () => void }) {
             <button onClick={handleConfirmReplace} disabled={confirmLoading} className="btn-primary" style={{ fontSize: 12, padding: '6px 14px', opacity: confirmLoading ? 0.6 : 1 }}>
               {confirmLoading ? 'Replacing…' : 'Replace'}
             </button>
-            <button onClick={() => setState({ status: 'idle' })} style={{ background: '#2a2a2a', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, color: '#888888', cursor: 'pointer', fontFamily: 'inherit' }}>
+            <button onClick={() => setState({ status: 'idle' })} style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit' }}>
               Cancel
             </button>
           </div>
@@ -466,8 +466,8 @@ function RevenueSection({ onSuccess }: { onSuccess: () => void }) {
   return (
     <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff' }}>Revenue</div>
-        <div style={{ fontSize: 11, color: '#666666', marginTop: 2 }}>QuickBooks revenue export .xls</div>
+        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Revenue</div>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>QuickBooks revenue export .xls</div>
       </div>
 
       <DropZone
@@ -481,7 +481,7 @@ function RevenueSection({ onSuccess }: { onSuccess: () => void }) {
       {isDuplicate && (
         <div style={{ background: '#2a1a00', border: '1px solid #ff9800', borderRadius: 8, padding: '10px 12px' }}>
           <div style={{ fontSize: 12, color: '#ff9800', fontWeight: 500, marginBottom: 4 }}>Duplicate import detected</div>
-          <div style={{ fontSize: 12, color: '#cccccc', marginBottom: 10 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>
             Revenue is already imported for{' '}
             <strong>{state.status === 'duplicate' && state.conflict.periodDate ? formatPeriodDate(state.conflict.periodDate) : ''}</strong>.
             {' '}Replacing it will permanently delete the previous import.
@@ -490,7 +490,7 @@ function RevenueSection({ onSuccess }: { onSuccess: () => void }) {
             <button onClick={handleConfirmReplace} disabled={confirmLoading} className="btn-primary" style={{ fontSize: 12, padding: '6px 14px', opacity: confirmLoading ? 0.6 : 1 }}>
               {confirmLoading ? 'Replacing…' : 'Replace'}
             </button>
-            <button onClick={() => setState({ status: 'idle' })} style={{ background: '#2a2a2a', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, color: '#888888', cursor: 'pointer', fontFamily: 'inherit' }}>
+            <button onClick={() => setState({ status: 'idle' })} style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit' }}>
               Cancel
             </button>
           </div>
@@ -600,8 +600,8 @@ function FuelSection({ onSuccess }: { onSuccess: () => void }) {
   return (
     <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff' }}>Fuel</div>
-        <div style={{ fontSize: 11, color: '#666666', marginTop: 2 }}>Interstate or Flyers export .csv or .xlsx</div>
+        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Fuel</div>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>Interstate or Flyers export .csv or .xlsx</div>
       </div>
 
       <DropZone
@@ -615,7 +615,7 @@ function FuelSection({ onSuccess }: { onSuccess: () => void }) {
       {isDuplicate && (
         <div style={{ background: '#2a1a00', border: '1px solid #ff9800', borderRadius: 8, padding: '10px 12px' }}>
           <div style={{ fontSize: 12, color: '#ff9800', fontWeight: 500, marginBottom: 4 }}>Duplicate import detected</div>
-          <div style={{ fontSize: 12, color: '#cccccc', marginBottom: 10 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>
             Fuel data already exists for{' '}
             <strong>{state.status === 'duplicate' ? `${state.conflict.dateRangeStart} – ${state.conflict.dateRangeEnd}` : ''}</strong>.
             {' '}Replacing it will permanently delete the previous import.
@@ -624,7 +624,7 @@ function FuelSection({ onSuccess }: { onSuccess: () => void }) {
             <button onClick={handleConfirmReplace} disabled={confirmLoading} className="btn-primary" style={{ fontSize: 12, padding: '6px 14px', opacity: confirmLoading ? 0.6 : 1 }}>
               {confirmLoading ? 'Replacing…' : 'Replace'}
             </button>
-            <button onClick={() => setState({ status: 'idle' })} style={{ background: '#2a2a2a', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, color: '#888888', cursor: 'pointer', fontFamily: 'inherit' }}>
+            <button onClick={() => setState({ status: 'idle' })} style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit' }}>
               Cancel
             </button>
           </div>
@@ -661,7 +661,7 @@ function ResultSummary({ lines, onReset }: { lines: string[]; onReset: () => voi
           {line}
         </div>
       ))}
-      <button onClick={onReset} style={{ marginTop: 8, background: 'none', border: 'none', color: '#555555', fontSize: 11, cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+      <button onClick={onReset} style={{ marginTop: 8, background: 'none', border: 'none', color: 'var(--text-faint)', fontSize: 11, cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
         Import another file
       </button>
     </div>
@@ -698,16 +698,16 @@ function HistoryPanel({ activeTab, refreshKey }: { activeTab: ImportType; refres
   const thStyle: React.CSSProperties = {
     textAlign: 'left',
     fontSize: 11,
-    color: '#666666',
+    color: 'var(--text-dim)',
     fontWeight: 400,
     padding: '0 12px 8px 0',
     whiteSpace: 'nowrap',
   }
   const tdStyle: React.CSSProperties = {
     fontSize: 12,
-    color: '#cccccc',
+    color: 'var(--text-secondary)',
     padding: '7px 12px 7px 0',
-    borderTop: '1px solid #2a2a2a',
+    borderTop: '1px solid var(--border)',
     whiteSpace: 'nowrap',
   }
 
@@ -717,11 +717,11 @@ function HistoryPanel({ activeTab, refreshKey }: { activeTab: ImportType; refres
   return (
     <div style={{ overflowX: 'auto' }}>
       {loading && (
-        <div style={{ fontSize: 12, color: '#555555', padding: '16px 0' }}>Loading…</div>
+        <div style={{ fontSize: 12, color: 'var(--text-faint)', padding: '16px 0' }}>Loading…</div>
       )}
 
       {isEmpty && (
-        <div style={{ fontSize: 12, color: '#555555', padding: '16px 0' }}>No imports yet.</div>
+        <div style={{ fontSize: 12, color: 'var(--text-faint)', padding: '16px 0' }}>No imports yet.</div>
       )}
 
       {!loading && activeTab === 'payroll' && payroll && payroll.length > 0 && (
@@ -738,11 +738,11 @@ function HistoryPanel({ activeTab, refreshKey }: { activeTab: ImportType; refres
               <tr key={r.id}>
                 <td style={tdStyle}>{formatPeriodDate(r.periodDate)}</td>
                 <td style={{ ...tdStyle }}>
-                  <span style={{ background: '#2a2a2a', borderRadius: 4, padding: '2px 8px', fontSize: 11, color: '#ff6b00' }}>
+                  <span style={{ background: 'var(--bg-secondary)', borderRadius: 4, padding: '2px 8px', fontSize: 11, color: '#ff6b00' }}>
                     {r.entityCode}
                   </span>
                 </td>
-                <td style={{ ...tdStyle, color: '#888888' }}>{formatImportedAt(r.importedAt)}</td>
+                <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{formatImportedAt(r.importedAt)}</td>
               </tr>
             ))}
           </tbody>
@@ -761,7 +761,7 @@ function HistoryPanel({ activeTab, refreshKey }: { activeTab: ImportType; refres
             {revenue.map((r) => (
               <tr key={r.id}>
                 <td style={tdStyle}>{formatPeriodDate(r.periodDate)}</td>
-                <td style={{ ...tdStyle, color: '#888888' }}>{formatImportedAt(r.importedAt)}</td>
+                <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{formatImportedAt(r.importedAt)}</td>
               </tr>
             ))}
           </tbody>
@@ -781,12 +781,12 @@ function HistoryPanel({ activeTab, refreshKey }: { activeTab: ImportType; refres
             {fuel.map((r) => (
               <tr key={r.id}>
                 <td style={tdStyle}>
-                  <span style={{ background: '#2a2a2a', borderRadius: 4, padding: '2px 8px', fontSize: 11, color: '#cccccc', textTransform: 'capitalize' }}>
+                  <span style={{ background: 'var(--bg-secondary)', borderRadius: 4, padding: '2px 8px', fontSize: 11, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
                     {r.vendor}
                   </span>
                 </td>
                 <td style={tdStyle}>{r.dateRangeStart} – {r.dateRangeEnd}</td>
-                <td style={{ ...tdStyle, color: '#888888' }}>{formatImportedAt(r.importedAt)}</td>
+                <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{formatImportedAt(r.importedAt)}</td>
               </tr>
             ))}
           </tbody>
@@ -809,7 +809,7 @@ export default function ImportClient() {
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
     background: active ? '#ff6b00' : 'transparent',
-    border: active ? 'none' : '1px solid #2a2a2a',
+    border: active ? 'none' : '1px solid var(--border)',
     borderRadius: 8,
     padding: '5px 14px',
     fontSize: 12,
@@ -822,8 +822,8 @@ export default function ImportClient() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 960 }}>
       <div>
-        <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Import Data</div>
-        <div style={{ fontSize: 12, color: '#666666', marginTop: 4 }}>
+        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Import Data</div>
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
           Upload weekly exports from QuickBooks and fuel vendors. Each file is validated before inserting.
         </div>
       </div>
@@ -837,7 +837,7 @@ export default function ImportClient() {
       {/* Import history */}
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff' }}>Import History</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Import History</div>
           <div style={{ display: 'flex', gap: 6 }}>
             {(['payroll', 'revenue', 'fuel'] as ImportType[]).map((t) => (
               <button key={t} onClick={() => setHistoryTab(t)} style={tabStyle(historyTab === t)}>
@@ -884,8 +884,8 @@ function UploadingState({ label, progress }: { label?: string; progress?: number
 
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-      <div style={{ fontSize: 12, color: '#888888' }}>{displayLabel}</div>
-      <div style={{ width: '85%', height: 4, background: '#2a2a2a', borderRadius: 2, overflow: 'hidden' }}>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{displayLabel}</div>
+      <div style={{ width: '85%', height: 4, background: 'var(--bg-secondary)', borderRadius: 2, overflow: 'hidden' }}>
         <div
           style={{
             height: '100%',
@@ -896,7 +896,7 @@ function UploadingState({ label, progress }: { label?: string; progress?: number
           }}
         />
       </div>
-      <div style={{ fontSize: 11, color: '#555555' }}>{Math.round(displayProgress)}%</div>
+      <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{Math.round(displayProgress)}%</div>
     </div>
   )
 }

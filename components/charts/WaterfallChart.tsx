@@ -34,9 +34,9 @@ export default function WaterfallChart({ revenue, payroll, fuel, height = 200 }:
         />
         <YAxis hide />
         <Tooltip
-          contentStyle={{ background: '#2a2a2a', border: '1px solid #333333', borderRadius: 8, fontSize: 12 }}
-          labelStyle={{ color: '#888888' }}
-          itemStyle={{ color: '#ffffff' }}
+          contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, fontSize: 12 }}
+          labelStyle={{ color: 'var(--text-muted)' }}
+          itemStyle={{ color: 'var(--text-primary)' }}
           formatter={(v: number, name: string) =>
             name === 'offset' ? [null, ''] : [`$${v.toLocaleString()}`, '']
           }

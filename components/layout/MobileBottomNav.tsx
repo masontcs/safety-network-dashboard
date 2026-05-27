@@ -211,10 +211,10 @@ export default function MobileBottomNav({ role }: Props) {
           onClick={() => setMenuOpen(false)}
         >
           <div
-            style={{ background: '#1a1a1a', borderRadius: '16px 16px 0 0', borderTop: '1px solid #2a2a2a', paddingBottom: 64, width: '100%', maxHeight: '80vh', overflowY: 'auto' }}
+            style={{ background: 'var(--bg-nav)', borderRadius: '16px 16px 0 0', borderTop: '1px solid var(--border)', paddingBottom: 64, width: '100%', maxHeight: '80vh', overflowY: 'auto' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ padding: '16px 20px 8px', fontSize: 11, color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div style={{ padding: '16px 20px 8px', fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               More
             </div>
             {config.more.map((item) => {
@@ -240,7 +240,7 @@ export default function MobileBottomNav({ role }: Props) {
               style={{
                 display: 'flex', alignItems: 'center', padding: '14px 20px', minHeight: 52,
                 fontSize: 15, width: '100%', textAlign: 'left',
-                background: 'none', border: 'none', color: '#666',
+                background: 'none', border: 'none', color: 'var(--text-dim)',
                 cursor: 'pointer', fontFamily: 'inherit',
               }}
             >
@@ -251,7 +251,7 @@ export default function MobileBottomNav({ role }: Props) {
       )}
 
       {/* Bottom bar */}
-      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 60, background: '#1a1a1a', borderTop: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', justifyContent: 'space-around', zIndex: 100 }}>
+      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 60, background: 'var(--bg-nav)', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-around', zIndex: 100 }}>
         {config.primary.map((item) => {
           const active = isActive(item)
           return (
@@ -275,7 +275,7 @@ export default function MobileBottomNav({ role }: Props) {
             <span>More</span>
           </button>
         ) : (
-          <button onClick={handleSignOut} style={{ ...itemStyle, color: '#666' }}>
+          <button onClick={handleSignOut} style={{ ...itemStyle, color: 'var(--text-dim)' }}>
             <LogOutIcon />
             <span>Sign Out</span>
           </button>

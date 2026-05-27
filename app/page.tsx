@@ -55,7 +55,7 @@ export default async function RootPage() {
 
           <p
             className="text-[14px] md:text-[16px] leading-relaxed mx-auto mb-10"
-            style={{ color: '#888888', maxWidth: 420 }}
+            style={{ color: 'var(--text-muted)', maxWidth: 420 }}
           >
             Real-time visibility into payroll, revenue, and fuel across all branches
           </p>
@@ -66,7 +66,7 @@ export default async function RootPage() {
               className="w-full md:w-auto text-center"
               style={{
                 background: '#ff6b00',
-                color: '#ffffff',
+                color: 'var(--text-primary)',
                 borderRadius: 8,
                 padding: '12px 32px',
                 fontSize: 14,
@@ -106,7 +106,7 @@ export default async function RootPage() {
             left: 0,
             right: 0,
             textAlign: 'center',
-            color: '#555555',
+            color: 'var(--text-faint)',
           }}
         >
           © 2026 Safety Network Inc. — Confidential&nbsp;&nbsp;|&nbsp;&nbsp;Internal Use Only

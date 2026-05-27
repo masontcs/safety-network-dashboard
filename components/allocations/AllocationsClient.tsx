@@ -38,8 +38,8 @@ interface AllocationsData {
 }
 
 const cardStyle: React.CSSProperties = {
-  background: '#1e1e1e',
-  border: '1px solid #2a2a2a',
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border)',
   borderRadius: 12,
   padding: 16,
   marginBottom: 16,
@@ -48,17 +48,17 @@ const cardStyle: React.CSSProperties = {
 const thStyle: React.CSSProperties = {
   textAlign: 'left',
   padding: '8px 12px',
-  color: '#666',
+  color: 'var(--text-dim)',
   fontWeight: 400,
   fontSize: 11,
   textTransform: 'uppercase',
   letterSpacing: '0.04em',
-  borderBottom: '1px solid #2a2a2a',
+  borderBottom: '1px solid var(--border)',
 }
 
 const tdStyle: React.CSSProperties = {
   padding: '9px 12px',
-  color: '#cccccc',
+  color: 'var(--text-secondary)',
   fontSize: 12,
   borderBottom: '1px solid #1e1e1e',
 }
@@ -143,8 +143,8 @@ export default function AllocationsClient() {
   return (
     <div style={{ padding: 24, maxWidth: 1200 }}>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ color: '#ffffff', fontSize: 22, fontWeight: 500, margin: 0 }}>Employee Allocations</h1>
-        <p style={{ color: '#888', fontSize: 13, marginTop: 4 }}>Manage branch cost splits for payroll and fuel reporting.</p>
+        <h1 style={{ color: 'var(--text-primary)', fontSize: 22, fontWeight: 500, margin: 0 }}>Employee Allocations</h1>
+        <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4 }}>Manage branch cost splits for payroll and fuel reporting.</p>
       </div>
 
       {/* Tabs */}
@@ -175,13 +175,13 @@ export default function AllocationsClient() {
       </div>
 
       {loading ? (
-        <p style={{ color: '#888', fontSize: 14 }}>Loading…</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Loading…</p>
       ) : tab === 'pending' ? (
         <>
           {/* Pending default allocations */}
-          <h2 style={{ color: '#fff', fontSize: 14, fontWeight: 500, marginBottom: 8 }}>Default Allocations</h2>
+          <h2 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 500, marginBottom: 8 }}>Default Allocations</h2>
           {!data || data.pendingAllocations.length === 0 ? (
-            <p style={{ color: '#888', fontSize: 13, marginBottom: 24 }}>No pending default allocations.</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 24 }}>No pending default allocations.</p>
           ) : (
             <div style={cardStyle}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -194,12 +194,12 @@ export default function AllocationsClient() {
                 </thead>
                 <tbody>
                   {data.pendingAllocations.map((a) => (
-                    <tr key={a.id} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                    <tr key={a.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ ...tdStyle, color: '#ff6b00', cursor: 'pointer' }} onClick={() => router.push(`/admin/employees/${a.employee_id}`)}>{a.displayName}</td>
                       <td style={tdStyle}>{a.branchName}</td>
                       <td style={tdStyle}>{a.percentage}%</td>
                       <td style={tdStyle}>{a.effective_from}</td>
-                      <td style={{ ...tdStyle, color: '#888' }}>{a.notes ?? '—'}</td>
+                      <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{a.notes ?? '—'}</td>
                       <td style={tdStyle}>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button
@@ -226,9 +226,9 @@ export default function AllocationsClient() {
           )}
 
           {/* Pending weekly overrides */}
-          <h2 style={{ color: '#fff', fontSize: 14, fontWeight: 500, marginBottom: 8, marginTop: 8 }}>Weekly Overrides</h2>
+          <h2 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 500, marginBottom: 8, marginTop: 8 }}>Weekly Overrides</h2>
           {!data || data.pendingOverrides.length === 0 ? (
-            <p style={{ color: '#888', fontSize: 13 }}>No pending weekly overrides.</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No pending weekly overrides.</p>
           ) : (
             <div style={cardStyle}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -241,12 +241,12 @@ export default function AllocationsClient() {
                 </thead>
                 <tbody>
                   {data.pendingOverrides.map((o) => (
-                    <tr key={o.id} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                    <tr key={o.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ ...tdStyle, color: '#ff6b00', cursor: 'pointer' }} onClick={() => router.push(`/admin/employees/${o.employee_id}`)}>{o.displayName}</td>
                       <td style={tdStyle}>{o.period_date}</td>
                       <td style={tdStyle}>{o.branchName}</td>
                       <td style={tdStyle}>{o.percentage}%</td>
-                      <td style={{ ...tdStyle, color: '#888' }}>{o.notes ?? '—'}</td>
+                      <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{o.notes ?? '—'}</td>
                       <td style={tdStyle}>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button
@@ -274,9 +274,9 @@ export default function AllocationsClient() {
         </>
       ) : (
         <>
-          <h2 style={{ color: '#fff', fontSize: 14, fontWeight: 500, marginBottom: 8 }}>Active Default Allocations</h2>
+          <h2 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 500, marginBottom: 8 }}>Active Default Allocations</h2>
           {!data || data.activeAllocations.length === 0 ? (
-            <p style={{ color: '#888', fontSize: 13 }}>No active allocations. All employees are 100% home branch.</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No active allocations. All employees are 100% home branch.</p>
           ) : (
             <div style={cardStyle}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -289,7 +289,7 @@ export default function AllocationsClient() {
                 </thead>
                 <tbody>
                   {data.activeAllocations.map((a) => (
-                    <tr key={a.id} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                    <tr key={a.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ ...tdStyle, color: '#ff6b00', cursor: 'pointer' }} onClick={() => router.push(`/admin/employees/${a.employee_id}`)}>{a.displayName}</td>
                       <td style={tdStyle}>{a.branchName}</td>
                       <td style={tdStyle}>{a.percentage}%</td>

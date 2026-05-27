@@ -95,12 +95,12 @@ export default function CardList({ role: _role }: Props) {
           onChange={(e) => setSearch(e.target.value)}
           style={{
             marginLeft: 'auto',
-            background: '#2a2a2a',
-            border: '1px solid #333333',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border-emphasis)',
             borderRadius: 8,
             padding: '5px 12px',
             fontSize: 12,
-            color: '#cccccc',
+            color: 'var(--text-secondary)',
             outline: 'none',
             width: 200,
           }}
@@ -108,33 +108,33 @@ export default function CardList({ role: _role }: Props) {
       </div>
 
       {/* Table */}
-      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
+            <tr style={{ borderBottom: '1px solid var(--border)' }}>
               {['Card Name', 'Vendor', 'Assignment', 'Branch', 'Status'].map((h) => (
-                <th key={h} style={{ textAlign: 'left', fontSize: 11, color: '#666666', fontWeight: 400, padding: '10px 12px' }}>{h}</th>
+                <th key={h} style={{ textAlign: 'left', fontSize: 11, color: 'var(--text-dim)', fontWeight: 400, padding: '10px 12px' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} style={{ textAlign: 'center', padding: 32, color: '#555555', fontSize: 12 }}>Loading…</td></tr>
+              <tr><td colSpan={5} style={{ textAlign: 'center', padding: 32, color: 'var(--text-faint)', fontSize: 12 }}>Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={5} style={{ textAlign: 'center', padding: 32, color: '#555555', fontSize: 12 }}>No cards found</td></tr>
+              <tr><td colSpan={5} style={{ textAlign: 'center', padding: 32, color: 'var(--text-faint)', fontSize: 12 }}>No cards found</td></tr>
             ) : filtered.map((c) => {
               const status = cardStatus(c)
               return (
                 <tr
                   key={c.id}
                   onClick={() => router.push(`/fuel/cards/${c.id}`)}
-                  style={{ borderTop: '1px solid #2a2a2a', cursor: 'pointer', transition: 'background 100ms' }}
+                  style={{ borderTop: '1px solid var(--border)', cursor: 'pointer', transition: 'background 100ms' }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = '#252525')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <td style={{ padding: '10px 12px', fontSize: 12, color: '#cccccc', fontWeight: 500 }}>{c.cardName}</td>
-                  <td style={{ padding: '10px 12px', fontSize: 12, color: '#888888', textTransform: 'capitalize' }}>{c.vendor}</td>
-                  <td style={{ padding: '10px 12px', fontSize: 12, color: '#cccccc' }}>
+                  <td style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>{c.cardName}</td>
+                  <td style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{c.vendor}</td>
+                  <td style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text-secondary)' }}>
                     {status === 'linked' ? c.employeeDisplayName
                       : status === 'general' ? '—'
                       : status === 'business' ? (c.businessTag?.replace('_', ' ') ?? '—')
@@ -159,9 +159,9 @@ export default function CardList({ role: _role }: Props) {
 function StatusBadge({ status }: { status: FilterTab }) {
   const config: Record<FilterTab, { label: string; bg: string; color: string }> = {
     linked: { label: 'Linked', bg: '#1a2a1a', color: '#ff6b00' },
-    general: { label: 'General', bg: '#2a2a2a', color: '#888888' },
+    general: { label: 'General', bg: '#2a2a2a', color: 'var(--text-muted)' },
     unlinked: { label: 'Unlinked', bg: '#2a1a1a', color: '#cc4444' },
-    business: { label: 'WH/Signs', bg: '#2a2a2a', color: '#666666' },
+    business: { label: 'WH/Signs', bg: '#2a2a2a', color: 'var(--text-dim)' },
     all: { label: '', bg: '', color: '' },
   }
   const { label, bg, color } = config[status]

@@ -539,10 +539,10 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
   if (loading) {
     return (
       <div style={{ padding: 24 }}>
-        <div style={{ height: 32, background: '#2a2a2a', borderRadius: 8, width: 200, marginBottom: 12 }} />
-        <div style={{ height: 24, background: '#2a2a2a', borderRadius: 8, width: 140, marginBottom: 24 }} />
-        <div style={{ height: 120, background: '#1e1e1e', borderRadius: 12, marginBottom: 12 }} />
-        <div style={{ height: 200, background: '#1e1e1e', borderRadius: 12 }} />
+        <div style={{ height: 32, background: 'var(--bg-secondary)', borderRadius: 8, width: 200, marginBottom: 12 }} />
+        <div style={{ height: 24, background: 'var(--bg-secondary)', borderRadius: 8, width: 140, marginBottom: 24 }} />
+        <div style={{ height: 120, background: 'var(--bg-surface)', borderRadius: 12, marginBottom: 12 }} />
+        <div style={{ height: 200, background: 'var(--bg-surface)', borderRadius: 12 }} />
       </div>
     )
   }
@@ -552,7 +552,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
       <div style={{ padding: 24 }}>
         <button
           onClick={() => router.back()}
-          style={{ color: '#888888', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', marginBottom: 16 }}
+          style={{ color: 'var(--text-muted)', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', marginBottom: 16 }}
         >
           ← Back
         </button>
@@ -570,7 +570,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
       <button
         onClick={() => router.back()}
         style={{
-          color: '#888888',
+          color: 'var(--text-muted)',
           fontSize: 13,
           background: 'none',
           border: 'none',
@@ -595,10 +595,10 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                   onChange={(e) => setEditFirst(e.target.value)}
                   placeholder="First name"
                   style={{
-                    background: '#2a2a2a',
-                    border: '1px solid #333333',
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-emphasis)',
                     borderRadius: 8,
-                    color: '#ffffff',
+                    color: 'var(--text-primary)',
                     fontSize: 18,
                     fontWeight: 500,
                     padding: '6px 12px',
@@ -611,10 +611,10 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                   onChange={(e) => setEditLast(e.target.value)}
                   placeholder="Last name"
                   style={{
-                    background: '#2a2a2a',
-                    border: '1px solid #333333',
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-emphasis)',
                     borderRadius: 8,
-                    color: '#ffffff',
+                    color: 'var(--text-primary)',
                     fontSize: 18,
                     fontWeight: 500,
                     padding: '6px 12px',
@@ -627,7 +627,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                   disabled={savingName}
                   style={{
                     background: '#ff6b00',
-                    color: '#ffffff',
+                    color: 'var(--text-primary)',
                     border: 'none',
                     borderRadius: 8,
                     padding: '6px 16px',
@@ -641,8 +641,8 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                 <button
                   onClick={() => setEditing(false)}
                   style={{
-                    background: '#2a2a2a',
-                    color: '#cccccc',
+                    background: 'var(--bg-secondary)',
+                    color: 'var(--text-secondary)',
                     border: 'none',
                     borderRadius: 8,
                     padding: '6px 16px',
@@ -656,23 +656,23 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
               {nameError && <p style={{ color: '#cc4444', fontSize: 12, margin: 0 }}>{nameError}</p>}
               {/* Legal names shown read-only during edit */}
               {employee.legalNames.map((ln, i) => (
-                <p key={i} style={{ margin: 0, fontSize: 11, color: '#555555' }}>
+                <p key={i} style={{ margin: 0, fontSize: 11, color: 'var(--text-faint)' }}>
                   Legal name ({ln.entityCode}): {ln.rawName}
                 </p>
               ))}
             </div>
           ) : (
             <>
-              <h1 style={{ fontSize: 22, fontWeight: 500, color: '#ffffff', margin: '0 0 4px 0' }}>
+              <h1 style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)', margin: '0 0 4px 0' }}>
                 {employee.displayName}
                 {!employee.isActive && (
-                  <span style={{ marginLeft: 10, fontSize: 11, color: '#888888', fontWeight: 400 }}>
+                  <span style={{ marginLeft: 10, fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>
                     inactive
                   </span>
                 )}
               </h1>
               {employee.legalNames.map((ln, i) => (
-                <p key={i} style={{ margin: '0 0 2px 0', fontSize: 11, color: '#555555' }}>
+                <p key={i} style={{ margin: '0 0 2px 0', fontSize: 11, color: 'var(--text-faint)' }}>
                   Legal name ({ln.entityCode}): {ln.rawName}
                 </p>
               ))}
@@ -684,9 +684,9 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
           <button
             onClick={startEdit}
             style={{
-              background: '#2a2a2a',
-              color: '#cccccc',
-              border: '1px solid #333333',
+              background: 'var(--bg-secondary)',
+              color: 'var(--text-secondary)',
+              border: '1px solid var(--border-emphasis)',
               borderRadius: 8,
               padding: '6px 14px',
               fontSize: 13,
@@ -717,7 +717,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                     setLtError(null)
                     setLtSuccess(null)
                   }}
-                  style={{ background: 'none', border: '1px solid #333333', borderRadius: 6, padding: '2px 10px', fontSize: 11, color: '#888888', cursor: 'pointer' }}
+                  style={{ background: 'none', border: '1px solid var(--border-emphasis)', borderRadius: 6, padding: '2px 10px', fontSize: 11, color: 'var(--text-muted)', cursor: 'pointer' }}
                 >
                   Change
                 </button>
@@ -726,13 +726,13 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
 
             {/* Inline change form */}
             {isAdmin && changingLaborFor === a.entityId && (
-              <div style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 10, padding: 16, marginTop: 8, maxWidth: 420 }}>
-                <div style={{ fontSize: 11, color: '#888888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 16, marginTop: 8, maxWidth: 420 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
                   Change Labor Type — {a.entityCode}
                 </div>
 
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 11, color: '#666666', marginBottom: 6 }}>New labor type</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>New labor type</div>
                   <select
                     value={ltNewType}
                     onChange={(e) => setLtNewType(e.target.value as LaborType)}
@@ -745,12 +745,12 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                 </div>
 
                 <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 11, color: '#666666', marginBottom: 8 }}>Effective</div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#cccccc', marginBottom: 6, cursor: 'pointer' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>Effective</div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6, cursor: 'pointer' }}>
                     <input type="radio" checked={!ltRetroactive} onChange={() => setLtRetroactive(false)} />
                     Going forward only — future imports use the new type
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#cccccc', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer' }}>
                     <input type="radio" checked={ltRetroactive} onChange={() => setLtRetroactive(true)} />
                     Retroactive from date
                   </label>
@@ -817,7 +817,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                   </button>
                   <button
                     onClick={() => { setChangingLaborFor(null); setLtError(null); setLtSuccess(null) }}
-                    style={{ background: 'none', border: '1px solid #333333', borderRadius: 8, padding: '7px 16px', fontSize: 12, color: '#888888', cursor: 'pointer' }}
+                    style={{ background: 'none', border: '1px solid var(--border-emphasis)', borderRadius: 8, padding: '7px 16px', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer' }}
                   >
                     Cancel
                   </button>
@@ -848,7 +848,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
       <SectionHeader>Payroll History</SectionHeader>
 
       {payrollHistory.length === 0 ? (
-        <p style={{ color: '#888888', fontSize: 13, marginBottom: 24 }}>No payroll records found.</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 24 }}>No payroll records found.</p>
       ) : (
         <>
           {/* Charts */}
@@ -883,7 +883,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
           <div style={{ ...cardStyle, marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <p style={{ ...cardLabelStyle, margin: 0 }}>Rate History</p>
-              <span style={{ fontSize: 11, color: '#555555' }}>
+              <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>
                 {payrollHistory.length} transactions
               </span>
             </div>
@@ -911,14 +911,14 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                         <tr
                           key={rowIdx}
                           style={{
-                            borderTop: '1px solid #2a2a2a',
+                            borderTop: '1px solid var(--border)',
                             background: rowIdx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
                           }}
                         >
                           <td style={tdStyle}>{formatPeriod(row.periodDate)}</td>
-                          <td style={tdStyle}>{row.itemName ?? <span style={{ color: '#555555' }}>—</span>}</td>
-                          <td style={{ ...tdStyle, color: '#888888' }}>{row.groupName ?? '—'}</td>
-                          <td style={{ ...tdStyle, color: '#888888' }}>{row.entityCode}</td>
+                          <td style={tdStyle}>{row.itemName ?? <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
+                          <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{row.groupName ?? '—'}</td>
+                          <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{row.entityCode}</td>
                           <td style={tdStyle}>{row.rate != null ? formatCurrency(row.rate) : '—'}</td>
                           <td style={tdStyle}>{row.hours != null ? row.hours.toFixed(2) : '—'}</td>
                           <td style={{ ...tdStyle, color: '#ff6b00' }}>{formatCurrency(row.amount)}</td>
@@ -936,7 +936,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                           elements.push(
                             <tr
                               key={`tax-${row.periodDate}`}
-                              style={{ borderTop: '1px solid #2a2a2a', background: 'rgba(204,68,68,0.04)' }}
+                              style={{ borderTop: '1px solid var(--border)', background: 'rgba(204,68,68,0.04)' }}
                             >
                               <td style={tdStyle}>{formatPeriod(row.periodDate)}</td>
                               <td style={{ ...tdStyle, color: '#cc4444', fontStyle: 'italic' }} colSpan={5}>
@@ -955,7 +955,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
             </div>
             {/* Pagination controls */}
             {payrollHistory.length > PAYROLL_PAGE_SIZE && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 10, borderTop: '1px solid #2a2a2a', fontSize: 12, color: '#888888' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--text-muted)' }}>
                 <span>
                   Showing {(payrollPage - 1) * PAYROLL_PAGE_SIZE + 1}–{Math.min(payrollPage * PAYROLL_PAGE_SIZE, payrollHistory.length)} of {payrollHistory.length} transactions
                 </span>
@@ -963,14 +963,14 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                   <button
                     disabled={payrollPage <= 1}
                     onClick={() => setPayrollPage((p) => p - 1)}
-                    style={{ background: '#2a2a2a', border: 'none', borderRadius: 6, padding: '4px 10px', color: payrollPage <= 1 ? '#444444' : '#cccccc', cursor: payrollPage <= 1 ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 12 }}
+                    style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: 6, padding: '4px 10px', color: payrollPage <= 1 ? '#444444' : '#cccccc', cursor: payrollPage <= 1 ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 12 }}
                   >
                     ← Prev
                   </button>
                   <button
                     disabled={payrollPage * PAYROLL_PAGE_SIZE >= payrollHistory.length}
                     onClick={() => setPayrollPage((p) => p + 1)}
-                    style={{ background: '#2a2a2a', border: 'none', borderRadius: 6, padding: '4px 10px', color: payrollPage * PAYROLL_PAGE_SIZE >= payrollHistory.length ? '#444444' : '#cccccc', cursor: payrollPage * PAYROLL_PAGE_SIZE >= payrollHistory.length ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 12 }}
+                    style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: 6, padding: '4px 10px', color: payrollPage * PAYROLL_PAGE_SIZE >= payrollHistory.length ? '#444444' : '#cccccc', cursor: payrollPage * PAYROLL_PAGE_SIZE >= payrollHistory.length ? 'default' : 'pointer', fontFamily: 'inherit', fontSize: 12 }}
                   >
                     Next →
                   </button>
@@ -997,14 +997,14 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                       <tr
                         key={i}
                         style={{
-                          borderTop: '1px solid #2a2a2a',
+                          borderTop: '1px solid var(--border)',
                           background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
                         }}
                       >
                         <td style={tdStyle}>{item.itemName}</td>
-                        <td style={{ ...tdStyle, color: '#888888' }}>{item.groupName}</td>
+                        <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{item.groupName}</td>
                         <td style={tdStyle}>{item.mostRecentRate != null ? formatCurrency(item.mostRecentRate) : '—'}</td>
-                        <td style={{ ...tdStyle, color: '#888888' }}>{item.lastDate ? formatPeriod(item.lastDate) : '—'}</td>
+                        <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{item.lastDate ? formatPeriod(item.lastDate) : '—'}</td>
                         <td style={{ ...tdStyle, color: '#ff6b00' }}>{item.occurrences}</td>
                       </tr>
                     ))}
@@ -1021,13 +1021,13 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
               {groupBreakdown.map((g) => (
                 <div key={g.groupName}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, color: '#cccccc' }}>{g.groupName}</span>
-                    <span style={{ fontSize: 12, color: '#888888' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{g.groupName}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                       {g.pct}% &nbsp;
                       <span style={{ color: '#ff6b00' }}>{formatCurrency(g.total)}</span>
                     </span>
                   </div>
-                  <div style={{ height: 4, background: '#2a2a2a', borderRadius: 2 }}>
+                  <div style={{ height: 4, background: 'var(--bg-secondary)', borderRadius: 2 }}>
                     <div
                       style={{
                         height: 4,
@@ -1054,9 +1054,9 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
               <button
                 onClick={() => { setShowTransferForm(true); setTransferError(null) }}
                 style={{
-                  background: '#2a2a2a',
-                  color: '#cccccc',
-                  border: '1px solid #333333',
+                  background: 'var(--bg-secondary)',
+                  color: 'var(--text-secondary)',
+                  border: '1px solid var(--border-emphasis)',
                   borderRadius: 8,
                   padding: '6px 14px',
                   fontSize: 13,
@@ -1088,10 +1088,10 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                   </thead>
                   <tbody>
                     {periods.map((a, i) => (
-                      <tr key={a.id} style={{ borderTop: '1px solid #2a2a2a' }}>
+                      <tr key={a.id} style={{ borderTop: '1px solid var(--border)' }}>
                         <td style={{ ...tdStyle, color: '#ff6b00' }}>{a.branchName ?? '—'}</td>
                         <td style={tdStyle}>{a.payrollCode}</td>
-                        <td style={{ ...tdStyle, color: '#888888' }}>{formatLaborType(a.laborType)}</td>
+                        <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{formatLaborType(a.laborType)}</td>
                         <td style={{ ...tdStyle, color: a.effectiveFrom === '1900-01-01' ? '#555555' : '#cccccc' }}>
                           {a.effectiveFrom === '1900-01-01' ? 'Original' : formatPeriod(a.effectiveFrom)}
                         </td>
@@ -1123,19 +1123,19 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                     justifyContent: 'space-between',
                     gap: 12,
                     padding: '10px 0',
-                    borderTop: '1px solid #2a2a2a',
+                    borderTop: '1px solid var(--border)',
                   }}
                 >
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, color: '#cccccc' }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                       <span style={{ color: '#cc4444' }}>{t.fromBranchName ?? t.fromCode}</span>
                       {' → '}
                       <span style={{ color: '#ff6b00' }}>{t.toBranchName ?? t.toCode}</span>
-                      <span style={{ color: '#555555', marginLeft: 8 }}>({t.entityCode})</span>
+                      <span style={{ color: 'var(--text-faint)', marginLeft: 8 }}>({t.entityCode})</span>
                     </div>
-                    <div style={{ fontSize: 11, color: '#666666', marginTop: 3 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }}>
                       Effective {formatPeriod(t.effectiveDate)}
-                      {t.notes && <span style={{ color: '#555555' }}> · {t.notes}</span>}
+                      {t.notes && <span style={{ color: 'var(--text-faint)' }}> · {t.notes}</span>}
                     </div>
                   </div>
                   {isAdmin && i === 0 && (
@@ -1184,14 +1184,14 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
             const canSubmit = !!transferCodeId && !!transferDate && nameMatch && !submittingTransfer
 
             return (
-              <div style={{ ...cardStyle, border: '1px solid #333333', marginBottom: 8 }}>
+              <div style={{ ...cardStyle, border: '1px solid var(--border-emphasis)', marginBottom: 8 }}>
                 <p style={{ ...cardLabelStyle, marginBottom: 16 }}>Transfer Branch</p>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
                   {/* Step 1: Entity picker */}
                   <div>
-                    <label style={{ fontSize: 11, color: '#888888', display: 'block', marginBottom: 4 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
                       ENTITY
                     </label>
                     <div style={{ display: 'flex', gap: 8 }}>
@@ -1205,7 +1205,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                             fontSize: 13,
                             fontWeight: 500,
                             cursor: 'pointer',
-                            border: transferEntity === code ? '1px solid #ff6b00' : '1px solid #333333',
+                            border: transferEntity === code ? '1px solid #ff6b00' : '1px solid var(--border-emphasis)',
                             background: transferEntity === code ? 'rgba(255,107,0,0.15)' : '#2a2a2a',
                             color: transferEntity === code ? '#ff6b00' : '#888888',
                           }}
@@ -1219,7 +1219,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                   {/* Step 2: Payroll code selector — only shown after entity chosen */}
                   {transferEntity && (
                   <div>
-                    <label style={{ fontSize: 11, color: '#888888', display: 'block', marginBottom: 4 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
                       DESTINATION PAYROLL CODE
                     </label>
                     <select
@@ -1243,7 +1243,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
 
                   {/* Effective date */}
                   <div>
-                    <label style={{ fontSize: 11, color: '#888888', display: 'block', marginBottom: 4 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
                       EFFECTIVE DATE (must be a Saturday)
                     </label>
                     <input
@@ -1256,7 +1256,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
 
                   {/* Notes */}
                   <div>
-                    <label style={{ fontSize: 11, color: '#888888', display: 'block', marginBottom: 4 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
                       NOTES (optional)
                     </label>
                     <input
@@ -1287,7 +1287,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
 
                   {/* Name confirmation */}
                   <div>
-                    <label style={{ fontSize: 11, color: '#888888', display: 'block', marginBottom: 4 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>
                       TYPE &ldquo;{expectedName.toUpperCase()}&rdquo; TO CONFIRM
                     </label>
                     <input
@@ -1335,8 +1335,8 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                         setTransferError(null)
                       }}
                       style={{
-                        background: '#2a2a2a',
-                        color: '#cccccc',
+                        background: 'var(--bg-secondary)',
+                        color: 'var(--text-secondary)',
                         border: 'none',
                         borderRadius: 8,
                         padding: '7px 18px',
@@ -1362,7 +1362,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
             {!showAllocForm && (
               <button
                 onClick={() => setShowAllocForm(true)}
-                style={{ background: '#ff6b00', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}
+                style={{ background: '#ff6b00', color: 'var(--text-primary)', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}
               >
                 + Set Allocation
               </button>
@@ -1370,26 +1370,26 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
           </div>
 
           {allocLoading ? (
-            <p style={{ color: '#888', fontSize: 13 }}>Loading…</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Loading…</p>
           ) : allocations.length === 0 ? (
-            <p style={{ color: '#888888', fontSize: 13 }}>No active allocation — 100% home branch by default.</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No active allocation — 100% home branch by default.</p>
           ) : (
-            <div style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
                     {['Branch', 'Pct', 'From', 'To', 'Status'].map((h) => (
-                      <th key={h} style={{ textAlign: 'left', padding: '8px 12px', color: '#666', fontWeight: 400, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                      <th key={h} style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {allocations.map((a) => (
-                    <tr key={a.id} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                    <tr key={a.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '8px 12px', color: '#ff6b00' }}>{a.branches?.name ?? a.branch_id}</td>
-                      <td style={{ padding: '8px 12px', color: '#cccccc' }}>{a.percentage}%</td>
-                      <td style={{ padding: '8px 12px', color: '#cccccc' }}>{a.effective_from}</td>
-                      <td style={{ padding: '8px 12px', color: '#888' }}>{a.effective_to ?? '—'}</td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>{a.percentage}%</td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>{a.effective_from}</td>
+                      <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>{a.effective_to ?? '—'}</td>
                       <td style={{ padding: '8px 12px' }}>
                         <span style={{ background: a.status === 'approved' ? '#1a3a1a' : '#3a2a1a', color: a.status === 'approved' ? '#4caf50' : '#ff9800', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>{a.status}</span>
                       </td>
@@ -1402,22 +1402,22 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
 
           {overrides.length > 0 && (
             <>
-              <p style={{ color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Weekly Overrides (last 52 weeks)</p>
-              <div style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Weekly Overrides (last 52 weeks)</p>
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
                       {['Period', 'Branch', 'Pct', 'Status'].map((h) => (
-                        <th key={h} style={{ textAlign: 'left', padding: '8px 12px', color: '#666', fontWeight: 400, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                        <th key={h} style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {overrides.map((o) => (
-                      <tr key={o.id} style={{ borderBottom: '1px solid #2a2a2a' }}>
-                        <td style={{ padding: '8px 12px', color: '#cccccc' }}>{o.period_date}</td>
+                      <tr key={o.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>{o.period_date}</td>
                         <td style={{ padding: '8px 12px', color: '#ff6b00' }}>{o.branches?.name ?? o.branch_id}</td>
-                        <td style={{ padding: '8px 12px', color: '#cccccc' }}>{o.percentage}%</td>
+                        <td style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>{o.percentage}%</td>
                         <td style={{ padding: '8px 12px' }}>
                           <span style={{ background: o.status === 'approved' ? '#1a3a1a' : '#3a2a1a', color: o.status === 'approved' ? '#4caf50' : '#ff9800', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>{o.status}</span>
                         </td>
@@ -1430,14 +1430,14 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
           )}
 
           {showAllocForm && (
-            <div style={{ background: '#1e1e1e', border: '1px solid #333', borderRadius: 12, padding: 16, marginBottom: 16 }}>
-              <p style={{ color: '#fff', fontSize: 14, fontWeight: 500, marginBottom: 12 }}>Set Default Allocation</p>
+            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-emphasis)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              <p style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 500, marginBottom: 12 }}>Set Default Allocation</p>
               {allocSplits.map((sp, i) => (
                 <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
                   <select
                     value={sp.branchId}
                     onChange={(e) => { const s = [...allocSplits]; s[i] = { ...s[i], branchId: e.target.value }; setAllocSplits(s) }}
-                    style={{ flex: 2, background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '6px 8px', fontSize: 13 }}
+                    style={{ flex: 2, background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '6px 8px', fontSize: 13 }}
                   >
                     <option value="">Select branch…</option>
                     {availableBranches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -1448,9 +1448,9 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                     max={100}
                     value={sp.percentage}
                     onChange={(e) => { const s = [...allocSplits]; s[i] = { ...s[i], percentage: Number(e.target.value) }; setAllocSplits(s) }}
-                    style={{ width: 70, background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '6px 8px', fontSize: 13 }}
+                    style={{ width: 70, background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '6px 8px', fontSize: 13 }}
                   />
-                  <span style={{ color: '#888', fontSize: 12 }}>%</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>%</span>
                   {allocSplits.length > 1 && (
                     <button onClick={() => setAllocSplits(allocSplits.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#cc4444', cursor: 'pointer', fontSize: 14 }}>✕</button>
                   )}
@@ -1460,35 +1460,35 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                 <span style={{ color: allocSplits.reduce((s, sp) => s + Number(sp.percentage), 0) === 100 ? '#4caf50' : '#cc4444', fontSize: 12 }}>
                   Total: {allocSplits.reduce((s, sp) => s + Number(sp.percentage), 0)}%
                 </span>
-                <button onClick={() => setAllocSplits([...allocSplits, { branchId: '', percentage: 0 }])} style={{ background: 'none', border: '1px solid #333', borderRadius: 6, color: '#888', padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>
+                <button onClick={() => setAllocSplits([...allocSplits, { branchId: '', percentage: 0 }])} style={{ background: 'none', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: 'var(--text-muted)', padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>
                   + Branch
                 </button>
               </div>
               <div style={{ marginBottom: 12 }}>
-                <label style={{ color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 4 }}>Effective From (Saturday)</label>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 4 }}>Effective From (Saturday)</label>
                 <input
                   type="date"
                   value={allocEffectiveFrom}
                   onChange={(e) => setAllocEffectiveFrom(e.target.value)}
-                  style={{ width: '100%', background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '6px 8px', fontSize: 13 }}
+                  style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '6px 8px', fontSize: 13 }}
                 />
               </div>
               <div style={{ marginBottom: 12 }}>
-                <label style={{ color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 4 }}>Notes (optional)</label>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 4 }}>Notes (optional)</label>
                 <input
                   type="text"
                   value={allocNotes}
                   onChange={(e) => setAllocNotes(e.target.value)}
                   placeholder="Reason for split…"
-                  style={{ width: '100%', background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '6px 8px', fontSize: 13 }}
+                  style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '6px 8px', fontSize: 13 }}
                 />
               </div>
               {allocError && <p style={{ color: '#cc4444', fontSize: 12, marginBottom: 8 }}>{allocError}</p>}
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={submitAllocation} disabled={allocSaving} style={{ background: '#ff6b00', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, cursor: 'pointer' }}>
+                <button onClick={submitAllocation} disabled={allocSaving} style={{ background: '#ff6b00', color: 'var(--text-primary)', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, cursor: 'pointer' }}>
                   {allocSaving ? 'Saving…' : 'Save Allocation'}
                 </button>
-                <button onClick={() => { setShowAllocForm(false); setAllocError(null) }} style={{ background: '#2a2a2a', color: '#ccc', border: '1px solid #333', borderRadius: 8, padding: '7px 16px', fontSize: 13, cursor: 'pointer' }}>
+                <button onClick={() => { setShowAllocForm(false); setAllocError(null) }} style={{ background: 'var(--bg-secondary)', color: '#ccc', border: '1px solid var(--border-emphasis)', borderRadius: 8, padding: '7px 16px', fontSize: 13, cursor: 'pointer' }}>
                   Cancel
                 </button>
               </div>
@@ -1501,7 +1501,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
       <SectionHeader style={{ marginTop: 32 }}>Fuel History</SectionHeader>
 
       {!hasFuel ? (
-        <p style={{ color: '#888888', fontSize: 13 }}>No fuel transactions found for this employee.</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No fuel transactions found for this employee.</p>
       ) : (
         <>
           {/* Filters */}
@@ -1572,19 +1572,19 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
                     <tr
                       key={row.id}
                       style={{
-                        borderTop: '1px solid #2a2a2a',
+                        borderTop: '1px solid var(--border)',
                         background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
                       }}
                     >
                       <td style={tdStyle}>{formatPeriod(row.transactionDate)}</td>
                       <td style={{ ...tdStyle, textTransform: 'capitalize' }}>{row.vendor}</td>
                       <td style={tdStyle}>{row.siteName ?? '—'}</td>
-                      <td style={{ ...tdStyle, color: '#888888' }}>
+                      <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>
                         {[row.siteCity, row.siteState].filter(Boolean).join(', ') || '—'}
                       </td>
-                      <td style={{ ...tdStyle, color: '#888888' }}>{row.product ?? '—'}</td>
+                      <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{row.product ?? '—'}</td>
                       <td style={tdStyle}>{row.gallons != null ? row.gallons.toFixed(3) : '—'}</td>
-                      <td style={{ ...tdStyle, color: '#888888' }}>{row.pricePerGallon != null ? `$${row.pricePerGallon.toFixed(3)}` : '—'}</td>
+                      <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{row.pricePerGallon != null ? `$${row.pricePerGallon.toFixed(3)}` : '—'}</td>
                       <td style={{ ...tdStyle, color: '#ff6b00' }}>{formatCurrency(row.totalWithTax)}</td>
                     </tr>
                   ))}
@@ -1609,9 +1609,9 @@ function Pill({ children, color }: { children: React.ReactNode; color?: 'orange'
         borderRadius: 20,
         fontSize: 11,
         fontWeight: 400,
-        background: '#2a2a2a',
+        background: 'var(--bg-secondary)',
         color: color === 'orange' ? '#ff6b00' : '#cccccc',
-        border: '1px solid #333333',
+        border: '1px solid var(--border-emphasis)',
       }}
     >
       {children}
@@ -1640,7 +1640,7 @@ function SectionHeader({
       style={{
         fontSize: 14,
         fontWeight: 500,
-        color: '#ffffff',
+        color: 'var(--text-primary)',
         margin: '0 0 12px 0',
         ...style,
       }}
@@ -1653,9 +1653,9 @@ function SectionHeader({
 // ── Shared styles ─────────────────────────────────────────────────────────────
 
 const cardStyle: React.CSSProperties = {
-  background: '#1e1e1e',
+  background: 'var(--bg-surface)',
   borderRadius: 12,
-  border: '1px solid #2a2a2a',
+  border: '1px solid var(--border)',
   padding: 16,
 }
 
@@ -1663,7 +1663,7 @@ const cardLabelStyle: React.CSSProperties = {
   margin: '0 0 8px 0',
   fontSize: 11,
   fontWeight: 400,
-  color: '#888888',
+  color: 'var(--text-muted)',
   textTransform: 'uppercase',
   letterSpacing: '0.04em',
 }
@@ -1672,7 +1672,7 @@ const thStyle: React.CSSProperties = {
   textAlign: 'left',
   fontSize: 11,
   fontWeight: 400,
-  color: '#666666',
+  color: 'var(--text-dim)',
   paddingBottom: 8,
   paddingRight: 16,
   whiteSpace: 'nowrap',
@@ -1680,17 +1680,17 @@ const thStyle: React.CSSProperties = {
 
 const tdStyle: React.CSSProperties = {
   fontSize: 12,
-  color: '#cccccc',
+  color: 'var(--text-secondary)',
   padding: '8px 16px 8px 0',
   whiteSpace: 'nowrap',
 }
 
 const ltInputStyle: React.CSSProperties = {
   width: '100%',
-  background: '#2a2a2a',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 8,
-  color: '#cccccc',
+  color: 'var(--text-secondary)',
   fontSize: 12,
   padding: '6px 10px',
   outline: 'none',
@@ -1698,10 +1698,10 @@ const ltInputStyle: React.CSSProperties = {
 }
 
 const selectStyle: React.CSSProperties = {
-  background: '#2a2a2a',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 8,
-  color: '#cccccc',
+  color: 'var(--text-secondary)',
   fontSize: 12,
   padding: '5px 12px',
   cursor: 'pointer',

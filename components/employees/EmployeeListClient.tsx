@@ -49,9 +49,9 @@ function fmtDate(dateStr: string | null): string {
 // ── Shared styles ─────────────────────────────────────────────────────────────
 
 const cardStyle: React.CSSProperties = {
-  background: '#1e1e1e',
+  background: 'var(--bg-surface)',
   borderRadius: 12,
-  border: '1px solid #2a2a2a',
+  border: '1px solid var(--border)',
   padding: 16,
 }
 
@@ -59,7 +59,7 @@ const thStyle: React.CSSProperties = {
   textAlign: 'left',
   fontSize: 11,
   fontWeight: 400,
-  color: '#666666',
+  color: 'var(--text-dim)',
   paddingBottom: 8,
   paddingRight: 12,
   whiteSpace: 'nowrap',
@@ -69,17 +69,17 @@ const thStyle: React.CSSProperties = {
 
 const tdStyle: React.CSSProperties = {
   fontSize: 12,
-  color: '#cccccc',
+  color: 'var(--text-secondary)',
   padding: '9px 12px 9px 0',
   whiteSpace: 'nowrap',
   verticalAlign: 'middle',
 }
 
 const inputStyle: React.CSSProperties = {
-  background: '#2a2a2a',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 8,
-  color: '#cccccc',
+  color: 'var(--text-secondary)',
   fontSize: 12,
   padding: '6px 12px',
   outline: 'none',
@@ -87,10 +87,10 @@ const inputStyle: React.CSSProperties = {
 }
 
 const selectStyle: React.CSSProperties = {
-  background: '#2a2a2a',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 8,
-  color: '#cccccc',
+  color: 'var(--text-secondary)',
   fontSize: 12,
   padding: '6px 10px',
   outline: 'none',
@@ -198,7 +198,7 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
   return (
     <div style={{ padding: 24, maxWidth: 1200 }}>
       {/* Page title */}
-      <h1 style={{ fontSize: 22, fontWeight: 500, color: '#ffffff', margin: '0 0 20px 0' }}>
+      <h1 style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)', margin: '0 0 20px 0' }}>
         Employees
       </h1>
 
@@ -220,7 +220,7 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
               left: 10,
               top: '50%',
               transform: 'translateY(-50%)',
-              color: '#666666',
+              color: 'var(--text-dim)',
               fontSize: 13,
               pointerEvents: 'none',
             }}
@@ -280,9 +280,9 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
             onClick={clearFilters}
             style={{
               background: 'none',
-              border: '1px solid #333333',
+              border: '1px solid var(--border-emphasis)',
               borderRadius: 8,
-              color: '#888888',
+              color: 'var(--text-muted)',
               fontSize: 12,
               padding: '6px 12px',
               cursor: 'pointer',
@@ -295,7 +295,7 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
       </div>
 
       {/* Count */}
-      <p style={{ fontSize: 12, color: '#888888', margin: '0 0 12px 0' }}>
+      <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 12px 0' }}>
         {loading
           ? 'Loading…'
           : `Showing ${employees.length} of ${total} employee${total !== 1 ? 's' : ''}`}
@@ -311,7 +311,7 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
         {loading ? (
           <SkeletonRows />
         ) : employees.length === 0 ? (
-          <div style={{ padding: '32px 0', textAlign: 'center', color: '#555555', fontSize: 13 }}>
+          <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>
             No employees match your filters.
           </div>
         ) : (
@@ -348,7 +348,7 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
                   <tr
                     key={emp.id}
                     style={{
-                      borderTop: '1px solid #2a2a2a',
+                      borderTop: '1px solid var(--border)',
                       background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
                     }}
                   >
@@ -366,7 +366,7 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
 
                     {/* Branch */}
                     <td style={{ ...tdStyle, color: '#ff6b00' }}>
-                      {emp.branchName ?? <span style={{ color: '#555555' }}>—</span>}
+                      {emp.branchName ?? <span style={{ color: 'var(--text-faint)' }}>—</span>}
                     </td>
 
                     {/* Entities */}
@@ -376,12 +376,12 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
                           ? emp.entities.map((code) => (
                               <span key={code} style={pillStyle}>{code}</span>
                             ))
-                          : <span style={{ color: '#555555' }}>—</span>}
+                          : <span style={{ color: 'var(--text-faint)' }}>—</span>}
                       </div>
                     </td>
 
                     {/* Labor Type */}
-                    <td style={{ ...tdStyle, color: '#888888' }}>
+                    <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>
                       {fmtLaborType(emp.laborType)}
                     </td>
 
@@ -402,8 +402,8 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
                       ) : (
                         <span
                           style={{
-                            background: '#2a2a2a',
-                            color: '#888888',
+                            background: 'var(--bg-secondary)',
+                            color: 'var(--text-muted)',
                             borderRadius: 4,
                             fontSize: 11,
                             padding: '2px 8px',
@@ -415,7 +415,7 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
                     </td>
 
                     {/* Last Payroll */}
-                    <td style={{ ...tdStyle, color: '#888888' }}>
+                    <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>
                       {fmtDate(emp.lastPayrollDate)}
                     </td>
 
@@ -424,9 +424,9 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
                       <Link
                         href={`${basePath}/${emp.id}`}
                         style={{
-                          background: '#2a2a2a',
-                          color: '#cccccc',
-                          border: '1px solid #333333',
+                          background: 'var(--bg-secondary)',
+                          color: 'var(--text-secondary)',
+                          border: '1px solid var(--border-emphasis)',
                           borderRadius: 6,
                           fontSize: 11,
                           padding: '4px 10px',
@@ -461,9 +461,9 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
               alignItems: 'center',
               marginTop: 16,
               paddingTop: 12,
-              borderTop: '1px solid #2a2a2a',
+              borderTop: '1px solid var(--border)',
               fontSize: 12,
-              color: '#888888',
+              color: 'var(--text-muted)',
             }}
           >
             <span>
@@ -474,7 +474,7 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
                 style={{
-                  background: '#2a2a2a',
+                  background: 'var(--bg-secondary)',
                   border: 'none',
                   borderRadius: 6,
                   padding: '5px 12px',
@@ -490,7 +490,7 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
                 style={{
-                  background: '#2a2a2a',
+                  background: 'var(--bg-secondary)',
                   border: 'none',
                   borderRadius: 6,
                   padding: '5px 12px',
@@ -520,7 +520,7 @@ function SkeletonRows() {
           key={i}
           style={{
             height: 36,
-            background: '#2a2a2a',
+            background: 'var(--bg-secondary)',
             borderRadius: 6,
             opacity: 1 - i * 0.08,
           }}

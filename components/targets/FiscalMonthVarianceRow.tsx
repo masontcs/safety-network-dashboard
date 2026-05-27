@@ -53,7 +53,7 @@ function VarianceMetric({
     return (
       <div style={{ minWidth: 180 }}>
         <p style={labelStyle}>{label}</p>
-        <p style={{ margin: 0, fontSize: 13, color: '#555555' }}>No target</p>
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--text-faint)' }}>No target</p>
       </div>
     )
   }
@@ -61,7 +61,7 @@ function VarianceMetric({
     return (
       <div style={{ minWidth: 180 }}>
         <p style={labelStyle}>{label}</p>
-        <p style={{ margin: 0, fontSize: 13, color: '#888888' }}>—</p>
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>—</p>
       </div>
     )
   }
@@ -75,8 +75,8 @@ function VarianceMetric({
     <div style={{ minWidth: 180, background: STATUS_BG[status], borderRadius: 8, padding: '10px 14px' }}>
       <p style={labelStyle}>{label}</p>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 2 }}>
-        <span style={{ fontSize: 18, fontWeight: 500, color: '#ffffff' }}>{fmt(actual)}</span>
-        <span style={{ fontSize: 11, color: '#888888' }}>vs {fmt(target)}</span>
+        <span style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)' }}>{fmt(actual)}</span>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>vs {fmt(target)}</span>
       </div>
       <span style={{ fontSize: 11, color: STATUS_COLOR[status] }}>
         {sign}{fmt(varAbs)} ({sign}{varPct.toFixed(1)}%)
@@ -124,25 +124,25 @@ export default function FiscalMonthVarianceRow({
 
     return (
       <div style={{
-        background: '#1e1e1e',
-        border: '1px solid #2a2a2a',
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border)',
         borderRadius: 8,
         padding: '8px 12px',
         fontSize: 12,
-        color: '#888888',
+        color: 'var(--text-muted)',
         display: 'flex',
         flexWrap: 'wrap',
         gap: 8,
         alignItems: 'center',
       }}>
         <span style={{ textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: 10 }}>Target</span>
-        <span style={{ color: '#cccccc' }}>{formatCurrency(totalRevenueTarget)}</span>
-        <span style={{ color: '#555555' }}>|</span>
+        <span style={{ color: 'var(--text-secondary)' }}>{formatCurrency(totalRevenueTarget)}</span>
+        <span style={{ color: 'var(--text-faint)' }}>|</span>
         <span style={{ textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: 10 }}>Actual</span>
-        <span style={{ color: '#cccccc' }}>{actualRevenue != null ? formatCurrency(actualRevenue) : '—'}</span>
+        <span style={{ color: 'var(--text-secondary)' }}>{actualRevenue != null ? formatCurrency(actualRevenue) : '—'}</span>
         {varPct != null && (
           <>
-            <span style={{ color: '#555555' }}>|</span>
+            <span style={{ color: 'var(--text-faint)' }}>|</span>
             <span style={{ color: STATUS_COLOR[status], fontWeight: 500 }}>
               {sign}{varPct.toFixed(1)}%
             </span>
@@ -175,7 +175,7 @@ export default function FiscalMonthVarianceRow({
           Variance vs Target
           {fiscalMonthName && <span style={subHeaderStyle}>{fiscalMonthName}</span>}
         </p>
-        <p style={{ margin: 0, fontSize: 12, color: '#555555' }}>
+        <p style={{ margin: 0, fontSize: 12, color: 'var(--text-faint)' }}>
           No targets configured for this fiscal month.{' '}
           <a href="/admin/targets" style={{ color: '#ff6b00', textDecoration: 'none' }}>
             Set targets →
@@ -204,8 +204,8 @@ export default function FiscalMonthVarianceRow({
 }
 
 const containerStyle: React.CSSProperties = {
-  background: '#1e1e1e',
-  border: '1px solid #2a2a2a',
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border)',
   borderRadius: 12,
   padding: '12px 16px',
 }
@@ -214,7 +214,7 @@ const headerStyle: React.CSSProperties = {
   margin: '0 0 10px 0',
   fontSize: 11,
   fontWeight: 400,
-  color: '#888888',
+  color: 'var(--text-muted)',
   textTransform: 'uppercase',
   letterSpacing: '0.04em',
 }
@@ -223,13 +223,13 @@ const subHeaderStyle: React.CSSProperties = {
   marginLeft: 8,
   textTransform: 'none',
   fontWeight: 400,
-  color: '#555555',
+  color: 'var(--text-faint)',
 }
 
 const labelStyle: React.CSSProperties = {
   margin: '0 0 4px 0',
   fontSize: 11,
-  color: '#888888',
+  color: 'var(--text-muted)',
   textTransform: 'uppercase',
   letterSpacing: '0.04em',
 }

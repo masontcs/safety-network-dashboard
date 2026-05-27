@@ -53,7 +53,7 @@ function CustomTooltip({ active, payload, label, formatValue }: {
   return (
     <div style={{
       background: '#161616',
-      border: '1px solid #2a2a2a',
+      border: '1px solid var(--border)',
       borderRadius: 8,
       padding: '10px 14px',
       fontSize: 12,
@@ -61,17 +61,17 @@ function CustomTooltip({ active, payload, label, formatValue }: {
       minWidth: 170,
       pointerEvents: 'none',
     }}>
-      <div style={{ color: '#888888', fontSize: 11, marginBottom: 8, fontWeight: 500 }}>{label}</div>
+      <div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 8, fontWeight: 500 }}>{label}</div>
       {entries.map((entry) => (
         <div key={entry.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <div style={{ width: 8, height: 8, borderRadius: 2, background: entry.color, flexShrink: 0 }} />
-          <span style={{ color: '#888888', flex: 1, fontSize: 11 }}>{entry.name}</span>
-          <span style={{ color: '#ffffff', fontWeight: 500 }}>{formatValue(entry.value ?? 0)}</span>
+          <span style={{ color: 'var(--text-muted)', flex: 1, fontSize: 11 }}>{entry.name}</span>
+          <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{formatValue(entry.value ?? 0)}</span>
         </div>
       ))}
       {entries.length > 1 && (
         <div style={{ borderTop: '1px solid #242424', marginTop: 6, paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ color: '#555555', fontSize: 11 }}>Total</span>
+          <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>Total</span>
           <span style={{ color: '#ff6b00', fontWeight: 500, fontSize: 11 }}>{formatValue(total)}</span>
         </div>
       )}
@@ -170,7 +170,7 @@ export default function WeeklyChart({ data, dateKey, series, height = 160, forma
           {series.map((s) => (
             <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ width: 8, height: 8, borderRadius: 2, background: s.color, opacity: s.opacity ?? 1 }} />
-              <span style={{ fontSize: 10, color: '#888888' }}>{s.label}</span>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{s.label}</span>
             </div>
           ))}
         </div>

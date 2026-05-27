@@ -93,7 +93,7 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           style={{
-            background: '#2a2a2a', border: '1px solid #333', borderRadius: 8,
+            background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8,
             color: '#ccc', padding: '7px 12px', fontSize: 12, outline: 'none', width: 200,
           }}
         />
@@ -101,42 +101,42 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
         <select
           value={entity}
           onChange={(e) => setEntity(e.target.value)}
-          style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
+          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
         >
           <option value="">All Entities</option>
           {ENTITIES.map((e) => <option key={e} value={e}>{e}</option>)}
         </select>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <label style={{ fontSize: 11, color: '#666' }}>From</label>
+          <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>From</label>
           <input
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '7px 10px', fontSize: 12, outline: 'none' }}
+            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '7px 10px', fontSize: 12, outline: 'none' }}
           />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <label style={{ fontSize: 11, color: '#666' }}>To</label>
+          <label style={{ fontSize: 11, color: 'var(--text-dim)' }}>To</label>
           <input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '7px 10px', fontSize: 12, outline: 'none' }}
+            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '7px 10px', fontSize: 12, outline: 'none' }}
           />
         </div>
 
         {hasFilters && (
           <button
             onClick={clearFilters}
-            style={{ background: 'transparent', border: '1px solid #333', borderRadius: 8, color: '#888', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
+            style={{ background: 'transparent', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: 'var(--text-muted)', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
           >
             Clear
           </button>
         )}
 
         {!loading && (
-          <span style={{ fontSize: 12, color: '#555', marginLeft: 4 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-faint)', marginLeft: 4 }}>
             {total.toLocaleString()} payment{total !== 1 ? 's' : ''}
             {hasFilters && payments.length < total ? ` (${payments.length} shown)` : ''}
           </span>
@@ -144,18 +144,18 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
       </div>
 
       {/* Table */}
-      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 {['Date', 'Customer', 'Entity', 'Check / Ref #', 'Memo', 'Amount'].map((h, i) => (
                   <th
                     key={h}
                     style={{
                       padding: '10px 12px',
                       fontSize: 11,
-                      color: '#666',
+                      color: 'var(--text-dim)',
                       fontWeight: 400,
                       textAlign: i === 5 ? 'right' : 'left',
                       whiteSpace: 'nowrap',
@@ -169,13 +169,13 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#555', fontSize: 13 }}>
+                  <td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>
                     Loading…
                   </td>
                 </tr>
               ) : payments.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#555', fontSize: 13 }}>
+                  <td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>
                     {hasFilters ? 'No payments match your filters.' : 'No payments imported yet. Use Import Payments to get started.'}
                   </td>
                 </tr>
@@ -202,17 +202,17 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
                         <span style={{ color: pmt.unmatched ? '#666' : '#ccc' }}>
                           {pmt.customer_name}
                           {pmt.unmatched && (
-                            <span style={{ fontSize: 10, color: '#555', marginLeft: 6, fontStyle: 'italic' }}>
+                            <span style={{ fontSize: 10, color: 'var(--text-faint)', marginLeft: 6, fontStyle: 'italic' }}>
                               unmatched
                             </span>
                           )}
                         </span>
                       )}
                     </td>
-                    <td style={{ padding: '9px 12px', fontSize: 11, color: '#888' }}>
+                    <td style={{ padding: '9px 12px', fontSize: 11, color: 'var(--text-muted)' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                         <span style={{
-                          background: '#2a2a2a', borderRadius: 4,
+                          background: 'var(--bg-secondary)', borderRadius: 4,
                           padding: '2px 7px', fontWeight: 500, color: '#aaa',
                         }}>
                           {pmt.entity_code}
@@ -227,7 +227,7 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
                     <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                       {pmt.reference_number ?? <span style={{ color: '#444' }}>—</span>}
                     </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#888', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-muted)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {pmt.memo ?? <span style={{ color: '#444' }}>—</span>}
                     </td>
                     <td style={{ padding: '9px 12px', fontSize: 13, color: '#4caf50', fontWeight: 500, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
@@ -240,8 +240,8 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
             {/* Footer total */}
             {!loading && payments.length > 0 && (
               <tfoot>
-                <tr style={{ borderTop: '1px solid #2a2a2a' }}>
-                  <td colSpan={5} style={{ padding: '10px 12px', fontSize: 12, color: '#666' }}>
+                <tr style={{ borderTop: '1px solid var(--border)' }}>
+                  <td colSpan={5} style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text-dim)' }}>
                     {payments.length < total
                       ? `Showing ${payments.length} of ${total.toLocaleString()} payments`
                       : `${payments.length} payment${payments.length !== 1 ? 's' : ''}`}
@@ -263,21 +263,21 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
             style={{
-              background: '#2a2a2a', border: '1px solid #333', borderRadius: 8,
+              background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8,
               color: page === 1 ? '#444' : '#ccc', padding: '6px 14px', fontSize: 12,
               cursor: page === 1 ? 'default' : 'pointer',
             }}
           >
             ← Prev
           </button>
-          <span style={{ fontSize: 12, color: '#666' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
             Page {page} of {totalPages}
           </span>
           <button
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
             style={{
-              background: '#2a2a2a', border: '1px solid #333', borderRadius: 8,
+              background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8,
               color: page === totalPages ? '#444' : '#ccc', padding: '6px 14px', fontSize: 12,
               cursor: page === totalPages ? 'default' : 'pointer',
             }}

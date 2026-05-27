@@ -56,12 +56,12 @@ function FormRow({
       value={String(value[key])}
       onChange={(e) => onChange({ ...value, [key]: type === 'number' ? Number(e.target.value) : e.target.value })}
       style={{
-        background: '#2a2a2a',
-        border: '1px solid #333333',
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border-emphasis)',
         borderRadius: 6,
         padding: '5px 8px',
         fontSize: 12,
-        color: '#cccccc',
+        color: 'var(--text-secondary)',
         fontFamily: 'inherit',
         width: width ?? 'auto',
       }}
@@ -69,13 +69,13 @@ function FormRow({
   )
 
   return (
-    <tr style={{ borderBottom: '1px solid #333333', background: '#1a1a1a' }}>
+    <tr style={{ borderBottom: '1px solid var(--border-emphasis)', background: 'var(--bg-nav)' }}>
       <td style={{ padding: '10px 16px' }}>{field('name', 'text', 'Name e.g. January 2026', 180)}</td>
       <td style={{ padding: '10px 8px' }}>{field('year', 'number', 'Year', 72)}</td>
       <td style={{ padding: '10px 8px' }}>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap' }}>
           {field('start_date', 'date', '', 130)}
-          <span style={{ color: '#555555', fontSize: 11 }}>→</span>
+          <span style={{ color: 'var(--text-faint)', fontSize: 11 }}>→</span>
           {field('end_date', 'date', '', 130)}
           {value.start_date && !isSundayStr(value.start_date) && (
             <span style={{ color: '#cc4444', fontSize: 10 }}>start not Sun</span>
@@ -94,7 +94,7 @@ function FormRow({
             onChange={(e) => onChange({ ...value, is_active: e.target.checked })}
             style={{ accentColor: '#ff6b00' }}
           />
-          <span style={{ fontSize: 12, color: '#888888' }}>Active</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Active</span>
         </label>
       </td>
       <td style={{ padding: '10px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -111,8 +111,8 @@ function FormRow({
             <button
               onClick={onCancel}
               style={{
-                background: '#2a2a2a', border: 'none', borderRadius: 6, padding: '5px 12px',
-                fontSize: 12, color: '#888888', cursor: 'pointer', fontFamily: 'inherit',
+                background: 'var(--bg-secondary)', border: 'none', borderRadius: 6, padding: '5px 12px',
+                fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit',
               }}
             >
               Cancel
@@ -250,7 +250,7 @@ export default function FiscalMonthsClient() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 960 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Fiscal Months</div>
+        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fiscal Months</div>
         {!adding && (
           <button
             onClick={() => { setAdding(true); setAddForm(BLANK_FORM); setAddError(null) }}
@@ -275,7 +275,7 @@ export default function FiscalMonthsClient() {
                   <th
                     key={h}
                     className="table-header"
-                    style={{ textAlign: 'left', padding: '10px 16px', borderBottom: '1px solid #2a2a2a', fontWeight: 400, fontSize: 11, color: '#666666', textTransform: 'uppercase', letterSpacing: '0.04em' }}
+                    style={{ textAlign: 'left', padding: '10px 16px', borderBottom: '1px solid var(--border)', fontWeight: 400, fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}
                   >
                     {h}
                   </th>
@@ -298,7 +298,7 @@ export default function FiscalMonthsClient() {
 
               {months.length === 0 && !adding && (
                 <tr>
-                  <td colSpan={6} style={{ padding: '24px 16px', textAlign: 'center', fontSize: 12, color: '#555555' }}>
+                  <td colSpan={6} style={{ padding: '24px 16px', textAlign: 'center', fontSize: 12, color: 'var(--text-faint)' }}>
                     No fiscal months defined. Click &ldquo;Add Fiscal Month&rdquo; to create one.
                   </td>
                 </tr>
@@ -323,14 +323,14 @@ export default function FiscalMonthsClient() {
                 const isDeleting = deleteId === m.id
 
                 return (
-                  <tr key={m.id} style={{ borderBottom: '1px solid #2a2a2a' }}>
-                    <td className="table-body" style={{ padding: '10px 16px', color: '#ffffff', fontWeight: 500 }}>
+                  <tr key={m.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td className="table-body" style={{ padding: '10px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>
                       {m.name}
                     </td>
                     <td className="table-body" style={{ padding: '10px 16px' }}>
                       {m.year}
                     </td>
-                    <td className="table-body" style={{ padding: '10px 16px', fontSize: 12, color: '#888888' }}>
+                    <td className="table-body" style={{ padding: '10px 16px', fontSize: 12, color: 'var(--text-muted)' }}>
                       {fmtDate(m.start_date)} → {fmtDate(m.end_date)}
                     </td>
                     <td className="table-body" style={{ padding: '10px 16px' }}>
@@ -357,7 +357,7 @@ export default function FiscalMonthsClient() {
                           </button>
                           <button
                             onClick={() => setDeleteId(null)}
-                            style={{ background: '#2a2a2a', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: '#888888', cursor: 'pointer', fontFamily: 'inherit' }}
+                            style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit' }}
                           >
                             Cancel
                           </button>
@@ -372,7 +372,7 @@ export default function FiscalMonthsClient() {
                           </button>
                           <button
                             onClick={() => setDeleteId(m.id)}
-                            style={{ background: 'none', border: 'none', color: '#666666', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
                           >
                             Delete
                           </button>

@@ -32,14 +32,14 @@ export default function BranchMultiSelect({ branches, selectedIds, onChange, rol
 
   const labelStyle: React.CSSProperties = {
     fontSize: 12,
-    color: '#cccccc',
+    color: 'var(--text-secondary)',
     cursor: 'pointer',
     userSelect: 'none',
   }
 
   const groupLabelStyle: React.CSSProperties = {
     fontSize: 10,
-    color: '#555555',
+    color: 'var(--text-faint)',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
     fontWeight: 500,
@@ -76,8 +76,8 @@ export default function BranchMultiSelect({ branches, selectedIds, onChange, rol
       {/* Checkbox list */}
       <div
         style={{
-          background: '#1a1a1a',
-          border: '1px solid #333333',
+          background: 'var(--bg-nav)',
+          border: '1px solid var(--border-emphasis)',
           borderRadius: 6,
           maxHeight: 180,
           overflowY: 'auto',

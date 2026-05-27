@@ -6,12 +6,12 @@ import { createBrowserClient } from '@/lib/supabase/client'
 
 const INPUT_STYLE: React.CSSProperties = {
   width: '100%',
-  background: '#2a2a2a',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 8,
   padding: '8px 12px',
   fontSize: 13,
-  color: '#ffffff',
+  color: 'var(--text-primary)',
   outline: 'none',
   boxSizing: 'border-box',
 }
@@ -78,7 +78,7 @@ export default function ChangePasswordPage() {
       className="px-4 md:px-0"
       style={{
         minHeight: '100vh',
-        background: '#111111',
+        background: 'var(--bg-base)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -92,17 +92,17 @@ export default function ChangePasswordPage() {
             alt="Safety Network"
             className="block mx-auto w-[120px] md:w-auto md:h-[52px] h-auto mb-4"
           />
-          <div style={{ fontSize: 18, fontWeight: 500, color: '#ffffff', marginBottom: 6 }}>
+          <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 6 }}>
             Set Your Password
           </div>
-          <div style={{ fontSize: 12, color: '#888888', lineHeight: 1.5 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
             You must set a new password before continuing.
           </div>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 11, color: '#888888', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
               New Password
             </label>
             <input
@@ -116,7 +116,7 @@ export default function ChangePasswordPage() {
           </div>
 
           <div style={{ marginBottom: 24 }}>
-            <label style={{ display: 'block', fontSize: 11, color: '#888888', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
               Confirm New Password
             </label>
             <input

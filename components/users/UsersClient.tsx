@@ -42,23 +42,23 @@ const ROLE_COLORS: Record<Role, string> = {
 }
 
 const selectStyle: React.CSSProperties = {
-  background: '#2a2a2a',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 6,
   padding: '4px 8px',
   fontSize: 12,
-  color: '#cccccc',
+  color: 'var(--text-secondary)',
   fontFamily: 'inherit',
 }
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
-  background: '#2a2a2a',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 6,
   padding: '7px 10px',
   fontSize: 13,
-  color: '#ffffff',
+  color: 'var(--text-primary)',
   outline: 'none',
   fontFamily: 'inherit',
   boxSizing: 'border-box',
@@ -384,7 +384,7 @@ export default function UsersClient() {
     <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1100 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Users</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Users</div>
           <button onClick={openCreate} className="btn-primary" style={{ fontSize: 13, padding: '7px 16px' }}>
             + Add User
           </button>
@@ -412,7 +412,7 @@ export default function UsersClient() {
                     <th
                       key={h}
                       className="table-header"
-                      style={{ textAlign: 'left', padding: '10px 14px', borderBottom: '1px solid #2a2a2a', fontWeight: 400 }}
+                      style={{ textAlign: 'left', padding: '10px 14px', borderBottom: '1px solid var(--border)', fontWeight: 400 }}
                     >
                       {h}
                     </th>
@@ -425,7 +425,7 @@ export default function UsersClient() {
                   const shownBranches = user.branchIds.slice(0, 3)
                   const extraCount = user.branchIds.length - shownBranches.length
                   return (
-                    <tr key={user.id} style={{ borderBottom: '1px solid #2a2a2a', opacity: user.isActive ? 1 : 0.45 }}>
+                    <tr key={user.id} style={{ borderBottom: '1px solid var(--border)', opacity: user.isActive ? 1 : 0.45 }}>
                       {/* Access toggle */}
                       <td style={{ padding: '12px 14px', textAlign: 'center', verticalAlign: 'middle' }}>
                         <button
@@ -520,7 +520,7 @@ export default function UsersClient() {
                             role={editRole}
                           />
                         ) : user.branchIds.length === 0 ? (
-                          <span style={{ fontSize: 12, color: '#555555' }}>
+                          <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>
                             {needsBranchScope(user.role) ? 'None assigned' : 'All branches'}
                           </span>
                         ) : (
@@ -531,7 +531,7 @@ export default function UsersClient() {
                               </span>
                             ))}
                             {extraCount > 0 && (
-                              <span style={{ fontSize: 11, color: '#555555', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                              <span style={{ fontSize: 11, color: 'var(--text-faint)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                                 +{extraCount} more
                               </span>
                             )}
@@ -553,7 +553,7 @@ export default function UsersClient() {
                             </button>
                             <button
                               onClick={cancelEdit}
-                              style={{ background: '#2a2a2a', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, color: '#888888', cursor: 'pointer', fontFamily: 'inherit' }}
+                              style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: 6, padding: '5px 12px', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit' }}
                             >
                               Cancel
                             </button>
@@ -562,13 +562,13 @@ export default function UsersClient() {
                           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
                             <button
                               onClick={() => startEdit(user)}
-                              style={{ background: '#2a2a2a', border: '1px solid #333', borderRadius: 6, color: '#ff6b00', fontSize: 12, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit' }}
+                              style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: '#ff6b00', fontSize: 12, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit' }}
                             >
                               Edit
                             </button>
                             <button
                               onClick={() => openReset(user)}
-                              style={{ background: 'none', border: '1px solid #2a2a2a', borderRadius: 6, color: '#666666', fontSize: 12, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit' }}
+                              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-dim)', fontSize: 12, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit' }}
                             >
                               Reset PW
                             </button>
@@ -588,13 +588,13 @@ export default function UsersClient() {
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff' }}>Test Accounts</div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Test Accounts</div>
                 <span style={{ fontSize: 10, fontWeight: 600, color: '#ff9800', background: '#3a2a1a', border: '1px solid #5a3a1a', padding: '1px 7px', borderRadius: 4, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                   Development / Testing Only
                 </span>
               </div>
-              <div style={{ fontSize: 12, color: '#666666' }}>
-                Pre-configured accounts for testing each role. Password: <span style={{ fontFamily: 'monospace', color: '#888888' }}>TestPass2026!</span>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                Pre-configured accounts for testing each role. Password: <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}>TestPass2026!</span>
               </div>
             </div>
           </div>
@@ -606,16 +606,16 @@ export default function UsersClient() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
               {testAccounts.map((a) => (
-                <div key={a.email} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 10px', background: '#1a1a1a', borderRadius: 6 }}>
+                <div key={a.email} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 10px', background: 'var(--bg-nav)', borderRadius: 6 }}>
                   <div style={{
                     width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
                     background: a.exists ? '#4caf50' : '#444444',
                   }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ fontSize: 12, color: '#cccccc' }}>{a.displayName}</span>
-                    <span style={{ fontSize: 11, color: '#555555', marginLeft: 8 }}>{a.email}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{a.displayName}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 8 }}>{a.email}</span>
                   </div>
-                  <span style={{ fontSize: 11, color: '#666666', flexShrink: 0 }}>{a.role.replace('_', ' ')}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)', flexShrink: 0 }}>{a.role.replace('_', ' ')}</span>
                   <span style={{ fontSize: 11, color: a.exists ? '#4caf50' : '#555555', flexShrink: 0 }}>
                     {a.exists ? 'Active' : 'Not created'}
                   </span>
@@ -635,10 +635,10 @@ export default function UsersClient() {
               onClick={handleCreateTestAccounts}
               disabled={testCreating || testDeleting}
               style={{
-                background: '#2a2a2a',
+                background: 'var(--bg-secondary)',
                 border: '1px solid #3a3a3a',
                 borderRadius: 8,
-                color: '#cccccc',
+                color: 'var(--text-secondary)',
                 fontSize: 13,
                 padding: '7px 16px',
                 cursor: (testCreating || testDeleting) ? 'default' : 'pointer',
@@ -675,9 +675,9 @@ export default function UsersClient() {
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}
           onClick={(e) => { if (e.target === e.currentTarget) closeReset() }}
         >
-          <div style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, padding: 28, width: '100%', maxWidth: 440 }}>
-            <div style={{ fontSize: 16, fontWeight: 500, color: '#ffffff', marginBottom: 4 }}>Reset Password</div>
-            <div style={{ fontSize: 12, color: '#888888', marginBottom: 20 }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 28, width: '100%', maxWidth: 440 }}>
+            <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Reset Password</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 20 }}>
               {resetUserName}
             </div>
 
@@ -697,7 +697,7 @@ export default function UsersClient() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Temporary Password</label>
+                  <label style={{ display: 'block', fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Temporary Password</label>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <input
                       type="text"
@@ -710,14 +710,14 @@ export default function UsersClient() {
                       type="button"
                       onClick={handleCopyReset}
                       disabled={!resetPassword}
-                      style={{ background: '#2a2a2a', border: '1px solid #333333', borderRadius: 6, color: resetCopied ? '#4caf50' : '#888888', fontSize: 11, padding: '0 10px', cursor: resetPassword ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: resetPassword ? 1 : 0.4 }}
+                      style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: resetCopied ? '#4caf50' : '#888888', fontSize: 11, padding: '0 10px', cursor: resetPassword ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: resetPassword ? 1 : 0.4 }}
                     >
                       {resetCopied ? 'Copied' : 'Copy'}
                     </button>
                     <button
                       type="button"
                       onClick={handleGenerateReset}
-                      style={{ background: '#2a2a2a', border: '1px solid #333333', borderRadius: 6, color: '#ff6b00', fontSize: 11, padding: '0 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+                      style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: '#ff6b00', fontSize: 11, padding: '0 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
                     >
                       Generate
                     </button>
@@ -725,7 +725,7 @@ export default function UsersClient() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Confirm Password</label>
+                  <label style={{ display: 'block', fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Confirm Password</label>
                   <input
                     type="text"
                     value={resetConfirm}
@@ -735,7 +735,7 @@ export default function UsersClient() {
                   />
                 </div>
 
-                <div style={{ fontSize: 11, color: '#555555', lineHeight: 1.5, padding: '8px 10px', background: '#1a1a1a', borderRadius: 6, border: '1px solid #2a2a2a' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-faint)', lineHeight: 1.5, padding: '8px 10px', background: 'var(--bg-nav)', borderRadius: 6, border: '1px solid var(--border)' }}>
                   Share this temporary password with the user out of band. They will be required to set a new password on their next login.
                 </div>
 
@@ -756,7 +756,7 @@ export default function UsersClient() {
                   </button>
                   <button
                     onClick={closeReset}
-                    style={{ flex: 1, background: '#2a2a2a', border: 'none', borderRadius: 8, color: '#888888', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}
+                    style={{ flex: 1, background: 'var(--bg-secondary)', border: 'none', borderRadius: 8, color: 'var(--text-muted)', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}
                   >
                     Cancel
                   </button>
@@ -773,16 +773,16 @@ export default function UsersClient() {
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}
           onClick={(e) => { if (e.target === e.currentTarget) closeCreate() }}
         >
-          <div style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, padding: 28, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ fontSize: 16, fontWeight: 500, color: '#ffffff', marginBottom: 4 }}>Add User</div>
-            <div style={{ fontSize: 12, color: '#888888', marginBottom: 20 }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 28, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Add User</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 20 }}>
               Create a new account with a temporary password. The user will be required to change it on first login.
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Display name */}
               <div>
-                <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Full Name</label>
+                <label style={{ display: 'block', fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Full Name</label>
                 <input
                   type="text"
                   value={createName}
@@ -795,7 +795,7 @@ export default function UsersClient() {
 
               {/* Email */}
               <div>
-                <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Email</label>
+                <label style={{ display: 'block', fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Email</label>
                 <input
                   type="email"
                   value={createEmail}
@@ -808,7 +808,7 @@ export default function UsersClient() {
 
               {/* Username */}
               <div>
-                <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                <label style={{ display: 'block', fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                   Username <span style={{ color: '#444444', textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
                 </label>
                 <input
@@ -829,7 +829,7 @@ export default function UsersClient() {
 
               {/* Role */}
               <div>
-                <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Role</label>
+                <label style={{ display: 'block', fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Role</label>
                 <select value={createRole} onChange={(e) => setCreateRole(e.target.value as Role)} style={{ ...inputStyle, cursor: 'pointer' }}>
                   {(Object.keys(ROLE_LABELS) as Role[]).map((r) => (
                     <option key={r} value={r}>{ROLE_LABELS[r]}</option>
@@ -839,7 +839,7 @@ export default function UsersClient() {
 
               {/* Branches */}
               <div>
-                <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                <label style={{ display: 'block', fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                   Branches {(createRole === 'admin' || createRole === 'executive') && <span style={{ color: '#444444', textTransform: 'none', letterSpacing: 0 }}>(optional — they see all)</span>}
                 </label>
                 <BranchMultiSelect
@@ -852,7 +852,7 @@ export default function UsersClient() {
 
               {/* Temporary password */}
               <div>
-                <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Temporary Password</label>
+                <label style={{ display: 'block', fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Temporary Password</label>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input
                     type="text"
@@ -865,14 +865,14 @@ export default function UsersClient() {
                     type="button"
                     onClick={handleCopyCreate}
                     disabled={!createPassword}
-                    style={{ background: '#2a2a2a', border: '1px solid #333333', borderRadius: 6, color: createCopied ? '#4caf50' : '#888888', fontSize: 11, padding: '0 10px', cursor: createPassword ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: createPassword ? 1 : 0.4 }}
+                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: createCopied ? '#4caf50' : '#888888', fontSize: 11, padding: '0 10px', cursor: createPassword ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: createPassword ? 1 : 0.4 }}
                   >
                     {createCopied ? 'Copied' : 'Copy'}
                   </button>
                   <button
                     type="button"
                     onClick={handleGenerateCreate}
-                    style={{ background: '#2a2a2a', border: '1px solid #333333', borderRadius: 6, color: '#ff6b00', fontSize: 11, padding: '0 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: '#ff6b00', fontSize: 11, padding: '0 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
                   >
                     Generate
                   </button>
@@ -881,7 +881,7 @@ export default function UsersClient() {
 
               {/* Confirm password */}
               <div>
-                <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Confirm Password</label>
+                <label style={{ display: 'block', fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Confirm Password</label>
                 <input
                   type="text"
                   value={createConfirm}
@@ -891,7 +891,7 @@ export default function UsersClient() {
                 />
               </div>
 
-              <div style={{ fontSize: 11, color: '#555555', lineHeight: 1.5, padding: '8px 10px', background: '#1a1a1a', borderRadius: 6, border: '1px solid #2a2a2a' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-faint)', lineHeight: 1.5, padding: '8px 10px', background: 'var(--bg-nav)', borderRadius: 6, border: '1px solid var(--border)' }}>
                 Share this temporary password with the user. They will be required to change it on first login.
               </div>
 
@@ -912,7 +912,7 @@ export default function UsersClient() {
                 </button>
                 <button
                   onClick={closeCreate}
-                  style={{ flex: 1, background: '#2a2a2a', border: 'none', borderRadius: 8, color: '#888888', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}
+                  style={{ flex: 1, background: 'var(--bg-secondary)', border: 'none', borderRadius: 8, color: 'var(--text-muted)', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}
                 >
                   Cancel
                 </button>

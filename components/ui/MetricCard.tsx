@@ -32,7 +32,7 @@ export default function MetricCard({
       style={{
         background: isHero ? '#ff6b00' : '#1e1e1e',
         borderRadius: 12,
-        border: isHero ? 'none' : '1px solid #2a2a2a',
+        border: isHero ? 'none' : '1px solid var(--border)',
         padding: 16,
         display: 'flex',
         flexDirection: 'column',
@@ -79,7 +79,7 @@ export default function MetricCard({
         style={{
           fontSize: isHero ? 28 : 26,
           fontWeight: 500,
-          color: '#ffffff',
+          color: 'var(--text-primary)',
           lineHeight: 1.1,
           marginTop: 8,
         }}

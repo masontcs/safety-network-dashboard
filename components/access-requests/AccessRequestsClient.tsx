@@ -53,9 +53,9 @@ function StatusPill({ status }: { status: AccessRequest['status'] }) {
   const styles: Record<string, React.CSSProperties> = {
     pending:  { background: '#2a1a00', color: '#ff9800', border: '1px solid #3a2a00' },
     approved: { background: '#1a3a1a', color: '#4caf50', border: '1px solid #2a4a2a' },
-    archived: { background: '#2a2a2a', color: '#555555', border: '1px solid #333333' },
+    archived: { background: 'var(--bg-secondary)', color: 'var(--text-faint)', border: '1px solid var(--border-emphasis)' },
     // legacy denied records
-    denied:   { background: '#2a2a2a', color: '#555555', border: '1px solid #333333' },
+    denied:   { background: 'var(--bg-secondary)', color: 'var(--text-faint)', border: '1px solid var(--border-emphasis)' },
   }
   const label = status === 'denied' ? 'Archived' : status.charAt(0).toUpperCase() + status.slice(1)
   return (
@@ -213,12 +213,12 @@ export default function AccessRequestsClient() {
   }
 
   const selectStyle: React.CSSProperties = {
-    background: '#2a2a2a',
-    border: '1px solid #333333',
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border-emphasis)',
     borderRadius: 6,
     padding: '7px 10px',
     fontSize: 12,
-    color: '#cccccc',
+    color: 'var(--text-secondary)',
     fontFamily: 'inherit',
     cursor: 'pointer',
     width: '100%',
@@ -228,9 +228,9 @@ export default function AccessRequestsClient() {
     <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1100 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-          <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Access Requests</div>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Access Requests</div>
           {!loading && pending.length > 0 && (
-            <span style={{ background: '#ff6b00', color: '#ffffff', borderRadius: 10, padding: '1px 8px', fontSize: 11, fontWeight: 600 }}>
+            <span style={{ background: '#ff6b00', color: 'var(--text-primary)', borderRadius: 10, padding: '1px 8px', fontSize: 11, fontWeight: 600 }}>
               {pending.length} pending
             </span>
           )}
@@ -238,16 +238,16 @@ export default function AccessRequestsClient() {
 
         {/* Pending table */}
         <div className="card" style={{ padding: 0 }}>
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid #2a2a2a', display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 500, color: '#cccccc' }}>Pending Review</span>
-            <span style={{ fontSize: 11, color: '#555' }}>— click Review to approve or adjust the role &amp; branches before creating the account</span>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)' }}>Pending Review</span>
+            <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>— click Review to approve or adjust the role &amp; branches before creating the account</span>
           </div>
           {loading ? (
             <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[1, 2, 3].map((i) => <Skeleton key={i} height={44} />)}
             </div>
           ) : pending.length === 0 ? (
-            <div style={{ padding: '20px 16px', textAlign: 'center', fontSize: 12, color: '#555555' }}>
+            <div style={{ padding: '20px 16px', textAlign: 'center', fontSize: 12, color: 'var(--text-faint)' }}>
               No pending requests.
             </div>
           ) : (
@@ -255,7 +255,7 @@ export default function AccessRequestsClient() {
               <thead>
                 <tr>
                   {['Name', 'Email', 'Username', 'Requested Branch', 'Requested Role', 'Submitted', 'Notes', ''].map((h) => (
-                    <th key={h} style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 400, fontSize: 11, color: '#666666', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #2a2a2a' }}>
+                    <th key={h} style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 400, fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid var(--border)' }}>
                       {h}
                     </th>
                   ))}
@@ -263,29 +263,29 @@ export default function AccessRequestsClient() {
               </thead>
               <tbody>
                 {pending.map((r) => (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #2a2a2a' }}>
-                    <td style={{ padding: '11px 16px', fontSize: 13, fontWeight: 500, color: '#ffffff', whiteSpace: 'nowrap' }}>
+                  <tr key={r.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '11px 16px', fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                       {r.firstName} {r.lastName}
                     </td>
-                    <td style={{ padding: '11px 16px', fontSize: 12, color: '#cccccc' }}>{r.email}</td>
-                    <td style={{ padding: '11px 16px', fontSize: 12, color: '#888888', fontFamily: 'monospace' }}>
-                      {r.username ?? <span style={{ color: '#555555' }}>—</span>}
+                    <td style={{ padding: '11px 16px', fontSize: 12, color: 'var(--text-secondary)' }}>{r.email}</td>
+                    <td style={{ padding: '11px 16px', fontSize: 12, color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                      {r.username ?? <span style={{ color: 'var(--text-faint)' }}>—</span>}
                     </td>
-                    <td style={{ padding: '11px 16px', fontSize: 12, color: '#888888', whiteSpace: 'nowrap' }}>
-                      {r.branchName ?? <span style={{ color: '#555555' }}>—</span>}
+                    <td style={{ padding: '11px 16px', fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                      {r.branchName ?? <span style={{ color: 'var(--text-faint)' }}>—</span>}
                     </td>
-                    <td style={{ padding: '11px 16px', fontSize: 12, color: '#888888', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '11px 16px', fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                       {ROLE_LABELS[r.requestedRole] ?? r.requestedRole}
                     </td>
-                    <td style={{ padding: '11px 16px', fontSize: 12, color: '#888888', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '11px 16px', fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                       {fmtDate(r.createdAt)}
                     </td>
-                    <td style={{ padding: '11px 16px', fontSize: 12, color: '#888888', maxWidth: 200 }}>
+                    <td style={{ padding: '11px 16px', fontSize: 12, color: 'var(--text-muted)', maxWidth: 200 }}>
                       {r.notes ? (
                         <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                           {r.notes}
                         </span>
-                      ) : <span style={{ color: '#555555' }}>—</span>}
+                      ) : <span style={{ color: 'var(--text-faint)' }}>—</span>}
                     </td>
                     <td style={{ padding: '11px 16px', whiteSpace: 'nowrap', textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
@@ -300,7 +300,7 @@ export default function AccessRequestsClient() {
                         <button
                           onClick={() => openArchive(r)}
                           title="Archive this request (not a block — they can re-apply)"
-                          style={{ background: 'none', border: '1px solid #2a2a2a', borderRadius: 6, color: '#444444', fontSize: 11, padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit' }}
+                          style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, color: '#444444', fontSize: 11, padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit' }}
                           onMouseEnter={(e) => { e.currentTarget.style.color = '#666'; e.currentTarget.style.borderColor = '#444' }}
                           onMouseLeave={(e) => { e.currentTarget.style.color = '#444'; e.currentTarget.style.borderColor = '#2a2a2a' }}
                         >
@@ -318,14 +318,14 @@ export default function AccessRequestsClient() {
         {/* Reviewed table */}
         {!loading && reviewed.length > 0 && (
           <div className="card" style={{ padding: 0 }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid #2a2a2a', fontSize: 12, fontWeight: 500, color: '#cccccc' }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)' }}>
               Reviewed
             </div>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   {['Name', 'Email', 'Branch', 'Role Requested', 'Submitted', 'Status'].map((h) => (
-                    <th key={h} style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 400, fontSize: 11, color: '#666666', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #2a2a2a' }}>
+                    <th key={h} style={{ textAlign: 'left', padding: '9px 16px', fontWeight: 400, fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid var(--border)' }}>
                       {h}
                     </th>
                   ))}
@@ -333,18 +333,18 @@ export default function AccessRequestsClient() {
               </thead>
               <tbody>
                 {reviewed.map((r) => (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #2a2a2a', opacity: 0.7 }}>
-                    <td style={{ padding: '10px 16px', fontSize: 13, color: '#cccccc', whiteSpace: 'nowrap' }}>
+                  <tr key={r.id} style={{ borderBottom: '1px solid var(--border)', opacity: 0.7 }}>
+                    <td style={{ padding: '10px 16px', fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                       {r.firstName} {r.lastName}
                     </td>
-                    <td style={{ padding: '10px 16px', fontSize: 12, color: '#888888' }}>{r.email}</td>
-                    <td style={{ padding: '10px 16px', fontSize: 12, color: '#888888', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '10px 16px', fontSize: 12, color: 'var(--text-muted)' }}>{r.email}</td>
+                    <td style={{ padding: '10px 16px', fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                       {r.branchName ?? '—'}
                     </td>
-                    <td style={{ padding: '10px 16px', fontSize: 12, color: '#888888', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '10px 16px', fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                       {ROLE_LABELS[r.requestedRole] ?? r.requestedRole}
                     </td>
-                    <td style={{ padding: '10px 16px', fontSize: 12, color: '#888888', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '10px 16px', fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                       {fmtDate(r.createdAt)}
                     </td>
                     <td style={{ padding: '10px 16px' }}>
@@ -372,8 +372,8 @@ export default function AccessRequestsClient() {
         >
           <div
             style={{
-              background: '#1e1e1e',
-              border: '1px solid #2a2a2a',
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
               borderRadius: 12,
               padding: 28,
               width: '100%',
@@ -385,25 +385,25 @@ export default function AccessRequestsClient() {
             {/* ── Review & Approve modal ──────────────────────────────────────── */}
             {modal.type === 'review' && (
               <>
-                <div style={{ fontSize: 16, fontWeight: 500, color: '#ffffff', marginBottom: 4 }}>
+                <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>
                   Review Request — {modal.request.firstName} {modal.request.lastName}
                 </div>
-                <div style={{ fontSize: 12, color: '#666', marginBottom: 16, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16, lineHeight: 1.5 }}>
                   Adjust the role and branches below if what they requested isn&rsquo;t right, then create the account.
                 </div>
 
                 {/* What they requested — reference row */}
-                <div style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 8, padding: '10px 14px', marginBottom: 20, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                <div style={{ background: 'var(--bg-nav)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', marginBottom: 20, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
                   <div>
-                    <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>They requested</div>
-                    <div style={{ fontSize: 12, color: '#888' }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>They requested</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                       <span style={{ color: '#ccc' }}>{ROLE_LABELS[modal.request.requestedRole] ?? modal.request.requestedRole}</span>
-                      {modal.request.branchName && <span style={{ color: '#555' }}> · {modal.request.branchName}</span>}
+                      {modal.request.branchName && <span style={{ color: 'var(--text-faint)' }}> · {modal.request.branchName}</span>}
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Email</div>
-                    <div style={{ fontSize: 12, color: '#888' }}>{modal.request.email}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>Email</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{modal.request.email}</div>
                   </div>
                 </div>
 
@@ -411,7 +411,7 @@ export default function AccessRequestsClient() {
 
                   {/* Username */}
                   <div>
-                    <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                    <label style={{ display: 'block', fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                       Username
                     </label>
                     <input
@@ -425,14 +425,14 @@ export default function AccessRequestsClient() {
                       spellCheck={false}
                       style={{ ...selectStyle, fontFamily: 'monospace', letterSpacing: '0.04em' }}
                     />
-                    <div style={{ fontSize: 11, color: '#555555', marginTop: 4 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>
                       3–20 chars · lowercase letters, numbers, underscores · used to log in
                     </div>
                   </div>
 
                   {/* Role — labelled as "Approved Role" to make clear it's what gets set */}
                   <div>
-                    <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                    <label style={{ display: 'block', fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                       Approved Role
                       {actionRole !== modal.request.requestedRole && (
                         <span style={{ marginLeft: 8, color: '#ff6b00', fontWeight: 600 }}>changed</span>
@@ -447,7 +447,7 @@ export default function AccessRequestsClient() {
 
                   {/* Branches */}
                   <div>
-                    <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                    <label style={{ display: 'block', fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                       Approved Branches
                       {modal.request.branchId && !actionBranchIds.includes(modal.request.branchId) && (
                         <span style={{ marginLeft: 8, color: '#ff6b00', fontWeight: 600 }}>changed</span>
@@ -463,7 +463,7 @@ export default function AccessRequestsClient() {
 
                   {/* Temporary password */}
                   <div>
-                    <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                    <label style={{ display: 'block', fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                       Temporary Password
                     </label>
                     <div style={{ display: 'flex', gap: 6 }}>
@@ -478,14 +478,14 @@ export default function AccessRequestsClient() {
                         type="button"
                         onClick={handleCopy}
                         disabled={!tmpPassword}
-                        style={{ background: '#2a2a2a', border: '1px solid #333333', borderRadius: 6, color: copied ? '#4caf50' : '#888888', fontSize: 11, padding: '0 10px', cursor: tmpPassword ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: tmpPassword ? 1 : 0.4 }}
+                        style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: copied ? '#4caf50' : '#888888', fontSize: 11, padding: '0 10px', cursor: tmpPassword ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: tmpPassword ? 1 : 0.4 }}
                       >
                         {copied ? 'Copied' : 'Copy'}
                       </button>
                       <button
                         type="button"
                         onClick={handleGenerate}
-                        style={{ background: '#2a2a2a', border: '1px solid #333333', borderRadius: 6, color: '#ff6b00', fontSize: 11, padding: '0 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+                        style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: '#ff6b00', fontSize: 11, padding: '0 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
                       >
                         Generate
                       </button>
@@ -493,7 +493,7 @@ export default function AccessRequestsClient() {
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: 11, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                    <label style={{ display: 'block', fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
                       Confirm Password
                     </label>
                     <input
@@ -505,7 +505,7 @@ export default function AccessRequestsClient() {
                     />
                   </div>
 
-                  <div style={{ fontSize: 11, color: '#555555', lineHeight: 1.5, padding: '8px 10px', background: '#1a1a1a', borderRadius: 6, border: '1px solid #2a2a2a' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-faint)', lineHeight: 1.5, padding: '8px 10px', background: 'var(--bg-nav)', borderRadius: 6, border: '1px solid var(--border)' }}>
                     Share this temporary password with the user. They will be required to change it on first login.
                   </div>
 
@@ -526,7 +526,7 @@ export default function AccessRequestsClient() {
                     </button>
                     <button
                       onClick={closeModal}
-                      style={{ flex: 1, background: '#2a2a2a', border: 'none', borderRadius: 8, color: '#888888', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}
+                      style={{ flex: 1, background: 'var(--bg-secondary)', border: 'none', borderRadius: 8, color: 'var(--text-muted)', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}
                     >
                       Cancel
                     </button>
@@ -538,14 +538,14 @@ export default function AccessRequestsClient() {
             {/* ── Archive modal ───────────────────────────────────────────────── */}
             {modal.type === 'archive' && (
               <>
-                <div style={{ fontSize: 16, fontWeight: 500, color: '#ffffff', marginBottom: 8 }}>
+                <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>
                   Archive Request
                 </div>
-                <div style={{ fontSize: 13, color: '#888888', marginBottom: 8, lineHeight: 1.6 }}>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8, lineHeight: 1.6 }}>
                   This will remove <span style={{ color: '#ccc' }}>{modal.request.firstName} {modal.request.lastName}</span>&rsquo;s request from the pending queue.
                 </div>
-                <div style={{ fontSize: 12, color: '#555', marginBottom: 24, padding: '8px 10px', background: '#1a1a1a', borderRadius: 6, border: '1px solid #2a2a2a', lineHeight: 1.5 }}>
-                  This does <strong style={{ color: '#888' }}>not</strong> block the person from re-applying or getting access in the future. Use this only for duplicate or clearly erroneous submissions.
+                <div style={{ fontSize: 12, color: 'var(--text-faint)', marginBottom: 24, padding: '8px 10px', background: 'var(--bg-nav)', borderRadius: 6, border: '1px solid var(--border)', lineHeight: 1.5 }}>
+                  This does <strong style={{ color: 'var(--text-muted)' }}>not</strong> block the person from re-applying or getting access in the future. Use this only for duplicate or clearly erroneous submissions.
                 </div>
 
                 {actionError && (
@@ -556,13 +556,13 @@ export default function AccessRequestsClient() {
                   <button
                     onClick={handleArchive}
                     disabled={actionSaving}
-                    style={{ flex: 1, background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#888888', fontSize: 14, fontWeight: 500, padding: '9px 0', cursor: 'pointer', fontFamily: 'inherit', opacity: actionSaving ? 0.6 : 1 }}
+                    style={{ flex: 1, background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: 'var(--text-muted)', fontSize: 14, fontWeight: 500, padding: '9px 0', cursor: 'pointer', fontFamily: 'inherit', opacity: actionSaving ? 0.6 : 1 }}
                   >
                     {actionSaving ? 'Archiving…' : 'Archive Request'}
                   </button>
                   <button
                     onClick={closeModal}
-                    style={{ flex: 1, background: '#2a2a2a', border: 'none', borderRadius: 8, color: '#888888', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}
+                    style={{ flex: 1, background: 'var(--bg-secondary)', border: 'none', borderRadius: 8, color: 'var(--text-muted)', fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}
                   >
                     Cancel
                   </button>

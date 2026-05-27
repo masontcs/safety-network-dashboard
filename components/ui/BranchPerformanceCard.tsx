@@ -13,8 +13,8 @@ function gpColor(pct: number): string {
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div style={{ background: '#2a2a2a', border: '1px solid #333333', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: '#ffffff' }}>
-      <p style={{ margin: '0 0 4px', color: '#888888' }}>{label}</p>
+    <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: 'var(--text-primary)' }}>
+      <p style={{ margin: '0 0 4px', color: 'var(--text-muted)' }}>{label}</p>
       {payload.map((p: { name: string; value: number; color: string }) => (
         <p key={p.name} style={{ margin: '2px 0', color: p.color }}>
           {p.name}: {formatCurrency(p.value)}
@@ -53,26 +53,26 @@ export default function BranchPerformanceCard({
     <div className="card" style={{ position: 'relative', overflow: 'hidden' }}>
       <div style={{ fontSize: 12, fontWeight: 500, color: '#ff6b00', marginBottom: 6 }}>{name}</div>
       {noData ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80, fontSize: 11, color: '#555555' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80, fontSize: 11, color: 'var(--text-faint)' }}>
           No data
         </div>
       ) : (
         <>
-          <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff', lineHeight: 1.2, marginBottom: 6 }}>
+          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)', lineHeight: 1.2, marginBottom: 6 }}>
             {formatCurrency(rev)}
           </div>
           <div style={{ display: 'flex', gap: 12, marginBottom: 4 }}>
             <div>
-              <div style={{ fontSize: 10, color: '#666666', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Payroll</div>
-              <div style={{ fontSize: 12, color: '#cccccc' }}>{formatCurrency(payroll)}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Payroll</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{formatCurrency(payroll)}</div>
             </div>
             <div>
-              <div style={{ fontSize: 10, color: '#666666', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Fuel</div>
-              <div style={{ fontSize: 12, color: '#cccccc' }}>{formatCurrency(fuel)}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Fuel</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{formatCurrency(fuel)}</div>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: hasTrend ? 8 : 0 }}>
-            <span style={{ fontSize: 13, color: '#cccccc' }}>{formatCurrency(gp)}</span>
+            <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{formatCurrency(gp)}</span>
             <span
               style={{
                 fontSize: 12,
@@ -88,7 +88,7 @@ export default function BranchPerformanceCard({
           </div>
           {hasTrend && (
             <>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, fontSize: 9, color: '#666666', marginBottom: 2 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>
                 {(['Revenue', 'Payroll', 'Fuel'] as const).map((label, i) => {
                   const color = [['#ff6b00'], ['#888888'], ['#cc4444']][i][0]
                   return (

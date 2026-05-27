@@ -40,7 +40,7 @@ function CustomTooltip({ active, payload, label, formatValue }: {
   return (
     <div style={{
       background: '#161616',
-      border: '1px solid #2a2a2a',
+      border: '1px solid var(--border)',
       borderRadius: 8,
       padding: '10px 14px',
       fontSize: 12,
@@ -48,8 +48,8 @@ function CustomTooltip({ active, payload, label, formatValue }: {
       minWidth: 140,
       pointerEvents: 'none',
     }}>
-      <div style={{ color: '#888888', fontSize: 11, marginBottom: 6 }}>{label}</div>
-      <div style={{ color: '#ffffff', fontWeight: 500, fontSize: 14 }}>
+      <div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 6 }}>{label}</div>
+      <div style={{ color: 'var(--text-primary)', fontWeight: 500, fontSize: 14 }}>
         {formatValue(payload[0].value)}
       </div>
     </div>

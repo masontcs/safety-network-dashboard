@@ -252,7 +252,7 @@ function DashboardSkeleton() {
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 10,
-          background: '#1e1e1e', border: '1px solid #2a2a2a',
+          background: 'var(--bg-surface)', border: '1px solid var(--border)',
           borderRadius: 24, padding: '8px 22px',
         }}>
           <div style={{
@@ -264,7 +264,7 @@ function DashboardSkeleton() {
           <span
             key={msgIdx}
             style={{
-              fontSize: 12, color: '#888888', letterSpacing: '0.02em',
+              fontSize: 12, color: 'var(--text-muted)', letterSpacing: '0.02em',
               animation: 'sn-fade-in 0.4s ease-out',
               display: 'inline-block',
               minWidth: 210, textAlign: 'center',
@@ -294,7 +294,7 @@ function DashboardSkeleton() {
         </div>
         {/* 3 metric cards */}
         {[0, 1, 2].map((i) => (
-          <div key={i} style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
+          <div key={i} style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
             <div className="sn-sk" style={{ height: 10, width: '50%', marginBottom: 14, animationDelay: `${i * 0.15}s` }} />
             <div className="sn-sk" style={{ height: 28, width: '70%', marginBottom: 10, animationDelay: `${i * 0.15 + 0.1}s` }} />
             <div className="sn-sk" style={{ height: 9, width: '42%', marginBottom: 16, animationDelay: `${i * 0.15 + 0.2}s` }} />
@@ -307,7 +307,7 @@ function DashboardSkeleton() {
 
       {/* Middle row: chart + breakdown + 2 small cards */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr 0.7fr', gap: 12, marginBottom: 12 }}>
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
           <div className="sn-sk" style={{ height: 10, width: '38%', marginBottom: 20 }} />
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 130 }}>
             {[48, 62, 52, 72, 58, 84, 68, 52, 76, 62, 88, 70].map((h, i) => (
@@ -319,7 +319,7 @@ function DashboardSkeleton() {
             ))}
           </div>
         </div>
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
           <div className="sn-sk" style={{ height: 10, width: '48%', marginBottom: 14 }} />
           <div className="sn-sk" style={{ height: 26, width: '58%', marginBottom: 10 }} />
           <div className="sn-sk" style={{ height: 9, width: '35%', marginBottom: 20 }} />
@@ -327,7 +327,7 @@ function DashboardSkeleton() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {[0, 1].map((i) => (
-            <div key={i} style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16, flex: 1 }}>
+            <div key={i} style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16, flex: 1 }}>
               <div className="sn-sk" style={{ height: 10, width: '52%', marginBottom: 12, animationDelay: `${i * 0.2}s` }} />
               <div className="sn-sk" style={{ height: 22, width: '65%', marginBottom: 8, animationDelay: `${i * 0.2 + 0.1}s` }} />
               <div className="sn-sk" style={{ height: 9, width: '38%', animationDelay: `${i * 0.2 + 0.2}s` }} />
@@ -337,7 +337,7 @@ function DashboardSkeleton() {
       </div>
 
       {/* Table rows */}
-      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
+      <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
         <div className="sn-sk" style={{ height: 10, width: '28%', marginBottom: 18 }} />
         {[0, 1, 2, 3, 4].map((i) => (
           <div
@@ -543,7 +543,7 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
       {/* ── Header row ─────────────────────────────────────────────────────── */}
       <div className="ar-page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Dashboard</div>
+        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Dashboard</div>
 
         <div className="tab-scroll" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {/* Allocation toggle — admin/exec only */}
@@ -555,7 +555,7 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
                 borderRadius: 8,
                 border: `1px solid ${allocationOn ? '#ff6b00' : '#333333'}`,
                 background: allocationOn ? '#ff6b00' : '#2a2a2a',
-                color: '#ffffff',
+                color: 'var(--text-primary)',
                 fontSize: 12,
                 cursor: 'pointer',
               }}
@@ -572,9 +572,9 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
               style={{
                 padding: '6px 12px',
                 borderRadius: 8,
-                border: '1px solid #333333',
-                background: '#2a2a2a',
-                color: '#cccccc',
+                border: '1px solid var(--border-emphasis)',
+                background: 'var(--bg-secondary)',
+                color: 'var(--text-secondary)',
                 fontSize: 12,
                 cursor: 'pointer',
               }}
@@ -587,7 +587,7 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
           )}
 
           {/* Period selector */}
-          <div style={{ display: 'flex', gap: 4, background: '#2a2a2a', borderRadius: 8, padding: 3 }}>
+          <div style={{ display: 'flex', gap: 4, background: 'var(--bg-secondary)', borderRadius: 8, padding: 3 }}>
             {(['month', 'quarter', 'year'] as ViewMode[]).map((v) => (
               <button
                 key={v}
@@ -613,7 +613,7 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
             <select
               value={selectedMonthId}
               onChange={(e) => setSelectedMonthId(e.target.value)}
-              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #333333', background: '#2a2a2a', color: '#cccccc', fontSize: 12 }}
+              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-emphasis)', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', fontSize: 12 }}
             >
               {[...sortedMonths].reverse().map((m) => (
                 <option key={m.id} value={m.id}>{m.name}</option>
@@ -625,7 +625,7 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
             <select
               value={selectedQuarterIdx}
               onChange={(e) => setSelectedQuarterIdx(Number(e.target.value))}
-              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #333333', background: '#2a2a2a', color: '#cccccc', fontSize: 12 }}
+              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-emphasis)', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', fontSize: 12 }}
             >
               {[0, 1, 2, 3].map((qi) => (
                 <option key={qi} value={qi}>Q{qi + 1}</option>
@@ -637,7 +637,7 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(Number(e.target.value))}
-              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #333333', background: '#2a2a2a', color: '#cccccc', fontSize: 12 }}
+              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--border-emphasis)', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', fontSize: 12 }}
             >
               {availableYears.map((y) => (
                 <option key={y} value={y}>{y}</option>
@@ -648,7 +648,7 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
       </div>
 
       {/* ── Tab bar ──────────────────────────────────────────────────────────── */}
-      <div className="tab-scroll" style={{ display: 'flex', gap: 2, borderBottom: '1px solid #2a2a2a', marginBottom: 20 }}>
+      <div className="tab-scroll" style={{ display: 'flex', gap: 2, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
         {tabs.map((t) => (
           <button
             key={t.key}

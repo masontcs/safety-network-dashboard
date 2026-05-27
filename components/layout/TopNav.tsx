@@ -35,17 +35,17 @@ export default function TopNav({ branchName, userName }: TopNavProps) {
       {/* Hidden on mobile — sign-out lives in bottom nav More sheet */}
       <div className="hidden md:flex" style={{ alignItems: 'center', gap: 12 }}>
         {userName && (
-          <span style={{ fontSize: 12, color: '#888888' }}>{userName}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{userName}</span>
         )}
         <button
           onClick={handleSignOut}
           style={{
             background: 'none',
-            border: '1px solid #333333',
+            border: '1px solid var(--border-emphasis)',
             borderRadius: 6,
             padding: '4px 10px',
             fontSize: 12,
-            color: '#888888',
+            color: 'var(--text-muted)',
             cursor: 'pointer',
             fontFamily: 'inherit',
           }}

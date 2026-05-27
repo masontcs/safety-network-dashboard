@@ -174,7 +174,7 @@ export default function FuelDashboard({ role, branchIds, branches, fiscalMonths 
       {/* Period + branch filters */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 20 }}>
         {/* Month / Year toggle */}
-        <div style={{ display: 'flex', gap: 4, background: '#2a2a2a', borderRadius: 8, padding: 3 }}>
+        <div style={{ display: 'flex', gap: 4, background: 'var(--bg-secondary)', borderRadius: 8, padding: 3 }}>
           {(['month', 'year'] as ViewMode[]).map((v) => (
             <button
               key={v}
@@ -260,47 +260,47 @@ export default function FuelDashboard({ role, branchIds, branches, fiscalMonths 
       </div>
 
       {/* Weekly cost chart */}
-      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16, marginBottom: 20 }}>
-        <div style={{ fontSize: 11, color: '#888888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
+      <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16, marginBottom: 20 }}>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
           Weekly Fuel Cost
         </div>
         {loading ? (
-          <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555555', fontSize: 12 }}>Loading…</div>
+          <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 12 }}>Loading…</div>
         ) : chartData.length === 0 ? (
-          <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555555', fontSize: 12 }}>No data for this period</div>
+          <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 12 }}>No data for this period</div>
         ) : (
           <BarChart data={chartData} height={160} color="#cc4444" formatValue={(v) => `$${v.toLocaleString()}`} />
         )}
       </div>
 
       {/* Top consumers */}
-      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-        <div style={{ fontSize: 11, color: '#888888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
+      <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
           Top Fuel Consumers
         </div>
         {loading ? (
-          <div style={{ color: '#555555', fontSize: 12 }}>Loading…</div>
+          <div style={{ color: 'var(--text-faint)', fontSize: 12 }}>Loading…</div>
         ) : consumers.length === 0 ? (
-          <div style={{ color: '#555555', fontSize: 12 }}>No data for this period</div>
+          <div style={{ color: 'var(--text-faint)', fontSize: 12 }}>No data for this period</div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 {['Employee', 'Branch', 'Gallons', '$/Gal', 'Total Cost'].map((h) => (
-                  <th key={h} style={{ textAlign: 'left', fontSize: 11, color: '#666666', fontWeight: 400, padding: '0 8px 8px 0' }}>{h}</th>
+                  <th key={h} style={{ textAlign: 'left', fontSize: 11, color: 'var(--text-dim)', fontWeight: 400, padding: '0 8px 8px 0' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {consumers.map((c, i) => (
-                <tr key={`${c.employeeId ?? 'general'}-${c.branchName}-${i}`} style={{ borderTop: '1px solid #2a2a2a' }}>
+                <tr key={`${c.employeeId ?? 'general'}-${c.branchName}-${i}`} style={{ borderTop: '1px solid var(--border)' }}>
                   <td style={{ padding: '8px 8px 8px 0', fontSize: 12, color: c.isGeneral ? '#888888' : '#cccccc', fontStyle: c.isGeneral ? 'italic' : 'normal' }}>{c.displayName}</td>
                   <td style={{ padding: '8px 8px 8px 0', fontSize: 12, color: '#ff6b00' }}>{c.branchName}</td>
-                  <td style={{ padding: '8px 8px 8px 0', fontSize: 12, color: '#cccccc' }}>{fmtDec(c.totalGallons, 1)}</td>
-                  <td style={{ padding: '8px 8px 8px 0', fontSize: 12, color: '#cccccc' }}>
+                  <td style={{ padding: '8px 8px 8px 0', fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDec(c.totalGallons, 1)}</td>
+                  <td style={{ padding: '8px 8px 8px 0', fontSize: 12, color: 'var(--text-secondary)' }}>
                     {c.avgPpg != null ? `$${fmtDec(c.avgPpg, 3)}` : '—'}
                   </td>
-                  <td style={{ padding: '8px 0', fontSize: 12, color: '#cccccc' }}>{fmt(c.totalCost)}</td>
+                  <td style={{ padding: '8px 0', fontSize: 12, color: 'var(--text-secondary)' }}>{fmt(c.totalCost)}</td>
                 </tr>
               ))}
             </tbody>
@@ -312,12 +312,12 @@ export default function FuelDashboard({ role, branchIds, branches, fiscalMonths 
 }
 
 const selectStyle: React.CSSProperties = {
-  background: '#2a2a2a',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 8,
   padding: '5px 10px',
   fontSize: 12,
-  color: '#cccccc',
+  color: 'var(--text-secondary)',
   cursor: 'pointer',
 }
 

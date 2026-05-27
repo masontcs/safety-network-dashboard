@@ -7,7 +7,7 @@ import type { TabProps } from './types'
 export default function RevenueTab({ data, branches, isMultiBranch, monthSaturdays, selectedBranchId }: TabProps) {
   const rev = data.revenue
   if (!rev) {
-    return <div style={{ color: '#888888', fontSize: 13, padding: 24 }}>No revenue data for this period.</div>
+    return <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: 24 }}>No revenue data for this period.</div>
   }
 
   const branchNameMap: Record<string, string> = {}
@@ -78,8 +78,8 @@ export default function RevenueTab({ data, branches, isMultiBranch, monthSaturda
 
       {/* ── Weekly table (month view uses monthSaturdays) ──────────────────────── */}
       {monthSaturdays.length > 0 ? (
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Weekly Revenue</div>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Weekly Revenue</div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr>
@@ -94,28 +94,28 @@ export default function RevenueTab({ data, branches, isMultiBranch, monthSaturda
               {monthSaturdays.map((sat) => {
                 const p = byPeriodMap[sat]
                 return (
-                  <tr key={sat} style={{ borderBottom: '1px solid #2a2a2a' }}>
-                    <td style={{ ...td, color: '#cccccc' }}>{fmtDate(sat)}</td>
+                  <tr key={sat} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ ...td, color: 'var(--text-secondary)' }}>{fmtDate(sat)}</td>
                     <td style={td}>{p ? formatCurrency(p.labor) : '—'}</td>
                     <td style={td}>{p ? formatCurrency(p.rental) : '—'}</td>
                     <td style={td}>{p ? formatCurrency(p.oneTime) : '—'}</td>
-                    <td style={{ ...td, color: '#ffffff', fontWeight: 500 }}>{p && p.total > 0 ? formatCurrency(p.total) : '—'}</td>
+                    <td style={{ ...td, color: 'var(--text-primary)', fontWeight: 500 }}>{p && p.total > 0 ? formatCurrency(p.total) : '—'}</td>
                   </tr>
                 )
               })}
-              <tr style={{ borderTop: '1px solid #333333' }}>
-                <td style={{ ...td, color: '#888888' }}>Total</td>
-                <td style={{ ...td, color: '#ffffff', fontWeight: 500 }}>{formatCurrency(rev.labor)}</td>
-                <td style={{ ...td, color: '#ffffff', fontWeight: 500 }}>{formatCurrency(rev.rental)}</td>
-                <td style={{ ...td, color: '#ffffff', fontWeight: 500 }}>{formatCurrency(rev.oneTimeCharges)}</td>
+              <tr style={{ borderTop: '1px solid var(--border-emphasis)' }}>
+                <td style={{ ...td, color: 'var(--text-muted)' }}>Total</td>
+                <td style={{ ...td, color: 'var(--text-primary)', fontWeight: 500 }}>{formatCurrency(rev.labor)}</td>
+                <td style={{ ...td, color: 'var(--text-primary)', fontWeight: 500 }}>{formatCurrency(rev.rental)}</td>
+                <td style={{ ...td, color: 'var(--text-primary)', fontWeight: 500 }}>{formatCurrency(rev.oneTimeCharges)}</td>
                 <td style={{ ...td, color: '#ff6b00', fontWeight: 500 }}>{formatCurrency(rev.totalRevenue)}</td>
               </tr>
             </tbody>
           </table>
         </div>
       ) : byPeriod.length > 0 ? (
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Revenue by Week</div>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Revenue by Week</div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr>
@@ -128,12 +128,12 @@ export default function RevenueTab({ data, branches, isMultiBranch, monthSaturda
             </thead>
             <tbody>
               {byPeriod.map((p) => (
-                <tr key={p.periodDate} style={{ borderBottom: '1px solid #2a2a2a' }}>
-                  <td style={{ ...td, color: '#cccccc' }}>{fmtDate(p.periodDate)}</td>
+                <tr key={p.periodDate} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ ...td, color: 'var(--text-secondary)' }}>{fmtDate(p.periodDate)}</td>
                   <td style={td}>{formatCurrency(p.labor)}</td>
                   <td style={td}>{formatCurrency(p.rental)}</td>
                   <td style={td}>{formatCurrency(p.oneTime)}</td>
-                  <td style={{ ...td, color: '#ffffff', fontWeight: 500 }}>{formatCurrency(p.total)}</td>
+                  <td style={{ ...td, color: 'var(--text-primary)', fontWeight: 500 }}>{formatCurrency(p.total)}</td>
                 </tr>
               ))}
             </tbody>
@@ -143,8 +143,8 @@ export default function RevenueTab({ data, branches, isMultiBranch, monthSaturda
 
       {/* ── By-branch table ───────────────────────────────────────────────────── */}
       {isMultiBranch && byBranch.length > 1 && (
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Revenue by Branch</div>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Revenue by Branch</div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr>
@@ -158,12 +158,12 @@ export default function RevenueTab({ data, branches, isMultiBranch, monthSaturda
             </thead>
             <tbody>
               {byBranch.map((b) => (
-                <tr key={b.branchId} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                <tr key={b.branchId} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ ...td, textAlign: 'left', color: '#ff6b00' }}>{branchNameMap[b.branchId] ?? b.branchId}</td>
                   <td style={td}>{formatCurrency(b.labor)}</td>
                   <td style={td}>{formatCurrency(b.rental)}</td>
                   <td style={td}>{formatCurrency(b.oneTime)}</td>
-                  <td style={{ ...td, color: '#ffffff', fontWeight: 500 }}>{formatCurrency(b.total)}</td>
+                  <td style={{ ...td, color: 'var(--text-primary)', fontWeight: 500 }}>{formatCurrency(b.total)}</td>
                   <td style={td}>{rev.totalRevenue > 0 ? formatPercent((b.total / rev.totalRevenue) * 100) : '—'}</td>
                 </tr>
               ))}
@@ -180,8 +180,8 @@ function fmtDate(dateStr: string): string {
   return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}`
 }
 
-const th: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', fontSize: 11, color: '#666666', fontWeight: 400 }
-const td: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', color: '#cccccc' }
+const th: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', fontSize: 11, color: 'var(--text-dim)', fontWeight: 400 }
+const td: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', color: 'var(--text-secondary)' }
 
 // ── Revenue goals ─────────────────────────────────────────────────────────────
 
@@ -237,8 +237,8 @@ function RevenueGoals({
     const totalRevActual = rows.reduce((s, r) => s + r.revActual, 0)
 
     return (
-      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Revenue Goals by Branch</div>
+      <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Revenue Goals by Branch</div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr>
@@ -254,10 +254,10 @@ function RevenueGoals({
               const revTarget = target?.revenueTarget ?? null
               const revDelta  = revTarget != null ? revActual - revTarget : null
               return (
-                <tr key={id} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                <tr key={id} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ ...td, textAlign: 'left', color: '#ff6b00' }}>{name}</td>
                   <td style={td}>{revTarget != null ? formatCurrency(revTarget) : <span style={{ color: '#444' }}>—</span>}</td>
-                  <td style={{ ...td, color: '#ffffff' }}>{formatCurrency(revActual)}</td>
+                  <td style={{ ...td, color: 'var(--text-primary)' }}>{formatCurrency(revActual)}</td>
                   <td style={{ ...td, color: revDelta != null ? varianceColor(revActual, revTarget!) : '#666' }}>
                     {revDelta != null ? `${revDelta >= 0 ? '+' : ''}${formatCurrency(revDelta)}` : '—'}
                   </td>
@@ -269,10 +269,10 @@ function RevenueGoals({
             })}
           </tbody>
           <tfoot>
-            <tr style={{ borderTop: '1px solid #333' }}>
-              <td style={{ ...td, textAlign: 'left', color: '#888', fontWeight: 500 }}>Total</td>
-              <td style={{ ...td, color: '#888' }}>{formatCurrency(totalRevTarget)}</td>
-              <td style={{ ...td, color: '#ffffff', fontWeight: 500 }}>{formatCurrency(totalRevActual)}</td>
+            <tr style={{ borderTop: '1px solid var(--border-emphasis)' }}>
+              <td style={{ ...td, textAlign: 'left', color: 'var(--text-muted)', fontWeight: 500 }}>Total</td>
+              <td style={{ ...td, color: 'var(--text-muted)' }}>{formatCurrency(totalRevTarget)}</td>
+              <td style={{ ...td, color: 'var(--text-primary)', fontWeight: 500 }}>{formatCurrency(totalRevActual)}</td>
               <td style={{ ...td, color: varianceColor(totalRevActual, totalRevTarget), fontWeight: 500 }}>
                 {`${totalRevActual - totalRevTarget >= 0 ? '+' : ''}${formatCurrency(totalRevActual - totalRevTarget)}`}
               </td>
@@ -293,13 +293,13 @@ function RevenueGoals({
   const revDelta = totalRevenue - revTarget
 
   return (
-    <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-      <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Revenue Goal</div>
+    <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+      <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Revenue Goal</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ flex: '1 1 160px', background: '#2a2a2a', borderRadius: 10, padding: 14 }}>
-          <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Revenue vs. Target</div>
-          <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{formatCurrency(totalRevenue)}</div>
-          <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Target: {formatCurrency(revTarget)}</div>
+        <div style={{ flex: '1 1 160px', background: 'var(--bg-secondary)', borderRadius: 10, padding: 14 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Revenue vs. Target</div>
+          <div style={{ fontSize: 20, fontWeight: 500, color: 'var(--text-primary)' }}>{formatCurrency(totalRevenue)}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>Target: {formatCurrency(revTarget)}</div>
           <div style={{ fontSize: 13, fontWeight: 500, color: varianceColor(totalRevenue, revTarget), marginTop: 6 }}>
             {revDelta >= 0 ? '+' : ''}{formatCurrency(revDelta)}
           </div>

@@ -45,19 +45,19 @@ export default function LoginPage() {
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
-    background: '#2a2a2a',
-    border: '1px solid #333333',
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border-emphasis)',
     borderRadius: 8,
     padding: '8px 12px',
     fontSize: 13,
-    color: '#ffffff',
+    color: 'var(--text-primary)',
     outline: 'none',
   }
 
   return (
     <div className="px-4 md:px-0" style={{
       minHeight: '100vh',
-      background: '#111111',
+      background: 'var(--bg-base)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -71,7 +71,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 11, color: '#888888', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
               Username or Email
             </label>
             <input
@@ -89,7 +89,7 @@ export default function LoginPage() {
           </div>
 
           <div style={{ marginBottom: 24 }}>
-            <label style={{ display: 'block', fontSize: 11, color: '#888888', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
               Password
             </label>
             <input

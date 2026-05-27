@@ -22,12 +22,12 @@ const ROLE_OPTIONS = [
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
-  background: '#2a2a2a',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 8,
   padding: '9px 12px',
   fontSize: 13,
-  color: '#ffffff',
+  color: 'var(--text-primary)',
   outline: 'none',
   fontFamily: 'inherit',
   boxSizing: 'border-box',
@@ -36,7 +36,7 @@ const inputStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: 11,
-  color: '#888888',
+  color: 'var(--text-muted)',
   marginBottom: 6,
   fontWeight: 400,
 }
@@ -96,7 +96,7 @@ export default function RequestAccessClient({ branches }: { branches: Branch[] }
     <div
       style={{
         minHeight: '100vh',
-        background: '#111111',
+        background: 'var(--bg-base)',
         backgroundImage: 'radial-gradient(circle, #1e1e1e 1px, transparent 1px)',
         backgroundSize: '28px 28px',
         display: 'flex',
@@ -108,9 +108,9 @@ export default function RequestAccessClient({ branches }: { branches: Branch[] }
     >
       <div
         style={{
-          background: '#1e1e1e',
+          background: 'var(--bg-surface)',
           borderRadius: 12,
-          border: '1px solid #2a2a2a',
+          border: '1px solid var(--border)',
           padding: 32,
           width: '100%',
           maxWidth: 480,
@@ -124,10 +124,10 @@ export default function RequestAccessClient({ branches }: { branches: Branch[] }
             alt="Safety Network"
             style={{ width: 120, height: 'auto', marginBottom: 20 }}
           />
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#ffffff', marginBottom: 6 }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
             Request Access
           </div>
-          <div style={{ fontSize: 13, color: '#888888', lineHeight: 1.5 }}>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
             Submit your details and an administrator will create your account
           </div>
         </div>
@@ -151,10 +151,10 @@ export default function RequestAccessClient({ branches }: { branches: Branch[] }
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#ffffff', marginBottom: 8 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
               Request submitted!
             </div>
-            <div style={{ fontSize: 13, color: '#888888', lineHeight: 1.6 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6 }}>
               You&rsquo;ll hear from us within 1 business day.
             </div>
             <Link
@@ -220,7 +220,7 @@ export default function RequestAccessClient({ branches }: { branches: Branch[] }
                 maxLength={20}
                 style={inputStyle}
               />
-              <div style={{ fontSize: 11, color: '#555555', marginTop: 4 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>
                 3–20 characters · lowercase letters, numbers, underscores only · used to log in
               </div>
             </div>
@@ -263,7 +263,7 @@ export default function RequestAccessClient({ branches }: { branches: Branch[] }
             </div>
 
             <div>
-              <label style={labelStyle}>Notes <span style={{ color: '#555555' }}>(optional)</span></label>
+              <label style={labelStyle}>Notes <span style={{ color: 'var(--text-faint)' }}>(optional)</span></label>
               <textarea
                 value={form.notes}
                 onChange={(e) => set('notes', e.target.value)}
@@ -288,7 +288,7 @@ export default function RequestAccessClient({ branches }: { branches: Branch[] }
               {submitting ? 'Submitting…' : 'Submit Request'}
             </button>
 
-            <div style={{ textAlign: 'center', fontSize: 13, color: '#666666', marginTop: 4 }}>
+            <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>
               Already have an account?{' '}
               <Link href="/login" style={{ color: '#ff6b00', textDecoration: 'none' }}>
                 Sign in →

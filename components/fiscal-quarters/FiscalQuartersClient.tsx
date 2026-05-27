@@ -75,13 +75,13 @@ function MonthSelect({
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <div style={{ fontSize: 10, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+      <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
         style={{
-          background: '#2a2a2a',
-          border: '1px solid #333333',
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border-emphasis)',
           borderRadius: 6,
           padding: '5px 8px',
           fontSize: 12,
@@ -138,8 +138,8 @@ function QuarterFormRow({
   return (
     <div
       style={{
-        background: '#1a1a1a',
-        border: '1px solid #333333',
+        background: 'var(--bg-nav)',
+        border: '1px solid var(--border-emphasis)',
         borderRadius: 8,
         padding: '16px',
         display: 'flex',
@@ -150,19 +150,19 @@ function QuarterFormRow({
     >
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ fontSize: 10, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Name</div>
+          <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Name</div>
           <input
             type="text"
             placeholder="e.g. Q1 FY2026"
             value={form.name}
             onChange={(e) => onChange({ ...form, name: e.target.value })}
             style={{
-              background: '#2a2a2a',
-              border: '1px solid #333333',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-emphasis)',
               borderRadius: 6,
               padding: '5px 8px',
               fontSize: 12,
-              color: '#cccccc',
+              color: 'var(--text-secondary)',
               fontFamily: 'inherit',
               width: 160,
             }}
@@ -170,17 +170,17 @@ function QuarterFormRow({
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ fontSize: 10, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quarter #</div>
+          <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quarter #</div>
           <select
             value={form.quarterNumber}
             onChange={(e) => onChange({ ...form, quarterNumber: Number(e.target.value) as 1 | 2 | 3 | 4 })}
             style={{
-              background: '#2a2a2a',
-              border: '1px solid #333333',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-emphasis)',
               borderRadius: 6,
               padding: '5px 8px',
               fontSize: 12,
-              color: '#cccccc',
+              color: 'var(--text-secondary)',
               fontFamily: 'inherit',
               cursor: 'pointer',
               width: 72,
@@ -193,18 +193,18 @@ function QuarterFormRow({
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ fontSize: 10, color: '#555555', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Year</div>
+          <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Year</div>
           <input
             type="number"
             value={form.year}
             onChange={(e) => onChange({ ...form, year: Number(e.target.value) })}
             style={{
-              background: '#2a2a2a',
-              border: '1px solid #333333',
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-emphasis)',
               borderRadius: 6,
               padding: '5px 8px',
               fontSize: 12,
-              color: '#cccccc',
+              color: 'var(--text-secondary)',
               fontFamily: 'inherit',
               width: 80,
             }}
@@ -236,8 +236,8 @@ function QuarterFormRow({
         <button
           onClick={onCancel}
           style={{
-            background: '#2a2a2a', border: 'none', borderRadius: 6, padding: '6px 16px',
-            fontSize: 12, color: '#888888', cursor: 'pointer', fontFamily: 'inherit',
+            background: 'var(--bg-secondary)', border: 'none', borderRadius: 6, padding: '6px 16px',
+            fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit',
           }}
         >
           Cancel
@@ -396,7 +396,7 @@ export default function FiscalQuartersClient() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 1000 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Fiscal Quarters</div>
+        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Fiscal Quarters</div>
         {!adding && !editId && (
           <button
             onClick={() => { setAdding(true); setAddForm(BLANK_FORM); setAddError(null) }}
@@ -479,10 +479,10 @@ export default function FiscalQuartersClient() {
                     style={{
                       textAlign: 'left',
                       padding: '10px 16px',
-                      borderBottom: '1px solid #2a2a2a',
+                      borderBottom: '1px solid var(--border)',
                       fontWeight: 400,
                       fontSize: 11,
-                      color: '#666666',
+                      color: 'var(--text-dim)',
                       textTransform: 'uppercase',
                       letterSpacing: '0.04em',
                     }}
@@ -495,7 +495,7 @@ export default function FiscalQuartersClient() {
             <tbody>
               {quarters.length === 0 && !adding && (
                 <tr>
-                  <td colSpan={6} style={{ padding: '24px 16px', textAlign: 'center', fontSize: 12, color: '#555555' }}>
+                  <td colSpan={6} style={{ padding: '24px 16px', textAlign: 'center', fontSize: 12, color: 'var(--text-faint)' }}>
                     No fiscal quarters defined yet. Click &ldquo;Add Quarter&rdquo; to create one.
                   </td>
                 </tr>
@@ -513,7 +513,7 @@ export default function FiscalQuartersClient() {
 
                 if (isEditing) {
                   return (
-                    <tr key={q.id} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                    <tr key={q.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td colSpan={6} style={{ padding: '12px 16px' }}>
                         <QuarterFormRow
                           form={editForm}
@@ -533,8 +533,8 @@ export default function FiscalQuartersClient() {
                 }
 
                 return (
-                  <tr key={q.id} style={{ borderBottom: '1px solid #2a2a2a' }}>
-                    <td style={{ padding: '12px 16px', color: '#ffffff', fontWeight: 500, fontSize: 13 }}>
+                  <tr key={q.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500, fontSize: 13 }}>
                       {q.name}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
@@ -543,12 +543,12 @@ export default function FiscalQuartersClient() {
                           <span
                             key={m.id}
                             style={{
-                              background: '#2a2a2a',
-                              border: '1px solid #333333',
+                              background: 'var(--bg-secondary)',
+                              border: '1px solid var(--border-emphasis)',
                               borderRadius: 4,
                               padding: '2px 8px',
                               fontSize: 11,
-                              color: '#cccccc',
+                              color: 'var(--text-secondary)',
                               whiteSpace: 'nowrap',
                             }}
                           >
@@ -562,10 +562,10 @@ export default function FiscalQuartersClient() {
                         )}
                       </div>
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 12, color: '#888888' }}>
+                    <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-muted)' }}>
                       {q.year}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 12, color: '#888888' }}>
+                    <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-muted)' }}>
                       Q{q.quarter_number}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
@@ -586,7 +586,7 @@ export default function FiscalQuartersClient() {
                           </button>
                           <button
                             onClick={() => setDeleteId(null)}
-                            style={{ background: '#2a2a2a', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: '#888888', cursor: 'pointer', fontFamily: 'inherit' }}
+                            style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit' }}
                           >
                             Cancel
                           </button>
@@ -601,7 +601,7 @@ export default function FiscalQuartersClient() {
                           </button>
                           <button
                             onClick={() => setDeleteId(q.id)}
-                            style={{ background: 'none', border: 'none', color: '#666666', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
                           >
                             Delete
                           </button>

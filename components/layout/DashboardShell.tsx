@@ -26,7 +26,7 @@ export default function DashboardShell({ role, branchName, userName, children }:
             flex: 1,
             overflowY: 'auto',
             overflowX: 'hidden',
-            background: '#111111',
+            background: 'var(--bg-base)',
             padding: 16,
           }}
         >

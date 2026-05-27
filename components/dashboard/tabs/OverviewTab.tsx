@@ -221,10 +221,10 @@ export default function OverviewTab({ role, data, branches, selectedBranchId, al
       {/* ── Allocation breakdown (admin/exec) ────────────────────────────────── */}
       {allocationOn && isAdminOrExec && (corpOverhead > 0 || hqOverhead > 0 || allocatedFuel > 0) && (
         <div style={{
-          background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: '12px 16px',
+          background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: '12px 16px',
           display: 'flex', gap: 32, alignItems: 'center',
         }}>
-          <div style={{ fontSize: 11, color: '#888888', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Allocation Breakdown</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Allocation Breakdown</div>
           <Item label='Corp Payroll' value={formatCurrency(corpOverhead)} />
           <Item label='HQ Payroll' value={formatCurrency(hqOverhead)} />
           <Item label='Corp/HQ Fuel' value={formatCurrency(allocatedFuel)} />
@@ -234,8 +234,8 @@ export default function OverviewTab({ role, data, branches, selectedBranchId, al
 
       {/* ── Admin/exec: weekly trend ──────────────────────────────────────────── */}
       {periods.length > 0 && (
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Weekly Trend</div>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Weekly Trend</div>
           <WeeklyChart
             data={periods.map((p) => ({
               date: p.periodDate,
@@ -257,8 +257,8 @@ export default function OverviewTab({ role, data, branches, selectedBranchId, al
 
       {/* ── Manager: cost breakdown ───────────────────────────────────────────── */}
       {!isAdminOrExec && revenue > 0 && (
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 16 }}>Revenue Breakdown</div>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 16 }}>Revenue Breakdown</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <CostBar label='Direct Labor' amount={directPayroll} total={revenue} color='#cc4444' />
             <CostBar label='Admin Payroll' amount={adminPayroll} total={revenue} color='#cc4444' opacity={0.75} />
@@ -271,8 +271,8 @@ export default function OverviewTab({ role, data, branches, selectedBranchId, al
 
       {/* ── Manager: weekly trend ─────────────────────────────────────────────── */}
       {!isAdminOrExec && managerWeeklyPeriods.length > 0 && (
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Weekly Trend</div>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Weekly Trend</div>
           <WeeklyChart
             data={managerWeeklyPeriods.map((p) => ({
               date: p.date,
@@ -294,8 +294,8 @@ export default function OverviewTab({ role, data, branches, selectedBranchId, al
 
       {/* ── Manager: branch breakdown (district managers) ─────────────────────── */}
       {!isAdminOrExec && managerByBranch.length > 1 && (
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>By Branch</div>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>By Branch</div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr>
@@ -313,7 +313,7 @@ export default function OverviewTab({ role, data, branches, selectedBranchId, al
                 const gpPct = b.revenue > 0 ? r((gp / b.revenue) * 100) : 0
                 const laborPct = b.revenue > 0 ? r((b.directPayroll / b.revenue) * 100) : 0
                 return (
-                  <tr key={b.id} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                  <tr key={b.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ ...td, textAlign: 'left', color: '#ff6b00' }}>{branchNameMap[b.id] ?? b.id}</td>
                     <td style={td}>{formatCurrency(b.revenue)}</td>
                     <td style={td}>{formatCurrency(b.directPayroll)}</td>
@@ -330,8 +330,8 @@ export default function OverviewTab({ role, data, branches, selectedBranchId, al
 
       {/* ── Manager: top fuel consumers ───────────────────────────────────────── */}
       {!isAdminOrExec && topConsumers.length > 0 && (
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Top Fuel Consumers</div>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Top Fuel Consumers</div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr>
@@ -343,13 +343,13 @@ export default function OverviewTab({ role, data, branches, selectedBranchId, al
             </thead>
             <tbody>
               {topConsumers.map((c, i) => (
-                <tr key={`${c.employeeId ?? 'gen'}-${i}`} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                <tr key={`${c.employeeId ?? 'gen'}-${i}`} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ ...td, textAlign: 'left', color: c.isGeneral ? '#888888' : '#cccccc', fontStyle: c.isGeneral ? 'italic' : 'normal' }}>
                     {c.displayName}
                   </td>
                   <td style={td}>{c.totalGallons.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
                   <td style={td}>{c.avgPpg != null ? `$${c.avgPpg.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}` : '—'}</td>
-                  <td style={{ ...td, color: '#ffffff', fontWeight: 500 }}>{formatCurrency(c.totalCost)}</td>
+                  <td style={{ ...td, color: 'var(--text-primary)', fontWeight: 500 }}>{formatCurrency(c.totalCost)}</td>
                 </tr>
               ))}
             </tbody>
@@ -359,8 +359,8 @@ export default function OverviewTab({ role, data, branches, selectedBranchId, al
 
       {/* ── Admin/exec: branch table ──────────────────────────────────────────── */}
       {byBranch.length > 1 && !selectedBranchId && (
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>By Branch</div>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>By Branch</div>
           <BranchTable byBranch={byBranch} branchNameMap={branchNameMap} allocationOn={allocationOn} />
         </div>
       )}
@@ -373,8 +373,8 @@ export default function OverviewTab({ role, data, branches, selectedBranchId, al
 function Item({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div style={{ fontSize: 10, color: '#666666', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
-      <div style={{ fontSize: 14, color: '#ffffff', fontWeight: 500 }}>{value}</div>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+      <div style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 500 }}>{value}</div>
     </div>
   )
 }
@@ -385,14 +385,14 @@ function CostBar({ label, amount, total, color, opacity = 1 }: {
   const pct = total > 0 ? Math.max(0, Math.min(100, (amount / total) * 100)) : 0
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div style={{ width: 120, fontSize: 12, color: '#888888', flexShrink: 0 }}>{label}</div>
-      <div style={{ flex: 1, height: 6, background: '#2a2a2a', borderRadius: 3 }}>
+      <div style={{ width: 120, fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>{label}</div>
+      <div style={{ flex: 1, height: 6, background: 'var(--bg-secondary)', borderRadius: 3 }}>
         <div style={{ width: `${pct}%`, height: '100%', background: color, opacity, borderRadius: 3, transition: 'width 0.4s ease' }} />
       </div>
-      <div style={{ width: 72, fontSize: 12, color: '#cccccc', textAlign: 'right', flexShrink: 0 }}>
+      <div style={{ width: 72, fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right', flexShrink: 0 }}>
         {formatCurrency(amount)}
       </div>
-      <div style={{ width: 44, fontSize: 11, color: '#555555', textAlign: 'right', flexShrink: 0 }}>
+      <div style={{ width: 44, fontSize: 11, color: 'var(--text-faint)', textAlign: 'right', flexShrink: 0 }}>
         {formatPercent(pct)}
       </div>
     </div>
@@ -453,7 +453,7 @@ function BranchTable({ byBranch, branchNameMap, allocationOn }: {
         </thead>
         <tbody>
           {sorted.map((b) => (
-            <tr key={b.branchId} style={{ borderBottom: '1px solid #2a2a2a' }}>
+            <tr key={b.branchId} style={{ borderBottom: '1px solid var(--border)' }}>
               <td style={{ ...td, color: '#ff6b00' }}>{branchNameMap[b.branchId] ?? b.branchId}</td>
               {columns.map((c) => (
                 <td key={c.key} style={td}>
@@ -470,8 +470,8 @@ function BranchTable({ byBranch, branchNameMap, allocationOn }: {
   )
 }
 
-const th: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', fontSize: 11, color: '#666666', fontWeight: 400, whiteSpace: 'nowrap' }
-const td: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', color: '#cccccc' }
+const th: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', fontSize: 11, color: 'var(--text-dim)', fontWeight: 400, whiteSpace: 'nowrap' }
+const td: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', color: 'var(--text-secondary)' }
 
 // ── Goals helpers ─────────────────────────────────────────────────────────────
 
@@ -571,8 +571,8 @@ function OverviewGoals({
       : null
 
     return (
-      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Goals by Branch</div>
+      <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Goals by Branch</div>
         <div className="table-scroll">
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
@@ -594,10 +594,10 @@ function OverviewGoals({
                 const gpActual  = actual?.gpPct ?? 0
                 const revDelta  = revTarget != null ? revActual - revTarget : null
                 return (
-                  <tr key={id} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                  <tr key={id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ ...td, textAlign: 'left', color: '#ff6b00' }}>{name}</td>
                     <td style={td}>{revTarget != null ? formatCurrency(revTarget) : <span style={{ color: '#444' }}>—</span>}</td>
-                    <td style={{ ...td, color: '#ffffff' }}>{formatCurrency(revActual)}</td>
+                    <td style={{ ...td, color: 'var(--text-primary)' }}>{formatCurrency(revActual)}</td>
                     <td style={{ ...td, color: revDelta != null ? varianceColor(revActual, revTarget!) : '#666' }}>
                       {revDelta != null ? `${revDelta >= 0 ? '+' : ''}${formatCurrency(revDelta)}` : '—'}
                     </td>
@@ -613,14 +613,14 @@ function OverviewGoals({
               })}
             </tbody>
             <tfoot>
-              <tr style={{ borderTop: '1px solid #333' }}>
-                <td style={{ ...td, textAlign: 'left', color: '#888', fontWeight: 500 }}>Total</td>
-                <td style={{ ...td, color: '#888' }}>{formatCurrency(totalRevTarget)}</td>
-                <td style={{ ...td, color: '#ffffff', fontWeight: 500 }}>{formatCurrency(totalRevActual)}</td>
+              <tr style={{ borderTop: '1px solid var(--border-emphasis)' }}>
+                <td style={{ ...td, textAlign: 'left', color: 'var(--text-muted)', fontWeight: 500 }}>Total</td>
+                <td style={{ ...td, color: 'var(--text-muted)' }}>{formatCurrency(totalRevTarget)}</td>
+                <td style={{ ...td, color: 'var(--text-primary)', fontWeight: 500 }}>{formatCurrency(totalRevActual)}</td>
                 <td style={{ ...td, color: varianceColor(totalRevActual, totalRevTarget), fontWeight: 500 }}>
                   {`${totalRevActual - totalRevTarget >= 0 ? '+' : ''}${formatCurrency(totalRevActual - totalRevTarget)}`}
                 </td>
-                <td style={{ ...td, color: '#888' }}>{avgGpGoal != null ? `${avgGpGoal}%` : '—'}</td>
+                <td style={{ ...td, color: 'var(--text-muted)' }}>{avgGpGoal != null ? `${avgGpGoal}%` : '—'}</td>
                 <td style={{ ...td, fontWeight: 500, color: avgGpGoal != null ? gpVarianceColor(blendedGpActual, avgGpGoal) : '#ffffff' }}>
                   {formatPercent(blendedGpActual)}
                 </td>
@@ -645,8 +645,8 @@ function OverviewGoals({
     const totalRevActual = rows.reduce((s, r) => s + r.revActual, 0)
 
     return (
-      <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Revenue Goals by Branch</div>
+      <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Revenue Goals by Branch</div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr>
@@ -662,10 +662,10 @@ function OverviewGoals({
               const revTarget = target?.revenueTarget ?? null
               const revDelta  = revTarget != null ? revActual - revTarget : null
               return (
-                <tr key={id} style={{ borderBottom: '1px solid #2a2a2a' }}>
+                <tr key={id} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ ...td, textAlign: 'left', color: '#ff6b00' }}>{name}</td>
                   <td style={td}>{revTarget != null ? formatCurrency(revTarget) : <span style={{ color: '#444' }}>—</span>}</td>
-                  <td style={{ ...td, color: '#ffffff' }}>{formatCurrency(revActual)}</td>
+                  <td style={{ ...td, color: 'var(--text-primary)' }}>{formatCurrency(revActual)}</td>
                   <td style={{ ...td, color: revDelta != null ? varianceColor(revActual, revTarget!) : '#666' }}>
                     {revDelta != null ? `${revDelta >= 0 ? '+' : ''}${formatCurrency(revDelta)}` : '—'}
                   </td>
@@ -677,10 +677,10 @@ function OverviewGoals({
             })}
           </tbody>
           <tfoot>
-            <tr style={{ borderTop: '1px solid #333' }}>
-              <td style={{ ...td, textAlign: 'left', color: '#888', fontWeight: 500 }}>Total</td>
-              <td style={{ ...td, color: '#888' }}>{formatCurrency(totalRevTarget)}</td>
-              <td style={{ ...td, color: '#ffffff', fontWeight: 500 }}>{formatCurrency(totalRevActual)}</td>
+            <tr style={{ borderTop: '1px solid var(--border-emphasis)' }}>
+              <td style={{ ...td, textAlign: 'left', color: 'var(--text-muted)', fontWeight: 500 }}>Total</td>
+              <td style={{ ...td, color: 'var(--text-muted)' }}>{formatCurrency(totalRevTarget)}</td>
+              <td style={{ ...td, color: 'var(--text-primary)', fontWeight: 500 }}>{formatCurrency(totalRevActual)}</td>
               <td style={{ ...td, color: varianceColor(totalRevActual, totalRevTarget), fontWeight: 500 }}>
                 {`${totalRevActual - totalRevTarget >= 0 ? '+' : ''}${formatCurrency(totalRevActual - totalRevTarget)}`}
               </td>
@@ -702,14 +702,14 @@ function OverviewGoals({
   const revDelta  = revTarget != null ? totalRevenue - revTarget : null
 
   return (
-    <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-      <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Goals</div>
+    <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+      <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Goals</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
         {revTarget != null && (
-          <div style={{ flex: '1 1 160px', background: '#2a2a2a', borderRadius: 10, padding: 14 }}>
-            <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Revenue vs. Target</div>
-            <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{formatCurrency(totalRevenue)}</div>
-            <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Target: {formatCurrency(revTarget)}</div>
+          <div style={{ flex: '1 1 160px', background: 'var(--bg-secondary)', borderRadius: 10, padding: 14 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Revenue vs. Target</div>
+            <div style={{ fontSize: 20, fontWeight: 500, color: 'var(--text-primary)' }}>{formatCurrency(totalRevenue)}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>Target: {formatCurrency(revTarget)}</div>
             <div style={{ fontSize: 13, fontWeight: 500, color: varianceColor(totalRevenue, revTarget), marginTop: 6 }}>
               {revDelta! >= 0 ? '+' : ''}{formatCurrency(revDelta!)}
             </div>
@@ -717,10 +717,10 @@ function OverviewGoals({
           </div>
         )}
         {gpTarget != null && (
-          <div style={{ flex: '1 1 160px', background: '#2a2a2a', borderRadius: 10, padding: 14 }}>
-            <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>GP% vs. Target</div>
+          <div style={{ flex: '1 1 160px', background: 'var(--bg-secondary)', borderRadius: 10, padding: 14 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>GP% vs. Target</div>
             <div style={{ fontSize: 20, fontWeight: 500, color: gpVarianceColor(totalGpPct, gpTarget) }}>{formatPercent(totalGpPct)}</div>
-            <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Target: {gpTarget}%</div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>Target: {gpTarget}%</div>
             <div style={{ marginTop: 8 }}>{gpStatus(totalGpPct, gpTarget)}</div>
           </div>
         )}

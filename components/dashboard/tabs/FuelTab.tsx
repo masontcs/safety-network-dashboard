@@ -47,8 +47,8 @@ export default function FuelTab({ role, data, allocationOn }: TabProps) {
 
       {/* ── Weekly fuel chart ─────────────────────────────────────────────────── */}
       {fuelByWeek.length > 0 && (
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Fuel Cost by Week</div>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Fuel Cost by Week</div>
           <WeeklyChart
             data={weeklyChartData}
             dateKey="date"
@@ -61,8 +61,8 @@ export default function FuelTab({ role, data, allocationOn }: TabProps) {
 
       {/* ── Top consumers table ────────────────────────────────────────────────── */}
       {consumers.length > 0 && (
-        <div style={{ background: '#1e1e1e', borderRadius: 12, border: '1px solid #2a2a2a', padding: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff', marginBottom: 12 }}>Top Consumers</div>
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Top Consumers</div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
@@ -76,19 +76,19 @@ export default function FuelTab({ role, data, allocationOn }: TabProps) {
               </thead>
               <tbody>
                 {consumers.map((c, i) => (
-                  <tr key={`${c.employeeId ?? 'gen'}-${i}`} style={{ borderBottom: '1px solid #2a2a2a' }}>
-                    <td style={{ ...td, textAlign: 'left', color: '#cccccc' }}>
+                  <tr key={`${c.employeeId ?? 'gen'}-${i}`} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ ...td, textAlign: 'left', color: 'var(--text-secondary)' }}>
                       {c.displayName}
                       {c.isGeneral && (
-                        <span style={{ marginLeft: 6, fontSize: 10, color: '#555555', background: '#2a2a2a', borderRadius: 4, padding: '1px 6px' }}>
+                        <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--text-faint)', background: 'var(--bg-secondary)', borderRadius: 4, padding: '1px 6px' }}>
                           General
                         </span>
                       )}
                     </td>
-                    <td style={{ ...td, color: '#888888' }}>{c.branchName}</td>
+                    <td style={{ ...td, color: 'var(--text-muted)' }}>{c.branchName}</td>
                     <td style={td}>{c.totalGallons.toFixed(1)}</td>
                     <td style={td}>{c.avgPpg !== null ? `$${c.avgPpg.toFixed(3)}` : '—'}</td>
-                    <td style={{ ...td, color: '#ffffff' }}>{formatCurrency(c.totalCost)}</td>
+                    <td style={{ ...td, color: 'var(--text-primary)' }}>{formatCurrency(c.totalCost)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -100,5 +100,5 @@ export default function FuelTab({ role, data, allocationOn }: TabProps) {
   )
 }
 
-const th: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', fontSize: 11, color: '#666666', fontWeight: 400 }
-const td: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', color: '#cccccc' }
+const th: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', fontSize: 11, color: 'var(--text-dim)', fontWeight: 400 }
+const td: React.CSSProperties = { textAlign: 'right', padding: '6px 8px', color: 'var(--text-secondary)' }

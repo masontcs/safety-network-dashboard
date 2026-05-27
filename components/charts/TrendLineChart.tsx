@@ -47,18 +47,18 @@ export default function TrendLineChart({ data, height = 200 }: TrendLineChartPro
         />
         <Tooltip
           contentStyle={{
-            background: '#2a2a2a',
-            border: '1px solid #333333',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border-emphasis)',
             borderRadius: 8,
             fontSize: 12,
           }}
-          labelStyle={{ color: '#888888' }}
-          itemStyle={{ color: '#ffffff' }}
+          labelStyle={{ color: 'var(--text-muted)' }}
+          itemStyle={{ color: 'var(--text-primary)' }}
           formatter={(value: number) => [`$${value.toLocaleString()}`, undefined]}
         />
         <Legend
           iconSize={8}
-          wrapperStyle={{ fontSize: 11, color: '#888888', paddingTop: 8 }}
+          wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)', paddingTop: 8 }}
         />
         <Line
           type="monotone"

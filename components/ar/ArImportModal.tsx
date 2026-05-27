@@ -23,8 +23,8 @@ function ProgressBar({ label, progress }: { label: string; progress: number }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '8px 0' }}>
-      <div style={{ fontSize: 12, color: '#888' }}>{label}</div>
-      <div style={{ width: '100%', height: 4, background: '#2a2a2a', borderRadius: 2, overflow: 'hidden' }}>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{label}</div>
+      <div style={{ width: '100%', height: 4, background: 'var(--bg-secondary)', borderRadius: 2, overflow: 'hidden' }}>
         <div
           style={{
             height: '100%',
@@ -35,7 +35,7 @@ function ProgressBar({ label, progress }: { label: string; progress: number }) {
           }}
         />
       </div>
-      <div style={{ fontSize: 11, color: '#555' }}>{Math.round(displayed)}%</div>
+      <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{Math.round(displayed)}%</div>
     </div>
   )
 }
@@ -147,20 +147,20 @@ export default function ArImportModal({ onClose, onSuccess }: Props) {
       onClick={(e) => { if (e.target === e.currentTarget && !isLoading) onClose() }}
     >
       <div style={{
-        background: '#1e1e1e',
-        border: '1px solid #2a2a2a',
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border)',
         borderRadius: 12,
         padding: 24,
         width: 420,
         maxWidth: '90vw',
       }}>
-        <div style={{ fontSize: 16, fontWeight: 500, color: '#fff', marginBottom: 20 }}>
+        <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 20 }}>
           Import AR File
         </div>
 
         {/* Entity selector */}
         <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 6 }}>
+          <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 6 }}>
             Entity
           </label>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -189,8 +189,8 @@ export default function ArImportModal({ onClose, onSuccess }: Props) {
 
         {/* Report date */}
         <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 6 }}>
-            Report Date <span style={{ color: '#555' }}>(optional — defaults to today)</span>
+          <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 6 }}>
+            Report Date <span style={{ color: 'var(--text-faint)' }}>(optional — defaults to today)</span>
           </label>
           <input
             type="date"
@@ -198,7 +198,7 @@ export default function ArImportModal({ onClose, onSuccess }: Props) {
             onChange={(e) => setReportDate(e.target.value)}
             disabled={isLoading}
             style={{
-              background: '#2a2a2a', border: '1px solid #333', borderRadius: 8,
+              background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8,
               color: '#ccc', padding: '7px 12px', fontSize: 13, width: '100%',
               outline: 'none', boxSizing: 'border-box',
               opacity: isLoading ? 0.5 : 1,
@@ -208,13 +208,13 @@ export default function ArImportModal({ onClose, onSuccess }: Props) {
 
         {/* File picker */}
         <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 6 }}>
+          <label style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 6 }}>
             File (.xlsx, .xlsm)
           </label>
           <div
             onClick={() => !isLoading && inputRef.current?.click()}
             style={{
-              background: '#2a2a2a',
+              background: 'var(--bg-secondary)',
               border: `1px dashed ${
                 state.status === 'success' ? '#4caf50'
                 : state.status === 'error' ? '#cc4444'
@@ -263,7 +263,7 @@ export default function ArImportModal({ onClose, onSuccess }: Props) {
             <div style={{ fontSize: 12, color: '#4caf50', fontWeight: 500, marginBottom: 4 }}>
               ✓ Import complete
             </div>
-            <div style={{ fontSize: 12, color: '#888', lineHeight: 1.7 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
               {state.invoiceCount} invoices · ${state.totalAr.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               {state.newCustomers > 0 && <> · {state.newCustomers} new customer{state.newCustomers !== 1 ? 's' : ''}</>}
               {state.crossLinked > 0 && <> · {state.crossLinked} linked across entities</>}
@@ -292,8 +292,8 @@ export default function ArImportModal({ onClose, onSuccess }: Props) {
             onClick={onClose}
             disabled={isLoading}
             style={{
-              background: 'transparent', border: '1px solid #333', borderRadius: 8,
-              color: '#888', padding: '8px 16px', fontSize: 13,
+              background: 'transparent', border: '1px solid var(--border-emphasis)', borderRadius: 8,
+              color: 'var(--text-muted)', padding: '8px 16px', fontSize: 13,
               cursor: isLoading ? 'default' : 'pointer',
               opacity: isLoading ? 0.5 : 1,
             }}
@@ -307,7 +307,7 @@ export default function ArImportModal({ onClose, onSuccess }: Props) {
               style={{
                 background: '#ff6b00',
                 border: 'none', borderRadius: 8,
-                color: '#fff', padding: '8px 20px', fontSize: 13, fontWeight: 500,
+                color: 'var(--text-primary)', padding: '8px 20px', fontSize: 13, fontWeight: 500,
                 cursor: isLoading || !file ? 'default' : 'pointer',
                 opacity: isLoading || !file ? 0.5 : 1,
               }}

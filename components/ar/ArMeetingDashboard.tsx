@@ -153,11 +153,11 @@ function KpiCard({
   const muted = accent ? 'rgba(255,255,255,0.7)' : warn ? '#cc6600' : '#888'
   const subC  = accent ? 'rgba(255,255,255,0.6)' : '#666'
   return (
-    <div style={{ background: bg, border: accent ? 'none' : '1px solid #2a2a2a', borderRadius: 12, padding: 20 }}>
+    <div style={{ background: bg, border: accent ? 'none' : '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
       <div style={{ fontSize: 11, color: muted, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
         {label}
       </div>
-      <div style={{ fontSize: 26, fontWeight: 500, color: '#fff' }}>{value}</div>
+      <div style={{ fontSize: 26, fontWeight: 500, color: 'var(--text-primary)' }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: subC, marginTop: 4 }}>{sub}</div>}
     </div>
   )
@@ -168,8 +168,8 @@ function KpiCard({
 function AgingBar({ kpis }: { kpis: MeetingKPIs }) {
   const total = kpis.totalAr || 1
   return (
-    <div style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, padding: '16px 20px' }}>
-      <div style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
+    <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px' }}>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
         Aging Breakdown — {kpis.totalCustomers} customers
       </div>
 
@@ -192,12 +192,12 @@ function AgingBar({ kpis }: { kpis: MeetingKPIs }) {
             <div key={b} style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 100, flex: '1 1 100px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: AGING_COLORS[b], flexShrink: 0 }} />
-                <span style={{ fontSize: 11, color: '#888' }}>{b} days</span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{b} days</span>
               </div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
                 {fmt(val)}
               </div>
-              <div style={{ fontSize: 10, color: '#555' }}>{pct(val, total)}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-faint)' }}>{pct(val, total)}</div>
             </div>
           )
         })}
@@ -211,9 +211,9 @@ function AgingBar({ kpis }: { kpis: MeetingKPIs }) {
 function SectionHeader({ title, count }: { title: string; count?: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12 }}>
-      <div style={{ fontSize: 14, fontWeight: 500, color: '#fff' }}>{title}</div>
+      <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>{title}</div>
       {count !== undefined && (
-        <div style={{ fontSize: 11, color: '#555' }}>{count}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{count}</div>
       )}
     </div>
   )
@@ -267,7 +267,7 @@ function CustomerRow({
           {displayName}
         </span>
 
-        <span style={{ fontSize: 13, fontWeight: 500, color: '#fff', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
           {fmt(totalAr)}
         </span>
       </div>
@@ -292,10 +292,10 @@ function CustomerRow({
       {latestNote !== undefined && (
         latestNote ? (
           <div style={{ paddingLeft: priority !== undefined ? 36 : 0, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-            <div style={{ fontSize: 11, color: '#666', whiteSpace: 'nowrap', marginTop: 1 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', whiteSpace: 'nowrap', marginTop: 1 }}>
               {latestNote.createdByName ?? 'Unknown'} · {timeAgo(latestNote.createdAt)}
             </div>
-            <div style={{ fontSize: 12, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
               {latestNote.content}
             </div>
           </div>
@@ -328,7 +328,7 @@ export default function ArMeetingDashboard({ entity, onSelectCustomer }: Props) 
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, color: '#555', fontSize: 13 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, color: 'var(--text-faint)', fontSize: 13 }}>
         Loading meeting data…
       </div>
     )
@@ -336,7 +336,7 @@ export default function ArMeetingDashboard({ entity, onSelectCustomer }: Props) 
 
   if (!data) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, color: '#555', fontSize: 13 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240, color: 'var(--text-faint)', fontSize: 13 }}>
         Failed to load data.
       </div>
     )
@@ -384,7 +384,7 @@ export default function ArMeetingDashboard({ entity, onSelectCustomer }: Props) 
           {actionItems.length > 0 ? (
             <>
               <SectionHeader title="Action Items" count={actionItems.length} />
-              <div style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
                 {actionItems.map((item, idx) => (
                   <CustomerRow
                     key={item.id}
@@ -407,9 +407,9 @@ export default function ArMeetingDashboard({ entity, onSelectCustomer }: Props) 
             title={actionItems.length > 0 ? 'All Customers by Balance' : 'Top Customers by Balance'}
             count={topCustomers.length}
           />
-          <div style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
             {topCustomers.length === 0 ? (
-              <div style={{ padding: 32, textAlign: 'center', color: '#555', fontSize: 13 }}>
+              <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>
                 No AR data yet. Import a file to get started.
               </div>
             ) : (
@@ -435,9 +435,9 @@ export default function ArMeetingDashboard({ entity, onSelectCustomer }: Props) 
           {/* Recent activity */}
           <div>
             <SectionHeader title="Recent Activity" />
-            <div style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
               {recentActivity.length === 0 ? (
-                <div style={{ padding: 24, textAlign: 'center', color: '#555', fontSize: 12 }}>No recent notes.</div>
+                <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-faint)', fontSize: 12 }}>No recent notes.</div>
               ) : (
                 recentActivity.map((act, idx) => (
                   <div
@@ -453,13 +453,13 @@ export default function ArMeetingDashboard({ entity, onSelectCustomer }: Props) 
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
                       <span style={{ fontSize: 12, fontWeight: 500, color: '#ff6b00' }}>{act.customerName}</span>
-                      <span style={{ fontSize: 10, color: '#555' }}>{timeAgo(act.createdAt)}</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>{timeAgo(act.createdAt)}</span>
                     </div>
                     <div style={{ fontSize: 12, color: '#aaa', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                       {act.content}
                     </div>
                     {act.createdByName && (
-                      <div style={{ fontSize: 10, color: '#555', marginTop: 2 }}>{act.createdByName}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 2 }}>{act.createdByName}</div>
                     )}
                   </div>
                 ))
@@ -471,7 +471,7 @@ export default function ArMeetingDashboard({ entity, onSelectCustomer }: Props) 
           {newCustomers.length > 0 && (
             <div>
               <SectionHeader title="New Customers (30d)" count={newCustomers.length} />
-              <div style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
                 {newCustomers.map((cust, idx) => (
                   <div
                     key={cust.id}
@@ -487,7 +487,7 @@ export default function ArMeetingDashboard({ entity, onSelectCustomer }: Props) 
                   >
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 500, color: '#ff6b00' }}>{cust.displayName}</div>
-                      <div style={{ fontSize: 10, color: '#555', marginTop: 2 }}>{fmtDate(cust.createdAt)}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 2 }}>{fmtDate(cust.createdAt)}</div>
                     </div>
                     <div style={{ fontSize: 12, color: cust.totalAr > 0 ? '#fff' : '#444', fontVariantNumeric: 'tabular-nums' }}>
                       {cust.totalAr > 0 ? fmt(cust.totalAr) : '—'}

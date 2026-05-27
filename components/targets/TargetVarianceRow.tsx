@@ -64,7 +64,7 @@ function VarianceMetric({
     return (
       <div style={metricWrapStyle}>
         <p style={metricLabelStyle}>{label}</p>
-        <p style={{ margin: 0, fontSize: 13, color: '#555555' }}>No target</p>
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--text-faint)' }}>No target</p>
       </div>
     )
   }
@@ -73,7 +73,7 @@ function VarianceMetric({
     return (
       <div style={metricWrapStyle}>
         <p style={metricLabelStyle}>{label}</p>
-        <p style={{ margin: 0, fontSize: 13, color: '#888888' }}>—</p>
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>—</p>
       </div>
     )
   }
@@ -94,8 +94,8 @@ function VarianceMetric({
     >
       <p style={metricLabelStyle}>{label}</p>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 2 }}>
-        <span style={{ fontSize: 18, fontWeight: 500, color: '#ffffff' }}>{fmt(actual)}</span>
-        <span style={{ fontSize: 11, color: '#888888' }}>vs {fmt(target)}</span>
+        <span style={{ fontSize: 18, fontWeight: 500, color: 'var(--text-primary)' }}>{fmt(actual)}</span>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>vs {fmt(target)}</span>
       </div>
       <span style={{ fontSize: 11, color: STATUS_COLOR[status] }}>
         {sign}{fmt(varAbs)} ({sign}{varPct.toFixed(1)}%)
@@ -192,8 +192,8 @@ export default function TargetVarianceRow({
   return (
     <div
       style={{
-        background: '#1e1e1e',
-        border: '1px solid #2a2a2a',
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border)',
         borderRadius: 12,
         padding: '12px 16px',
       }}
@@ -210,18 +210,18 @@ export default function TargetVarianceRow({
       >
         Variance vs Target
         {loadState.status === 'ready' && (
-          <span style={{ marginLeft: 8, textTransform: 'none', fontWeight: 400, color: '#555555' }}>
+          <span style={{ marginLeft: 8, textTransform: 'none', fontWeight: 400, color: 'var(--text-faint)' }}>
             {loadState.fiscalMonthName}
           </span>
         )}
       </p>
 
       {loadState.status === 'no_fiscal_month' ? (
-        <p style={{ margin: 0, fontSize: 12, color: '#555555' }}>
+        <p style={{ margin: 0, fontSize: 12, color: 'var(--text-faint)' }}>
           No fiscal month covers this period.
         </p>
       ) : loadState.status === 'no_target' ? (
-        <p style={{ margin: 0, fontSize: 12, color: '#555555' }}>
+        <p style={{ margin: 0, fontSize: 12, color: 'var(--text-faint)' }}>
           No performance target configured for {loadState.fiscalMonthName}.{' '}
           <a href="/admin/targets" style={{ color: '#ff6b00', textDecoration: 'none' }}>
             Set targets →
@@ -258,7 +258,7 @@ const metricWrapStyle: React.CSSProperties = {
 const metricLabelStyle: React.CSSProperties = {
   margin: '0 0 4px 0',
   fontSize: 11,
-  color: '#888888',
+  color: 'var(--text-muted)',
   textTransform: 'uppercase',
   letterSpacing: '0.04em',
 }

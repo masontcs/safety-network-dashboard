@@ -113,15 +113,16 @@ export async function GET(): Promise<NextResponse> {
       rawCodes.map((pc) => [pc.id, { laborType: pc.labor_type, branchId: pc.branch_id }]),
     )
 
-    const empEntityMap: Record<string, Array<{ entityCode: string; branchName: string; laborType: string }>> = {}
+    const empEntityMap: Record<string, Array<{ entityCode: string; branchId: string | null; branchName: string; laborType: string }>> = {}
     for (const ea of confirmedAssignments ?? []) {
       if (!empEntityMap[ea.employee_id]) empEntityMap[ea.employee_id] = []
       const codeDetail = ea.payroll_code_id ? codeDetailMap[ea.payroll_code_id] : null
       const entityCode = entityMap[ea.entity_id] ?? ea.entity_id
-      const branchName = codeDetail?.branchId ? (branchNameMap[codeDetail.branchId] ?? 'Unknown') : 'Corp/HQ'
+      const branchId = codeDetail?.branchId ?? null
+      const branchName = branchId ? (branchNameMap[branchId] ?? 'Unknown') : 'Corp/HQ'
       const laborType = codeDetail?.laborType ?? 'unknown'
       if (!empEntityMap[ea.employee_id].some((x) => x.entityCode === entityCode)) {
-        empEntityMap[ea.employee_id].push({ entityCode, branchName, laborType })
+        empEntityMap[ea.employee_id].push({ entityCode, branchId, branchName, laborType })
       }
     }
 

@@ -113,12 +113,12 @@ function fmtLaborType(lt: string): string {
 function SectionHeader({ title, count }: { title: string; count: number }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-      <div style={{ fontSize: 14, fontWeight: 500, color: '#ffffff' }}>{title}</div>
+      <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>{title}</div>
       {count > 0 && (
         <span
           style={{
             background: '#ff6b00',
-            color: '#ffffff',
+            color: 'var(--text-primary)',
             borderRadius: 10,
             fontSize: 10,
             fontWeight: 600,
@@ -141,9 +141,9 @@ function EmptyQueue({ message }: { message: string }) {
       style={{
         padding: '20px 0',
         fontSize: 12,
-        color: '#555555',
+        color: 'var(--text-faint)',
         textAlign: 'center',
-        borderTop: '1px solid #2a2a2a',
+        borderTop: '1px solid var(--border)',
       }}
     >
       {message}
@@ -188,22 +188,22 @@ function ActionBtn({
 }
 
 const selectStyle: React.CSSProperties = {
-  background: '#2a2a2a',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 6,
   padding: '4px 8px',
   fontSize: 12,
-  color: '#cccccc',
+  color: 'var(--text-secondary)',
   fontFamily: 'inherit',
 }
 
 const inputStyle: React.CSSProperties = {
-  background: '#2a2a2a',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 6,
   padding: '5px 10px',
   fontSize: 12,
-  color: '#cccccc',
+  color: 'var(--text-secondary)',
   fontFamily: 'inherit',
   outline: 'none',
   width: 300,
@@ -355,25 +355,25 @@ function EmployeeMatchRow({
   }
 
   return (
-    <div style={{ padding: '14px 0', borderTop: '1px solid #2a2a2a' }}>
+    <div style={{ padding: '14px 0', borderTop: '1px solid var(--border)' }}>
       {/* Import name */}
-      <div style={{ fontSize: 12, color: '#cccccc', marginBottom: 4 }}>
+      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
         Import name:{' '}
-        <span style={{ color: '#ffffff', fontWeight: 500 }}>&ldquo;{item.rawName}&rdquo;</span>{' '}
-        <span style={{ color: '#555555' }}>({item.entityCode})</span>
+        <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>&ldquo;{item.rawName}&rdquo;</span>{' '}
+        <span style={{ color: 'var(--text-faint)' }}>({item.entityCode})</span>
       </div>
 
       {/* AI suggestion */}
       {item.aiCandidateName ? (
-        <div style={{ fontSize: 12, color: '#888888', marginBottom: 10 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
           AI suggestion:{' '}
           <span style={{ color: '#ff6b00' }}>{item.aiCandidateName}</span>
           {item.aiScore !== null && (
-            <span style={{ color: '#555555' }}> [{Math.round(item.aiScore)}%]</span>
+            <span style={{ color: 'var(--text-faint)' }}> [{Math.round(item.aiScore)}%]</span>
           )}
         </div>
       ) : (
-        <div style={{ fontSize: 12, color: '#555555', marginBottom: 10 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-faint)', marginBottom: 10 }}>
           No AI match suggestion
         </div>
       )}
@@ -385,7 +385,7 @@ function EmployeeMatchRow({
           alignItems: 'center',
           gap: 6,
           fontSize: 12,
-          color: '#cccccc',
+          color: 'var(--text-secondary)',
           cursor: 'pointer',
           marginBottom: 12,
           userSelect: 'none',
@@ -410,7 +410,7 @@ function EmployeeMatchRow({
       {!linkMode && (
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
           <div>
-            <div style={{ fontSize: 11, color: '#666666', marginBottom: 4 }}>Branch</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Branch</div>
             <select
               value={branchId}
               onChange={(e) => setBranchId(e.target.value)}
@@ -434,7 +434,7 @@ function EmployeeMatchRow({
             </select>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: '#666666', marginBottom: 4 }}>Labor Type</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Labor Type</div>
             <select
               value={laborType}
               onChange={(e) => setLaborType(e.target.value)}
@@ -452,7 +452,7 @@ function EmployeeMatchRow({
       {/* Link existing fields */}
       {linkMode && (
         <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 11, color: '#666666', marginBottom: 4 }}>Search employee</div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Search employee</div>
           <div ref={searchRef} style={{ position: 'relative', display: 'inline-block' }}>
             <input
               type="text"
@@ -479,8 +479,8 @@ function EmployeeMatchRow({
                   top: '100%',
                   left: 0,
                   minWidth: '100%',
-                  background: '#2a2a2a',
-                  border: '1px solid #333333',
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-emphasis)',
                   borderRadius: 6,
                   marginTop: 2,
                   maxHeight: 220,
@@ -489,7 +489,7 @@ function EmployeeMatchRow({
                 }}
               >
                 {filteredEmployees.length === 0 ? (
-                  <div style={{ padding: '8px 12px', fontSize: 12, color: '#555555' }}>
+                  <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-faint)' }}>
                     No employees found
                   </div>
                 ) : (
@@ -510,17 +510,17 @@ function EmployeeMatchRow({
                         textAlign: 'left',
                         background: 'none',
                         border: 'none',
-                        borderBottom: '1px solid #333333',
+                        borderBottom: '1px solid var(--border-emphasis)',
                         padding: '8px 12px',
                         fontSize: 12,
-                        color: '#cccccc',
+                        color: 'var(--text-secondary)',
                         cursor: 'pointer',
                         fontFamily: 'inherit',
                       }}
                     >
-                      <span style={{ color: '#ffffff', fontWeight: 500 }}>{emp.displayName}</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{emp.displayName}</span>
                       {emp.entityAssignments.length > 0 && (
-                        <span style={{ color: '#666666', marginLeft: 8, fontSize: 11 }}>
+                        <span style={{ color: 'var(--text-dim)', marginLeft: 8, fontSize: 11 }}>
                           {emp.entityAssignments
                             .map((ea) => `${ea.entityCode}: ${ea.branchName} ${fmtLaborType(ea.laborType)}`)
                             .join(', ')}
@@ -541,7 +541,7 @@ function EmployeeMatchRow({
                 marginLeft: 8,
                 background: 'none',
                 border: 'none',
-                color: '#666666',
+                color: 'var(--text-dim)',
                 fontSize: 11,
                 cursor: 'pointer',
                 fontFamily: 'inherit',
@@ -553,7 +553,7 @@ function EmployeeMatchRow({
 
           {/* Selected employee's existing assignments */}
           {selectedEmployee && existingEntityAssignment && (
-            <div style={{ marginTop: 6, fontSize: 11, color: '#888888' }}>
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>
               Existing {item.entityCode} assignment:{' '}
               <span style={{ color: '#ff6b00' }}>
                 {existingEntityAssignment.branchName} · {fmtLaborType(existingEntityAssignment.laborType)}
@@ -564,12 +564,12 @@ function EmployeeMatchRow({
           {/* Override dropdowns if employee has no assignment for this entity */}
           {needsOverride && (
             <div style={{ marginTop: 10 }}>
-              <div style={{ fontSize: 11, color: '#888888', marginBottom: 6 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
                 {selectedEmployee.displayName} has no {item.entityCode} assignment yet — set one:
               </div>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 <div>
-                  <div style={{ fontSize: 11, color: '#666666', marginBottom: 4 }}>Branch</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Branch</div>
                   <select
                     value={overrideBranchId}
                     onChange={(e) => setOverrideBranchId(e.target.value)}
@@ -593,7 +593,7 @@ function EmployeeMatchRow({
                   </select>
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, color: '#666666', marginBottom: 4 }}>Labor Type</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Labor Type</div>
                   <select
                     value={overrideLaborType}
                     onChange={(e) => setOverrideLaborType(e.target.value)}
@@ -716,7 +716,7 @@ function PayrollItemsSection({
                 key={item.id}
                 style={{
                   padding: '12px 0',
-                  borderTop: '1px solid #2a2a2a',
+                  borderTop: '1px solid var(--border)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -724,15 +724,15 @@ function PayrollItemsSection({
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, color: '#ffffff', fontWeight: 500 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 500 }}>
                     &ldquo;{item.name}&rdquo;
                   </div>
                   {item.suggestedGroup && (
-                    <div style={{ fontSize: 12, color: '#888888', marginTop: 3 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>
                       Suggested:{' '}
                       <span style={{ color: '#ff6b00' }}>{item.suggestedGroup}</span>
                       {item.confidence !== null && (
-                        <span style={{ color: '#555555' }}>
+                        <span style={{ color: 'var(--text-faint)' }}>
                           {' '}[{Math.round(item.confidence)}%]
                         </span>
                       )}
@@ -858,20 +858,20 @@ function FuelCardRow({
   }
 
   return (
-    <div style={{ padding: '14px 0', borderTop: '1px solid #2a2a2a' }}>
+    <div style={{ padding: '14px 0', borderTop: '1px solid var(--border)' }}>
       {/* Card info */}
-      <div style={{ fontSize: 12, color: '#ffffff', fontWeight: 500, marginBottom: 4 }}>
+      <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 500, marginBottom: 4 }}>
         &ldquo;{card.cardName}&rdquo;{' '}
-        <span style={{ color: '#555555', fontWeight: 400 }}>({card.vendor})</span>
+        <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>({card.vendor})</span>
       </div>
       {card.currentEmployeeName && (
-        <div style={{ fontSize: 12, color: '#888888', marginBottom: 4 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
           Linked employee:{' '}
           <span style={{ color: '#ff6b00' }}>{card.currentEmployeeName}</span>
         </div>
       )}
       {card.businessTag && (
-        <div style={{ fontSize: 11, color: '#555555', marginBottom: 4 }}>
+        <div style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 4 }}>
           Tagged: {card.businessTag}
         </div>
       )}
@@ -883,7 +883,7 @@ function FuelCardRow({
           alignItems: 'center',
           gap: 6,
           fontSize: 12,
-          color: '#cccccc',
+          color: 'var(--text-secondary)',
           cursor: 'pointer',
           marginBottom: 12,
           userSelect: 'none',
@@ -946,7 +946,7 @@ function FuelCardRow({
       {/* Employee link mode */}
       {linkEmpMode && (
         <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 11, color: '#666666', marginBottom: 4 }}>Search employee</div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>Search employee</div>
           <div ref={searchRef} style={{ position: 'relative', display: 'inline-block' }}>
             <input
               type="text"
@@ -970,8 +970,8 @@ function FuelCardRow({
                   top: '100%',
                   left: 0,
                   minWidth: '100%',
-                  background: '#2a2a2a',
-                  border: '1px solid #333333',
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-emphasis)',
                   borderRadius: 6,
                   marginTop: 2,
                   maxHeight: 220,
@@ -980,7 +980,7 @@ function FuelCardRow({
                 }}
               >
                 {filteredEmployees.length === 0 ? (
-                  <div style={{ padding: '8px 12px', fontSize: 12, color: '#555555' }}>
+                  <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-faint)' }}>
                     No employees found
                   </div>
                 ) : (
@@ -1003,17 +1003,17 @@ function FuelCardRow({
                           textAlign: 'left',
                           background: 'none',
                           border: 'none',
-                          borderBottom: '1px solid #333333',
+                          borderBottom: '1px solid var(--border-emphasis)',
                           padding: '8px 12px',
                           fontSize: 12,
-                          color: '#cccccc',
+                          color: 'var(--text-secondary)',
                           cursor: 'pointer',
                           fontFamily: 'inherit',
                         }}
                       >
-                        <span style={{ color: '#ffffff', fontWeight: 500 }}>{emp.displayName}</span>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{emp.displayName}</span>
                         {branchNames.length > 0 && (
-                          <span style={{ color: '#666666', marginLeft: 8, fontSize: 11 }}>
+                          <span style={{ color: 'var(--text-dim)', marginLeft: 8, fontSize: 11 }}>
                             {branchNames.join(', ')}
                           </span>
                         )}
@@ -1036,7 +1036,7 @@ function FuelCardRow({
                 marginLeft: 8,
                 background: 'none',
                 border: 'none',
-                color: '#666666',
+                color: 'var(--text-dim)',
                 fontSize: 11,
                 cursor: 'pointer',
                 fontFamily: 'inherit',
@@ -1049,7 +1049,7 @@ function FuelCardRow({
           {/* Branch select for cost allocation — shown after employee is chosen */}
           {selectedEmployee && (
             <div style={{ marginTop: 10 }}>
-              <div style={{ fontSize: 11, color: '#666666', marginBottom: 4 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>
                 Card branch (for cost allocation)
               </div>
               <select
@@ -1074,7 +1074,7 @@ function FuelCardRow({
                 )}
               </select>
               {empBranchId && (
-                <span style={{ fontSize: 11, color: '#555555', marginLeft: 8 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 8 }}>
                   auto-filled from employee
                 </span>
               )}
@@ -1202,8 +1202,8 @@ export default function ReviewClient() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 860 }}>
       <div>
-        <div style={{ fontSize: 22, fontWeight: 500, color: '#ffffff' }}>Review Queue</div>
-        <div style={{ fontSize: 12, color: '#666666', marginTop: 4 }}>
+        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Review Queue</div>
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
           {loading
             ? 'Loading…'
             : totalPending === 0
@@ -1246,13 +1246,13 @@ export default function ReviewClient() {
               <SectionHeader title="Pending Allocations" count={pendingAllocs.length + pendingOverrides.length} />
               {pendingAllocs.length > 0 && (
                 <>
-                  <p style={{ color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Default Allocations</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Default Allocations</p>
                   {pendingAllocs.map((a) => (
-                    <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #2a2a2a' }}>
+                    <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                       <div>
                         <span style={{ color: '#ff6b00', fontSize: 13, fontWeight: 500 }}>{a.displayName}</span>
-                        <span style={{ color: '#888', fontSize: 12, marginLeft: 8 }}>{a.branchName} — {a.percentage}% from {a.effective_from}</span>
-                        {a.notes && <p style={{ color: '#666', fontSize: 11, margin: '2px 0 0' }}>{a.notes}</p>}
+                        <span style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 8 }}>{a.branchName} — {a.percentage}% from {a.effective_from}</span>
+                        {a.notes && <p style={{ color: 'var(--text-dim)', fontSize: 11, margin: '2px 0 0' }}>{a.notes}</p>}
                       </div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button onClick={() => actOnAllocation(a.employee_id, a.id, 'approved', 'alloc')} disabled={allocActioning === a.id}
@@ -1270,13 +1270,13 @@ export default function ReviewClient() {
               )}
               {pendingOverrides.length > 0 && (
                 <>
-                  <p style={{ color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 12, marginBottom: 8 }}>Weekly Overrides</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 12, marginBottom: 8 }}>Weekly Overrides</p>
                   {pendingOverrides.map((o) => (
-                    <div key={o.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #2a2a2a' }}>
+                    <div key={o.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                       <div>
                         <span style={{ color: '#ff6b00', fontSize: 13, fontWeight: 500 }}>{o.displayName}</span>
-                        <span style={{ color: '#888', fontSize: 12, marginLeft: 8 }}>{o.period_date} — {o.branchName} {o.percentage}%</span>
-                        {o.notes && <p style={{ color: '#666', fontSize: 11, margin: '2px 0 0' }}>{o.notes}</p>}
+                        <span style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 8 }}>{o.period_date} — {o.branchName} {o.percentage}%</span>
+                        {o.notes && <p style={{ color: 'var(--text-dim)', fontSize: 11, margin: '2px 0 0' }}>{o.notes}</p>}
                       </div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button onClick={() => actOnAllocation(o.employee_id, o.id, 'approved', 'override')} disabled={allocActioning === o.id}

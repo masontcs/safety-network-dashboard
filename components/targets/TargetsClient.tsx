@@ -177,13 +177,13 @@ export default function TargetsClient({ branches, fiscalMonths }: Props) {
 
   return (
     <div style={{ padding: 24, maxWidth: 960 }}>
-      <h1 style={{ fontSize: 22, fontWeight: 500, color: '#ffffff', margin: '0 0 20px 0' }}>
+      <h1 style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)', margin: '0 0 20px 0' }}>
         Performance Targets
       </h1>
 
       {fiscalMonths.length === 0 ? (
-        <div style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, padding: 24 }}>
-          <p style={{ color: '#888888', fontSize: 13, margin: 0 }}>
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>
             No fiscal months created yet. Add fiscal months first at{' '}
             <a href="/admin/fiscal-months" style={{ color: '#ff6b00', textDecoration: 'none' }}>
               Settings → Fiscal Months
@@ -210,7 +210,7 @@ export default function TargetsClient({ branches, fiscalMonths }: Props) {
               disabled={availableFiscalMonths.length === 0}
               style={{
                 background: '#ff6b00',
-                color: '#ffffff',
+                color: 'var(--text-primary)',
                 border: 'none',
                 borderRadius: 8,
                 padding: '6px 16px',
@@ -226,8 +226,8 @@ export default function TargetsClient({ branches, fiscalMonths }: Props) {
 
           {/* Add form */}
           {showAddForm && (
-            <div style={{ background: '#1e1e1e', border: '1px solid #333333', borderRadius: 12, padding: 16, marginBottom: 16 }}>
-              <p style={{ margin: '0 0 12px 0', fontSize: 13, fontWeight: 500, color: '#cccccc' }}>
+            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-emphasis)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              <p style={{ margin: '0 0 12px 0', fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)' }}>
                 New target — {selectedBranch?.name}
               </p>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
@@ -291,20 +291,20 @@ export default function TargetsClient({ branches, fiscalMonths }: Props) {
           ) : loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[1, 2, 3].map((i) => (
-                <div key={i} style={{ height: 44, background: '#1e1e1e', borderRadius: 8 }} />
+                <div key={i} style={{ height: 44, background: 'var(--bg-surface)', borderRadius: 8 }} />
               ))}
             </div>
           ) : targets.length === 0 ? (
-            <div style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, padding: 24, textAlign: 'center' }}>
-              <p style={{ color: '#888888', fontSize: 13, margin: 0 }}>
+            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 24, textAlign: 'center' }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>
                 No targets set for {selectedBranch?.name}.
               </p>
             </div>
           ) : (
-            <div style={{ background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #2a2a2a' }}>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
                     {['Fiscal Month', 'Revenue Target', 'Weekly Breakdown', 'GP% Target', ''].map((h) => (
                       <th key={h} style={{ ...thStyle, padding: '10px 16px' }}>{h}</th>
                     ))}
@@ -317,11 +317,11 @@ export default function TargetsClient({ branches, fiscalMonths }: Props) {
                     const weeklyRevenue = t.revenue_target != null && weeks ? t.revenue_target / weeks : null
 
                     return (
-                      <tr key={t.id} style={{ borderTop: i === 0 ? 'none' : '1px solid #2a2a2a' }}>
+                      <tr key={t.id} style={{ borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}>
                         <td style={tdStyle}>
-                          <span style={{ color: '#ffffff', fontWeight: 500 }}>{fm?.name ?? '—'}</span>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{fm?.name ?? '—'}</span>
                           {fm && (
-                            <span style={{ display: 'block', fontSize: 11, color: '#555555' }}>
+                            <span style={{ display: 'block', fontSize: 11, color: 'var(--text-faint)' }}>
                               {fmtDate(fm.start_date)} – {fmtDate(fm.end_date)}
                               {weeks != null && ` · ${weeks}w`}
                             </span>
@@ -340,17 +340,17 @@ export default function TargetsClient({ branches, fiscalMonths }: Props) {
                           ) : (
                             t.revenue_target != null
                               ? formatCurrency(t.revenue_target)
-                              : <span style={{ color: '#555555' }}>—</span>
+                              : <span style={{ color: 'var(--text-faint)' }}>—</span>
                           )}
                         </td>
                         <td style={tdStyle}>
                           {weeklyRevenue != null && editingId !== t.id ? (
                             <span>
                               {formatCurrency(weeklyRevenue)}
-                              <span style={{ fontSize: 11, color: '#555555' }}>/wk</span>
+                              <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>/wk</span>
                             </span>
                           ) : (
-                            <span style={{ color: '#555555' }}>—</span>
+                            <span style={{ color: 'var(--text-faint)' }}>—</span>
                           )}
                         </td>
                         <td style={tdStyle}>
@@ -367,7 +367,7 @@ export default function TargetsClient({ branches, fiscalMonths }: Props) {
                           ) : (
                             t.profit_pct_target != null
                               ? `${t.profit_pct_target}%`
-                              : <span style={{ color: '#555555' }}>—</span>
+                              : <span style={{ color: 'var(--text-faint)' }}>—</span>
                           )}
                         </td>
                         <td style={{ ...tdStyle, textAlign: 'right' }}>
@@ -410,10 +410,10 @@ export default function TargetsClient({ branches, fiscalMonths }: Props) {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const selectStyle: React.CSSProperties = {
-  background: '#2a2a2a',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 8,
-  color: '#cccccc',
+  color: 'var(--text-secondary)',
   fontSize: 12,
   padding: '5px 12px',
   cursor: 'pointer',
@@ -422,10 +422,10 @@ const selectStyle: React.CSSProperties = {
 }
 
 const inputStyle: React.CSSProperties = {
-  background: '#2a2a2a',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 8,
-  color: '#ffffff',
+  color: 'var(--text-primary)',
   fontSize: 13,
   padding: '5px 10px',
   outline: 'none',
@@ -436,13 +436,13 @@ const inputStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: 11,
-  color: '#888888',
+  color: 'var(--text-muted)',
   marginBottom: 4,
 }
 
 const btnPrimaryStyle: React.CSSProperties = {
   background: '#ff6b00',
-  color: '#ffffff',
+  color: 'var(--text-primary)',
   border: 'none',
   borderRadius: 8,
   padding: '6px 16px',
@@ -452,9 +452,9 @@ const btnPrimaryStyle: React.CSSProperties = {
 }
 
 const btnSecondaryStyle: React.CSSProperties = {
-  background: '#2a2a2a',
-  color: '#cccccc',
-  border: '1px solid #333333',
+  background: 'var(--bg-secondary)',
+  color: 'var(--text-secondary)',
+  border: '1px solid var(--border-emphasis)',
   borderRadius: 8,
   padding: '6px 16px',
   fontSize: 13,
@@ -466,19 +466,19 @@ const thStyle: React.CSSProperties = {
   textAlign: 'left',
   fontSize: 11,
   fontWeight: 400,
-  color: '#666666',
+  color: 'var(--text-dim)',
 }
 
 const tdStyle: React.CSSProperties = {
   fontSize: 13,
-  color: '#cccccc',
+  color: 'var(--text-secondary)',
   padding: '10px 16px',
 }
 
 const iconBtnStyle: React.CSSProperties = {
   background: 'none',
   border: 'none',
-  color: '#888888',
+  color: 'var(--text-muted)',
   fontSize: 12,
   cursor: 'pointer',
   padding: '2px 4px',
