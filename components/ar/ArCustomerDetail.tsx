@@ -957,7 +957,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
 
           {/* Aging breakdown — numbers + bar */}
           <div style={{ flex: 1, minWidth: 280 }}>
-            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 10 }}>
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 10, alignItems: 'flex-start' }}>
               {AGING_BUCKETS.map((b) => {
                 const val = { Current: customer.current, '1-30': customer.d30, '31-60': customer.d60, '61-90': customer.d90, '>90': customer.d90plus }[b]
                 return (
@@ -967,6 +967,30 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                   </div>
                 )
               })}
+
+              {/* Credits indicator — only shown when credits exist */}
+              {!creditsLoading && credits.length > 0 && (() => {
+                const creditTotal = credits.reduce((s, c) => s + Math.abs(Number(c.open_balance)), 0)
+                return (
+                  <>
+                    <div style={{ width: 1, alignSelf: 'stretch', background: '#2a2a2a', flexShrink: 0, marginTop: 2 }} />
+                    <div>
+                      <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 3 }}>Credits</div>
+                      <div style={{
+                        fontSize: 13, fontWeight: 500, color: '#ff6b00',
+                        background: 'rgba(255,107,0,0.08)',
+                        border: '1px solid rgba(255,107,0,0.2)',
+                        borderRadius: 6,
+                        padding: '1px 8px',
+                        display: 'inline-block',
+                      }}>
+                        {fmt(creditTotal)}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#555', marginTop: 3 }}>{credits.length} memo{credits.length !== 1 ? 's' : ''}</div>
+                    </div>
+                  </>
+                )
+              })()}
             </div>
             {/* Horizontal aging bar */}
             {customer.totalAr > 0 && (
