@@ -278,10 +278,10 @@ function EmpGroup({ emp, isOpen, onToggle, branchNameMap }: {
           <td style={{ ...td, color: 'var(--text-faint)' }}>
             {item.rate !== null ? `$${item.rate.toFixed(2)}/hr` : '—'}
           </td>
-          <td style={{ ...td, color: '#777777' }}>
+          <td style={{ ...td, color: 'var(--text-muted)' }}>
             {item.hours !== null ? item.hours.toFixed(2) : '—'}
           </td>
-          <td style={{ ...td, color: '#999999' }}>{formatCurrency(item.amount)}</td>
+          <td style={{ ...td, color: 'var(--text-muted)' }}>{formatCurrency(item.amount)}</td>
         </tr>
       ))}
     </>

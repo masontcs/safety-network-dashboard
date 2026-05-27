@@ -164,8 +164,8 @@ function ActionBtn({
   variant?: 'primary' | 'secondary' | 'danger'
   disabled?: boolean
 }) {
-  const bg = variant === 'primary' ? '#ff6b00' : variant === 'danger' ? '#3a1a1a' : '#2a2a2a'
-  const color = variant === 'primary' ? '#ffffff' : variant === 'danger' ? '#cc4444' : '#888888'
+  const bg = variant === 'primary' ? '#ff6b00' : variant === 'danger' ? '#3a1a1a' : 'var(--bg-secondary)'
+  const color = variant === 'primary' ? 'var(--text-primary)' : variant === 'danger' ? '#cc4444' : 'var(--text-muted)'
   return (
     <button
       onClick={onClick}

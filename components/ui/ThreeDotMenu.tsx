@@ -45,7 +45,7 @@ export default function ThreeDotMenu({ items }: ThreeDotMenuProps) {
         {[0, 1, 2].map((i) => (
           <div
             key={i}
-            style={{ width: 3, height: 3, borderRadius: '50%', background: '#555555' }}
+            style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--text-faint)' }}
           />
         ))}
       </button>
@@ -80,11 +80,11 @@ export default function ThreeDotMenu({ items }: ThreeDotMenuProps) {
                 border: 'none',
                 textAlign: 'left',
                 fontSize: 13,
-                color: item.danger ? '#cc4444' : '#cccccc',
+                color: item.danger ? '#cc4444' : 'var(--text-secondary)',
                 cursor: 'pointer',
               }}
               onMouseEnter={(e) => {
-                ;(e.currentTarget as HTMLButtonElement).style.background = '#333333'
+                ;(e.currentTarget as HTMLButtonElement).style.background = 'var(--bg-tertiary)'
               }}
               onMouseLeave={(e) => {
                 ;(e.currentTarget as HTMLButtonElement).style.background = 'none'

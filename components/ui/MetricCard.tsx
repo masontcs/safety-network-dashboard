@@ -30,7 +30,7 @@ export default function MetricCard({
   return (
     <div
       style={{
-        background: isHero ? '#ff6b00' : '#1e1e1e',
+        background: isHero ? '#ff6b00' : 'var(--bg-surface)',
         borderRadius: 12,
         border: isHero ? 'none' : '1px solid var(--border)',
         padding: 16,
@@ -43,7 +43,7 @@ export default function MetricCard({
           <div
             style={{
               fontSize: 11,
-              color: isHero ? 'rgba(255,255,255,0.8)' : '#888888',
+              color: isHero ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)',
               textTransform: 'uppercase',
               letterSpacing: '0.04em',
               fontWeight: 400,
@@ -52,7 +52,7 @@ export default function MetricCard({
             {label}
           </div>
           {sub && (
-            <div style={{ fontSize: 11, color: isHero ? 'rgba(255,255,255,0.65)' : '#666666' }}>
+            <div style={{ fontSize: 11, color: isHero ? 'rgba(255,255,255,0.65)' : 'var(--text-dim)' }}>
               {sub}
             </div>
           )}
@@ -62,7 +62,7 @@ export default function MetricCard({
             style={{
               width: 36,
               height: 36,
-              background: isHero ? 'rgba(255,255,255,0.2)' : '#2a2a2a',
+              background: isHero ? 'rgba(255,255,255,0.2)' : 'var(--bg-secondary)',
               borderRadius: 8,
               display: 'flex',
               alignItems: 'center',
@@ -79,7 +79,7 @@ export default function MetricCard({
         style={{
           fontSize: isHero ? 28 : 26,
           fontWeight: 500,
-          color: 'var(--text-primary)',
+          color: isHero ? '#ffffff' : 'var(--text-primary)',
           lineHeight: 1.1,
           marginTop: 8,
         }}
@@ -108,7 +108,7 @@ export default function MetricCard({
           <div
             style={{
               height: 4,
-              background: isHero ? 'rgba(255,255,255,0.3)' : '#2a2a2a',
+              background: isHero ? 'rgba(255,255,255,0.3)' : 'var(--bg-secondary)',
               borderRadius: 2,
               marginTop: 8,
             }}
@@ -126,7 +126,7 @@ export default function MetricCard({
             <div
               style={{
                 fontSize: 11,
-                color: isHero ? 'rgba(255,255,255,0.65)' : '#666666',
+                color: isHero ? 'rgba(255,255,255,0.65)' : 'var(--text-dim)',
                 marginTop: 4,
               }}
             >

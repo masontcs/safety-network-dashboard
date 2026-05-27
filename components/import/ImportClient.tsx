@@ -68,7 +68,7 @@ function DropZone({ accept, state, onFile, label, hint }: DropZoneProps) {
         padding: '20px 16px',
         textAlign: 'center',
         cursor: isActive ? 'pointer' : 'default',
-        background: dragging ? '#1a1a1a' : 'transparent',
+        background: dragging ? 'var(--bg-nav)' : 'transparent',
         transition: 'border-color 0.15s',
         minHeight: 90,
         display: 'flex',
@@ -657,7 +657,7 @@ function ResultSummary({ lines, onReset }: { lines: string[]; onReset: () => voi
     <div style={{ background: '#0a1f0a', border: '1px solid #2d5a2d', borderRadius: 8, padding: '10px 12px' }}>
       <div style={{ fontSize: 12, color: '#4caf50', fontWeight: 500, marginBottom: 6 }}>✓ Import complete</div>
       {lines.map((line, i) => (
-        <div key={i} style={{ fontSize: 12, color: line.includes('review') || line.includes('flagged') || line.includes('corrected') ? '#ff9800' : '#888888', marginBottom: 2 }}>
+        <div key={i} style={{ fontSize: 12, color: line.includes('review') || line.includes('flagged') || line.includes('corrected') ? '#ff9800' : 'var(--text-muted)', marginBottom: 2 }}>
           {line}
         </div>
       ))}
@@ -813,7 +813,7 @@ export default function ImportClient() {
     borderRadius: 8,
     padding: '5px 14px',
     fontSize: 12,
-    color: active ? '#ffffff' : '#888888',
+    color: active ? 'var(--text-primary)' : 'var(--text-muted)',
     cursor: 'pointer',
     fontFamily: 'inherit',
     transition: 'background 0.15s, color 0.15s',

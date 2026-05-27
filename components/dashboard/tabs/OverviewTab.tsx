@@ -318,7 +318,7 @@ export default function OverviewTab({ role, data, branches, selectedBranchId, al
                     <td style={td}>{formatCurrency(b.revenue)}</td>
                     <td style={td}>{formatCurrency(b.directPayroll)}</td>
                     <td style={td}>{formatPercent(laborPct)}</td>
-                    <td style={{ ...td, color: gp >= 0 ? '#ffffff' : '#cc4444', fontWeight: 500 }}>{formatCurrency(gp)}</td>
+                    <td style={{ ...td, color: gp >= 0 ? 'var(--text-primary)' : '#cc4444', fontWeight: 500 }}>{formatCurrency(gp)}</td>
                     <td style={{ ...td, color: gpPct >= 0 ? '#ff6b00' : '#cc4444' }}>{formatPercent(gpPct)}</td>
                   </tr>
                 )
@@ -344,7 +344,7 @@ export default function OverviewTab({ role, data, branches, selectedBranchId, al
             <tbody>
               {topConsumers.map((c, i) => (
                 <tr key={`${c.employeeId ?? 'gen'}-${i}`} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ ...td, textAlign: 'left', color: c.isGeneral ? '#888888' : '#cccccc', fontStyle: c.isGeneral ? 'italic' : 'normal' }}>
+                  <td style={{ ...td, textAlign: 'left', color: c.isGeneral ? 'var(--text-muted)' : 'var(--text-secondary)', fontStyle: c.isGeneral ? 'italic' : 'normal' }}>
                     {c.displayName}
                   </td>
                   <td style={td}>{c.totalGallons.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
@@ -596,13 +596,13 @@ function OverviewGoals({
                 return (
                   <tr key={id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ ...td, textAlign: 'left', color: '#ff6b00' }}>{name}</td>
-                    <td style={td}>{revTarget != null ? formatCurrency(revTarget) : <span style={{ color: '#444' }}>—</span>}</td>
+                    <td style={td}>{revTarget != null ? formatCurrency(revTarget) : <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
                     <td style={{ ...td, color: 'var(--text-primary)' }}>{formatCurrency(revActual)}</td>
-                    <td style={{ ...td, color: revDelta != null ? varianceColor(revActual, revTarget!) : '#666' }}>
+                    <td style={{ ...td, color: revDelta != null ? varianceColor(revActual, revTarget!) : 'var(--text-dim)' }}>
                       {revDelta != null ? `${revDelta >= 0 ? '+' : ''}${formatCurrency(revDelta)}` : '—'}
                     </td>
-                    <td style={td}>{gpTarget != null ? `${gpTarget}%` : <span style={{ color: '#444' }}>—</span>}</td>
-                    <td style={{ ...td, color: gpTarget != null ? gpVarianceColor(gpActual, gpTarget) : '#cccccc' }}>
+                    <td style={td}>{gpTarget != null ? `${gpTarget}%` : <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
+                    <td style={{ ...td, color: gpTarget != null ? gpVarianceColor(gpActual, gpTarget) : 'var(--text-secondary)' }}>
                       {formatPercent(gpActual)}
                     </td>
                     <td style={{ ...td, textAlign: 'right' }}>
@@ -621,7 +621,7 @@ function OverviewGoals({
                   {`${totalRevActual - totalRevTarget >= 0 ? '+' : ''}${formatCurrency(totalRevActual - totalRevTarget)}`}
                 </td>
                 <td style={{ ...td, color: 'var(--text-muted)' }}>{avgGpGoal != null ? `${avgGpGoal}%` : '—'}</td>
-                <td style={{ ...td, fontWeight: 500, color: avgGpGoal != null ? gpVarianceColor(blendedGpActual, avgGpGoal) : '#ffffff' }}>
+                <td style={{ ...td, fontWeight: 500, color: avgGpGoal != null ? gpVarianceColor(blendedGpActual, avgGpGoal) : 'var(--text-primary)' }}>
                   {formatPercent(blendedGpActual)}
                 </td>
                 <td style={{ ...td, textAlign: 'right' }}>{combinedStatus(totalRevActual, totalRevTarget, blendedGpActual, avgGpGoal ?? null)}</td>
@@ -664,9 +664,9 @@ function OverviewGoals({
               return (
                 <tr key={id} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ ...td, textAlign: 'left', color: '#ff6b00' }}>{name}</td>
-                  <td style={td}>{revTarget != null ? formatCurrency(revTarget) : <span style={{ color: '#444' }}>—</span>}</td>
+                  <td style={td}>{revTarget != null ? formatCurrency(revTarget) : <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
                   <td style={{ ...td, color: 'var(--text-primary)' }}>{formatCurrency(revActual)}</td>
-                  <td style={{ ...td, color: revDelta != null ? varianceColor(revActual, revTarget!) : '#666' }}>
+                  <td style={{ ...td, color: revDelta != null ? varianceColor(revActual, revTarget!) : 'var(--text-dim)' }}>
                     {revDelta != null ? `${revDelta >= 0 ? '+' : ''}${formatCurrency(revDelta)}` : '—'}
                   </td>
                   <td style={{ ...td, textAlign: 'right' }}>

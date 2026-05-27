@@ -231,7 +231,7 @@ export default function RequestAccessClient({ branches }: { branches: Branch[] }
                 value={form.branchId}
                 onChange={(e) => set('branchId', e.target.value)}
                 required
-                style={{ ...inputStyle, cursor: 'pointer', color: form.branchId ? '#ffffff' : '#555555' }}
+                style={{ ...inputStyle, cursor: 'pointer', color: form.branchId ? 'var(--text-primary)' : 'var(--text-faint)' }}
               >
                 <option value="" disabled>Select your branch</option>
                 <optgroup label="— Operations —">
@@ -253,7 +253,7 @@ export default function RequestAccessClient({ branches }: { branches: Branch[] }
                 value={form.requestedRole}
                 onChange={(e) => set('requestedRole', e.target.value)}
                 required
-                style={{ ...inputStyle, cursor: 'pointer', color: form.requestedRole ? '#ffffff' : '#555555' }}
+                style={{ ...inputStyle, cursor: 'pointer', color: form.requestedRole ? 'var(--text-primary)' : 'var(--text-faint)' }}
               >
                 <option value="" disabled>Select a role</option>
                 {ROLE_OPTIONS.map((r) => (

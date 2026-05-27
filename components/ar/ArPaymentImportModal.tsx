@@ -182,9 +182,9 @@ export default function ArPaymentImportModal({ onClose, onSuccess }: Props) {
                   flex: 1,
                   padding: '8px 0',
                   borderRadius: 8,
-                  border: `1px solid ${entity === e ? '#ff6b00' : '#333'}`,
-                  background: entity === e ? 'rgba(255,107,0,0.12)' : '#2a2a2a',
-                  color: entity === e ? '#ff6b00' : '#888',
+                  border: `1px solid ${entity === e ? '#ff6b00' : 'var(--border-emphasis)'}`,
+                  background: entity === e ? 'rgba(255,107,0,0.12)' : 'var(--bg-secondary)',
+                  color: entity === e ? '#ff6b00' : 'var(--text-muted)',
                   fontSize: 13,
                   fontWeight: entity === e ? 500 : 400,
                   cursor: isLoading ? 'default' : 'pointer',
@@ -210,13 +210,13 @@ export default function ArPaymentImportModal({ onClose, onSuccess }: Props) {
                 state.status === 'success' ? '#4caf50'
                 : state.status === 'error'   ? '#cc4444'
                 : file ? '#ff6b00'
-                : '#444'
+                : 'var(--text-faint)'
               }`,
               borderRadius: 8,
               padding: '14px 16px',
               textAlign: 'center',
               cursor: isLoading ? 'default' : 'pointer',
-              color: file ? '#ff6b00' : '#666',
+              color: file ? '#ff6b00' : 'var(--text-dim)',
               fontSize: 13,
               opacity: isLoading ? 0.5 : 1,
             }}
@@ -264,7 +264,7 @@ export default function ArPaymentImportModal({ onClose, onSuccess }: Props) {
                   ['Unmatched',            state.unmatched],
                 ] as [string, number][]).map(([label, val]) => (
                   <div key={label} style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    <span style={{ color: val > 0 && label === 'Unmatched' ? '#ff9800' : '#ccc' }}>{val}</span>{' '}
+                    <span style={{ color: val > 0 && label === 'Unmatched' ? '#ff9800' : 'var(--text-secondary)' }}>{val}</span>{' '}
                     {label}
                   </div>
                 ))}
@@ -296,7 +296,7 @@ export default function ArPaymentImportModal({ onClose, onSuccess }: Props) {
                   {state.unmatchedNames.map((name) => (
                     <div key={name} style={{
                       fontSize: 11,
-                      color: '#999',
+                      color: 'var(--text-muted)',
                       padding: '2px 0',
                       borderBottom: '1px solid #222',
                       fontFamily: 'monospace',

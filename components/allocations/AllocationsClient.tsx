@@ -154,8 +154,8 @@ export default function AllocationsClient() {
             key={t}
             onClick={() => setTab(t)}
             style={{
-              background: tab === t ? '#ff6b00' : '#2a2a2a',
-              color: tab === t ? '#fff' : '#999',
+              background: tab === t ? '#ff6b00' : 'var(--bg-secondary)',
+              color: tab === t ? 'var(--text-primary)' : 'var(--text-muted)',
               border: 'none',
               borderRadius: 8,
               padding: '6px 16px',

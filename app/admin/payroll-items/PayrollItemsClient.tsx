@@ -325,7 +325,7 @@ export default function PayrollItemsClient() {
                             }
                             style={{
                               ...selectStyle,
-                              borderColor: isDirty ? '#ff6b00' : '#333333',
+                              borderColor: isDirty ? '#ff6b00' : 'var(--bg-tertiary)',
                             }}
                           >
                             {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -354,7 +354,7 @@ export default function PayrollItemsClient() {
                           title="Click to change group"
                         >
                           <span style={{ color: 'var(--text-secondary)' }}>{item.groupName}</span>
-                          <span style={{ color: '#444444', fontSize: 10, marginLeft: 6 }}>✎</span>
+                          <span style={{ color: 'var(--text-faint)', fontSize: 10, marginLeft: 6 }}>✎</span>
                         </button>
                       )}
                     </td>
@@ -376,7 +376,7 @@ export default function PayrollItemsClient() {
                     </td>
 
                     {/* Amount */}
-                    <td style={{ padding: '10px 16px', fontSize: 12, color: item.totalAmount != null ? '#cccccc' : '#555555', textAlign: 'right' }}>
+                    <td style={{ padding: '10px 16px', fontSize: 12, color: item.totalAmount != null ? 'var(--text-secondary)' : 'var(--text-faint)', textAlign: 'right' }}>
                       {item.totalAmount != null ? fmt(item.totalAmount) : '—'}
                     </td>
                   </tr>
@@ -402,7 +402,7 @@ function SortTh({
   const active = current === sortKey
   return (
     <th
-      style={{ ...thStyle, cursor: 'pointer', userSelect: 'none', color: active ? '#cccccc' : '#666666' }}
+      style={{ ...thStyle, cursor: 'pointer', userSelect: 'none', color: active ? 'var(--text-secondary)' : 'var(--text-dim)' }}
       onClick={() => onClick(sortKey)}
     >
       {label} {active ? (dir === 'asc' ? '↑' : '↓') : ''}
@@ -426,9 +426,9 @@ function pillStyle(active: boolean): React.CSSProperties {
   return {
     padding: '5px 12px',
     borderRadius: 6,
-    border: `1px solid ${active ? '#ff6b00' : '#333333'}`,
+    border: `1px solid ${active ? '#ff6b00' : 'var(--bg-tertiary)'}`,
     background: active ? '#1a1000' : 'transparent',
-    color: active ? '#ff6b00' : '#888888',
+    color: active ? '#ff6b00' : 'var(--text-muted)',
     fontSize: 12,
     cursor: 'pointer',
   }

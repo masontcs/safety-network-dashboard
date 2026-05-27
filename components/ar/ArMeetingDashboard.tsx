@@ -91,7 +91,7 @@ const COLLECTION_STATUS_COLORS: Record<string, string> = {
   collections:    '#cc4444',
   on_hold:        '#cc9900',
   dispute:        '#cc6600',
-  write_off:      '#555',
+  write_off:      'var(--text-faint)',
 }
 
 const AGING_COLORS: Record<string, string> = {
@@ -103,7 +103,7 @@ const AGING_COLORS: Record<string, string> = {
 }
 
 const PRIORITY_LABELS: Record<number, string> = { 1: 'P1', 2: 'P2', 3: 'P3' }
-const PRIORITY_COLORS: Record<number, string>  = { 1: '#cc4444', 2: '#cc9900', 3: '#888' }
+const PRIORITY_COLORS: Record<number, string>  = { 1: '#cc4444', 2: '#cc9900', 3: 'var(--text-muted)' }
 
 const AGING_BUCKETS = ['Current', '1-30', '31-60', '61-90', '>90'] as const
 
@@ -149,9 +149,9 @@ function KpiCard({
   accent?: boolean
   warn?: boolean
 }) {
-  const bg    = accent ? '#ff6b00' : '#1e1e1e'
-  const muted = accent ? 'rgba(255,255,255,0.7)' : warn ? '#cc6600' : '#888'
-  const subC  = accent ? 'rgba(255,255,255,0.6)' : '#666'
+  const bg    = accent ? '#ff6b00' : 'var(--bg-surface)'
+  const muted = accent ? 'rgba(255,255,255,0.7)' : warn ? '#cc6600' : 'var(--text-muted)'
+  const subC  = accent ? 'rgba(255,255,255,0.6)' : 'var(--text-dim)'
   return (
     <div style={{ background: bg, border: accent ? 'none' : '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
       <div style={{ fontSize: 11, color: muted, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
@@ -254,8 +254,8 @@ function CustomerRow({
         {priority !== undefined && (
           <span style={{
             fontSize: 10, fontWeight: 600,
-            color: PRIORITY_COLORS[priority] ?? '#888',
-            background: `${PRIORITY_COLORS[priority] ?? '#888'}22`,
+            color: PRIORITY_COLORS[priority] ?? 'var(--text-muted)',
+            background: `${PRIORITY_COLORS[priority] ?? 'var(--text-muted)'}22`,
             borderRadius: 4, padding: '2px 6px',
             minWidth: 28, textAlign: 'center', flexShrink: 0,
           }}>
@@ -283,7 +283,7 @@ function CustomerRow({
             {statusLabel}
           </span>
         )}
-        <span style={{ fontSize: 10, color: AGING_COLORS[maxAgingBucket] ?? '#888', flexShrink: 0 }}>
+        <span style={{ fontSize: 10, color: AGING_COLORS[maxAgingBucket] ?? 'var(--text-muted)', flexShrink: 0 }}>
           {maxAgingBucket}
         </span>
       </div>
@@ -489,7 +489,7 @@ export default function ArMeetingDashboard({ entity, onSelectCustomer }: Props) 
                       <div style={{ fontSize: 12, fontWeight: 500, color: '#ff6b00' }}>{cust.displayName}</div>
                       <div style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 2 }}>{fmtDate(cust.createdAt)}</div>
                     </div>
-                    <div style={{ fontSize: 12, color: cust.totalAr > 0 ? '#fff' : '#444', fontVariantNumeric: 'tabular-nums' }}>
+                    <div style={{ fontSize: 12, color: cust.totalAr > 0 ? 'var(--text-primary)' : 'var(--text-faint)', fontVariantNumeric: 'tabular-nums' }}>
                       {cust.totalAr > 0 ? fmt(cust.totalAr) : '—'}
                     </div>
                   </div>

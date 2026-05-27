@@ -203,7 +203,7 @@ export default function TargetVarianceRow({
           margin: '0 0 10px 0',
           fontSize: 11,
           fontWeight: 400,
-          color: loadState.status === 'ready' ? '#888888' : '#555555',
+          color: loadState.status === 'ready' ? 'var(--text-muted)' : 'var(--text-faint)',
           textTransform: 'uppercase',
           letterSpacing: '0.04em',
         }}

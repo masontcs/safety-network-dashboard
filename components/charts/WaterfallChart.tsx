@@ -28,7 +28,7 @@ export default function WaterfallChart({ revenue, payroll, fuel, height = 200 }:
       <BarChart data={data} barCategoryGap="25%" margin={{ top: 20, right: 8, left: 0, bottom: 0 }}>
         <XAxis
           dataKey="name"
-          tick={{ fill: '#555555', fontSize: 10 }}
+          tick={{ fill: 'var(--text-faint)', fontSize: 10 }}
           axisLine={false}
           tickLine={false}
         />
@@ -49,7 +49,7 @@ export default function WaterfallChart({ revenue, payroll, fuel, height = 200 }:
             dataKey="value"
             position="top"
             formatter={fmt}
-            style={{ fill: '#ffffff', fontSize: 9 }}
+            style={{ fill: 'var(--text-primary)', fontSize: 9 }}
           />
           {data.map((entry, i) => (
             <Cell

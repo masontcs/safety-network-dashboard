@@ -256,9 +256,9 @@ function RevenueGoals({
               return (
                 <tr key={id} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ ...td, textAlign: 'left', color: '#ff6b00' }}>{name}</td>
-                  <td style={td}>{revTarget != null ? formatCurrency(revTarget) : <span style={{ color: '#444' }}>—</span>}</td>
+                  <td style={td}>{revTarget != null ? formatCurrency(revTarget) : <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
                   <td style={{ ...td, color: 'var(--text-primary)' }}>{formatCurrency(revActual)}</td>
-                  <td style={{ ...td, color: revDelta != null ? varianceColor(revActual, revTarget!) : '#666' }}>
+                  <td style={{ ...td, color: revDelta != null ? varianceColor(revActual, revTarget!) : 'var(--text-dim)' }}>
                     {revDelta != null ? `${revDelta >= 0 ? '+' : ''}${formatCurrency(revDelta)}` : '—'}
                   </td>
                   <td style={{ ...td, textAlign: 'right' }}>

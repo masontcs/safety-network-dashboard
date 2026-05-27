@@ -94,14 +94,14 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
           onChange={(e) => setSearchInput(e.target.value)}
           style={{
             background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8,
-            color: '#ccc', padding: '7px 12px', fontSize: 12, outline: 'none', width: 200,
+            color: 'var(--text-secondary)', padding: '7px 12px', fontSize: 12, outline: 'none', width: 200,
           }}
         />
 
         <select
           value={entity}
           onChange={(e) => setEntity(e.target.value)}
-          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
+          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: 'var(--text-secondary)', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
         >
           <option value="">All Entities</option>
           {ENTITIES.map((e) => <option key={e} value={e}>{e}</option>)}
@@ -113,7 +113,7 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '7px 10px', fontSize: 12, outline: 'none' }}
+            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: 'var(--text-secondary)', padding: '7px 10px', fontSize: 12, outline: 'none' }}
           />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -122,7 +122,7 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '7px 10px', fontSize: 12, outline: 'none' }}
+            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: 'var(--text-secondary)', padding: '7px 10px', fontSize: 12, outline: 'none' }}
           />
         </div>
 
@@ -187,7 +187,7 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
                     onMouseEnter={(e) => (e.currentTarget.style.background = '#242424')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = '')}
                   >
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                       {fmtDate(pmt.payment_date)}
                     </td>
                     <td style={{ padding: '9px 12px', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap' }}>
@@ -199,7 +199,7 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
                           {pmt.customer_name}
                         </span>
                       ) : (
-                        <span style={{ color: pmt.unmatched ? '#666' : '#ccc' }}>
+                        <span style={{ color: pmt.unmatched ? 'var(--text-dim)' : 'var(--text-secondary)' }}>
                           {pmt.customer_name}
                           {pmt.unmatched && (
                             <span style={{ fontSize: 10, color: 'var(--text-faint)', marginLeft: 6, fontStyle: 'italic' }}>
@@ -224,11 +224,11 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
                         )}
                       </span>
                     </td>
-                    <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
-                      {pmt.reference_number ?? <span style={{ color: '#444' }}>—</span>}
+                    <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                      {pmt.reference_number ?? <span style={{ color: 'var(--text-faint)' }}>—</span>}
                     </td>
                     <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-muted)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {pmt.memo ?? <span style={{ color: '#444' }}>—</span>}
+                      {pmt.memo ?? <span style={{ color: 'var(--text-faint)' }}>—</span>}
                     </td>
                     <td style={{ padding: '9px 12px', fontSize: 13, color: '#4caf50', fontWeight: 500, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
                       {fmt(pmt.amount)}
@@ -264,7 +264,7 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
             disabled={page === 1}
             style={{
               background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8,
-              color: page === 1 ? '#444' : '#ccc', padding: '6px 14px', fontSize: 12,
+              color: page === 1 ? 'var(--text-faint)' : 'var(--text-secondary)', padding: '6px 14px', fontSize: 12,
               cursor: page === 1 ? 'default' : 'pointer',
             }}
           >
@@ -278,7 +278,7 @@ export default function ArPaymentsView({ onSelectCustomer }: Props) {
             disabled={page === totalPages}
             style={{
               background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8,
-              color: page === totalPages ? '#444' : '#ccc', padding: '6px 14px', fontSize: 12,
+              color: page === totalPages ? 'var(--text-faint)' : 'var(--text-secondary)', padding: '6px 14px', fontSize: 12,
               cursor: page === totalPages ? 'default' : 'pointer',
             }}
           >

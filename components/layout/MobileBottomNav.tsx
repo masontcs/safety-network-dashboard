@@ -12,7 +12,7 @@ interface Props { role: Role }
 
 function GridIcon({ a }: { a: boolean }) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? '#ff6b00' : '#666'} strokeWidth={1.8}>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? '#ff6b00' : 'var(--text-dim)'} strokeWidth={1.8}>
       <rect x="3" y="3" width="7" height="7" rx="1" />
       <rect x="14" y="3" width="7" height="7" rx="1" />
       <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -23,7 +23,7 @@ function GridIcon({ a }: { a: boolean }) {
 
 function ArIcon({ a }: { a: boolean }) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? '#ff6b00' : '#666'} strokeWidth={1.8}>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? '#ff6b00' : 'var(--text-dim)'} strokeWidth={1.8}>
       <rect x="2" y="5" width="20" height="14" rx="2" />
       <path d="M2 10h20" />
       <path d="M7 15h2" />
@@ -34,7 +34,7 @@ function ArIcon({ a }: { a: boolean }) {
 
 function FuelIcon({ a }: { a: boolean }) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? '#ff6b00' : '#666'} strokeWidth={1.8}>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? '#ff6b00' : 'var(--text-dim)'} strokeWidth={1.8}>
       <path d="M3 22V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16" />
       <path d="M3 22h12" />
       <path d="M15 8h2a2 2 0 0 1 2 2v6a2 2 0 0 0 2 2h0" />
@@ -46,7 +46,7 @@ function FuelIcon({ a }: { a: boolean }) {
 
 function UploadIcon({ a }: { a: boolean }) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? '#ff6b00' : '#666'} strokeWidth={1.8}>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? '#ff6b00' : 'var(--text-dim)'} strokeWidth={1.8}>
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <polyline points="17 8 12 3 7 8" />
       <line x1="12" y1="3" x2="12" y2="15" />
@@ -56,7 +56,7 @@ function UploadIcon({ a }: { a: boolean }) {
 
 function EmployeesIcon({ a }: { a: boolean }) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? '#ff6b00' : '#666'} strokeWidth={1.8}>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? '#ff6b00' : 'var(--text-dim)'} strokeWidth={1.8}>
       <circle cx="9" cy="7" r="4" />
       <path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2" />
       <path d="M19 8v6M16 11h6" />
@@ -66,7 +66,7 @@ function EmployeesIcon({ a }: { a: boolean }) {
 
 function MenuIcon({ a }: { a: boolean }) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? '#ff6b00' : '#666'} strokeWidth={1.8}>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a ? '#ff6b00' : 'var(--text-dim)'} strokeWidth={1.8}>
       <line x1="3" y1="12" x2="21" y2="12" />
       <line x1="3" y1="6" x2="21" y2="6" />
       <line x1="3" y1="18" x2="21" y2="18" />
@@ -227,7 +227,7 @@ export default function MobileBottomNav({ role }: Props) {
                   style={{
                     display: 'flex', alignItems: 'center', padding: '14px 20px', minHeight: 52,
                     fontSize: 15, fontWeight: active ? 500 : 400,
-                    color: active ? '#ff6b00' : '#ccc',
+                    color: active ? '#ff6b00' : 'var(--text-secondary)',
                     textDecoration: 'none', borderBottom: '1px solid #222',
                   }}
                 >
@@ -258,7 +258,7 @@ export default function MobileBottomNav({ role }: Props) {
             <Link
               key={item.href}
               href={item.href}
-              style={{ ...itemStyle, color: active ? '#ff6b00' : '#666' }}
+              style={{ ...itemStyle, color: active ? '#ff6b00' : 'var(--text-dim)' }}
             >
               {item.icon(active)}
               <span>{item.label}</span>
@@ -269,7 +269,7 @@ export default function MobileBottomNav({ role }: Props) {
         {hasMore ? (
           <button
             onClick={() => setMenuOpen((v) => !v)}
-            style={{ ...itemStyle, color: isMoreActive || menuOpen ? '#ff6b00' : '#666' }}
+            style={{ ...itemStyle, color: isMoreActive || menuOpen ? '#ff6b00' : 'var(--text-dim)' }}
           >
             <MenuIcon a={isMoreActive || menuOpen} />
             <span>More</span>

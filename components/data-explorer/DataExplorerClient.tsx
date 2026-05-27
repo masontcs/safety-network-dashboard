@@ -390,10 +390,10 @@ export default function DataExplorerClient({ branches, entities }: Props) {
               key={ds}
               onClick={() => handleDatasetChange(ds)}
               style={{
-                background: dataset === ds ? '#ff6b00' : '#2a2a2a',
+                background: dataset === ds ? '#ff6b00' : 'var(--bg-secondary)',
                 border: 'none',
                 borderRadius: 6,
-                color: dataset === ds ? '#ffffff' : '#888888',
+                color: dataset === ds ? 'var(--text-primary)' : 'var(--text-muted)',
                 fontSize: 12,
                 fontWeight: dataset === ds ? 600 : 400,
                 padding: '6px 14px',
@@ -574,7 +574,7 @@ export default function DataExplorerClient({ branches, entities }: Props) {
                         padding: '9px 14px',
                         fontWeight: 400,
                         fontSize: 11,
-                        color: sortCol === col.key ? '#ff6b00' : '#666666',
+                        color: sortCol === col.key ? '#ff6b00' : 'var(--text-dim)',
                         textTransform: 'uppercase' as const,
                         letterSpacing: '0.04em',
                         borderBottom: '1px solid var(--border)',
@@ -626,7 +626,7 @@ export default function DataExplorerClient({ branches, entities }: Props) {
               disabled={page === 0}
               style={{
                 background: 'var(--bg-secondary)', border: 'none', borderRadius: 6,
-                color: page === 0 ? '#444444' : '#cccccc',
+                color: page === 0 ? 'var(--text-faint)' : 'var(--text-secondary)',
                 fontSize: 12, padding: '6px 14px', cursor: page === 0 ? 'default' : 'pointer',
                 fontFamily: 'inherit',
               }}
@@ -641,7 +641,7 @@ export default function DataExplorerClient({ branches, entities }: Props) {
               disabled={page >= totalPages - 1}
               style={{
                 background: 'var(--bg-secondary)', border: 'none', borderRadius: 6,
-                color: page >= totalPages - 1 ? '#444444' : '#cccccc',
+                color: page >= totalPages - 1 ? 'var(--text-faint)' : 'var(--text-secondary)',
                 fontSize: 12, padding: '6px 14px',
                 cursor: page >= totalPages - 1 ? 'default' : 'pointer',
                 fontFamily: 'inherit',

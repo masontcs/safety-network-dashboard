@@ -143,9 +143,9 @@ export default function CardDetail({ cardId, role, branches }: Props) {
 
   function statusColor(c: FuelCard): string {
     if (!c.isConfirmed) return '#cc4444'
-    if (c.businessTag) return '#666666'
+    if (c.businessTag) return 'var(--text-dim)'
     if (c.employeeId) return '#ff6b00'
-    return '#888888'
+    return 'var(--text-muted)'
   }
 
   if (loading) {
@@ -184,7 +184,7 @@ export default function CardDetail({ cardId, role, branches }: Props) {
             <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{card.vendor}</div>
           </div>
           <span style={{
-            background: card.isConfirmed ? (card.employeeId ? '#1a2a1a' : '#2a2a2a') : '#2a1a1a',
+            background: card.isConfirmed ? (card.employeeId ? '#1a2a1a' : 'var(--bg-secondary)') : '#2a1a1a',
             color: statusColor(card),
             borderRadius: 6,
             padding: '4px 10px',
@@ -251,8 +251,8 @@ export default function CardDetail({ cardId, role, branches }: Props) {
                       <div
                         key={e.id}
                         onClick={() => { setSelectedEmployeeId(e.id); setEmployeeSearch(e.displayName); setEmployees([]) }}
-                        style={{ padding: '8px 12px', fontSize: 12, color: selectedEmployeeId === e.id ? '#ff6b00' : '#cccccc', cursor: 'pointer' }}
-                        onMouseEnter={(ev) => (ev.currentTarget.style.background = '#333333')}
+                        style={{ padding: '8px 12px', fontSize: 12, color: selectedEmployeeId === e.id ? '#ff6b00' : 'var(--text-secondary)', cursor: 'pointer' }}
+                        onMouseEnter={(ev) => (ev.currentTarget.style.background = 'var(--bg-tertiary)')}
                         onMouseLeave={(ev) => (ev.currentTarget.style.background = 'transparent')}
                       >
                         {e.displayName}
@@ -357,8 +357,8 @@ function navPillStyle(active: boolean): React.CSSProperties {
     cursor: 'pointer',
     fontSize: 12,
     fontWeight: 500,
-    background: active ? '#ff6b00' : '#2a2a2a',
-    color: active ? '#ffffff' : '#888888',
+    background: active ? '#ff6b00' : 'var(--bg-secondary)',
+    color: active ? 'var(--text-primary)' : 'var(--text-muted)',
   }
 }
 
@@ -366,12 +366,12 @@ function modeTabStyle(active: boolean): React.CSSProperties {
   return {
     padding: '6px 14px',
     borderRadius: 6,
-    border: `1px solid ${active ? '#ff6b00' : '#333333'}`,
+    border: `1px solid ${active ? '#ff6b00' : 'var(--bg-tertiary)'}`,
     cursor: 'pointer',
     fontSize: 12,
     fontWeight: 500,
     background: active ? '#1a1000' : 'transparent',
-    color: active ? '#ff6b00' : '#888888',
+    color: active ? '#ff6b00' : 'var(--text-muted)',
   }
 }
 

@@ -151,8 +151,8 @@ function MetaDetails({ metadata, action, branchMap }: { metadata: Record<string,
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px', marginTop: 4 }}>
       {items.map((item) => (
         <span key={item.label} style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-          <span style={{ color: '#444444' }}>{item.label}:</span>{' '}
-          <span style={{ color: '#999999' }}>{item.value}</span>
+          <span style={{ color: 'var(--text-faint)' }}>{item.label}:</span>{' '}
+          <span style={{ color: 'var(--text-muted)' }}>{item.value}</span>
         </span>
       ))}
     </div>
@@ -280,7 +280,7 @@ export default function AuditClient() {
               gridTemplateColumns: '160px 160px 1fr 140px',
               padding: '10px 16px',
               borderBottom: '1px solid var(--border)',
-              fontSize: 11, color: '#444444', fontWeight: 400,
+              fontSize: 11, color: 'var(--text-faint)', fontWeight: 400,
               textTransform: 'uppercase', letterSpacing: '0.04em',
             }}>
               <span>Time</span>
@@ -306,13 +306,13 @@ export default function AuditClient() {
                   {/* Time */}
                   <div>
                     <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{fmtTime(log.created_at)}</div>
-                    <div style={{ fontSize: 11, color: '#444444', marginTop: 1 }}>{fmtRelative(log.created_at)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 1 }}>{fmtRelative(log.created_at)}</div>
                   </div>
 
                   {/* User */}
                   <div>
                     <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>{log.user_display_name}</div>
-                    <div style={{ fontSize: 11, color: '#444444', marginTop: 1 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 1 }}>
                       {ROLE_LABELS[log.user_role] ?? log.user_role}
                     </div>
                   </div>
@@ -337,7 +337,7 @@ export default function AuditClient() {
                   </div>
 
                   {/* IP */}
-                  <div style={{ fontSize: 11, color: '#444444', fontFamily: 'monospace', paddingTop: 2 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-faint)', fontFamily: 'monospace', paddingTop: 2 }}>
                     {log.ip_address ?? '—'}
                   </div>
                 </div>

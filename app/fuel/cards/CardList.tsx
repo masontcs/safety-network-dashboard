@@ -159,9 +159,9 @@ export default function CardList({ role: _role }: Props) {
 function StatusBadge({ status }: { status: FilterTab }) {
   const config: Record<FilterTab, { label: string; bg: string; color: string }> = {
     linked: { label: 'Linked', bg: '#1a2a1a', color: '#ff6b00' },
-    general: { label: 'General', bg: '#2a2a2a', color: 'var(--text-muted)' },
+    general: { label: 'General', bg: 'var(--bg-secondary)', color: 'var(--text-muted)' },
     unlinked: { label: 'Unlinked', bg: '#2a1a1a', color: '#cc4444' },
-    business: { label: 'WH/Signs', bg: '#2a2a2a', color: 'var(--text-dim)' },
+    business: { label: 'WH/Signs', bg: 'var(--bg-secondary)', color: 'var(--text-dim)' },
     all: { label: '', bg: '', color: '' },
   }
   const { label, bg, color } = config[status]
@@ -181,8 +181,8 @@ function navPillStyle(active: boolean): React.CSSProperties {
     cursor: 'pointer',
     fontSize: 12,
     fontWeight: 500,
-    background: active ? '#ff6b00' : '#2a2a2a',
-    color: active ? '#ffffff' : '#888888',
+    background: active ? '#ff6b00' : 'var(--bg-secondary)',
+    color: active ? 'var(--text-primary)' : 'var(--text-muted)',
   }
 }
 
@@ -194,7 +194,7 @@ function filterTabStyle(active: boolean): React.CSSProperties {
     cursor: 'pointer',
     fontSize: 12,
     fontWeight: 400,
-    background: active ? '#ff6b00' : '#2a2a2a',
-    color: active ? '#ffffff' : '#888888',
+    background: active ? '#ff6b00' : 'var(--bg-secondary)',
+    color: active ? 'var(--text-primary)' : 'var(--text-muted)',
   }
 }

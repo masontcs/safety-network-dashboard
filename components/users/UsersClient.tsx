@@ -31,14 +31,14 @@ const ROLE_LABELS: Record<Role, string> = {
 
 const ROLE_COLORS: Record<Role, string> = {
   admin:            '#ff6b00',
-  executive:        '#cccccc',
-  district_manager: '#cccccc',
-  branch_manager:   '#cccccc',
-  ar_manager:       '#cccccc',
-  ar_team:          '#cccccc',
-  office_team:      '#cccccc',
-  project_manager:  '#cccccc',
-  sales:            '#cccccc',
+  executive:        'var(--text-secondary)',
+  district_manager: 'var(--text-secondary)',
+  branch_manager:   'var(--text-secondary)',
+  ar_manager:       'var(--text-secondary)',
+  ar_team:          'var(--text-secondary)',
+  office_team:      'var(--text-secondary)',
+  project_manager:  'var(--text-secondary)',
+  sales:            'var(--text-secondary)',
 }
 
 const selectStyle: React.CSSProperties = {
@@ -435,7 +435,7 @@ export default function UsersClient() {
                             width: 30,
                             height: 17,
                             borderRadius: 9,
-                            background: user.isActive ? '#4caf50' : '#444',
+                            background: user.isActive ? '#4caf50' : 'var(--text-faint)',
                             border: 'none',
                             cursor: 'pointer',
                             position: 'relative',
@@ -449,7 +449,7 @@ export default function UsersClient() {
                             width: 13,
                             height: 13,
                             borderRadius: '50%',
-                            background: '#fff',
+                            background: 'var(--text-primary)',
                             top: 2,
                             left: user.isActive ? 15 : 2,
                             transition: 'left 0.18s',
@@ -460,7 +460,7 @@ export default function UsersClient() {
 
                       {/* Name */}
                       <td style={{ padding: '12px 14px', verticalAlign: 'middle', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        <span className="table-body" style={{ color: user.isActive ? '#ffffff' : '#888888', fontSize: 13, fontWeight: 500 }}>
+                        <span className="table-body" style={{ color: user.isActive ? 'var(--text-primary)' : 'var(--text-muted)', fontSize: 13, fontWeight: 500 }}>
                           {user.displayName || '—'}
                         </span>
                       </td>
@@ -609,14 +609,14 @@ export default function UsersClient() {
                 <div key={a.email} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 10px', background: 'var(--bg-nav)', borderRadius: 6 }}>
                   <div style={{
                     width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                    background: a.exists ? '#4caf50' : '#444444',
+                    background: a.exists ? '#4caf50' : 'var(--text-faint)',
                   }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{a.displayName}</span>
                     <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 8 }}>{a.email}</span>
                   </div>
                   <span style={{ fontSize: 11, color: 'var(--text-dim)', flexShrink: 0 }}>{a.role.replace('_', ' ')}</span>
-                  <span style={{ fontSize: 11, color: a.exists ? '#4caf50' : '#555555', flexShrink: 0 }}>
+                  <span style={{ fontSize: 11, color: a.exists ? '#4caf50' : 'var(--text-faint)', flexShrink: 0 }}>
                     {a.exists ? 'Active' : 'Not created'}
                   </span>
                 </div>
@@ -710,7 +710,7 @@ export default function UsersClient() {
                       type="button"
                       onClick={handleCopyReset}
                       disabled={!resetPassword}
-                      style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: resetCopied ? '#4caf50' : '#888888', fontSize: 11, padding: '0 10px', cursor: resetPassword ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: resetPassword ? 1 : 0.4 }}
+                      style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: resetCopied ? '#4caf50' : 'var(--text-muted)', fontSize: 11, padding: '0 10px', cursor: resetPassword ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: resetPassword ? 1 : 0.4 }}
                     >
                       {resetCopied ? 'Copied' : 'Copy'}
                     </button>
@@ -809,7 +809,7 @@ export default function UsersClient() {
               {/* Username */}
               <div>
                 <label style={{ display: 'block', fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
-                  Username <span style={{ color: '#444444', textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                  Username <span style={{ color: 'var(--text-faint)', textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
                 </label>
                 <input
                   type="text"
@@ -822,7 +822,7 @@ export default function UsersClient() {
                   spellCheck={false}
                   style={{ ...inputStyle, fontFamily: 'monospace' }}
                 />
-                <div style={{ fontSize: 11, color: '#444444', marginTop: 4 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 4 }}>
                   3–20 chars · lowercase letters, numbers, underscores · used to log in instead of email
                 </div>
               </div>
@@ -840,7 +840,7 @@ export default function UsersClient() {
               {/* Branches */}
               <div>
                 <label style={{ display: 'block', fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
-                  Branches {(createRole === 'admin' || createRole === 'executive') && <span style={{ color: '#444444', textTransform: 'none', letterSpacing: 0 }}>(optional — they see all)</span>}
+                  Branches {(createRole === 'admin' || createRole === 'executive') && <span style={{ color: 'var(--text-faint)', textTransform: 'none', letterSpacing: 0 }}>(optional — they see all)</span>}
                 </label>
                 <BranchMultiSelect
                   branches={branches}
@@ -865,7 +865,7 @@ export default function UsersClient() {
                     type="button"
                     onClick={handleCopyCreate}
                     disabled={!createPassword}
-                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: createCopied ? '#4caf50' : '#888888', fontSize: 11, padding: '0 10px', cursor: createPassword ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: createPassword ? 1 : 0.4 }}
+                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: createCopied ? '#4caf50' : 'var(--text-muted)', fontSize: 11, padding: '0 10px', cursor: createPassword ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: createPassword ? 1 : 0.4 }}
                   >
                     {createCopied ? 'Copied' : 'Copy'}
                   </button>

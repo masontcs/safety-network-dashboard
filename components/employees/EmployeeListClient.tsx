@@ -189,7 +189,7 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
   }
 
   function SortIndicator({ col }: { col: string }) {
-    if (sortBy !== col) return <span style={{ color: '#444444', marginLeft: 3 }}>↕</span>
+    if (sortBy !== col) return <span style={{ color: 'var(--text-faint)', marginLeft: 3 }}>↕</span>
     return <span style={{ color: '#ff6b00', marginLeft: 3 }}>{sortDir === 'asc' ? '↑' : '↓'}</span>
   }
 
@@ -438,8 +438,8 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
                           e.currentTarget.style.color = '#ff6b00'
                         }}
                         onMouseOut={(e) => {
-                          e.currentTarget.style.borderColor = '#333333'
-                          e.currentTarget.style.color = '#cccccc'
+                          e.currentTarget.style.borderColor = 'var(--bg-tertiary)'
+                          e.currentTarget.style.color = 'var(--text-secondary)'
                         }}
                       >
                         View →
@@ -478,7 +478,7 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
                   border: 'none',
                   borderRadius: 6,
                   padding: '5px 12px',
-                  color: page <= 1 ? '#444444' : '#cccccc',
+                  color: page <= 1 ? 'var(--text-faint)' : 'var(--text-secondary)',
                   cursor: page <= 1 ? 'default' : 'pointer',
                   fontSize: 12,
                   fontFamily: 'inherit',
@@ -494,7 +494,7 @@ export default function EmployeeListClient({ basePath, branches, entities }: Pro
                   border: 'none',
                   borderRadius: 6,
                   padding: '5px 12px',
-                  color: page >= totalPages ? '#444444' : '#cccccc',
+                  color: page >= totalPages ? 'var(--text-faint)' : 'var(--text-secondary)',
                   cursor: page >= totalPages ? 'default' : 'pointer',
                   fontSize: 12,
                   fontFamily: 'inherit',

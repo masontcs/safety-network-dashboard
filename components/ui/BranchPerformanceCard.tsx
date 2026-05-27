@@ -90,7 +90,7 @@ export default function BranchPerformanceCard({
             <>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>
                 {(['Revenue', 'Payroll', 'Fuel'] as const).map((label, i) => {
-                  const color = [['#ff6b00'], ['#888888'], ['#cc4444']][i][0]
+                  const color = [['#ff6b00'], ['var(--text-muted)'], ['#cc4444']][i][0]
                   return (
                     <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                       <span style={{ display: 'inline-block', width: 12, height: 1.5, background: color }} />
@@ -101,8 +101,8 @@ export default function BranchPerformanceCard({
               </div>
               <ResponsiveContainer width="100%" height={chartHeight}>
                 <LineChart data={trendData} margin={{ top: 4, right: 2, left: 0, bottom: 0 }}>
-                  <XAxis dataKey="label" tick={{ fill: '#555555', fontSize: 9 }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#333333', strokeWidth: 1 }} />
+                  <XAxis dataKey="label" tick={{ fill: 'var(--text-faint)', fontSize: 9 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'var(--border-emphasis)', strokeWidth: 1 }} />
                   <Line
                     dataKey="revenue"
                     name="Revenue"
@@ -117,7 +117,7 @@ export default function BranchPerformanceCard({
                     name="Payroll"
                     stroke="#888888"
                     strokeWidth={1.5}
-                    dot={{ r: 3, fill: '#888888', strokeWidth: 0 }}
+                    dot={{ r: 3, fill: 'var(--text-muted)', strokeWidth: 0 }}
                     activeDot={{ r: 4 }}
                     isAnimationActive={false}
                   />

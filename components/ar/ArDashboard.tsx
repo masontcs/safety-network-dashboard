@@ -94,7 +94,7 @@ function SortTh({
         padding: '10px 12px',
         textAlign: right ? 'right' : 'left',
         fontSize: 11,
-        color: active ? '#ff6b00' : '#666',
+        color: active ? '#ff6b00' : 'var(--text-dim)',
         fontWeight: 400,
         whiteSpace: 'nowrap',
         cursor: 'pointer',
@@ -145,15 +145,15 @@ function AgingCards({
           key={b}
           onClick={() => onBucketClick(bucket === b ? '' : b)}
           style={{
-            background: bucket === b ? '#2a2a2a' : '#1e1e1e',
-            border: `1px solid ${bucket === b ? BUCKET_COLORS[b] : '#2a2a2a'}`,
+            background: bucket === b ? 'var(--bg-secondary)' : 'var(--bg-surface)',
+            border: `1px solid ${bucket === b ? BUCKET_COLORS[b] : 'var(--bg-secondary)'}`,
             borderRadius: 12, padding: 16, cursor: 'pointer',
           }}
         >
           <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
             {b} days
           </div>
-          <div style={{ fontSize: 20, fontWeight: 500, color: bucket === b ? BUCKET_COLORS[b] : '#fff' }}>
+          <div style={{ fontSize: 20, fontWeight: 500, color: bucket === b ? BUCKET_COLORS[b] : 'var(--text-primary)' }}>
             {loading ? '—' : fmt(summary?.aging[b] ?? 0)}
           </div>
           {summary && (
@@ -382,7 +382,7 @@ export default function ArDashboard({ role, branches }: Props) {
                 <button key={String(all)} onClick={() => setShowAll(all)}
                   style={{
                     background: showAll === all ? '#ff6b00' : 'transparent',
-                    color: showAll === all ? '#fff' : '#888',
+                    color: showAll === all ? 'var(--text-primary)' : 'var(--text-muted)',
                     border: 'none', borderRadius: 6,
                     padding: '5px 14px', fontSize: 12, fontWeight: 500,
                     cursor: 'pointer',
@@ -398,7 +398,7 @@ export default function ArDashboard({ role, branches }: Props) {
                 <button key={v} onClick={() => setView(v)}
                   style={{
                     background: view === v ? '#ff6b00' : 'transparent',
-                    color: view === v ? '#fff' : '#888',
+                    color: view === v ? 'var(--text-primary)' : 'var(--text-muted)',
                     border: 'none', borderRadius: 6,
                     padding: '5px 14px', fontSize: 12, fontWeight: 500,
                     cursor: 'pointer',
@@ -455,13 +455,13 @@ export default function ArDashboard({ role, branches }: Props) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="ar-filter-search"
-          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, outline: 'none', width: 200 }}
+          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: 'var(--text-secondary)', padding: '7px 12px', fontSize: 12, outline: 'none', width: 200 }}
         />
         <div className="ar-filter-row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <select
             value={entity}
             onChange={(e) => setEntity(e.target.value)}
-            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
+            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: 'var(--text-secondary)', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
           >
             <option value="">All Entities</option>
             {ENTITIES.map((e) => <option key={e} value={e}>{e}</option>)}
@@ -471,7 +471,7 @@ export default function ArDashboard({ role, branches }: Props) {
             <select
               value={branchId}
               onChange={(e) => setBranchId(e.target.value)}
-              style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
+              style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: 'var(--text-secondary)', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
             >
               <option value="">All Branches</option>
               {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -482,7 +482,7 @@ export default function ArDashboard({ role, branches }: Props) {
             <select
               value={assignedUserId}
               onChange={(e) => setAssignedUserId(e.target.value)}
-              style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
+              style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: 'var(--text-secondary)', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}
             >
               <option value="">All Assignees</option>
               {teamMembers.map((m) => <option key={m.id} value={m.id}>{m.displayName}</option>)}
@@ -494,8 +494,8 @@ export default function ArDashboard({ role, branches }: Props) {
               onClick={() => setShowExcluded((v) => !v)}
               style={{
                 background: showExcluded ? 'rgba(204,68,68,0.12)' : 'transparent',
-                border: `1px solid ${showExcluded ? '#663333' : '#333'}`,
-                borderRadius: 8, color: showExcluded ? '#cc4444' : '#666',
+                border: `1px solid ${showExcluded ? '#663333' : 'var(--border-emphasis)'}`,
+                borderRadius: 8, color: showExcluded ? '#cc4444' : 'var(--text-dim)',
                 padding: '7px 12px', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
               }}
             >
@@ -550,14 +550,14 @@ export default function ArDashboard({ role, branches }: Props) {
                     onMouseEnter={(e) => (e.currentTarget.style.background = '#242424')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = '')}>
                     <td style={{ padding: '10px 12px', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap' }}>
-                      <span style={{ color: cust.isExcluded ? '#555' : '#ff6b00' }}>{cust.displayName}</span>
-                      {cust.isExcluded && <span style={{ fontSize: 10, color: '#444', marginLeft: 8, fontWeight: 400 }}>excluded</span>}
+                      <span style={{ color: cust.isExcluded ? 'var(--text-faint)' : '#ff6b00' }}>{cust.displayName}</span>
+                      {cust.isExcluded && <span style={{ fontSize: 10, color: 'var(--text-faint)', marginLeft: 8, fontWeight: 400 }}>excluded</span>}
                     </td>
-                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.current > 0 ? '#fff' : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.current > 0 ? fmt(cust.current) : '—'}</td>
-                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d30 > 0 ? BUCKET_COLORS['1-30'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.d30 > 0 ? fmt(cust.d30) : '—'}</td>
-                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d60 > 0 ? BUCKET_COLORS['31-60'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.d60 > 0 ? fmt(cust.d60) : '—'}</td>
-                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d90 > 0 ? BUCKET_COLORS['61-90'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.d90 > 0 ? fmt(cust.d90) : '—'}</td>
-                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d90plus > 0 ? BUCKET_COLORS['>90'] : '#444', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.d90plus > 0 ? fmt(cust.d90plus) : '—'}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.current > 0 ? 'var(--text-primary)' : 'var(--text-faint)', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.current > 0 ? fmt(cust.current) : '—'}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d30 > 0 ? BUCKET_COLORS['1-30'] : 'var(--text-faint)', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.d30 > 0 ? fmt(cust.d30) : '—'}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d60 > 0 ? BUCKET_COLORS['31-60'] : 'var(--text-faint)', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.d60 > 0 ? fmt(cust.d60) : '—'}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d90 > 0 ? BUCKET_COLORS['61-90'] : 'var(--text-faint)', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.d90 > 0 ? fmt(cust.d90) : '—'}</td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d90plus > 0 ? BUCKET_COLORS['>90'] : 'var(--text-faint)', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.d90plus > 0 ? fmt(cust.d90plus) : '—'}</td>
                     <td style={{ padding: '10px 12px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 500, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmt(cust.totalAr)}</td>
                     <td style={{ padding: '10px 12px', fontSize: 12, color: 'var(--text-dim)', textAlign: 'right' }}>{cust.invoiceCount}</td>
                   </tr>
@@ -581,14 +581,14 @@ export default function ArDashboard({ role, branches }: Props) {
             <div key={cust.id} onClick={() => setSelectedCustomer(cust)}
               style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 14, cursor: 'pointer', opacity: cust.isExcluded ? 0.5 : 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <span style={{ fontSize: 14, fontWeight: 500, color: cust.isExcluded ? '#555' : '#ff6b00' }}>{cust.displayName}</span>
+                <span style={{ fontSize: 14, fontWeight: 500, color: cust.isExcluded ? 'var(--text-faint)' : '#ff6b00' }}>{cust.displayName}</span>
                 <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)' }}>{fmt(cust.totalAr)}</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
                 {([['Current', cust.current, 'Current'], ['1-30', cust.d30, '1–30d'], ['31-60', cust.d60, '31–60d'], ['61-90', cust.d90, '61–90d'], ['>90', cust.d90plus, '>90d']] as [string, number, string][]).map(([key, val, label]) => (
                   <div key={key} style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: '6px 8px' }}>
                     <div style={{ fontSize: 10, color: 'var(--text-faint)', marginBottom: 2 }}>{label}</div>
-                    <div style={{ fontSize: 12, color: val > 0 ? BUCKET_COLORS[key] : '#444', fontVariantNumeric: 'tabular-nums' }}>
+                    <div style={{ fontSize: 12, color: val > 0 ? BUCKET_COLORS[key] : 'var(--text-faint)', fontVariantNumeric: 'tabular-nums' }}>
                       {val > 0 ? fmt(val) : '—'}
                     </div>
                   </div>

@@ -300,9 +300,9 @@ export default function AccessRequestsClient() {
                         <button
                           onClick={() => openArchive(r)}
                           title="Archive this request (not a block — they can re-apply)"
-                          style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, color: '#444444', fontSize: 11, padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit' }}
-                          onMouseEnter={(e) => { e.currentTarget.style.color = '#666'; e.currentTarget.style.borderColor = '#444' }}
-                          onMouseLeave={(e) => { e.currentTarget.style.color = '#444'; e.currentTarget.style.borderColor = '#2a2a2a' }}
+                          style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-faint)', fontSize: 11, padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-dim)'; e.currentTarget.style.borderColor = 'var(--text-faint)' }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.borderColor = 'var(--bg-secondary)' }}
                         >
                           Archive
                         </button>
@@ -397,7 +397,7 @@ export default function AccessRequestsClient() {
                   <div>
                     <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 3 }}>They requested</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                      <span style={{ color: '#ccc' }}>{ROLE_LABELS[modal.request.requestedRole] ?? modal.request.requestedRole}</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>{ROLE_LABELS[modal.request.requestedRole] ?? modal.request.requestedRole}</span>
                       {modal.request.branchName && <span style={{ color: 'var(--text-faint)' }}> · {modal.request.branchName}</span>}
                     </div>
                   </div>
@@ -478,7 +478,7 @@ export default function AccessRequestsClient() {
                         type="button"
                         onClick={handleCopy}
                         disabled={!tmpPassword}
-                        style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: copied ? '#4caf50' : '#888888', fontSize: 11, padding: '0 10px', cursor: tmpPassword ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: tmpPassword ? 1 : 0.4 }}
+                        style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: copied ? '#4caf50' : 'var(--text-muted)', fontSize: 11, padding: '0 10px', cursor: tmpPassword ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: tmpPassword ? 1 : 0.4 }}
                       >
                         {copied ? 'Copied' : 'Copy'}
                       </button>
@@ -542,7 +542,7 @@ export default function AccessRequestsClient() {
                   Archive Request
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8, lineHeight: 1.6 }}>
-                  This will remove <span style={{ color: '#ccc' }}>{modal.request.firstName} {modal.request.lastName}</span>&rsquo;s request from the pending queue.
+                  This will remove <span style={{ color: 'var(--text-secondary)' }}>{modal.request.firstName} {modal.request.lastName}</span>&rsquo;s request from the pending queue.
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-faint)', marginBottom: 24, padding: '8px 10px', background: 'var(--bg-nav)', borderRadius: 6, border: '1px solid var(--border)', lineHeight: 1.5 }}>
                   This does <strong style={{ color: 'var(--text-muted)' }}>not</strong> block the person from re-applying or getting access in the future. Use this only for duplicate or clearly erroneous submissions.

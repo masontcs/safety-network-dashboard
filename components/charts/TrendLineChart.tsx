@@ -31,16 +31,16 @@ export default function TrendLineChart({ data, height = 200 }: TrendLineChartPro
   return (
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
         <XAxis
           dataKey="period"
-          tick={{ fill: '#555555', fontSize: 10 }}
+          tick={{ fill: 'var(--text-faint)', fontSize: 10 }}
           axisLine={false}
           tickLine={false}
         />
         <YAxis
           tickFormatter={formatK}
-          tick={{ fill: '#555555', fontSize: 9 }}
+          tick={{ fill: 'var(--text-faint)', fontSize: 9 }}
           axisLine={false}
           tickLine={false}
           width={42}

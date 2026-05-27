@@ -235,7 +235,7 @@ function DashboardSkeleton() {
           to   { opacity: 1; transform: translateY(0); }
         }
         .sn-sk {
-          background: linear-gradient(90deg, #252525 25%, #303030 50%, #252525 75%);
+          background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-tertiary) 50%, var(--bg-secondary) 75%);
           background-size: 400% 100%;
           animation: sn-shimmer 1.6s ease-in-out infinite;
           border-radius: 6px;
@@ -298,7 +298,7 @@ function DashboardSkeleton() {
             <div className="sn-sk" style={{ height: 10, width: '50%', marginBottom: 14, animationDelay: `${i * 0.15}s` }} />
             <div className="sn-sk" style={{ height: 28, width: '70%', marginBottom: 10, animationDelay: `${i * 0.15 + 0.1}s` }} />
             <div className="sn-sk" style={{ height: 9, width: '42%', marginBottom: 16, animationDelay: `${i * 0.15 + 0.2}s` }} />
-            <div style={{ height: 4, background: '#222', borderRadius: 2 }}>
+            <div style={{ height: 4, background: 'var(--bg-secondary)', borderRadius: 2 }}>
               <div className="sn-sk" style={{ width: `${40 + i * 14}%`, height: '100%', borderRadius: 2, animationDelay: `${i * 0.15 + 0.3}s` }} />
             </div>
           </div>
@@ -553,8 +553,8 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
               style={{
                 padding: '6px 14px',
                 borderRadius: 8,
-                border: `1px solid ${allocationOn ? '#ff6b00' : '#333333'}`,
-                background: allocationOn ? '#ff6b00' : '#2a2a2a',
+                border: `1px solid ${allocationOn ? '#ff6b00' : 'var(--bg-tertiary)'}`,
+                background: allocationOn ? '#ff6b00' : 'var(--bg-secondary)',
                 color: 'var(--text-primary)',
                 fontSize: 12,
                 cursor: 'pointer',
@@ -597,7 +597,7 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
                   borderRadius: 6,
                   border: 'none',
                   background: viewMode === v ? '#ff6b00' : 'transparent',
-                  color: viewMode === v ? '#ffffff' : '#888888',
+                  color: viewMode === v ? 'var(--text-primary)' : 'var(--text-muted)',
                   fontSize: 12,
                   cursor: 'pointer',
                   textTransform: 'capitalize',
@@ -657,7 +657,7 @@ export default function UnifiedDashboard({ role, userName, userBranchIds, branch
               padding: '8px 20px',
               border: 'none',
               background: 'none',
-              color: activeTab === t.key ? '#ff6b00' : '#666666',
+              color: activeTab === t.key ? '#ff6b00' : 'var(--text-dim)',
               fontSize: 13,
               fontWeight: activeTab === t.key ? 500 : 400,
               cursor: 'pointer',

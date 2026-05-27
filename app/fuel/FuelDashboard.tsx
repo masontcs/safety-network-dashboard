@@ -154,8 +154,8 @@ export default function FuelDashboard({ role, branchIds, branches, fiscalMonths 
         cursor: 'pointer',
         fontSize: 12,
         fontWeight: 500,
-        background: active ? '#ff6b00' : '#2a2a2a',
-        color: active ? '#ffffff' : '#888888',
+        background: active ? '#ff6b00' : 'var(--bg-secondary)',
+        color: active ? 'var(--text-primary)' : 'var(--text-muted)',
         transition: 'background 150ms',
       }}
     >
@@ -184,7 +184,7 @@ export default function FuelDashboard({ role, branchIds, branches, fiscalMonths 
                 borderRadius: 6,
                 border: 'none',
                 background: viewMode === v ? '#ff6b00' : 'transparent',
-                color: viewMode === v ? '#ffffff' : '#888888',
+                color: viewMode === v ? 'var(--text-primary)' : 'var(--text-muted)',
                 fontSize: 12,
                 cursor: 'pointer',
                 textTransform: 'capitalize',
@@ -294,7 +294,7 @@ export default function FuelDashboard({ role, branchIds, branches, fiscalMonths 
             <tbody>
               {consumers.map((c, i) => (
                 <tr key={`${c.employeeId ?? 'general'}-${c.branchName}-${i}`} style={{ borderTop: '1px solid var(--border)' }}>
-                  <td style={{ padding: '8px 8px 8px 0', fontSize: 12, color: c.isGeneral ? '#888888' : '#cccccc', fontStyle: c.isGeneral ? 'italic' : 'normal' }}>{c.displayName}</td>
+                  <td style={{ padding: '8px 8px 8px 0', fontSize: 12, color: c.isGeneral ? 'var(--text-muted)' : 'var(--text-secondary)', fontStyle: c.isGeneral ? 'italic' : 'normal' }}>{c.displayName}</td>
                   <td style={{ padding: '8px 8px 8px 0', fontSize: 12, color: '#ff6b00' }}>{c.branchName}</td>
                   <td style={{ padding: '8px 8px 8px 0', fontSize: 12, color: 'var(--text-secondary)' }}>{fmtDec(c.totalGallons, 1)}</td>
                   <td style={{ padding: '8px 8px 8px 0', fontSize: 12, color: 'var(--text-secondary)' }}>

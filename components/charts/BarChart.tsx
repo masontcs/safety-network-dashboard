@@ -39,7 +39,7 @@ function CustomTooltip({ active, payload, label, formatValue }: {
   if (!active || !payload?.length) return null
   return (
     <div style={{
-      background: '#161616',
+      background: 'var(--bg-surface)',
       border: '1px solid var(--border)',
       borderRadius: 8,
       padding: '10px 14px',
@@ -74,19 +74,19 @@ export default function BarChart({
         margin={{ top: showLabels ? 24 : 4, right: 4, left: 0, bottom: 0 }}
       >
         {showAxes && (
-          <CartesianGrid strokeDasharray="3 3" stroke="#1f1f1f" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
         )}
         {showAxes && (
           <XAxis
             dataKey="label"
-            tick={{ fill: '#555555', fontSize: 10 }}
+            tick={{ fill: 'var(--text-faint)', fontSize: 10 }}
             axisLine={false}
             tickLine={false}
           />
         )}
         {showAxes && (
           <YAxis
-            tick={{ fill: '#444444', fontSize: 9 }}
+            tick={{ fill: 'var(--text-dim)', fontSize: 9 }}
             axisLine={false}
             tickLine={false}
             width={44}
@@ -109,7 +109,7 @@ export default function BarChart({
             <LabelList
               dataKey="value"
               position="top"
-              style={{ fill: '#666666', fontSize: 10 }}
+              style={{ fill: 'var(--text-dim)', fontSize: 10 }}
               formatter={(v: number) => v > 0 ? compactMoney(v) : ''}
             />
           )}

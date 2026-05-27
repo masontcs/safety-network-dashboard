@@ -339,7 +339,7 @@ export default function FiscalMonthsClient() {
                     <td style={{ padding: '10px 16px' }}>
                       <span style={{
                         fontSize: 11, fontWeight: 500,
-                        color: m.is_active ? '#4caf50' : '#555555',
+                        color: m.is_active ? '#4caf50' : 'var(--text-faint)',
                       }}>
                         {m.is_active ? 'Active' : 'Inactive'}
                       </span>

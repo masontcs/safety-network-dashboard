@@ -85,7 +85,7 @@ function MonthSelect({
           borderRadius: 6,
           padding: '5px 8px',
           fontSize: 12,
-          color: value ? '#cccccc' : '#555555',
+          color: value ? 'var(--text-secondary)' : 'var(--text-faint)',
           fontFamily: 'inherit',
           cursor: 'pointer',
           minWidth: 160,
@@ -569,7 +569,7 @@ export default function FiscalQuartersClient() {
                       Q{q.quarter_number}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
-                      <span style={{ fontSize: 11, fontWeight: 500, color: q.is_active ? '#4caf50' : '#555555' }}>
+                      <span style={{ fontSize: 11, fontWeight: 500, color: q.is_active ? '#4caf50' : 'var(--text-faint)' }}>
                         {q.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>

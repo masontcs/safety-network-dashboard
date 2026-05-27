@@ -94,7 +94,7 @@ const COLLECTION_STATUS_OPTIONS = [
   { value: 'collections',    label: 'Sent to Collections', color: '#cc4444', priority: 1 },
   { value: 'on_hold',        label: 'On Hold',             color: '#cc9900', priority: 2 },
   { value: 'dispute',        label: 'Dispute',             color: '#cc6600', priority: 2 },
-  { value: 'write_off',      label: 'Write Off',           color: '#444',    priority: 3 },
+  { value: 'write_off',      label: 'Write Off',           color: 'var(--text-faint)',    priority: 3 },
 ]
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Critical', 2: 'High', 3: 'Low', 0: '' }
@@ -247,7 +247,7 @@ function MergeModal({ customerId, customerName, onClose, onMerged }: {
         {!selected ? (
           <>
             <input autoFocus type="text" placeholder="Search by name…" value={q} onChange={(e) => setQ(e.target.value)}
-              style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '8px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 12 }} />
+              style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: 'var(--text-secondary)', padding: '8px 12px', fontSize: 13, outline: 'none', boxSizing: 'border-box', marginBottom: 12 }} />
             {searching && <div style={{ fontSize: 12, color: 'var(--text-faint)', textAlign: 'center', padding: 16 }}>Searching…</div>}
             {!searching && q.length >= 2 && results.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-faint)', textAlign: 'center', padding: 16 }}>No customers found</div>}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 300, overflowY: 'auto' }}>
@@ -255,7 +255,7 @@ function MergeModal({ customerId, customerName, onClose, onMerged }: {
                 <div key={r.id} onClick={() => setSelected(r)}
                   style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '10px 12px', cursor: 'pointer', border: '1px solid var(--border-emphasis)' }}
                   onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#ff6b00')}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#333')}>
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border-emphasis)')}>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{r.displayName}</div>
                   {r.entityRefs.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 3 }}>{r.entityRefs.map((ref) => `${ref.entityCode}: ${ref.quickbooksName}`).join(' · ')}</div>}
                 </div>
@@ -307,7 +307,7 @@ function ContactForm({ customerId, onSaved, onCancel }: { customerId: string; on
     setSaving(false)
   }
 
-  const inp = { background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '6px 10px', fontSize: 12, outline: 'none', width: '100%', boxSizing: 'border-box' as const }
+  const inp = { background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: 'var(--text-secondary)', padding: '6px 10px', fontSize: 12, outline: 'none', width: '100%', boxSizing: 'border-box' as const }
   return (
     <div style={{ background: '#242424', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div className="ar-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -844,7 +844,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
 
   const roleBadge = (r: string) => {
     const label = r === 'ar_manager' ? 'Manager' : r === 'ar_team' ? 'AR Team' : r === 'office_team' ? 'Office' : r
-    const color = r === 'ar_manager' ? '#ff6b00' : '#666666'
+    const color = r === 'ar_manager' ? '#ff6b00' : 'var(--text-dim)'
     return (
       <span style={{ fontSize: 10, color, background: 'rgba(255,255,255,0.06)', borderRadius: 3, padding: '1px 5px', fontWeight: 500 }}>
         {label}
@@ -864,10 +864,10 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
         {/* Row 1: Back / Name / Excluded badge / Download */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={onBack}
-            style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: 8, color: '#ccc', padding: '6px 12px', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
+            style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: 8, color: 'var(--text-secondary)', padding: '6px 12px', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>
             ← Back
           </button>
-          <div style={{ flex: 1, fontSize: 20, fontWeight: 500, color: profile?.isExcluded ? '#666' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ flex: 1, fontSize: 20, fontWeight: 500, color: profile?.isExcluded ? 'var(--text-dim)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {customer.displayName}
           </div>
           {profile?.isExcluded && (
@@ -883,7 +883,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 20px', alignItems: 'flex-end' }}>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Account</span>
+              <span style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Account</span>
               {canManageStatuses ? (
                 <select value={profile.customerStatus} onChange={(e) => handleCustomerStatusChange(e.target.value)}
                   style={{ background: `${custStatusMeta.color}18`, border: `1px solid ${custStatusMeta.color}`, borderRadius: 7, color: custStatusMeta.color, padding: '4px 9px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
@@ -897,7 +897,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Collection Issue</span>
+              <span style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Collection Issue</span>
               {canManageStatuses ? (
                 <select value={profile.collectionStatus} onChange={(e) => handleCollectionStatusChange(e.target.value)}
                   style={{ background: `${collStatusMeta.color}18`, border: `1px solid ${collStatusMeta.color}`, borderRadius: 7, color: collStatusMeta.color, padding: '4px 9px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
@@ -915,7 +915,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Escalation</span>
+              <span style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Escalation</span>
               {canManageStatuses ? (
                 <select value={profile.collectionPhase} onChange={(e) => handleCollectionPhaseChange(e.target.value)}
                   style={{ background: `${collPhaseMeta.color}18`, border: `1px solid ${collPhaseMeta.color}55`, borderRadius: 7, color: collPhaseMeta.color, padding: '4px 9px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
@@ -929,10 +929,10 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Contact Freq.</span>
+              <span style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Contact Freq.</span>
               {canManageStatuses ? (
                 <select value={profile.contactFrequency ?? ''} onChange={(e) => handleContactFrequencyChange(e.target.value)}
-                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 7, color: profile.contactFrequency ? '#cccccc' : '#555', padding: '4px 9px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
+                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 7, color: profile.contactFrequency ? 'var(--text-secondary)' : 'var(--text-faint)', padding: '4px 9px', fontSize: 12, cursor: 'pointer', outline: 'none' }}>
                   <option value=''>Not Set</option>
                   {CONTACT_FREQUENCY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
@@ -945,9 +945,9 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
 
             {canManageStatuses && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <span style={{ fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Visibility</span>
+                <span style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Visibility</span>
                 <button onClick={handleExcludeToggle} disabled={togglingExclude}
-                  style={{ background: profile.isExcluded ? '#2a2a2a' : 'rgba(204,68,68,0.12)', border: `1px solid ${profile.isExcluded ? '#333' : '#663333'}`, borderRadius: 7, color: profile.isExcluded ? '#888' : '#cc4444', padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}>
+                  style={{ background: profile.isExcluded ? 'var(--bg-secondary)' : 'rgba(204,68,68,0.12)', border: `1px solid ${profile.isExcluded ? 'var(--border-emphasis)' : '#663333'}`, borderRadius: 7, color: profile.isExcluded ? 'var(--text-muted)' : '#cc4444', padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}>
                   {profile.isExcluded ? 'Restore' : 'Exclude'}
                 </button>
               </div>
@@ -963,7 +963,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
           {/* Total AR — hero number */}
           <div style={{ flexShrink: 0, minWidth: 110 }}>
             <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Total AR</div>
-            <div style={{ fontSize: 28, fontWeight: 600, color: profile?.isExcluded ? '#555' : '#ff6b00', lineHeight: 1 }}>{fmt(customer.totalAr)}</div>
+            <div style={{ fontSize: 28, fontWeight: 600, color: profile?.isExcluded ? 'var(--text-faint)' : '#ff6b00', lineHeight: 1 }}>{fmt(customer.totalAr)}</div>
             <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 5 }}>{customer.invoiceCount} invoice{customer.invoiceCount !== 1 ? 's' : ''}</div>
           </div>
 
@@ -977,7 +977,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                 return (
                   <div key={b}>
                     <div style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 3 }}>{b}</div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: (val ?? 0) > 0 && !profile?.isExcluded ? BUCKET_COLORS[b] : '#333' }}>{fmt(val ?? 0)}</div>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: (val ?? 0) > 0 && !profile?.isExcluded ? BUCKET_COLORS[b] : 'var(--border-emphasis)' }}>{fmt(val ?? 0)}</div>
                   </div>
                 )
               })}
@@ -1012,7 +1012,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                 {AGING_BUCKETS.map((b) => {
                   const val = { Current: customer.current, '1-30': customer.d30, '31-60': customer.d60, '61-90': customer.d90, '>90': customer.d90plus }[b] ?? 0
                   if (val <= 0) return null
-                  return <div key={b} style={{ flex: val / customer.totalAr, background: profile?.isExcluded ? '#2a2a2a' : BUCKET_COLORS[b] }} />
+                  return <div key={b} style={{ flex: val / customer.totalAr, background: profile?.isExcluded ? 'var(--bg-secondary)' : BUCKET_COLORS[b] }} />
                 })}
               </div>
             )}
@@ -1109,7 +1109,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   <span style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>How Contacted</span>
                   <select value={collCommType} onChange={(e) => setCollCommType(e.target.value)}
-                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: collCommType ? '#ccc' : '#555', padding: '6px 10px', fontSize: 12, outline: 'none' }}>
+                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: collCommType ? 'var(--text-secondary)' : 'var(--text-faint)', padding: '6px 10px', fontSize: 12, outline: 'none' }}>
                     <option value=''>Not specified</option>
                     {COMMUNICATION_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
@@ -1120,7 +1120,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                     placeholder='Who did you speak with?'
                     value={collContactName}
                     onChange={(e) => setCollContactName(e.target.value)}
-                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '6px 10px', fontSize: 12, outline: 'none' }}
+                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: 'var(--text-secondary)', padding: '6px 10px', fontSize: 12, outline: 'none' }}
                   />
                 </div>
               </div>
@@ -1128,14 +1128,14 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <span style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Outcome</span>
                 <select value={collOutcome} onChange={(e) => setCollOutcome(e.target.value)}
-                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: collOutcome ? (getOutcomeMeta(collOutcome)?.color ?? '#ccc') : '#555', padding: '6px 10px', fontSize: 12, outline: 'none' }}>
+                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: collOutcome ? (getOutcomeMeta(collOutcome)?.color ?? 'var(--text-secondary)') : 'var(--text-faint)', padding: '6px 10px', fontSize: 12, outline: 'none' }}>
                   <option value=''>Select outcome…</option>
                   {OUTCOME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
               {/* Row 3: note text */}
               <textarea placeholder="Add a collection note…" value={collectionNoteText} onChange={(e) => setCollectionNoteText(e.target.value)} rows={3}
-                style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+                style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: 'var(--text-secondary)', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
               {collectionNoteError && (
                 <div style={{ fontSize: 11, color: '#cc4444', marginBottom: 4 }}>{collectionNoteError}</div>
               )}
@@ -1168,7 +1168,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                             value={editingNoteContent}
                             onChange={(e) => setEditingNoteContent(e.target.value)}
                             rows={3}
-                            style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid #ff6b00', borderRadius: 8, color: '#ccc', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                            style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid #ff6b00', borderRadius: 8, color: 'var(--text-secondary)', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
                           />
                           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                             <button onClick={() => setEditingNoteId(null)} style={{ background: 'none', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: 'var(--text-muted)', padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
@@ -1181,29 +1181,29 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                       ) : (
                         <>
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                            <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
+                            <div style={{ flex: 1, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{n.content}</div>
                             {isOwnNote && (
                               <button
                                 onClick={() => { setEditingNoteId(n.id); setEditingNoteContent(n.content) }}
                                 title="Edit note"
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '2px 4px', flexShrink: 0, color: '#444' }}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '2px 4px', flexShrink: 0, color: 'var(--text-faint)' }}
                                 onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6b00')}
-                                onMouseLeave={(e) => (e.currentTarget.style.color = '#444')}>✎</button>
+                                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-faint)')}>✎</button>
                             )}
                             {isArAdmin && (
                               <>
                                 <button
                                   onClick={() => handlePinNote(n.id, !n.isPinned)}
                                   title={n.isPinned ? 'Unpin note' : 'Pin note to top'}
-                                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: '2px 4px', flexShrink: 0, color: isPinnedSection ? '#ff6b00' : '#444', transition: 'color 0.15s' }}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: '2px 4px', flexShrink: 0, color: isPinnedSection ? '#ff6b00' : 'var(--text-faint)', transition: 'color 0.15s' }}
                                   onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6b00')}
-                                  onMouseLeave={(e) => (e.currentTarget.style.color = isPinnedSection ? '#ff6b00' : '#444')}>
+                                  onMouseLeave={(e) => (e.currentTarget.style.color = isPinnedSection ? '#ff6b00' : 'var(--text-faint)')}>
                                   📌
                                 </button>
                                 <button onClick={() => handleDeleteNote(n.id)}
                                   style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
                                   onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                                  onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
+                                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-faint)')}>×</button>
                               </>
                             )}
                           </div>
@@ -1221,7 +1221,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                             {n.contactName && <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>w/ {n.contactName}</span>}
                             <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 'auto' }}>
                               {n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}
-                              {n.editedAt && <span style={{ color: '#444', fontStyle: 'italic' }}> · edited</span>}
+                              {n.editedAt && <span style={{ color: 'var(--text-faint)', fontStyle: 'italic' }}> · edited</span>}
                             </span>
                           </div>
                         </>
@@ -1249,7 +1249,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                       {shown.map((n) => <NoteRow key={n.id} n={n} isPinnedSection={false} />)}
                     </div>
                     {extra > 0 && (
-                      <div style={{ fontSize: 11, color: '#444', textAlign: 'center', paddingTop: 8 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-faint)', textAlign: 'center', paddingTop: 8 }}>
                         {extra} older note{extra !== 1 ? 's' : ''} not shown
                       </div>
                     )}
@@ -1267,7 +1267,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   <span style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>How Contacted</span>
                   <select value={opCommType} onChange={(e) => setOpCommType(e.target.value)}
-                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: opCommType ? '#ccc' : '#555', padding: '6px 10px', fontSize: 12, outline: 'none' }}>
+                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: opCommType ? 'var(--text-secondary)' : 'var(--text-faint)', padding: '6px 10px', fontSize: 12, outline: 'none' }}>
                     <option value=''>Not specified</option>
                     {COMMUNICATION_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
@@ -1278,7 +1278,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                     placeholder='Who did you speak with?'
                     value={opContactName}
                     onChange={(e) => setOpContactName(e.target.value)}
-                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '6px 10px', fontSize: 12, outline: 'none' }}
+                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: 'var(--text-secondary)', padding: '6px 10px', fontSize: 12, outline: 'none' }}
                   />
                 </div>
               </div>
@@ -1286,14 +1286,14 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
               <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <span style={{ fontSize: 10, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Outcome</span>
                 <select value={opOutcome} onChange={(e) => setOpOutcome(e.target.value)}
-                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: opOutcome ? (getOutcomeMeta(opOutcome)?.color ?? '#ccc') : '#555', padding: '6px 10px', fontSize: 12, outline: 'none' }}>
+                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: opOutcome ? (getOutcomeMeta(opOutcome)?.color ?? 'var(--text-secondary)') : 'var(--text-faint)', padding: '6px 10px', fontSize: 12, outline: 'none' }}>
                   <option value=''>Select outcome…</option>
                   {OUTCOME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
               {/* Row 3: note text */}
               <textarea placeholder="Add an operation note…" value={operationNoteText} onChange={(e) => setOperationNoteText(e.target.value)} rows={3}
-                style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: '#ccc', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+                style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: 'var(--text-secondary)', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
               {operationNoteError && (
                 <div style={{ fontSize: 11, color: '#cc4444', marginBottom: 4 }}>{operationNoteError}</div>
               )}
@@ -1326,7 +1326,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                                 value={editingNoteContent}
                                 onChange={(e) => setEditingNoteContent(e.target.value)}
                                 rows={3}
-                                style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid #ff6b00', borderRadius: 8, color: '#ccc', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                                style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid #ff6b00', borderRadius: 8, color: 'var(--text-secondary)', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
                               />
                               <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                                 <button onClick={() => setEditingNoteId(null)} style={{ background: 'none', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: 'var(--text-muted)', padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
@@ -1339,20 +1339,20 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                           ) : (
                             <>
                               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                                <div style={{ flex: 1, fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{n.content}</div>
+                                <div style={{ flex: 1, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{n.content}</div>
                                 {isOwnNote && (
                                   <button
                                     onClick={() => { setEditingNoteId(n.id); setEditingNoteContent(n.content) }}
                                     title="Edit note"
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '2px 4px', flexShrink: 0, color: '#444' }}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '2px 4px', flexShrink: 0, color: 'var(--text-faint)' }}
                                     onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6b00')}
-                                    onMouseLeave={(e) => (e.currentTarget.style.color = '#444')}>✎</button>
+                                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-faint)')}>✎</button>
                                 )}
                                 {isAdmin && (
                                   <button onClick={() => handleDeleteNote(n.id)}
                                     style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
                                     onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                                    onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
+                                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-faint)')}>×</button>
                                 )}
                               </div>
                               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 5 }}>
@@ -1369,7 +1369,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                                 {n.contactName && <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>w/ {n.contactName}</span>}
                                 <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 'auto' }}>
                                   {n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}
-                                  {n.editedAt && <span style={{ color: '#444', fontStyle: 'italic' }}> · edited</span>}
+                                  {n.editedAt && <span style={{ color: 'var(--text-faint)', fontStyle: 'italic' }}> · edited</span>}
                                 </span>
                               </div>
                             </>
@@ -1378,7 +1378,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                       )
                     })}
                     {extra > 0 && (
-                      <div style={{ fontSize: 11, color: '#444', textAlign: 'center', paddingTop: 2 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-faint)', textAlign: 'center', paddingTop: 2 }}>
                         {extra} older note{extra !== 1 ? 's' : ''} not shown
                       </div>
                     )}
@@ -1432,20 +1432,20 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                       <div key={c.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 12, color: '#ccc', fontWeight: 500 }}>{c.name}</span>
+                            <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>{c.name}</span>
                             {c.isPrimary && <span style={{ fontSize: 9, color: '#ff6b00', background: 'rgba(255,107,0,0.12)', borderRadius: 3, padding: '1px 5px' }}>Primary</span>}
                           </div>
                           {c.title && <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 1 }}>{c.title}</div>}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 3 }}>
-                            {c.email && <a href={`mailto:${c.email}`} style={{ fontSize: 11, color: '#777', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.email}</a>}
-                            {c.phone && <span style={{ fontSize: 11, color: '#777' }}>{c.phone}</span>}
+                            {c.email && <a href={`mailto:${c.email}`} style={{ fontSize: 11, color: 'var(--text-muted)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.email}</a>}
+                            {c.phone && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{c.phone}</span>}
                           </div>
                         </div>
                         {isArAdmin && (
                           <button onClick={() => handleDeleteContact(c.id)}
-                            style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 14, padding: '1px 3px', flexShrink: 0 }}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 14, padding: '1px 3px', flexShrink: 0 }}
                             onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                            onMouseLeave={(e) => (e.currentTarget.style.color = '#444')}>×</button>
+                            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-faint)')}>×</button>
                         )}
                       </div>
                     ))}
@@ -1477,14 +1477,14 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                     {(profile?.pmAssignments ?? []).map((pm) => (
                       <div key={pm.userId} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 12, color: '#ccc' }}>{pm.displayName}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{pm.displayName}</div>
                           <div style={{ fontSize: 10, color: 'var(--text-faint)' }}>{pm.role.replace(/_/g, ' ')}</div>
                         </div>
                         {canManagePMs && (
                           <button onClick={() => handleRemovePm(pm.userId)}
-                            style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 14, padding: '1px 3px' }}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 14, padding: '1px 3px' }}
                             onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                            onMouseLeave={(e) => (e.currentTarget.style.color = '#444')}>×</button>
+                            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-faint)')}>×</button>
                         )}
                       </div>
                     ))}
@@ -1524,14 +1524,14 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                   {arAssignments.map((a) => (
                     <div key={a.userId} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-                        <span style={{ fontSize: 12, color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.displayName}</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.displayName}</span>
                         {roleBadge(a.role)}
                       </div>
                       {isArAdmin && (
                         <button onClick={() => handleRemoveAr(a.userId)}
-                          style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 14, padding: '1px 3px', flexShrink: 0 }}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 14, padding: '1px 3px', flexShrink: 0 }}
                           onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = '#444')}>×</button>
+                          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-faint)')}>×</button>
                       )}
                     </div>
                   ))}
@@ -1552,7 +1552,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                           <div key={b.name}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
                               <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{b.name}</span>
-                              <span style={{ fontSize: 11, color: '#ccc', fontVariantNumeric: 'tabular-nums' }}>{fmt(b.total)}</span>
+                              <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{fmt(b.total)}</span>
                             </div>
                             <div style={{ height: 3, borderRadius: 2, background: 'var(--bg-secondary)', overflow: 'hidden' }}>
                               <div style={{ height: '100%', borderRadius: 2, background: BRANCH_PALETTE[i % BRANCH_PALETTE.length], width: `${total > 0 ? (b.total / total) * 100 : 0}%` }} />
@@ -1576,13 +1576,13 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
         <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>Open Invoices</span>
           {invTotal > 0 && <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{invTotal} total</span>}
-          <span style={{ fontSize: 11, color: '#444' }}>· click row for notes &amp; flags</span>
+          <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>· click row for notes &amp; flags</span>
           <div style={{ flex: 1 }} />
           {invBranchOptions.length > 1 && (
             <select
               value={invBranchId}
               onChange={(e) => setInvBranchId(e.target.value)}
-              style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 7, color: invBranchId ? '#ccc' : '#666', padding: '4px 10px', fontSize: 12, cursor: 'pointer', outline: 'none' }}
+              style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 7, color: invBranchId ? 'var(--text-secondary)' : 'var(--text-dim)', padding: '4px 10px', fontSize: 12, cursor: 'pointer', outline: 'none' }}
             >
               <option value=''>All Branches</option>
               {invBranchOptions.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -1611,13 +1611,13 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                   return (
                     <React.Fragment key={inv.id}>
                       <tr
-                        style={{ borderBottom: isExpanded ? 'none' : '1px solid #222', cursor: 'pointer', background: isExpanded ? '#1a1a1a' : 'transparent' }}
+                        style={{ borderBottom: isExpanded ? 'none' : '1px solid #222', cursor: 'pointer', background: isExpanded ? 'var(--bg-nav)' : 'transparent' }}
                         onClick={() => handleToggleInv(inv.id)}>
                         {/* Chevron */}
-                        <td style={{ padding: '9px 8px 9px 12px', fontSize: 11, color: '#444' }}>
+                        <td style={{ padding: '9px 8px 9px 12px', fontSize: 11, color: 'var(--text-faint)' }}>
                           <span style={{ display: 'inline-block', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', userSelect: 'none' }}>▶</span>
                         </td>
-                        <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                             {inv.invoice_number ?? '—'}
                             {noteCount > 0 && (
@@ -1625,8 +1625,8 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                             )}
                           </span>
                         </td>
-                        <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc' }}>{inv.entity_code}</td>
-                        <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-secondary)' }}>{inv.entity_code}</td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                           {inv.branch?.name ?? <span style={{ color: 'var(--text-faint)' }}>{inv.raw_class_code ?? '—'}</span>}
                         </td>
                         <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-muted)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.job_name ?? '—'}</td>
@@ -1688,17 +1688,17 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>{fmtDate(inv.due_date)}</td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{fmtDate(inv.due_date)}</td>
                         <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-muted)' }}>{inv.terms ?? '—'}</td>
                         <td style={{ padding: '9px 12px', fontSize: 12, whiteSpace: 'nowrap' }}>
                           {invStatusMeta ? (
                             <span style={{ background: `${invStatusMeta.color}22`, color: invStatusMeta.color, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
                               {invStatusMeta.label}
                             </span>
-                          ) : <span style={{ color: '#444' }}>—</span>}
+                          ) : <span style={{ color: 'var(--text-faint)' }}>—</span>}
                         </td>
                         <td style={{ padding: '9px 12px', fontSize: 12, whiteSpace: 'nowrap' }}>
-                          <span style={{ background: `${BUCKET_COLORS[inv.aging_bucket] ?? '#333'}22`, color: BUCKET_COLORS[inv.aging_bucket] ?? '#888', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>{inv.aging_bucket}</span>
+                          <span style={{ background: `${BUCKET_COLORS[inv.aging_bucket] ?? 'var(--border-emphasis)'}22`, color: BUCKET_COLORS[inv.aging_bucket] ?? 'var(--text-muted)', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>{inv.aging_bucket}</span>
                         </td>
                         <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-primary)', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmt(Number(inv.open_balance))}</td>
                       </tr>
@@ -1707,7 +1707,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                       {isExpanded && (
                         <tr key={`${inv.id}-expand`} style={{ borderBottom: '1px solid #222' }}>
                           <td colSpan={12} style={{ padding: 0 }}>
-                            <div style={{ background: '#161616', padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}
+                            <div style={{ background: 'var(--bg-surface)', padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}
                               onClick={(e) => e.stopPropagation()}>
 
                               {/* Invoice status row */}
@@ -1717,14 +1717,14 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                                   <select
                                     value={inv.invoice_status ?? ''}
                                     onChange={(e) => handleInvStatusChange(inv.id, e.target.value)}
-                                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 7, color: invStatusMeta ? invStatusMeta.color : '#555', padding: '5px 10px', fontSize: 12, outline: 'none', cursor: 'pointer' }}>
+                                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 7, color: invStatusMeta ? invStatusMeta.color : 'var(--text-faint)', padding: '5px 10px', fontSize: 12, outline: 'none', cursor: 'pointer' }}>
                                     <option value=''>No Flag</option>
                                     {INVOICE_STATUS_OPTIONS.map((o) => (
                                       <option key={o.value} value={o.value}>{o.label}</option>
                                     ))}
                                   </select>
                                 ) : (
-                                  <span style={{ fontSize: 12, color: invStatusMeta ? invStatusMeta.color : '#444' }}>
+                                  <span style={{ fontSize: 12, color: invStatusMeta ? invStatusMeta.color : 'var(--text-faint)' }}>
                                     {invStatusMeta ? invStatusMeta.label : 'No flag'}
                                   </span>
                                 )}
@@ -1742,14 +1742,14 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                                     {(invNotes[inv.id] ?? []).map((note) => (
                                       <div key={note.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, paddingBottom: 8, marginBottom: 8, borderBottom: '1px solid #222' }}>
                                         <div style={{ flex: 1 }}>
-                                          <div style={{ fontSize: 12, color: '#ccc', lineHeight: 1.5 }}>{note.content}</div>
+                                          <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{note.content}</div>
                                           <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 3 }}>{note.createdByName ?? 'Unknown'} · {fmtTs(note.createdAt)}</div>
                                         </div>
                                         {isArAdmin && (
                                           <button onClick={() => handleDeleteInvNote(inv.id, note.id)}
                                             style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 13, padding: '2px 4px', flexShrink: 0 }}
                                             onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                                            onMouseLeave={(e) => (e.currentTarget.style.color = '#555')}>×</button>
+                                            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-faint)')}>×</button>
                                         )}
                                       </div>
                                     ))}
@@ -1760,7 +1760,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                                           value={invNoteText}
                                           onChange={(e) => setInvNoteText(e.target.value)}
                                           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddInvNote(inv.id) } }}
-                                          style={{ flex: 1, background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 7, color: '#ccc', padding: '6px 10px', fontSize: 12, outline: 'none' }}
+                                          style={{ flex: 1, background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 7, color: 'var(--text-secondary)', padding: '6px 10px', fontSize: 12, outline: 'none' }}
                                         />
                                         <button
                                           onClick={() => handleAddInvNote(inv.id)}
@@ -1789,10 +1789,10 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
             <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{invTotal} invoice{invTotal !== 1 ? 's' : ''}</span>
             <div style={{ display: 'flex', gap: 4 }}>
               <button onClick={() => setInvPage((p) => Math.max(1, p - 1))} disabled={invPage === 1}
-                style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: 6, color: invPage === 1 ? '#444' : '#ccc', padding: '4px 10px', fontSize: 12, cursor: invPage === 1 ? 'default' : 'pointer' }}>‹</button>
+                style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: 6, color: invPage === 1 ? 'var(--text-faint)' : 'var(--text-secondary)', padding: '4px 10px', fontSize: 12, cursor: invPage === 1 ? 'default' : 'pointer' }}>‹</button>
               <span style={{ fontSize: 12, color: 'var(--text-muted)', padding: '4px 8px' }}>{invPage} / {invPageCount}</span>
               <button onClick={() => setInvPage((p) => Math.min(invPageCount, p + 1))} disabled={invPage === invPageCount}
-                style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: 6, color: invPage === invPageCount ? '#444' : '#ccc', padding: '4px 10px', fontSize: 12, cursor: invPage === invPageCount ? 'default' : 'pointer' }}>›</button>
+                style={{ background: 'var(--bg-secondary)', border: 'none', borderRadius: 6, color: invPage === invPageCount ? 'var(--text-faint)' : 'var(--text-secondary)', padding: '4px 10px', fontSize: 12, cursor: invPage === invPageCount ? 'default' : 'pointer' }}>›</button>
             </div>
           </div>
         )}
@@ -1827,8 +1827,8 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                   : credits.map((cr) => (
                     <tr key={cr.id} style={{ borderBottom: '1px solid #222', background: 'rgba(255,107,0,0.03)' }}>
                       <td style={{ padding: '9px 12px', fontSize: 12, color: '#ff6b00', whiteSpace: 'nowrap' }}>{cr.invoice_number ?? '—'}</td>
-                      <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc' }}>{cr.entity_code}</td>
-                      <td style={{ padding: '9px 12px', fontSize: 12, color: '#ccc', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-secondary)' }}>{cr.entity_code}</td>
+                      <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                         {cr.branch?.name ?? <span style={{ color: 'var(--text-faint)' }}>{cr.raw_class_code ?? '—'}</span>}
                       </td>
                       <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-muted)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cr.job_name ?? '—'}</td>
@@ -1894,7 +1894,7 @@ function DownloadStatementButton({ customerId }: { customerId: string }) {
         title="Download PDF Statement"
         style={{
           display: 'flex', alignItems: 'center', gap: 6,
-          background: loading ? '#2a2a2a' : '#ff6b00',
+          background: loading ? 'var(--bg-secondary)' : '#ff6b00',
           border: 'none', borderRadius: 8,
           color: 'var(--text-primary)', padding: '6px 14px',
           fontSize: 12, fontWeight: 500,

@@ -140,13 +140,13 @@ export default function ProfitsTab({ role, data, branches, selectedBranchId, all
                       <td style={td}>{formatCurrency(b.revenue)}</td>
                       <td style={td}>{formatCurrency(branchTotalPayroll)}</td>
                       <td style={td}>{formatCurrency(b.fuel)}</td>
-                      <td style={{ ...td, color: b.grossProfit >= 0 ? '#ffffff' : '#cc4444' }}>{formatCurrency(b.grossProfit)}</td>
+                      <td style={{ ...td, color: b.grossProfit >= 0 ? 'var(--text-primary)' : '#cc4444' }}>{formatCurrency(b.grossProfit)}</td>
                       <td style={td}>{formatPercent(b.gpPct)}</td>
                       {allocationOn && <td style={td}>{formatCurrency(b.corpOverhead)}</td>}
                       {allocationOn && <td style={td}>{formatCurrency(b.hqOverhead)}</td>}
                       {allocationOn && <td style={td}>{formatCurrency(b.allocatedFuel ?? 0)}</td>}
                       {allocationOn && (
-                        <td style={{ ...td, color: b.netAfterAlloc >= 0 ? '#ffffff' : '#cc4444', fontWeight: 500 }}>
+                        <td style={{ ...td, color: b.netAfterAlloc >= 0 ? 'var(--text-primary)' : '#cc4444', fontWeight: 500 }}>
                           {formatCurrency(b.netAfterAlloc)}
                         </td>
                       )}
@@ -304,13 +304,13 @@ function GoalsByBranch({
                 return (
                   <tr key={id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ ...td, textAlign: 'left', color: '#ff6b00' }}>{name}</td>
-                    <td style={td}>{revTarget != null ? formatCurrency(revTarget) : <span style={{ color: '#444' }}>—</span>}</td>
+                    <td style={td}>{revTarget != null ? formatCurrency(revTarget) : <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
                     <td style={{ ...td, color: 'var(--text-primary)' }}>{formatCurrency(revActual)}</td>
-                    <td style={{ ...td, color: revDelta != null ? varianceColor(revActual, revTarget!) : '#666' }}>
+                    <td style={{ ...td, color: revDelta != null ? varianceColor(revActual, revTarget!) : 'var(--text-dim)' }}>
                       {revDelta != null ? `${revDelta >= 0 ? '+' : ''}${formatCurrency(revDelta)}` : '—'}
                     </td>
-                    <td style={td}>{gpTarget != null ? `${gpTarget}%` : <span style={{ color: '#444' }}>—</span>}</td>
-                    <td style={{ ...td, color: gpTarget != null ? gpVarianceColor(gpActual, gpTarget) : '#cccccc' }}>
+                    <td style={td}>{gpTarget != null ? `${gpTarget}%` : <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
+                    <td style={{ ...td, color: gpTarget != null ? gpVarianceColor(gpActual, gpTarget) : 'var(--text-secondary)' }}>
                       {formatPercent(gpActual)}
                     </td>
                     <td style={{ ...td, textAlign: 'right' }}>
@@ -329,7 +329,7 @@ function GoalsByBranch({
                   {`${totalRevActual - totalRevTarget >= 0 ? '+' : ''}${formatCurrency(totalRevActual - totalRevTarget)}`}
                 </td>
                 <td style={{ ...td, color: 'var(--text-muted)' }}>{avgGpGoal != null ? `${avgGpGoal}%` : '—'}</td>
-                <td style={{ ...td, fontWeight: 500, color: avgGpGoal != null ? gpVarianceColor(blendedGpActual, avgGpGoal) : '#ffffff' }}>
+                <td style={{ ...td, fontWeight: 500, color: avgGpGoal != null ? gpVarianceColor(blendedGpActual, avgGpGoal) : 'var(--text-primary)' }}>
                   {formatPercent(blendedGpActual)}
                 </td>
                 <td style={{ ...td, textAlign: 'right' }}>{combinedStatus(totalRevActual, totalRevTarget, blendedGpActual, avgGpGoal ?? null)}</td>
