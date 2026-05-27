@@ -16,27 +16,16 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-// Inline script runs synchronously before first paint to prevent FOUC.
-// It reads localStorage and sets data-theme on <html> before React hydrates.
-const themeScript = `
-(function(){
-  try {
-    var t = localStorage.getItem('sn-theme');
-    if (t === 'light' || t === 'dark') {
-      document.documentElement.setAttribute('data-theme', t);
-    }
-  } catch(e) {}
-})();
-`
+// Reads localStorage before first paint so the correct data-theme is applied
+// to <html> synchronously — prevents any flash of wrong theme color.
+const themeScript = `(function(){try{var t=localStorage.getItem('sn-theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();`
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      {/* eslint-disable-next-line @next/next/no-before-interactive-script-outside-document */}
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-      </head>
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.variable}>
+        {/* Must be first child — runs sync before any render to set data-theme */}
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <ThemeProvider>
           <NavigationProgress />
           {children}

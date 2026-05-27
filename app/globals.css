@@ -8,38 +8,44 @@
 
 /* Dark mode (default) */
 :root {
-  --bg-base:       #111111;
-  --bg-nav:        #1a1a1a;
-  --bg-surface:    #1e1e1e;
-  --bg-secondary:  #2a2a2a;
-  --bg-tertiary:   #333333;
-  --border:        #2a2a2a;
+  --bg-base:         #111111;
+  --bg-nav:          #1a1a1a;
+  --bg-surface:      #1e1e1e;
+  --bg-secondary:    #2a2a2a;
+  --bg-tertiary:     #333333;
+  --border:          #2a2a2a;
   --border-emphasis: #333333;
-  --text-primary:  #ffffff;
-  --text-secondary: #cccccc;
-  --text-muted:    #888888;
-  --text-dim:      #666666;
-  --text-faint:    #555555;
-  /* Skeleton */
-  --skeleton-bg:   #2a2a2a;
+  --text-primary:    #ffffff;
+  --text-secondary:  #cccccc;
+  --text-muted:      #888888;
+  --text-dim:        #666666;
+  --text-faint:      #555555;
+  --skeleton-bg:     #2a2a2a;
+  /* sidebar hover */
+  --sidebar-hover-bg: #2a2a2a;
+  /* icon button */
+  --icon-btn-hover:  #333333;
 }
 
 /* Light mode */
 [data-theme="light"] {
-  --bg-base:       #f5f4ef;
-  --bg-nav:        #eeede8;
-  --bg-surface:    #ffffff;
-  --bg-secondary:  #eceae5;
-  --bg-tertiary:   #e2e0da;
-  --border:        #dddbd5;
+  --bg-base:         #f5f4ef;
+  --bg-nav:          #eeede8;
+  --bg-surface:      #ffffff;
+  --bg-secondary:    #eceae5;
+  --bg-tertiary:     #e2e0da;
+  --border:          #dddbd5;
   --border-emphasis: #cccac4;
-  --text-primary:  #1a1a1a;
-  --text-secondary: #4a4a4a;
-  --text-muted:    #717171;
-  --text-dim:      #909090;
-  --text-faint:    #aaa8a3;
-  /* Skeleton */
-  --skeleton-bg:   #e2e0da;
+  --text-primary:    #1a1a1a;
+  --text-secondary:  #4a4a4a;
+  --text-muted:      #717171;
+  --text-dim:        #909090;
+  --text-faint:      #aaa8a3;
+  --skeleton-bg:     #e2e0da;
+  /* sidebar hover */
+  --sidebar-hover-bg: #e2e0da;
+  /* icon button */
+  --icon-btn-hover:  #e2e0da;
 }
 
 @keyframes skeleton-pulse {
@@ -116,4 +122,332 @@ h1, h2 {
 .delta-down {
   font-size: 11px;
   color: #cc4444;
+}
+
+/* ─────────────────────────────────────────────
+   Branch names (always orange — primary nav element)
+───────────────────────────────────────────── */
+.branch-name {
+  color: #ff6b00;
+}
+
+/* ─────────────────────────────────────────────
+   Top nav bar
+───────────────────────────────────────────── */
+.top-nav {
+  background: var(--bg-nav);
+  border-bottom: 1px solid var(--border);
+  height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+}
+
+.nav-item {
+  font-size: 13px;
+  color: #999999;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav-item:hover {
+  color: var(--text-primary);
+}
+
+.nav-item-active {
+  background: #ff6b00;
+  color: #ffffff;
+}
+
+/* ─────────────────────────────────────────────
+   Sidebar
+───────────────────────────────────────────── */
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  border-radius: 8px;
+  color: var(--text-dim);
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+  overflow: hidden;
+}
+
+.sidebar-link:hover {
+  background: var(--sidebar-hover-bg);
+  color: #ff6b00;
+}
+
+.sidebar-link-active {
+  background: #ff6b00 !important;
+  color: #ffffff !important;
+}
+
+.sidebar-link-active:hover {
+  background: #cc5500 !important;
+}
+
+/* ─────────────────────────────────────────────
+   Status pills
+───────────────────────────────────────────── */
+.pill-paid {
+  background: #1a3a1a;
+  color: #4caf50;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.pill-pending {
+  background: #3a2a1a;
+  color: #ff9800;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.pill-overdue {
+  background: #3a1a1a;
+  color: #cc4444;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* ─────────────────────────────────────────────
+   Tables
+───────────────────────────────────────────── */
+.table-header {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.table-body {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+/* ─────────────────────────────────────────────
+   Legal name (employee detail page only)
+───────────────────────────────────────────── */
+.legal-name {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+/* ─────────────────────────────────────────────
+   Icon button
+───────────────────────────────────────────── */
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff6b00;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s;
+}
+
+.icon-btn:hover {
+  background: var(--icon-btn-hover);
+}
+
+/* ─────────────────────────────────────────────
+   Orange CTA button
+───────────────────────────────────────────── */
+.btn-primary {
+  background: #ff6b00;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-primary:hover {
+  background: #cc5500;
+}
+
+/* ─────────────────────────────────────────────
+   Date / filter pill
+───────────────────────────────────────────── */
+.filter-pill {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-emphasis);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+/* ─────────────────────────────────────────────
+   Mobile base
+───────────────────────────────────────────── */
+html {
+  overflow-x: hidden;
+}
+
+/* Eliminate 300ms tap delay on all interactive elements */
+a, button, [role="button"], select, input, label {
+  touch-action: manipulation;
+}
+
+/* Immediate tap feedback — visible before the page transitions */
+a:active, button:active, [role="button"]:active {
+  opacity: 0.7;
+}
+
+/* Tables that can't collapse scroll horizontally */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.filter-pill:hover {
+  border-color: #ff6b00;
+}
+
+.filter-pill-active {
+  border-color: #ff6b00;
+  color: #ff6b00;
+}
+
+/* ─────────────────────────────────────────────
+   Responsive grid utilities
+───────────────────────────────────────────── */
+
+/* 6-col aging summary row → 3-col on mobile */
+.ar-aging-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+}
+
+/* 2-col detail sections → 1-col on mobile */
+.ar-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Show table on desktop, card list on mobile */
+.ar-table-wrap { display: block; }
+.ar-card-list  { display: none;  }
+
+/* Horizontally scrolling tab bar */
+.tab-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.tab-scroll::-webkit-scrollbar { display: none; }
+
+/* Meeting tab: action list left + sidebar right */
+.ar-meeting-grid {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 360px);
+  gap: 16px;
+  align-items: start;
+}
+/* Prevent grid children from overflowing their track */
+.ar-meeting-grid > * {
+  min-width: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 960px) {
+  /* Narrow the right column at mid-screen before stacking */
+  .ar-meeting-grid {
+    grid-template-columns: 1fr minmax(0, 300px);
+  }
+  /* KPI row: 4-col → 2-col at mid-size screens */
+  .dash-metric-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  /* Meeting main grid: side-by-side → stacked */
+  .ar-meeting-grid {
+    grid-template-columns: 1fr;
+  }
+  /* ── Layout ──────────────────────────────────────── */
+  .dashboard-main {
+    padding: 12px !important;
+    padding-bottom: 80px !important;
+  }
+
+  /* ── Metric card grid: 4-col → 2-col ─────────────── */
+  .dash-metric-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* ── AR aging grid: 6-col → 2-col ────────────────── */
+  .ar-aging-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  /* Total AR card spans full width */
+  .ar-aging-grid > :first-child { grid-column: 1 / -1; }
+  /* >90 card (6th) spans full width so no orphan */
+  .ar-aging-grid > :nth-child(6) { grid-column: 1 / -1; }
+
+  /* ── 2-col → 1-col ────────────────────────────────── */
+  .ar-detail-grid { grid-template-columns: 1fr; }
+
+  /* ── Prevent grid overflow ────────────────────────── */
+  .dash-metric-grid > *,
+  .ar-aging-grid > *,
+  .ar-detail-grid > *,
+  .ar-meeting-grid > * { min-width: 0; overflow: hidden; }
+
+  /* ── Customer table ↔ card list ──────────────────── */
+  .ar-table-wrap { display: none; }
+  .ar-card-list  { display: flex; flex-direction: column; gap: 10px; }
+
+  /* ── Page headers stack vertically ───────────────── */
+  .ar-page-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  /* ── Filter row: search full-width, selects in a row */
+  .ar-filter-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+  .ar-filter-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+  }
+  .ar-filter-row > * { flex: 1; min-width: 0; }
+  .ar-filter-search { width: 100% !important; box-sizing: border-box !important; }
+
+  /* ── Cards ────────────────────────────────────────── */
+  .card { padding: 12px; }
+
+  /* ── Tab bar scrolls without clipping ────────────── */
+  .tab-scroll { flex-shrink: 0; }
 }
