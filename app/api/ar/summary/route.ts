@@ -23,9 +23,11 @@ export async function GET(request: Request): Promise<Response> {
     const effectiveBranchIds = role === 'sales' ? null : branchIds
 
     // Build invoice query scoped to user's branch access
+    // Exclude credit memos — credits are informational only, never reduce AR totals
     let query = supabase
       .from('ar_invoices')
       .select('open_balance, aging_bucket, entity_code, branch_id')
+      .eq('row_type', 'invoice')
 
     if (entityCode) query = query.eq('entity_code', entityCode)
 

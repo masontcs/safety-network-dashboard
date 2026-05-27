@@ -125,13 +125,14 @@ const COMMUNICATION_TYPE_OPTIONS = [
 ]
 
 const OUTCOME_OPTIONS = [
-  { value: 'positive',        label: 'Positive',         color: '#4caf50' },
-  { value: 'needs_follow_up', label: 'Needs Follow-Up',  color: '#cc9900' },
-  { value: 'promise_to_pay',  label: 'Promise to Pay',   color: '#ff6b00' },
-  { value: 'no_answer',       label: 'No Answer',        color: '#555555' },
-  { value: 'unproductive',    label: 'Unproductive',     color: '#666666' },
-  { value: 'roadblock',       label: 'Roadblock',        color: '#cc4444' },
-  { value: 'escalated',       label: 'Escalated',        color: '#cc4444' },
+  { value: 'positive',        label: 'Positive',              color: '#4caf50' },
+  { value: 'needs_follow_up', label: 'Needs Follow-Up',       color: '#cc9900' },
+  { value: 'promise_to_pay',  label: 'Promise to Pay',        color: '#ff6b00' },
+  { value: 'tbd',             label: 'TBD – Awaiting Response', color: '#888888' },
+  { value: 'no_answer',       label: 'No Answer',             color: '#555555' },
+  { value: 'unproductive',    label: 'Unproductive',          color: '#666666' },
+  { value: 'roadblock',       label: 'Roadblock',             color: '#cc4444' },
+  { value: 'escalated',       label: 'Escalated',             color: '#cc4444' },
 ]
 
 function getCustomerStatusMeta(v: string) {

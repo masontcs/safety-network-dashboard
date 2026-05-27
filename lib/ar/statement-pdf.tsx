@@ -255,9 +255,10 @@ export function StatementDocument({ data }: { data: StatementData }) {
     .filter((i) => i.rowType === 'credit_memo')
     .sort((a, b) => invoiceNumSortKey(a.invoiceNumber) - invoiceNumSortKey(b.invoiceNumber))
 
-  const totalInvoices = invoices.reduce((s, i) => s + i.openBalance, 0)
-  const totalCredits  = credits.reduce((s, i) => s + i.openBalance, 0)   // negative
-  const netBalance    = totalInvoices + totalCredits
+  const totalInvoices   = invoices.reduce((s, i) => s + i.openBalance, 0)
+  const totalCredits    = credits.reduce((s, i) => s + i.openBalance, 0)   // negative values
+  // Credits are available to apply but do NOT reduce the AR balance we collect on
+  const balanceDue      = totalInvoices
 
   const BUCKETS = ['Current', '1-30', '31-60', '61-90', '>90'] as const
   const aging: Record<string, number> = Object.fromEntries(BUCKETS.map((b) => [b, 0]))
@@ -305,7 +306,7 @@ export function StatementDocument({ data }: { data: StatementData }) {
             ))}
             <View style={s.agingCardTotal}>
               <Text style={s.agingCardLabelTotal}>Total Due</Text>
-              <Text style={s.agingCardAmountTotal}>{fmt(netBalance)}</Text>
+              <Text style={s.agingCardAmountTotal}>{fmt(balanceDue)}</Text>
             </View>
           </View>
 
@@ -376,7 +377,7 @@ export function StatementDocument({ data }: { data: StatementData }) {
             </View>
             {credits.length > 0 && (
               <View style={s.totalLine}>
-                <Text style={s.totalLabel}>Total Credits</Text>
+                <Text style={s.totalLabel}>Available Credits</Text>
                 <Text style={[s.totalAmount, { color: ORANGE }]}>
                   ({fmt(Math.abs(totalCredits))})
                 </Text>
@@ -388,7 +389,7 @@ export function StatementDocument({ data }: { data: StatementData }) {
           <View style={s.balanceDueBlock}>
             <View style={s.balanceDuePill}>
               <Text style={s.balanceDueLabel}>Balance Due</Text>
-              <Text style={s.balanceDueAmount}>{fmt(netBalance)}</Text>
+              <Text style={s.balanceDueAmount}>{fmt(balanceDue)}</Text>
             </View>
           </View>
 

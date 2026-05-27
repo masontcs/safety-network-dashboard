@@ -61,6 +61,7 @@ export async function GET(request: Request): Promise<Response> {
         let q = supabase
           .from('ar_invoices')
           .select('customer_id, open_balance, aging_bucket, row_type')
+          .eq('row_type', 'invoice')  // credits are informational only — never reduce AR totals
           .range(from, from + PAGE_SIZE - 1)
         if (entityCode) q = q.eq('entity_code', entityCode)
         if (arTeamCustomerIds !== null) {

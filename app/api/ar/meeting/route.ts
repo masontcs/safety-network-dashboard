@@ -44,9 +44,11 @@ export async function GET(request: Request): Promise<Response> {
 
     // ── Overall AR: all invoices (not excluded), paginated ──────────────────
 
+    // Exclude credit memos — credits are informational only, never reduce AR totals
     let allInvQuery = supabase
       .from('ar_invoices')
       .select('customer_id, open_balance, aging_bucket')
+      .eq('row_type', 'invoice')
     if (entityCode) allInvQuery = allInvQuery.eq('entity_code', entityCode)
     if (branchIds)  allInvQuery = allInvQuery.in('branch_id', branchIds)
     if (excludedIds.length > 0) allInvQuery = allInvQuery.not('customer_id', 'in', `(${excludedIds.join(',')})`)
