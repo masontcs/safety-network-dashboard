@@ -371,6 +371,8 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
   const [operationNoteText, setOperationNoteText]     = useState('')
   const [addingCollectionNote, setAddingCollectionNote] = useState(false)
   const [addingOperationNote, setAddingOperationNote]   = useState(false)
+  const [collectionNoteError, setCollectionNoteError]   = useState<string | null>(null)
+  const [operationNoteError, setOperationNoteError]     = useState<string | null>(null)
   const [togglingExclude, setTogglingExclude] = useState(false)
   // Collection note form extras
   const [collCommType, setCollCommType]   = useState('')
@@ -643,41 +645,53 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
   const handleAddNote = async (noteType: 'collection' | 'operation') => {
     const text = noteType === 'collection' ? collectionNoteText : operationNoteText
     if (!text.trim()) return
-    if (noteType === 'collection') setAddingCollectionNote(true)
-    else setAddingOperationNote(true)
-    const res = await fetch(`/api/ar/customers/${customer.id}/notes`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        content: text.trim(),
-        noteType,
-        communicationType: noteType === 'collection' ? (collCommType || null) : (opCommType || null),
-        contactName:       noteType === 'collection' ? (collContactName.trim() || null) : (opContactName.trim() || null),
-        outcome:           noteType === 'collection' ? (collOutcome || null) : (opOutcome || null),
-      }),
-    })
-    if (res.ok) {
-      const { note } = await res.json()
-      const noteWithPin = { ...note, isPinned: note.isPinned ?? false }
-      // Realtime may have already inserted this note — deduplicate
-      setProfile((p) => {
-        if (!p) return p
-        if (p.notes.some((n) => n.id === noteWithPin.id)) return p
-        return { ...p, notes: [noteWithPin, ...p.notes] }
+    if (noteType === 'collection') { setAddingCollectionNote(true); setCollectionNoteError(null) }
+    else { setAddingOperationNote(true); setOperationNoteError(null) }
+    try {
+      const res = await fetch(`/api/ar/customers/${customer.id}/notes`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: text.trim(),
+          noteType,
+          communicationType: noteType === 'collection' ? (collCommType || null) : (opCommType || null),
+          contactName:       noteType === 'collection' ? (collContactName.trim() || null) : (opContactName.trim() || null),
+          outcome:           noteType === 'collection' ? (collOutcome || null) : (opOutcome || null),
+        }),
       })
-      if (noteType === 'collection') {
-        setCollectionNoteText('')
-        setCollCommType('')
-        setCollContactName('')
-        setCollOutcome('')
+      if (res.ok) {
+        const { note } = await res.json()
+        const noteWithPin = { ...note, isPinned: note.isPinned ?? false }
+        // Realtime may have already inserted this note — deduplicate
+        setProfile((p) => {
+          if (!p) return p
+          if (p.notes.some((n) => n.id === noteWithPin.id)) return p
+          return { ...p, notes: [noteWithPin, ...p.notes] }
+        })
+        if (noteType === 'collection') {
+          setCollectionNoteText('')
+          setCollCommType('')
+          setCollContactName('')
+          setCollOutcome('')
+        } else {
+          setOperationNoteText('')
+          setOpCommType('')
+          setOpContactName('')
+          setOpOutcome('')
+        }
       } else {
-        setOperationNoteText('')
-        setOpCommType('')
-        setOpContactName('')
-        setOpOutcome('')
+        const json = await res.json().catch(() => ({})) as { error?: string }
+        const msg = json.error ?? `Failed to save note (${res.status})`
+        if (noteType === 'collection') setCollectionNoteError(msg)
+        else setOperationNoteError(msg)
       }
+    } catch {
+      const msg = 'Network error — please try again'
+      if (noteType === 'collection') setCollectionNoteError(msg)
+      else setOperationNoteError(msg)
+    } finally {
+      if (noteType === 'collection') setAddingCollectionNote(false)
+      else setAddingOperationNote(false)
     }
-    if (noteType === 'collection') setAddingCollectionNote(false)
-    else setAddingOperationNote(false)
   }
 
   const handleEditNote = async (noteId: string) => {
@@ -1122,6 +1136,9 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
               {/* Row 3: note text */}
               <textarea placeholder="Add a collection note…" value={collectionNoteText} onChange={(e) => setCollectionNoteText(e.target.value)} rows={3}
                 style={{ width: '100%', background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+              {collectionNoteError && (
+                <div style={{ fontSize: 11, color: '#cc4444', marginBottom: 4 }}>{collectionNoteError}</div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button onClick={() => handleAddNote('collection')} disabled={addingCollectionNote || !collectionNoteText.trim()}
                   style={{ background: '#ff6b00', border: 'none', borderRadius: 6, color: '#fff', padding: '5px 14px', fontSize: 12, cursor: addingCollectionNote || !collectionNoteText.trim() ? 'default' : 'pointer', opacity: addingCollectionNote || !collectionNoteText.trim() ? 0.5 : 1 }}>
@@ -1277,6 +1294,9 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
               {/* Row 3: note text */}
               <textarea placeholder="Add an operation note…" value={operationNoteText} onChange={(e) => setOperationNoteText(e.target.value)} rows={3}
                 style={{ width: '100%', background: '#2a2a2a', border: '1px solid #333', borderRadius: 8, color: '#ccc', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+              {operationNoteError && (
+                <div style={{ fontSize: 11, color: '#cc4444', marginBottom: 4 }}>{operationNoteError}</div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button onClick={() => handleAddNote('operation')} disabled={addingOperationNote || !operationNoteText.trim()}
                   style={{ background: '#ff6b00', border: 'none', borderRadius: 6, color: '#fff', padding: '5px 14px', fontSize: 12, cursor: addingOperationNote || !operationNoteText.trim() ? 'default' : 'pointer', opacity: addingOperationNote || !operationNoteText.trim() ? 0.5 : 1 }}>
