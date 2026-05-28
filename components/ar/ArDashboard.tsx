@@ -20,6 +20,7 @@ interface Customer {
   id: string
   displayName: string
   isExcluded: boolean
+  terms: string | null
   current: number
   d30: number
   d60: number
@@ -305,7 +306,7 @@ export default function ArDashboard({ role, branches }: Props) {
     } else {
       // Customer might not be in the current customers list (e.g. excluded); create a minimal stub
       setSelectedCustomer({
-        id, displayName: name, isExcluded: false,
+        id, displayName: name, isExcluded: false, terms: null,
         current: 0, d30: 0, d60: 0, d90: 0, d90plus: 0, totalAr: 0, invoiceCount: 0,
       })
     }
@@ -527,6 +528,7 @@ export default function ArDashboard({ role, branches }: Props) {
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 <SortTh label="Customer"   sortKey="displayName"  current={sortKey} dir={sortDir} onSort={handleSort} />
+                <th style={{ padding: '10px 12px', fontSize: 11, fontWeight: 400, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>Terms</th>
                 <SortTh label="Current"    sortKey="current"      current={sortKey} dir={sortDir} onSort={handleSort} right />
                 <SortTh label="1–30 days"  sortKey="d30"          current={sortKey} dir={sortDir} onSort={handleSort} right />
                 <SortTh label="31–60 days" sortKey="d60"          current={sortKey} dir={sortDir} onSort={handleSort} right />
@@ -538,21 +540,22 @@ export default function ArDashboard({ role, branches }: Props) {
             </thead>
             <tbody>
               {loadingCustomers ? (
-                <tr><td colSpan={8} style={{ padding: 32, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>Loading…</td></tr>
+                <tr><td colSpan={9} style={{ padding: 32, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>Loading…</td></tr>
               ) : filteredCustomers.length === 0 ? (
-                <tr><td colSpan={8} style={{ padding: 32, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>
+                <tr><td colSpan={9} style={{ padding: 32, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>
                   {customers.length === 0 ? 'No AR data. Import a file to get started.' : 'No customers match your filters.'}
                 </td></tr>
               ) : (
                 filteredCustomers.map((cust) => (
                   <tr key={cust.id} onClick={() => setSelectedCustomer(cust)}
-                    style={{ borderBottom: '1px solid #222', cursor: 'pointer', opacity: cust.isExcluded ? 0.45 : 1 }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#242424')}
+                    style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', opacity: cust.isExcluded ? 0.45 : 1 }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = '')}>
                     <td style={{ padding: '10px 12px', fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap' }}>
                       <span style={{ color: cust.isExcluded ? 'var(--text-faint)' : '#ff6b00' }}>{cust.displayName}</span>
                       {cust.isExcluded && <span style={{ fontSize: 10, color: 'var(--text-faint)', marginLeft: 8, fontWeight: 400 }}>excluded</span>}
                     </td>
+                    <td style={{ padding: '10px 12px', fontSize: 12, color: cust.terms ? 'var(--text-secondary)' : 'var(--text-faint)', whiteSpace: 'nowrap' }}>{cust.terms ?? '—'}</td>
                     <td style={{ padding: '10px 12px', fontSize: 12, color: cust.current > 0 ? 'var(--text-primary)' : 'var(--text-faint)', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.current > 0 ? fmt(cust.current) : '—'}</td>
                     <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d30 > 0 ? BUCKET_COLORS['1-30'] : 'var(--text-faint)', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.d30 > 0 ? fmt(cust.d30) : '—'}</td>
                     <td style={{ padding: '10px 12px', fontSize: 12, color: cust.d60 > 0 ? BUCKET_COLORS['31-60'] : 'var(--text-faint)', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{cust.d60 > 0 ? fmt(cust.d60) : '—'}</td>

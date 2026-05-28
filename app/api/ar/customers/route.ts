@@ -52,7 +52,7 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     // Paginate through all invoices and aggregate by customer
-    type InvRow = { customer_id: string; open_balance: number; aging_bucket: string; row_type: string }
+    type InvRow = { customer_id: string; open_balance: number; aging_bucket: string; row_type: string; terms: string | null }
     const invoices: InvRow[] = []
     {
       const PAGE_SIZE = 1000
@@ -60,7 +60,7 @@ export async function GET(request: Request): Promise<Response> {
       while (true) {
         let q = supabase
           .from('ar_invoices')
-          .select('customer_id, open_balance, aging_bucket, row_type')
+          .select('customer_id, open_balance, aging_bucket, row_type, terms')
           .eq('row_type', 'invoice')  // credits are informational only — never reduce AR totals
           .range(from, from + PAGE_SIZE - 1)
         if (entityCode) q = q.eq('entity_code', entityCode)
@@ -83,7 +83,7 @@ export async function GET(request: Request): Promise<Response> {
     if (invoices.length === 0) return NextResponse.json({ customers: [] })
 
     // Aggregate by customer_id
-    type Agg = { buckets: Record<string, number>; totalAr: number; invoiceCount: number }
+    type Agg = { buckets: Record<string, number>; totalAr: number; invoiceCount: number; terms: string | null }
     const custMap = new Map<string, Agg>()
     for (const inv of invoices) {
       if (!custMap.has(inv.customer_id)) {
@@ -91,6 +91,7 @@ export async function GET(request: Request): Promise<Response> {
           buckets: Object.fromEntries(AGING_BUCKETS.map((b) => [b, 0])),
           totalAr: 0,
           invoiceCount: 0,
+          terms: null,
         })
       }
       const agg = custMap.get(inv.customer_id)!
@@ -98,6 +99,8 @@ export async function GET(request: Request): Promise<Response> {
       if (inv.aging_bucket in agg.buckets) agg.buckets[inv.aging_bucket] += amount
       agg.totalAr += amount
       if (inv.row_type === 'invoice') agg.invoiceCount++
+      // Pick first non-null terms seen (consistent per customer in practice)
+      if (!agg.terms && inv.terms) agg.terms = inv.terms
     }
 
     // Fetch display names and exclusion flags for all customer ids
@@ -119,6 +122,7 @@ export async function GET(request: Request): Promise<Response> {
           id,
           displayName:  nameMap.get(id) ?? '—',
           isExcluded:   excludedSet.has(id),
+          terms:        agg.terms,
           current:      Math.round(agg.buckets['Current'] * 100) / 100,
           d30:          Math.round(agg.buckets['1-30'] * 100) / 100,
           d60:          Math.round(agg.buckets['31-60'] * 100) / 100,
