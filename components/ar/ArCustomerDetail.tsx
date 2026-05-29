@@ -334,6 +334,103 @@ function ContactForm({ customerId, onSaved, onCancel }: { customerId: string; on
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
+// ─── NoteRow — module-level so React never remounts it on parent re-render ─────
+// (Defining a component inside a render function gives it a new identity every
+//  render, which causes React to unmount + remount it and lose textarea focus.)
+
+interface NoteRowProps {
+  n: Note
+  isPinnedSection: boolean
+  editingNoteId: string | null
+  editingNoteContent: string
+  currentUserId: string | null
+  canPin: boolean
+  canDelete: boolean
+  savingNoteEdit: boolean
+  onStartEdit: (noteId: string, content: string) => void
+  onCancelEdit: () => void
+  onContentChange: (val: string) => void
+  onSaveEdit: (noteId: string) => void
+  onPin: (noteId: string, pinned: boolean) => void
+  onDelete: (noteId: string) => void
+}
+
+function NoteRow({
+  n, isPinnedSection, editingNoteId, editingNoteContent, currentUserId,
+  canPin, canDelete, savingNoteEdit,
+  onStartEdit, onCancelEdit, onContentChange, onSaveEdit, onPin, onDelete,
+}: NoteRowProps) {
+  const outcomeMeta = n.outcome ? getOutcomeMeta(n.outcome) : null
+  const isEditing   = editingNoteId === n.id
+  const isOwnNote   = !!currentUserId && n.createdBy === currentUserId
+  return (
+    <div style={{ paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
+      {isEditing ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <textarea
+            autoFocus
+            value={editingNoteContent}
+            onChange={(e) => onContentChange(e.target.value)}
+            rows={3}
+            style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid #ff6b00', borderRadius: 8, color: 'var(--text-secondary)', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+          />
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+            <button onClick={onCancelEdit} style={{ background: 'none', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: 'var(--text-muted)', padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+            <button onClick={() => onSaveEdit(n.id)} disabled={savingNoteEdit || !editingNoteContent.trim()}
+              style={{ background: '#ff6b00', border: 'none', borderRadius: 6, color: 'var(--text-primary)', padding: '4px 12px', fontSize: 12, cursor: savingNoteEdit ? 'default' : 'pointer', opacity: savingNoteEdit || !editingNoteContent.trim() ? 0.6 : 1 }}>
+              {savingNoteEdit ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <div style={{ flex: 1, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{n.content}</div>
+            {isOwnNote && (
+              <button onClick={() => onStartEdit(n.id, n.content)} title="Edit note"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '2px 4px', flexShrink: 0, color: 'var(--text-faint)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6b00')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-faint)')}>✎</button>
+            )}
+            {canPin && (
+              <button onClick={() => onPin(n.id, !n.isPinned)}
+                title={n.isPinned ? 'Unpin note' : 'Pin note to top'}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: '2px 4px', flexShrink: 0, color: isPinnedSection ? '#ff6b00' : 'var(--text-faint)', transition: 'color 0.15s' }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6b00')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = isPinnedSection ? '#ff6b00' : 'var(--text-faint)')}>
+                📌
+              </button>
+            )}
+            {canDelete && (
+              <button onClick={() => onDelete(n.id)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-faint)')}>×</button>
+            )}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 5 }}>
+            {outcomeMeta && (
+              <span style={{ fontSize: 10, fontWeight: 600, color: outcomeMeta.color, background: `${outcomeMeta.color}18`, borderRadius: 4, padding: '1px 6px' }}>
+                {outcomeMeta.label}
+              </span>
+            )}
+            {n.communicationType && (
+              <span style={{ fontSize: 10, color: 'var(--text-dim)', background: 'var(--bg-secondary)', borderRadius: 4, padding: '1px 6px' }}>
+                {getCommTypeLabel(n.communicationType)}
+              </span>
+            )}
+            {n.contactName && <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>w/ {n.contactName}</span>}
+            <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 'auto' }}>
+              {n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}
+              {n.editedAt && <span style={{ color: 'var(--text-faint)', fontStyle: 'italic' }}> · edited</span>}
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function ArCustomerDetail({ customer, entity, branchId: initialBranchId, branchName: initialBranchName, role, branches, onBack, onRefresh }: Props) {
   const isAdmin            = role === 'admin'
   const isArAdmin          = role === 'admin' || role === 'ar_manager' || role === 'ar_team'
@@ -1155,79 +1252,19 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                 const shown    = unpinned.slice(0, 5)
                 const extra    = unpinned.length - shown.length
 
-                const NoteRow = ({ n, isPinnedSection }: { n: typeof allCollection[0]; isPinnedSection: boolean }) => {
-                  const outcomeMeta = n.outcome ? getOutcomeMeta(n.outcome) : null
-                  const isEditing   = editingNoteId === n.id
-                  const isOwnNote   = !!currentUserId && n.createdBy === currentUserId
-                  return (
-                    <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
-                      {isEditing ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          <textarea
-                            autoFocus
-                            value={editingNoteContent}
-                            onChange={(e) => setEditingNoteContent(e.target.value)}
-                            rows={3}
-                            style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid #ff6b00', borderRadius: 8, color: 'var(--text-secondary)', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
-                          />
-                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                            <button onClick={() => setEditingNoteId(null)} style={{ background: 'none', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: 'var(--text-muted)', padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
-                            <button onClick={() => handleEditNote(n.id)} disabled={savingNoteEdit || !editingNoteContent.trim()}
-                              style={{ background: '#ff6b00', border: 'none', borderRadius: 6, color: 'var(--text-primary)', padding: '4px 12px', fontSize: 12, cursor: savingNoteEdit ? 'default' : 'pointer', opacity: savingNoteEdit || !editingNoteContent.trim() ? 0.6 : 1 }}>
-                              {savingNoteEdit ? 'Saving…' : 'Save'}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                            <div style={{ flex: 1, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{n.content}</div>
-                            {isOwnNote && (
-                              <button
-                                onClick={() => { setEditingNoteId(n.id); setEditingNoteContent(n.content) }}
-                                title="Edit note"
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '2px 4px', flexShrink: 0, color: 'var(--text-faint)' }}
-                                onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6b00')}
-                                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-faint)')}>✎</button>
-                            )}
-                            {isArAdmin && (
-                              <>
-                                <button
-                                  onClick={() => handlePinNote(n.id, !n.isPinned)}
-                                  title={n.isPinned ? 'Unpin note' : 'Pin note to top'}
-                                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, padding: '2px 4px', flexShrink: 0, color: isPinnedSection ? '#ff6b00' : 'var(--text-faint)', transition: 'color 0.15s' }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6b00')}
-                                  onMouseLeave={(e) => (e.currentTarget.style.color = isPinnedSection ? '#ff6b00' : 'var(--text-faint)')}>
-                                  📌
-                                </button>
-                                <button onClick={() => handleDeleteNote(n.id)}
-                                  style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-faint)')}>×</button>
-                              </>
-                            )}
-                          </div>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 5 }}>
-                            {outcomeMeta && (
-                              <span style={{ fontSize: 10, fontWeight: 600, color: outcomeMeta.color, background: `${outcomeMeta.color}18`, borderRadius: 4, padding: '1px 6px' }}>
-                                {outcomeMeta.label}
-                              </span>
-                            )}
-                            {n.communicationType && (
-                              <span style={{ fontSize: 10, color: 'var(--text-dim)', background: 'var(--bg-secondary)', borderRadius: 4, padding: '1px 6px' }}>
-                                {getCommTypeLabel(n.communicationType)}
-                              </span>
-                            )}
-                            {n.contactName && <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>w/ {n.contactName}</span>}
-                            <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 'auto' }}>
-                              {n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}
-                              {n.editedAt && <span style={{ color: 'var(--text-faint)', fontStyle: 'italic' }}> · edited</span>}
-                            </span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )
+                const noteRowSharedProps = {
+                  editingNoteId,
+                  editingNoteContent,
+                  currentUserId,
+                  canPin: isArAdmin,
+                  canDelete: isArAdmin,
+                  savingNoteEdit,
+                  onStartEdit: (id: string, content: string) => { setEditingNoteId(id); setEditingNoteContent(content) },
+                  onCancelEdit: () => setEditingNoteId(null),
+                  onContentChange: (val: string) => setEditingNoteContent(val),
+                  onSaveEdit: handleEditNote,
+                  onPin: handlePinNote,
+                  onDelete: handleDeleteNote,
                 }
 
                 if (allCollection.length === 0) return <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>No collection notes yet.</div>
@@ -1240,13 +1277,13 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                           <span style={{ fontSize: 11, color: '#ff6b00', fontWeight: 500 }}>📌 Pinned</span>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                          {pinned.map((n) => <NoteRow key={n.id} n={n} isPinnedSection />)}
+                          {pinned.map((n) => <NoteRow key={n.id} n={n} isPinnedSection {...noteRowSharedProps} />)}
                         </div>
                       </div>
                     )}
                     {/* ── Recent notes ── */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {shown.map((n) => <NoteRow key={n.id} n={n} isPinnedSection={false} />)}
+                      {shown.map((n) => <NoteRow key={n.id} n={n} isPinnedSection={false} {...noteRowSharedProps} />)}
                     </div>
                     {extra > 0 && (
                       <div style={{ fontSize: 11, color: 'var(--text-faint)', textAlign: 'center', paddingTop: 8 }}>
@@ -1313,70 +1350,25 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                 if (shown.length === 0) return <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>No operation notes yet.</div>
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {shown.map((n) => {
-                      const outcomeMeta = n.outcome ? getOutcomeMeta(n.outcome) : null
-                      const isEditing   = editingNoteId === n.id
-                      const isOwnNote   = !!currentUserId && n.createdBy === currentUserId
-                      return (
-                        <div key={n.id} style={{ paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
-                          {isEditing ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                              <textarea
-                                autoFocus
-                                value={editingNoteContent}
-                                onChange={(e) => setEditingNoteContent(e.target.value)}
-                                rows={3}
-                                style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid #ff6b00', borderRadius: 8, color: 'var(--text-secondary)', padding: '8px 10px', fontSize: 12, outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
-                              />
-                              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                                <button onClick={() => setEditingNoteId(null)} style={{ background: 'none', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: 'var(--text-muted)', padding: '4px 12px', fontSize: 12, cursor: 'pointer' }}>Cancel</button>
-                                <button onClick={() => handleEditNote(n.id)} disabled={savingNoteEdit || !editingNoteContent.trim()}
-                                  style={{ background: '#ff6b00', border: 'none', borderRadius: 6, color: 'var(--text-primary)', padding: '4px 12px', fontSize: 12, cursor: savingNoteEdit ? 'default' : 'pointer', opacity: savingNoteEdit || !editingNoteContent.trim() ? 0.6 : 1 }}>
-                                  {savingNoteEdit ? 'Saving…' : 'Save'}
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <>
-                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                                <div style={{ flex: 1, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{n.content}</div>
-                                {isOwnNote && (
-                                  <button
-                                    onClick={() => { setEditingNoteId(n.id); setEditingNoteContent(n.content) }}
-                                    title="Edit note"
-                                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, padding: '2px 4px', flexShrink: 0, color: 'var(--text-faint)' }}
-                                    onMouseEnter={(e) => (e.currentTarget.style.color = '#ff6b00')}
-                                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-faint)')}>✎</button>
-                                )}
-                                {isAdmin && (
-                                  <button onClick={() => handleDeleteNote(n.id)}
-                                    style={{ background: 'none', border: 'none', color: 'var(--text-faint)', cursor: 'pointer', fontSize: 14, padding: '2px 4px', flexShrink: 0 }}
-                                    onMouseEnter={(e) => (e.currentTarget.style.color = '#cc4444')}
-                                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-faint)')}>×</button>
-                                )}
-                              </div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 5 }}>
-                                {outcomeMeta && (
-                                  <span style={{ fontSize: 10, fontWeight: 600, color: outcomeMeta.color, background: `${outcomeMeta.color}18`, borderRadius: 4, padding: '1px 6px' }}>
-                                    {outcomeMeta.label}
-                                  </span>
-                                )}
-                                {n.communicationType && (
-                                  <span style={{ fontSize: 10, color: 'var(--text-dim)', background: 'var(--bg-secondary)', borderRadius: 4, padding: '1px 6px' }}>
-                                    {getCommTypeLabel(n.communicationType)}
-                                  </span>
-                                )}
-                                {n.contactName && <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>w/ {n.contactName}</span>}
-                                <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 'auto' }}>
-                                  {n.createdByName ?? 'Unknown'} · {fmtTs(n.createdAt)}
-                                  {n.editedAt && <span style={{ color: 'var(--text-faint)', fontStyle: 'italic' }}> · edited</span>}
-                                </span>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      )
-                    })}
+                    {shown.map((n) => (
+                      <NoteRow
+                        key={n.id}
+                        n={n}
+                        isPinnedSection={false}
+                        editingNoteId={editingNoteId}
+                        editingNoteContent={editingNoteContent}
+                        currentUserId={currentUserId}
+                        canPin={false}
+                        canDelete={isAdmin}
+                        savingNoteEdit={savingNoteEdit}
+                        onStartEdit={(id, content) => { setEditingNoteId(id); setEditingNoteContent(content) }}
+                        onCancelEdit={() => setEditingNoteId(null)}
+                        onContentChange={(val) => setEditingNoteContent(val)}
+                        onSaveEdit={handleEditNote}
+                        onPin={handlePinNote}
+                        onDelete={handleDeleteNote}
+                      />
+                    ))}
                     {extra > 0 && (
                       <div style={{ fontSize: 11, color: 'var(--text-faint)', textAlign: 'center', paddingTop: 2 }}>
                         {extra} older note{extra !== 1 ? 's' : ''} not shown
