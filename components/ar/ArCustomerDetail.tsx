@@ -581,7 +581,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
 
   useEffect(() => {
     if (!isArAdmin) return
-    fetch('/api/ar/team-members')
+    fetch('/api/ar/ar-users')
       .then((r) => r.json())
       .then((d) => setArTeamUsers(d.users ?? []))
   }, [isArAdmin])
