@@ -409,7 +409,7 @@ export default function ArDashboard({ role, branches }: Props) {
               ))}
             </div>
           )}
-          {isAdmin && (
+          {isArAdmin && (
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 onClick={() => setShowImport(true)}
