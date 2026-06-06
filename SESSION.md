@@ -1,5 +1,5 @@
 # SESSION.md — Safety Network Operations Dashboard
-## Last updated: May 26, 2026 — Session: Fuel card employee linking + health check fixes + AR features
+## Last updated: June 2, 2026 — Session: Light/dark mode, AR bugs + fixes, ar_manager import access
 
 ## PRODUCTION URL
 **https://safety-network-dashboard.vercel.app/login**
@@ -93,6 +93,7 @@ project_manager  → Scoped to AR customers in their assigned branches
 - [x] `PATCH /api/ar/customers/[id]/exclude` — admin/ar_manager only; toggles is_excluded
 - [x] `GET|POST /api/ar/customers/[id]/credits`
 - [x] `GET /api/ar/team-members` — returns users with active ar_customer_assignments (for filter dropdown)
+- [x] `GET /api/ar/ar-users` — returns ALL users with ar_team/ar_manager/office_team roles; used by customer detail assignment dropdown; accessible to admin/executive/ar_manager/ar_team
 - [x] `POST /api/ar/payments/import` (streaming NDJSON) — imports QB payment export; fuzzy name matching; shows unmatched names in summary
 - [x] `PATCH /api/ar/invoices/[id]/date` — ar_team can override invoice dates (persisted)
 - [x] `GET /api/ar/customers/[id]/assignments` — shows AR team members assigned to customer
@@ -146,18 +147,19 @@ project_manager  → Scoped to AR customers in their assigned branches
 
 ### Frontend — AR Module
 
-- [x] `ArDashboard` — aging summary KPI cards; aging bar chart; customer list (sortable, paginated); entity / branch / assigned AR team member filter bar with filter bubble display; clear button resets all filters
+- [x] `ArDashboard` — aging summary KPI cards; aging bar chart; customer list (sortable, paginated); entity / branch / assigned AR team member filter bar with filter bubble display; clear button resets all filters; **Terms column** in customer table
 - [x] `ArCustomerDetail` — full customer detail page with filter context bubble (entity + branch inherited from list, independently adjustable or clearable); tabs: Invoices, Payments, Credits, Contacts, Notes
   - Invoices tab: sortable table; persistent date override (ar_team can edit invoice dates); invoice flags/notes; PDF statement download
   - Payments tab: payment history table
-  - Credits tab: credit memos table
+  - Credits tab: credit memos table; credits displayed as informational pill in aging strip (never deducted from AR totals)
   - Contacts tab: contact list + add contact form
-  - Notes tab: operation notes + meeting notes; role-scoped write; inline edit
+  - Notes tab: operation notes + collection notes; role-scoped write; inline edit (focus-loss bug fixed — NoteRow extracted to module level)
 - [x] AR Meeting Dashboard — real-time aggregate AR view for management meetings; aging totals unaffected by collection phase filter
 - [x] AR Customer Exclusion — admin/ar_manager can hide internal/in-house customers from all AR data
 - [x] Realtime updates via Supabase Realtime — live AR updates across all users
 - [x] AR Statement PDF — Apple-style clean layout; download from customer detail
 - [x] Customer merge UI
+- [x] Light/dark mode toggle — sidebar toggle; CSS custom properties (`data-theme` on `<html>`); FOUC prevention inline script; preference persisted in localStorage; `ThemeProvider` wraps app in layout
 
 ### Frontend — Admin Tools
 
@@ -270,6 +272,51 @@ A cold code review identified 12 bugs. All were fixed across 5 passes:
 - **`guardAdminOrExecutive` helper:** Added to `lib/api/auth.ts` — used by 7 routes: `allocations`, `allocations/pending-count`, `data-explorer/payroll`, `data-explorer/revenue`, `data-explorer/fuel`, `data-explorer/export`, (import history uses `guardAdminOnly`)
 - **Branch ID validation on access request approval:** `app/api/admin/access-requests/[id]/route.ts` — validates all `branchIds` against the `branches` table before creating accounts; returns 400 with specific invalid IDs if any are bogus
 - **Role validation and scoping fixes:** `office_team` role now correctly scoped to assigned customers; UTC date parsing fixes; additional role guards
+
+---
+
+## 3b-2. RECENT CHANGES (May 27 – June 2, 2026) — Light/dark mode, AR bug fixes, role access
+
+### Light / Dark Mode
+
+- `lib/theme/ThemeContext.tsx` (new) — `ThemeProvider` + `useTheme` hook; stores preference in localStorage under `sn-theme`; sets `data-theme` attribute on `<html>`
+- `app/globals.css` — full CSS custom property system (`:root` dark defaults + `[data-theme="light"]` overrides); all hardcoded hex colors replaced with variables: `--bg-base`, `--bg-surface`, `--bg-secondary`, `--bg-nav`, `--border`, `--border-emphasis`, `--text-primary/secondary/muted/dim/faint`
+- `app/layout.tsx` — FOUC prevention inline script (reads localStorage before React hydrates); `suppressHydrationWarning` on `<html>`; wraps app in `ThemeProvider`
+- `components/layout/Sidebar.tsx` — sun/moon toggle button above Sign Out; calls `useTheme()`
+- `components/layout/TopNav.tsx` — logo gets `brightness(0)` filter in light mode (white logo stays visible)
+- `components/ui/MetricCard.tsx` — ternary color expressions fixed to use CSS variables (hero card always uses explicit white on orange)
+- `components/charts/BarChart.tsx`, `WeeklyChart.tsx`, `TrendLineChart.tsx`, `WaterfallChart.tsx` — tooltip backgrounds, tick fills, grid strokes all use CSS variables
+
+### AR: Credits Informational Only
+
+- `app/api/ar/customers/route.ts` — credits (row_type = 'credit_memo') never reduce AR totals; only invoices summed
+- `components/ar/ArCustomerDetail.tsx` — credits shown as orange pill in aging strip ("Credits: $X / N memos") when present; not subtracted from totals
+
+### AR: Terms Column
+
+- `app/api/ar/customers/route.ts` — `terms` added to invoice select; first non-null terms per customer tracked in aggregation loop
+- `components/ar/ArDashboard.tsx` — Terms column added to customer table; non-sortable
+
+### AR: TBD Outcome Fix
+
+- `supabase/migrations/20260528000001_ar_notes_outcome_add_tbd.sql` (new) — drops and recreates `ar_customer_notes_outcome_check` constraint to include `'tbd'`
+- App-level `VALID_OUTCOMES` list already included `'tbd'`; DB constraint was the missing piece
+- **This migration must be applied manually in Supabase SQL Editor if not yet applied**
+
+### AR: Note Edit Focus-Loss Fix
+
+- `components/ar/ArCustomerDetail.tsx` — `NoteRow` was defined inside the render function (IIFE + inline `.map()` callback), giving it a new React identity on every render and causing textarea unmount/remount on each keystroke
+- Fix: `NoteRow` moved to module level with full `NoteRowProps` interface; both collection notes and operation notes sections now use the module-level component
+
+### AR: Assignment Dropdown Always Empty Fix
+
+- Root cause: `ArCustomerDetail` fetched `/api/ar/team-members` but read `d.users` (route returns `d.members`); additionally that route only returns users with existing assignments, not all eligible users; and its guard blocked `ar_team` users
+- `app/api/ar/ar-users/route.ts` (new) — queries all `user_profiles` with `ar_team/ar_manager/office_team` roles; returns `{ users: [{id, displayName, role}] }`; accessible to admin/executive/ar_manager/ar_team
+- `components/ar/ArCustomerDetail.tsx` — switched to `/api/ar/ar-users`
+
+### AR: ar_manager Can Import AR Reports
+
+- `components/ar/ArDashboard.tsx` — "Import AR" button gate changed from `isAdmin` → `isArAdmin` (admin + executive + ar_manager); API routes already permitted ar_manager via `guardArAdminOnly`
 
 ---
 
@@ -441,6 +488,7 @@ npx vitest run
 - AR migrations — ar_customers, ar_invoices, ar_imports, ar_customer_assignments, ar_customer_contacts, ar_customer_notes, ar_customer_payments, ar_credits, ar_class_codes (applied to production)
 - Role constraint migration — expanded CHECK on user_profiles.role for new roles
 - Username migration — username column on user_profiles
+- `20260528000001` — add 'tbd' to ar_customer_notes outcome CHECK constraint (**apply manually if not yet done**)
 
 ---
 
