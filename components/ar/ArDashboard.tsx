@@ -6,6 +6,7 @@ import type { Role } from '@/lib/supabase/database.types'
 import ArImportModal from './ArImportModal'
 import ArCustomerDetail from './ArCustomerDetail'
 import ArMeetingDashboard from './ArMeetingDashboard'
+import ArPromisesView from './ArPromisesView'
 import { createBrowserClient } from '@/lib/supabase/client'
 
 interface Branch { id: string; name: string }
@@ -51,7 +52,7 @@ interface TeamMember { id: string; displayName: string }
 
 interface Props { role: Role; branches: Branch[] }
 
-type ViewMode = 'ar' | 'meeting'
+type ViewMode = 'ar' | 'meeting' | 'promises'
 type SortKey = 'displayName' | 'current' | 'd30' | 'd60' | 'd90' | 'd90plus' | 'totalAr' | 'invoiceCount'
 type SortDir = 'asc' | 'desc'
 
@@ -194,6 +195,11 @@ export default function ArDashboard({ role, branches }: Props) {
 
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [showImport, setShowImport]               = useState(false)
+  const [currentUserId, setCurrentUserId]         = useState<string | null>(null)
+
+  useEffect(() => {
+    createBrowserClient().auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null))
+  }, [])
 
   // Fetch AR team members for the assignee dropdown (admin/exec/ar_manager only)
   useEffect(() => {
@@ -377,25 +383,43 @@ export default function ArDashboard({ role, branches }: Props) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {role === 'ar_team' ? (
-            /* ar_team: My Customers / All AR scope toggle */
-            <div style={{ display: 'flex', background: 'var(--bg-secondary)', borderRadius: 8, padding: 3, gap: 2 }}>
-              {([false, true] as const).map((all) => (
-                <button key={String(all)} onClick={() => setShowAll(all)}
-                  style={{
-                    background: showAll === all ? '#ff6b00' : 'transparent',
-                    color: showAll === all ? 'var(--text-primary)' : 'var(--text-muted)',
-                    border: 'none', borderRadius: 6,
-                    padding: '5px 14px', fontSize: 12, fontWeight: 500,
-                    cursor: 'pointer',
-                  }}>
-                  {all ? 'All AR' : 'My Customers'}
-                </button>
-              ))}
+            /* ar_team: scope toggle (My Customers / All AR) + Promises tab */
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {view !== 'promises' && (
+                <div style={{ display: 'flex', background: 'var(--bg-secondary)', borderRadius: 8, padding: 3, gap: 2 }}>
+                  {([false, true] as const).map((all) => (
+                    <button key={String(all)} onClick={() => setShowAll(all)}
+                      style={{
+                        background: showAll === all ? '#ff6b00' : 'transparent',
+                        color: showAll === all ? 'var(--text-primary)' : 'var(--text-muted)',
+                        border: 'none', borderRadius: 6,
+                        padding: '5px 14px', fontSize: 12, fontWeight: 500,
+                        cursor: 'pointer',
+                      }}>
+                      {all ? 'All AR' : 'My Customers'}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', background: 'var(--bg-secondary)', borderRadius: 8, padding: 3, gap: 2 }}>
+                {(['ar', 'promises'] as ViewMode[]).map((v) => (
+                  <button key={v} onClick={() => setView(v)}
+                    style={{
+                      background: view === v ? '#ff6b00' : 'transparent',
+                      color: view === v ? 'var(--text-primary)' : 'var(--text-muted)',
+                      border: 'none', borderRadius: 6,
+                      padding: '5px 14px', fontSize: 12, fontWeight: 500,
+                      cursor: 'pointer',
+                    }}>
+                    {v === 'ar' ? 'AR' : 'Promises'}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
-            /* other roles: AR / Meeting view toggle */
+            /* other roles: AR / Meeting / Promises view toggle */
             <div style={{ display: 'flex', background: 'var(--bg-secondary)', borderRadius: 8, padding: 3, gap: 2 }}>
-              {(['ar', 'meeting'] as ViewMode[]).map((v) => (
+              {(['ar', 'meeting', 'promises'] as ViewMode[]).map((v) => (
                 <button key={v} onClick={() => setView(v)}
                   style={{
                     background: view === v ? '#ff6b00' : 'transparent',
@@ -404,7 +428,7 @@ export default function ArDashboard({ role, branches }: Props) {
                     padding: '5px 14px', fontSize: 12, fontWeight: 500,
                     cursor: 'pointer',
                   }}>
-                  {v === 'ar' ? 'AR' : 'Meeting'}
+                  {v === 'ar' ? 'AR' : v === 'meeting' ? 'Meeting' : 'Promises'}
                 </button>
               ))}
             </div>
@@ -437,6 +461,10 @@ export default function ArDashboard({ role, branches }: Props) {
           entity={entity}
           onSelectCustomer={handleMeetingSelectCustomer}
         />
+      )}
+
+      {view === 'promises' && (
+        <ArPromisesView role={role} currentUserId={currentUserId} />
       )}
 
       {view === 'ar' && <>
