@@ -19,6 +19,8 @@ export type AuditAction =
   | 'ar.note.edit'
   | 'ar.note.delete'
   | 'ar.invoice.flag'
+  | 'ar.invoice.void'
+  | 'ar.invoice.unvoid'
   | 'ar.customer.update'
   // Payroll data access
   | 'payroll.view'

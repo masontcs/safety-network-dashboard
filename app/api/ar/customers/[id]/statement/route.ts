@@ -57,6 +57,8 @@ export async function GET(
         branch:branches(name)
       `)
       .eq('customer_id', id)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .eq('is_voided' as any, false)
       .order('invoice_date', { ascending: false })
     if (rowErr) {
       return NextResponse.json({ error: 'Failed to load line items' }, { status: 500 })

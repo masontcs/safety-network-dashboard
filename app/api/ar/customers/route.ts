@@ -62,6 +62,8 @@ export async function GET(request: Request): Promise<Response> {
           .from('ar_invoices')
           .select('customer_id, open_balance, aging_bucket, row_type, terms')
           .eq('row_type', 'invoice')  // credits are informational only — never reduce AR totals
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .eq('is_voided' as any, false)  // manually voided invoices excluded until QB catches up
           .range(from, from + PAGE_SIZE - 1)
         if (entityCode) q = q.eq('entity_code', entityCode)
         if (arTeamCustomerIds !== null) {

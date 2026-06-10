@@ -41,6 +41,7 @@ interface Invoice {
   job_name: string | null; invoice_date: string | null; due_date: string | null; terms: string | null
   open_balance: number; aging_bucket: string; aging_days: number | null; raw_class_code: string | null
   invoice_status: string | null
+  is_voided: boolean; voided_at: string | null
   branch: { id: string; name: string } | null
 }
 
@@ -434,6 +435,7 @@ function NoteRow({
 export default function ArCustomerDetail({ customer, entity, branchId: initialBranchId, branchName: initialBranchName, role, branches, onBack, onRefresh }: Props) {
   const isAdmin            = role === 'admin'
   const isArAdmin          = role === 'admin' || role === 'ar_manager' || role === 'ar_team'
+  const canVoid            = role === 'admin' || role === 'executive' || role === 'ar_manager' || role === 'ar_team'
   // AR team/manager + executive + admin can change all customer statuses and mark as excluded
   const canManageStatuses  = role === 'admin' || role === 'executive' || role === 'ar_manager' || role === 'ar_team'
   const canManagePMs       = role === 'admin' || role === 'executive' || role === 'district_manager' || role === 'branch_manager'
@@ -849,6 +851,21 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
       body: JSON.stringify({ invoiceStatus: status || null }),
     })
     setInvoices((prev) => prev.map((inv) => inv.id === invoiceId ? { ...inv, invoice_status: status || null } : inv))
+  }
+
+  const handleVoidInvoice = async (invoiceId: string, void_: boolean) => {
+    const res = await fetch(`/api/ar/invoices/${invoiceId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isVoided: void_ }),
+    })
+    if (res.ok) {
+      setInvoices((prev) => prev.map((inv) =>
+        inv.id === invoiceId
+          ? { ...inv, is_voided: void_, voided_at: void_ ? new Date().toISOString() : null }
+          : inv
+      ))
+      onRefresh()
+    }
   }
 
   const handleAddInvNote = async (invoiceId: string) => {
@@ -1595,34 +1612,40 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
               {invLoading ? <tr><td colSpan={12} style={{ padding: 32, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>Loading…</td></tr>
                 : invoices.length === 0 ? <tr><td colSpan={12} style={{ padding: 32, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>No invoices found</td></tr>
                 : invoices.map((inv) => {
-                  const isExpanded   = expandedInvId === inv.id
+                  const isExpanded    = expandedInvId === inv.id
                   const invStatusMeta = inv.invoice_status ? getInvStatusMeta(inv.invoice_status) : null
-                  const loadedNotes  = invNotes[inv.id]
-                  const noteCount    = loadedNotes?.length ?? 0
+                  const loadedNotes   = invNotes[inv.id]
+                  const noteCount     = loadedNotes?.length ?? 0
+                  const voided        = inv.is_voided
+                  const dimText       = voided ? 'var(--text-faint)' : 'var(--text-secondary)'
+                  const dimMuted      = voided ? 'var(--text-faint)' : 'var(--text-muted)'
 
                   return (
                     <React.Fragment key={inv.id}>
                       <tr
-                        style={{ borderBottom: isExpanded ? 'none' : '1px solid #222', cursor: 'pointer', background: isExpanded ? 'var(--bg-nav)' : 'transparent' }}
+                        style={{ borderBottom: isExpanded ? 'none' : '1px solid var(--border)', cursor: 'pointer', background: voided ? 'rgba(0,0,0,0.12)' : isExpanded ? 'var(--bg-nav)' : 'transparent', opacity: voided ? 0.6 : 1 }}
                         onClick={() => handleToggleInv(inv.id)}>
                         {/* Chevron */}
                         <td style={{ padding: '9px 8px 9px 12px', fontSize: 11, color: 'var(--text-faint)' }}>
                           <span style={{ display: 'inline-block', transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s', userSelect: 'none' }}>▶</span>
                         </td>
-                        <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: dimText, whiteSpace: 'nowrap' }}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            {inv.invoice_number ?? '—'}
+                            <span style={{ textDecoration: voided ? 'line-through' : 'none' }}>{inv.invoice_number ?? '—'}</span>
+                            {voided && (
+                              <span style={{ background: 'rgba(136,136,136,0.15)', color: 'var(--text-faint)', borderRadius: 3, fontSize: 9, fontWeight: 700, padding: '1px 5px', letterSpacing: '0.05em' }}>VOID</span>
+                            )}
                             {noteCount > 0 && (
                               <span style={{ background: '#ff6b00', color: 'var(--text-primary)', borderRadius: 10, fontSize: 9, fontWeight: 700, padding: '1px 5px', lineHeight: 1.4 }}>{noteCount}</span>
                             )}
                           </span>
                         </td>
-                        <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-secondary)' }}>{inv.entity_code}</td>
-                        <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: dimText }}>{inv.entity_code}</td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: dimText, whiteSpace: 'nowrap' }}>
                           {inv.branch?.name ?? <span style={{ color: 'var(--text-faint)' }}>{inv.raw_class_code ?? '—'}</span>}
                         </td>
-                        <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-muted)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.job_name ?? '—'}</td>
-                        <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-muted)' }}>{inv.po_number ?? '—'}</td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: dimMuted, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inv.job_name ?? '—'}</td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: dimMuted }}>{inv.po_number ?? '—'}</td>
                         {/* Invoice Date — editable by ar_admin roles */}
                         <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                           {isArAdmin && inv.invoice_number && editingDateInvId === inv.id ? (
@@ -1692,7 +1715,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                         <td style={{ padding: '9px 12px', fontSize: 12, whiteSpace: 'nowrap' }}>
                           <span style={{ background: `${BUCKET_COLORS[inv.aging_bucket] ?? 'var(--border-emphasis)'}22`, color: BUCKET_COLORS[inv.aging_bucket] ?? 'var(--text-muted)', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>{inv.aging_bucket}</span>
                         </td>
-                        <td style={{ padding: '9px 12px', fontSize: 12, color: 'var(--text-primary)', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmt(Number(inv.open_balance))}</td>
+                        <td style={{ padding: '9px 12px', fontSize: 12, color: voided ? 'var(--text-faint)' : 'var(--text-primary)', textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', textDecoration: voided ? 'line-through' : 'none' }}>{fmt(Number(inv.open_balance))}</td>
                       </tr>
 
                       {/* ── Expanded invoice panel ── */}
@@ -1702,8 +1725,37 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                             <div style={{ background: 'var(--bg-surface)', padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}
                               onClick={(e) => e.stopPropagation()}>
 
-                              {/* Invoice status row */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              {/* Invoice status + void row */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+
+                                {/* Void control */}
+                                {canVoid && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span style={{ fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Void</span>
+                                    {voided ? (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span style={{ fontSize: 11, color: 'var(--text-faint)', fontStyle: 'italic' }}>
+                                          Voided {inv.voided_at ? fmtDate(inv.voided_at.split('T')[0]) : ''}
+                                        </span>
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); handleVoidInvoice(inv.id, false) }}
+                                          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: 'var(--text-muted)', padding: '3px 10px', fontSize: 11, cursor: 'pointer' }}>
+                                          Unvoid
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleVoidInvoice(inv.id, true) }}
+                                        style={{ background: 'rgba(136,136,136,0.1)', border: '1px solid var(--border-emphasis)', borderRadius: 6, color: 'var(--text-muted)', padding: '3px 10px', fontSize: 11, cursor: 'pointer' }}
+                                        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(204,68,68,0.12)'; e.currentTarget.style.color = '#cc4444'; e.currentTarget.style.borderColor = '#663333' }}
+                                        onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(136,136,136,0.1)'; e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border-emphasis)' }}>
+                                        Mark Void
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                 <span style={{ fontSize: 11, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>Invoice Flag</span>
                                 {isArAdmin ? (
                                   <select
@@ -1720,7 +1772,8 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
                                     {invStatusMeta ? invStatusMeta.label : 'No flag'}
                                   </span>
                                 )}
-                              </div>
+                                </div>{/* end Invoice Flag wrapper */}
+                              </div>{/* end status+void row */}
 
                               {/* Notes */}
                               <div>
