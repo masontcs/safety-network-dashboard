@@ -12,6 +12,7 @@ type EntityCode = 'TCS' | 'INC' | 'STS'
 type State =
   | { status: 'idle' }
   | { status: 'loading'; label: string; progress: number }
+  | { status: 'entity_mismatch'; detectedEntity: string; confidence: number }
   | { status: 'success'; invoiceCount: number; totalAr: number; newCustomers: number; crossLinked: number }
   | { status: 'error'; message: string }
 
@@ -47,7 +48,7 @@ export default function ArImportModal({ onClose, onSuccess }: Props) {
   const [state, setState]         = useState<State>({ status: 'idle' })
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (forceEntity = false) => {
     if (!file) return
 
     setState({ status: 'loading', label: 'Parsing file…', progress: 5 })
@@ -56,6 +57,7 @@ export default function ArImportModal({ onClose, onSuccess }: Props) {
     form.append('file', file)
     form.append('entityCode', entity)
     if (reportDate) form.append('reportDate', reportDate)
+    if (forceEntity) form.append('forceEntity', 'true')
 
     try {
       const res = await fetch('/api/admin/ar/import', { method: 'POST', body: form })
@@ -95,6 +97,8 @@ export default function ArImportModal({ onClose, onSuccess }: Props) {
               progress?: number
               data?: Record<string, unknown>
               error?: string
+              detectedEntity?: string
+              confidence?: number
             }
             if (event.type === 'step') {
               setState({
@@ -102,6 +106,13 @@ export default function ArImportModal({ onClose, onSuccess }: Props) {
                 label: event.label ?? '',
                 progress: event.progress ?? 0,
               })
+            } else if (event.type === 'entity_mismatch') {
+              setState({
+                status: 'entity_mismatch',
+                detectedEntity: event.detectedEntity as string,
+                confidence: event.confidence as number,
+              })
+              return
             } else if (event.type === 'done') {
               finalData = event.data ?? null
               break outer
@@ -134,8 +145,9 @@ export default function ArImportModal({ onClose, onSuccess }: Props) {
     }
   }
 
-  const isLoading = state.status === 'loading'
-  const isDone    = state.status === 'success' || state.status === 'error'
+  const isLoading  = state.status === 'loading'
+  const isDone     = state.status === 'success' || state.status === 'error'
+  const isMismatch = state.status === 'entity_mismatch'
 
   return (
     <div
@@ -251,6 +263,28 @@ export default function ArImportModal({ onClose, onSuccess }: Props) {
           </div>
         )}
 
+        {/* Entity mismatch warning */}
+        {state.status === 'entity_mismatch' && (
+          <div style={{
+            marginBottom: 16,
+            padding: '12px 14px',
+            borderRadius: 8,
+            background: 'rgba(204,68,68,0.08)',
+            border: '1px solid #663333',
+          }}>
+            <div style={{ fontSize: 13, color: '#cc4444', fontWeight: 500, marginBottom: 6 }}>
+              Wrong entity selected?
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+              {state.confidence}% of customers in this file match{' '}
+              <span style={{ color: '#ff6b00', fontWeight: 500 }}>{state.detectedEntity}</span>{' '}
+              records, but you selected{' '}
+              <span style={{ color: '#ff6b00', fontWeight: 500 }}>{entity}</span>.
+              Did you upload the wrong file?
+            </div>
+          </div>
+        )}
+
         {/* Success summary */}
         {state.status === 'success' && (
           <div style={{
@@ -289,7 +323,7 @@ export default function ArImportModal({ onClose, onSuccess }: Props) {
         {/* Actions */}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button
-            onClick={onClose}
+            onClick={() => isMismatch ? setState({ status: 'idle' }) : onClose()}
             disabled={isLoading}
             style={{
               background: 'transparent', border: '1px solid var(--border-emphasis)', borderRadius: 8,
@@ -298,11 +332,24 @@ export default function ArImportModal({ onClose, onSuccess }: Props) {
               opacity: isLoading ? 0.5 : 1,
             }}
           >
-            {isDone ? 'Close' : 'Cancel'}
+            {isDone ? 'Close' : isMismatch ? 'Cancel' : 'Cancel'}
           </button>
-          {!isDone && (
+          {isMismatch && (
             <button
-              onClick={handleSubmit}
+              onClick={() => handleSubmit(true)}
+              style={{
+                background: '#663333',
+                border: '1px solid #cc4444', borderRadius: 8,
+                color: '#cc4444', padding: '8px 16px', fontSize: 13, fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              Import Anyway
+            </button>
+          )}
+          {!isDone && !isMismatch && (
+            <button
+              onClick={() => handleSubmit()}
               disabled={isLoading || !file}
               style={{
                 background: '#ff6b00',

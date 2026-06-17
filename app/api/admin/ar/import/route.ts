@@ -21,6 +21,7 @@ export async function POST(request: Request): Promise<Response> {
     const file = form.get('file')
     const entityCode = form.get('entityCode')
     const reportDateOverride = form.get('reportDate')
+    const forceEntity = form.get('forceEntity') === 'true'
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: 'file is required' }, { status: 400 })
@@ -90,14 +91,39 @@ export async function POST(request: Request): Promise<Response> {
           if (unknownNames.length > 0) {
             send({ type: 'step', label: `Checking ${unknownNames.length} new customers across entities…`, progress: 40 })
 
+            // Fetch entity_code too so we can detect if this file belongs to a different entity
             const { data: crossRefs } = await supabase
               .from('ar_customer_entity_refs')
-              .select('quickbooks_name, customer_id')
+              .select('quickbooks_name, customer_id, entity_code')
               .in('quickbooks_name', unknownNames)
 
             for (const ref of crossRefs ?? []) {
-              if (!refMap.has(ref.quickbooks_name)) {
-                refMap.set(ref.quickbooks_name, ref.customer_id)
+              if (!refMap.has(ref.quickbooks_name as string)) {
+                refMap.set(ref.quickbooks_name as string, ref.customer_id as string)
+              }
+            }
+
+            // Entity mismatch detection — runs before any destructive step
+            if (!forceEntity) {
+              const otherEntityCounts: Record<string, number> = {}
+              for (const ref of crossRefs ?? []) {
+                const ec = ref.entity_code as string
+                if (ec !== entityCode) {
+                  otherEntityCounts[ec] = (otherEntityCounts[ec] ?? 0) + 1
+                }
+              }
+              const selectedMatchCount = (existingRefs ?? []).length
+              const total = qbNames.length
+              for (const [otherEntity, count] of Object.entries(otherEntityCounts)) {
+                // Flag if >55% of file names match a different entity AND that entity has 2x more matches than selected
+                if (count / total >= 0.55 && count > selectedMatchCount * 2) {
+                  send({
+                    type: 'entity_mismatch',
+                    detectedEntity: otherEntity,
+                    confidence: Math.round((count / total) * 100),
+                  })
+                  return
+                }
               }
             }
           }
