@@ -16,14 +16,22 @@ function fmtDate(iso: string): string {
 export default function PayrollTab({ role, data, branches, allocationOn, startDate, endDate }: TabProps) {
   const isAdminOrExec = role === 'admin' || role === 'executive'
 
-  // Exec/admin: company-wide payroll cost breakdown — Gross / Employer Taxes / Fringes / Other
-  const [breakdown, setBreakdown] = useState<{ gross: number; employerTax: number; fringes: number; other: number; total: number } | null>(null)
+  // Exec/admin: payroll bucketed by item group × branch (ties out to Total Payroll)
+  type MatrixRow = { name: string; isEarnings: boolean; byBranch: Record<string, number>; total: number }
+  type GroupMatrix = {
+    branches: { id: string; name: string }[]
+    groups: MatrixRow[]
+    gross: { byBranch: Record<string, number>; total: number }
+    employerTax: number
+    grandTotal: number
+  }
+  const [matrix, setMatrix] = useState<GroupMatrix | null>(null)
   useEffect(() => {
-    if (!isAdminOrExec || !startDate || !endDate) { setBreakdown(null); return }
+    if (!isAdminOrExec || !startDate || !endDate) { setMatrix(null); return }
     let cancelled = false
-    fetch(`/api/payroll/group-breakdown?startDate=${startDate}&endDate=${endDate}`)
+    fetch(`/api/payroll/group-matrix?startDate=${startDate}&endDate=${endDate}`)
       .then((r) => r.json())
-      .then((j) => { if (!cancelled && j.success) setBreakdown(j.data) })
+      .then((j) => { if (!cancelled && j.success) setMatrix(j.data) })
       .catch(() => {})
     return () => { cancelled = true }
   }, [isAdminOrExec, startDate, endDate])
@@ -76,40 +84,60 @@ export default function PayrollTab({ role, data, branches, allocationOn, startDa
         />
       </div>
 
-      {/* ── Payroll cost breakdown (exec/admin): Gross / Employer Taxes / Fringes / Other ── */}
-      {isAdminOrExec && breakdown && breakdown.total > 0 && (
+      {/* ── Payroll by group × branch (exec/admin), tied out to Total Payroll ── */}
+      {isAdminOrExec && matrix && matrix.grandTotal > 0 && (
         <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 }}>
-            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Payroll Cost Breakdown</div>
-            <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>Company-wide · all branches</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Payroll by Group &amp; Branch</div>
+            <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>Ties to Total Payroll</div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-            {([
-              { label: 'Gross Wages',    value: breakdown.gross,       color: '#ff6b00' },
-              { label: 'Employer Taxes', value: breakdown.employerTax, color: 'var(--danger)' },
-              { label: 'Fringes',        value: breakdown.fringes,     color: 'var(--text-muted)' },
-              { label: 'Other',          value: breakdown.other,       color: 'var(--text-dim)' },
-            ] as const).map((row) => {
-              const pct = breakdown.total > 0 ? (row.value / breakdown.total) * 100 : 0
-              return (
-                <div key={row.label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
-                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{row.label}</span>
-                    <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                      {formatCurrency(row.value)}
-                      <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 6 }}>{pct.toFixed(1)}%</span>
-                    </span>
-                  </div>
-                  <div style={{ height: 4, background: 'var(--bg-secondary)', borderRadius: 2, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${Math.min(100, pct)}%`, background: row.color, borderRadius: 2 }} />
-                  </div>
-                </div>
-              )
-            })}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderTop: '1px solid var(--border-emphasis)', paddingTop: 11, marginTop: 2 }}>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Total Payroll Cost</span>
-              <span style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(breakdown.total)}</span>
-            </div>
+          <div className="table-scroll">
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 520 }}>
+              <thead>
+                <tr>
+                  <th style={{ ...mTh, textAlign: 'left' }}>Group</th>
+                  {matrix.branches.map((b) => <th key={b.id} style={mTh}>{b.name}</th>)}
+                  <th style={mTh}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {matrix.groups.filter((g) => g.isEarnings).map((g) => (
+                  <tr key={g.name}>
+                    <td style={{ ...mTd, textAlign: 'left', color: 'var(--text-secondary)' }}>{g.name}</td>
+                    {matrix.branches.map((b) => <td key={b.id} style={mTd}>{cell(g.byBranch[b.id])}</td>)}
+                    <td style={{ ...mTd, color: 'var(--text-primary)' }}>{cell(g.total)}</td>
+                  </tr>
+                ))}
+                <tr style={{ borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ ...mTd, textAlign: 'left', color: 'var(--text-primary)', fontWeight: 600 }}>Gross</td>
+                  {matrix.branches.map((b) => <td key={b.id} style={{ ...mTd, color: 'var(--text-primary)', fontWeight: 600 }}>{cell(matrix.gross.byBranch[b.id])}</td>)}
+                  <td style={{ ...mTd, color: '#ff6b00', fontWeight: 600 }}>{cell(matrix.gross.total)}</td>
+                </tr>
+                {matrix.groups.filter((g) => !g.isEarnings).map((g) => (
+                  <tr key={g.name}>
+                    <td style={{ ...mTd, textAlign: 'left', color: 'var(--text-secondary)' }}>{g.name}</td>
+                    {matrix.branches.map((b) => <td key={b.id} style={mTd}>{cell(g.byBranch[b.id])}</td>)}
+                    <td style={{ ...mTd, color: 'var(--text-primary)' }}>{cell(g.total)}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td style={{ ...mTd, textAlign: 'left', color: 'var(--text-secondary)' }}>Employer Taxes</td>
+                  {matrix.branches.map((b) => <td key={b.id} style={{ ...mTd, color: 'var(--text-faint)' }}>—</td>)}
+                  <td style={{ ...mTd, color: 'var(--text-primary)' }}>{cell(matrix.employerTax)}</td>
+                </tr>
+                <tr style={{ borderTop: '1px solid var(--border-emphasis)' }}>
+                  <td style={{ ...mTd, textAlign: 'left', color: 'var(--text-primary)', fontWeight: 600 }}>Total Payroll</td>
+                  {matrix.branches.map((b) => {
+                    const labor = (matrix.gross.byBranch[b.id] ?? 0) + matrix.groups.filter((g) => !g.isEarnings).reduce((s, g) => s + (g.byBranch[b.id] ?? 0), 0)
+                    return <td key={b.id} style={{ ...mTd, color: 'var(--text-muted)' }}>{cell(labor)}</td>
+                  })}
+                  <td style={{ ...mTd, color: '#ff6b00', fontWeight: 600 }}>{cell(matrix.grandTotal)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 8, lineHeight: 1.4 }}>
+            Employer taxes are company-wide (no branch in the source data), so the branch columns total to labor only; the grand Total includes taxes.
           </div>
         </div>
       )}
@@ -365,3 +393,10 @@ function EmpGroup({ emp, isOpen, onToggle, branchNameMap }: {
 
 const th: React.CSSProperties = { textAlign: 'right', padding: '0 8px 8px 8px', fontSize: 11, color: 'var(--text-dim)', fontWeight: 400 }
 const td: React.CSSProperties = { textAlign: 'right', padding: '8px 8px', color: 'var(--text-secondary)' }
+
+// Group × branch matrix table
+const mTh: React.CSSProperties = { textAlign: 'right', padding: '6px 10px', fontSize: 11, color: 'var(--text-dim)', fontWeight: 400, whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)' }
+const mTd: React.CSSProperties = { textAlign: 'right', padding: '6px 10px', color: 'var(--text-muted)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }
+function cell(v: number | undefined): string {
+  return v ? formatCurrency(v) : '—'
+}
