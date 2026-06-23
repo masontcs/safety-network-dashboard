@@ -43,6 +43,7 @@ const cardStyle: React.CSSProperties = {
   borderRadius: 12,
   padding: 16,
   marginBottom: 16,
+  overflowX: 'auto',
 }
 
 const thStyle: React.CSSProperties = {
@@ -205,14 +206,14 @@ export default function AllocationsClient() {
                           <button
                             onClick={() => approveAllocation(a.employee_id, a.id)}
                             disabled={actioning === a.id}
-                            style={{ background: '#1a3a1a', color: '#4caf50', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}
+                            style={{ background: 'var(--pill-paid-bg)', color: 'var(--pill-paid-fg)', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}
                           >
                             Approve
                           </button>
                           <button
                             onClick={() => denyAllocation(a.employee_id, a.id)}
                             disabled={actioning === a.id}
-                            style={{ background: '#3a1a1a', color: '#cc4444', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}
+                            style={{ background: 'var(--pill-overdue-bg)', color: 'var(--pill-overdue-fg)', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}
                           >
                             Deny
                           </button>
@@ -252,14 +253,14 @@ export default function AllocationsClient() {
                           <button
                             onClick={() => approveOverride(o.employee_id, o.id)}
                             disabled={actioning === o.id}
-                            style={{ background: '#1a3a1a', color: '#4caf50', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}
+                            style={{ background: 'var(--pill-paid-bg)', color: 'var(--pill-paid-fg)', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}
                           >
                             Approve
                           </button>
                           <button
                             onClick={() => denyOverride(o.employee_id, o.id)}
                             disabled={actioning === o.id}
-                            style={{ background: '#3a1a1a', color: '#cc4444', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}
+                            style={{ background: 'var(--pill-overdue-bg)', color: 'var(--pill-overdue-fg)', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}
                           >
                             Deny
                           </button>

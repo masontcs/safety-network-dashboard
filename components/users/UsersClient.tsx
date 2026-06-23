@@ -396,7 +396,8 @@ export default function UsersClient() {
               {[1, 2, 3].map((i) => <Skeleton key={i} height={48} />)}
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+            <div className="table-scroll">
+            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: 820 }}>
               <colgroup>
                 <col style={{ width: 64 }} />   {/* Access */}
                 <col style={{ width: '18%' }} /> {/* Name */}
@@ -580,6 +581,7 @@ export default function UsersClient() {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 

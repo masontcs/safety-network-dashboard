@@ -267,13 +267,13 @@ export default function AuditClient() {
       </div>
 
       {/* Table */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card" style={{ padding: 0, overflowX: 'auto' }}>
         {loading ? (
           <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>Loading…</div>
         ) : logs.length === 0 ? (
           <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>No events found</div>
         ) : (
-          <div>
+          <div style={{ minWidth: 620 }}>
             {/* Column headers */}
             <div style={{
               display: 'grid',
