@@ -100,7 +100,7 @@ export default function SettingsClient() {
         </div>
 
         {fetchError ? (
-          <div style={{ color: '#cc4444', fontSize: 13 }}>Failed to load: {fetchError}</div>
+          <div style={{ color: 'var(--danger)', fontSize: 13 }}>Failed to load: {fetchError}</div>
         ) : loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {[1, 2, 3].map((i) => <Skeleton key={i} height={40} />)}

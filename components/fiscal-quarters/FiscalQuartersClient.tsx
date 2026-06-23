@@ -413,12 +413,12 @@ export default function FiscalQuartersClient() {
       {!loading && allMonths.length === 0 && (
         <div
           style={{
-            background: '#2a1a00',
-            border: '1px solid #cc5500',
+            background: 'var(--alert-warning-bg)',
+            border: '1px solid var(--warning)',
             borderRadius: 8,
             padding: '10px 14px',
             fontSize: 12,
-            color: '#ff9966',
+            color: 'var(--alert-warning-fg)',
           }}
         >
           No fiscal months exist yet.{' '}
@@ -432,12 +432,12 @@ export default function FiscalQuartersClient() {
       {!loading && allMonths.length > 0 && unassignedCount < 3 && quarters.length === 0 && (
         <div
           style={{
-            background: '#2a1a00',
-            border: '1px solid #cc5500',
+            background: 'var(--alert-warning-bg)',
+            border: '1px solid var(--warning)',
             borderRadius: 8,
             padding: '10px 14px',
             fontSize: 12,
-            color: '#ff9966',
+            color: 'var(--alert-warning-fg)',
           }}
         >
           Only {unassignedCount} unassigned fiscal month{unassignedCount !== 1 ? 's' : ''} available.
@@ -580,7 +580,7 @@ export default function FiscalQuartersClient() {
                           <button
                             onClick={() => handleDelete(q.id)}
                             disabled={deleteLoading}
-                            style={{ background: '#3a1a1a', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: '#cc4444', cursor: 'pointer', fontFamily: 'inherit', opacity: deleteLoading ? 0.6 : 1 }}
+                            style={{ background: 'var(--pill-overdue-bg)', border: 'none', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--pill-overdue-fg)', cursor: 'pointer', fontFamily: 'inherit', opacity: deleteLoading ? 0.6 : 1 }}
                           >
                             {deleteLoading ? '…' : 'Confirm'}
                           </button>

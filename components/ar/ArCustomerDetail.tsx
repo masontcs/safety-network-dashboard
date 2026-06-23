@@ -310,7 +310,7 @@ function ContactForm({ customerId, onSaved, onCancel }: { customerId: string; on
 
   const inp = { background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)', borderRadius: 8, color: 'var(--text-secondary)', padding: '6px 10px', fontSize: 12, outline: 'none', width: '100%', boxSizing: 'border-box' as const }
   return (
-    <div style={{ background: '#242424', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div className="ar-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <input placeholder="Name *" value={name} onChange={(e) => setName(e.target.value)} style={inp} />
         <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} style={inp} />

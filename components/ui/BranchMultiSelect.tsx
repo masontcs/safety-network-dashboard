@@ -107,7 +107,7 @@ export default function BranchMultiSelect({ branches, selectedIds, onChange, rol
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 4,
-                background: '#2a1500',
+                background: 'var(--accent-soft-bg)',
                 border: '1px solid #ff6b00',
                 borderRadius: 4,
                 padding: '2px 6px 2px 8px',

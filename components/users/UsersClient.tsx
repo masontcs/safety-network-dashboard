@@ -586,7 +586,7 @@ export default function UsersClient() {
         </div>
 
         {/* ── Test Accounts ────────────────────────────────────────────────── */}
-        <div className="card" style={{ border: '1px solid #3a2a1a' }}>
+        <div className="card" style={{ border: '1px solid var(--border-emphasis)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>

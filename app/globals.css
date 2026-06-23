@@ -39,6 +39,7 @@
   --alert-success-bg:#14241a;  --alert-success-fg:#4caf50;
   --alert-warning-bg:#2a1d05;  --alert-warning-fg:#ffb74d;
   --alert-danger-bg: #2a1414;  --alert-danger-fg: #e06666;
+  --accent-soft-bg:  #2a1500;
 }
 
 /* Light mode */
@@ -74,6 +75,7 @@
   --alert-success-bg:#e6f4ea;  --alert-success-fg:#1e7e34;
   --alert-warning-bg:#fdf0d5;  --alert-warning-fg:#8a5d00;
   --alert-danger-bg: #fdecea;  --alert-danger-fg: #c62828;
+  --accent-soft-bg:  #fff3e0;
 }
 
 @keyframes skeleton-pulse {

@@ -51,9 +51,9 @@ function DropZone({ accept, state, onFile, label, hint }: DropZoneProps) {
   const border = dragging
     ? '2px dashed #ff6b00'
     : state.status === 'error'
-    ? '2px dashed #cc4444'
+    ? '2px dashed var(--danger)'
     : state.status === 'success'
-    ? '2px dashed #4caf50'
+    ? '2px dashed var(--success)'
     : '2px dashed #2a2a2a'
 
   return (
@@ -105,14 +105,14 @@ function DropZone({ accept, state, onFile, label, hint }: DropZoneProps) {
       {state.status === 'success' && (
         <>
           <CheckIcon />
-          <div style={{ fontSize: 12, color: '#4caf50', marginTop: 4 }}>Import successful</div>
+          <div style={{ fontSize: 12, color: 'var(--success)', marginTop: 4 }}>Import successful</div>
         </>
       )}
 
       {state.status === 'error' && (
         <>
           <ErrorIcon />
-          <div style={{ fontSize: 12, color: '#cc4444', marginTop: 4, maxWidth: 240 }}>
+          <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 4, maxWidth: 240 }}>
             {state.message}
           </div>
         </>
@@ -121,7 +121,7 @@ function DropZone({ accept, state, onFile, label, hint }: DropZoneProps) {
       {state.status === 'duplicate' && (
         <>
           <WarnIcon />
-          <div style={{ fontSize: 12, color: '#ff9800', marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: 'var(--warning)', marginTop: 4 }}>
             Duplicate detected
           </div>
         </>
@@ -347,8 +347,8 @@ function PayrollSection({ onSuccess }: { onSuccess: () => void }) {
       />
 
       {isDuplicate && (
-        <div style={{ background: '#2a1a00', border: '1px solid #ff9800', borderRadius: 8, padding: '10px 12px' }}>
-          <div style={{ fontSize: 12, color: '#ff9800', fontWeight: 500, marginBottom: 4 }}>Duplicate import detected</div>
+        <div style={{ background: 'var(--alert-warning-bg)', border: '1px solid var(--warning)', borderRadius: 8, padding: '10px 12px' }}>
+          <div style={{ fontSize: 12, color: 'var(--alert-warning-fg)', fontWeight: 500, marginBottom: 4 }}>Duplicate import detected</div>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>
             An import already exists for{' '}
             <strong>{state.status === 'duplicate' && state.conflict.periodDate ? formatPeriodDate(state.conflict.periodDate) : ''}</strong>
@@ -479,8 +479,8 @@ function RevenueSection({ onSuccess }: { onSuccess: () => void }) {
       />
 
       {isDuplicate && (
-        <div style={{ background: '#2a1a00', border: '1px solid #ff9800', borderRadius: 8, padding: '10px 12px' }}>
-          <div style={{ fontSize: 12, color: '#ff9800', fontWeight: 500, marginBottom: 4 }}>Duplicate import detected</div>
+        <div style={{ background: 'var(--alert-warning-bg)', border: '1px solid var(--warning)', borderRadius: 8, padding: '10px 12px' }}>
+          <div style={{ fontSize: 12, color: 'var(--alert-warning-fg)', fontWeight: 500, marginBottom: 4 }}>Duplicate import detected</div>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>
             Revenue is already imported for{' '}
             <strong>{state.status === 'duplicate' && state.conflict.periodDate ? formatPeriodDate(state.conflict.periodDate) : ''}</strong>.
@@ -613,8 +613,8 @@ function FuelSection({ onSuccess }: { onSuccess: () => void }) {
       />
 
       {isDuplicate && (
-        <div style={{ background: '#2a1a00', border: '1px solid #ff9800', borderRadius: 8, padding: '10px 12px' }}>
-          <div style={{ fontSize: 12, color: '#ff9800', fontWeight: 500, marginBottom: 4 }}>Duplicate import detected</div>
+        <div style={{ background: 'var(--alert-warning-bg)', border: '1px solid var(--warning)', borderRadius: 8, padding: '10px 12px' }}>
+          <div style={{ fontSize: 12, color: 'var(--alert-warning-fg)', fontWeight: 500, marginBottom: 4 }}>Duplicate import detected</div>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10 }}>
             Fuel data already exists for{' '}
             <strong>{state.status === 'duplicate' ? `${state.conflict.dateRangeStart} – ${state.conflict.dateRangeEnd}` : ''}</strong>.
@@ -654,10 +654,10 @@ function FuelSection({ onSuccess }: { onSuccess: () => void }) {
 
 function ResultSummary({ lines, onReset }: { lines: string[]; onReset: () => void }) {
   return (
-    <div style={{ background: '#0a1f0a', border: '1px solid #2d5a2d', borderRadius: 8, padding: '10px 12px' }}>
-      <div style={{ fontSize: 12, color: '#4caf50', fontWeight: 500, marginBottom: 6 }}>✓ Import complete</div>
+    <div style={{ background: 'var(--alert-success-bg)', border: '1px solid var(--success)', borderRadius: 8, padding: '10px 12px' }}>
+      <div style={{ fontSize: 12, color: 'var(--alert-success-fg)', fontWeight: 500, marginBottom: 6 }}>✓ Import complete</div>
       {lines.map((line, i) => (
-        <div key={i} style={{ fontSize: 12, color: line.includes('review') || line.includes('flagged') || line.includes('corrected') ? '#ff9800' : 'var(--text-muted)', marginBottom: 2 }}>
+        <div key={i} style={{ fontSize: 12, color: line.includes('review') || line.includes('flagged') || line.includes('corrected') ? 'var(--warning)' : 'var(--text-muted)', marginBottom: 2 }}>
           {line}
         </div>
       ))}
