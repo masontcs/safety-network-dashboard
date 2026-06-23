@@ -60,15 +60,15 @@ const tdStyle: React.CSSProperties = {
   padding: '9px 12px',
   color: 'var(--text-secondary)',
   fontSize: 12,
-  borderBottom: '1px solid #1e1e1e',
+  borderBottom: '1px solid var(--border)',
 }
 
 function statusPill(status: string) {
   const approved = status === 'approved'
   return (
     <span style={{
-      background: approved ? '#1a3a1a' : '#3a2a1a',
-      color: approved ? '#4caf50' : '#ff9800',
+      background: approved ? 'var(--pill-paid-bg)' : 'var(--pill-pending-bg)',
+      color: approved ? 'var(--pill-paid-fg)' : 'var(--pill-pending-fg)',
       borderRadius: 4,
       padding: '2px 8px',
       fontSize: 11,

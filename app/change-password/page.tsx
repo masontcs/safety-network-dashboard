@@ -130,7 +130,7 @@ export default function ChangePasswordPage() {
           </div>
 
           {error && (
-            <div style={{ fontSize: 12, color: '#cc4444', marginBottom: 16, padding: '8px 10px', background: '#2a1a1a', borderRadius: 6 }}>
+            <div style={{ fontSize: 12, color: 'var(--alert-danger-fg)', marginBottom: 16, padding: '8px 10px', background: 'var(--alert-danger-bg)', borderRadius: 6 }}>
               {error}
             </div>
           )}

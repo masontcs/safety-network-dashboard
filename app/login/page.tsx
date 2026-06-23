@@ -103,7 +103,7 @@ export default function LoginPage() {
           </div>
 
           {error !== null && (
-            <div style={{ fontSize: 12, color: '#cc4444', marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: 'var(--danger)', marginBottom: 16 }}>
               {error}
             </div>
           )}

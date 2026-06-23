@@ -169,29 +169,29 @@ export default function SettingsClient() {
               padding: '10px 14px',
               background: 'var(--bg-nav)',
               borderRadius: 8,
-              border: `1px solid ${totalOk ? '#1a3a1a' : '#3a1a1a'}`,
+              border: `1px solid ${totalOk ? 'var(--success)' : 'var(--danger)'}`,
               display: 'flex',
               alignItems: 'center',
               gap: 8,
             }}>
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Total:</span>
-              <span style={{ fontSize: 13, fontWeight: 500, color: totalOk ? '#4caf50' : '#cc4444' }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: totalOk ? 'var(--success)' : 'var(--danger)' }}>
                 {total.toFixed(2)}%
               </span>
               {totalOk
-                ? <span style={{ fontSize: 12, color: '#4caf50' }}>✓ Ready to save</span>
-                : <span style={{ fontSize: 12, color: '#cc4444' }}>— must equal exactly 100%</span>
+                ? <span style={{ fontSize: 12, color: 'var(--success)' }}>✓ Ready to save</span>
+                : <span style={{ fontSize: 12, color: 'var(--danger)' }}>— must equal exactly 100%</span>
               }
             </div>
 
             {saveError && (
-              <div style={{ fontSize: 12, color: '#cc4444', padding: '8px 10px', background: '#2a1a1a', borderRadius: 6 }}>
+              <div style={{ fontSize: 12, color: 'var(--alert-danger-fg)', padding: '8px 10px', background: 'var(--alert-danger-bg)', borderRadius: 6 }}>
                 {saveError}
               </div>
             )}
 
             {saveSuccess && (
-              <div style={{ fontSize: 12, color: '#4caf50', padding: '8px 10px', background: '#1a2a1a', borderRadius: 6 }}>
+              <div style={{ fontSize: 12, color: 'var(--alert-success-fg)', padding: '8px 10px', background: 'var(--alert-success-bg)', borderRadius: 6 }}>
                 Saved successfully.
               </div>
             )}

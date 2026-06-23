@@ -1,9 +1,9 @@
 type Status = 'paid' | 'pending' | 'overdue'
 
 const STYLES: Record<Status, React.CSSProperties> = {
-  paid:    { background: '#1a3a1a', color: '#4caf50' },
-  pending: { background: '#3a2a1a', color: '#ff9800' },
-  overdue: { background: '#3a1a1a', color: '#cc4444' },
+  paid:    { background: 'var(--pill-paid-bg)',    color: 'var(--pill-paid-fg)' },
+  pending: { background: 'var(--pill-pending-bg)', color: 'var(--pill-pending-fg)' },
+  overdue: { background: 'var(--pill-overdue-bg)', color: 'var(--pill-overdue-fg)' },
 }
 
 export default function StatusPill({ status }: { status: Status }) {

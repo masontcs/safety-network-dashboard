@@ -25,6 +25,20 @@
   --sidebar-hover-bg: #2a2a2a;
   /* icon button */
   --icon-btn-hover:  #333333;
+
+  /* semantic status colors (text) */
+  --success:         #4caf50;
+  --warning:         #ff9800;
+  --danger:          #cc4444;
+  /* status pills (bg + fg) */
+  --pill-paid-bg:    #1a3a1a;  --pill-paid-fg:    #4caf50;
+  --pill-pending-bg: #3a2a1a;  --pill-pending-fg: #ff9800;
+  --pill-overdue-bg: #3a1a1a;  --pill-overdue-fg: #cc4444;
+  --pill-neutral-bg: #2a2a2a;  --pill-neutral-fg: #888888;
+  /* alert / message boxes (bg + fg) */
+  --alert-success-bg:#14241a;  --alert-success-fg:#4caf50;
+  --alert-warning-bg:#2a1d05;  --alert-warning-fg:#ffb74d;
+  --alert-danger-bg: #2a1414;  --alert-danger-fg: #e06666;
 }
 
 /* Light mode */
@@ -46,6 +60,20 @@
   --sidebar-hover-bg: #e2e0da;
   /* icon button */
   --icon-btn-hover:  #e2e0da;
+
+  /* semantic status colors (text) */
+  --success:         #1e7e34;
+  --warning:         #8a5d00;
+  --danger:          #c62828;
+  /* status pills (bg + fg) */
+  --pill-paid-bg:    #e6f4ea;  --pill-paid-fg:    #1e7e34;
+  --pill-pending-bg: #fdf0d5;  --pill-pending-fg: #8a5d00;
+  --pill-overdue-bg: #fdecea;  --pill-overdue-fg: #c62828;
+  --pill-neutral-bg: #eceae5;  --pill-neutral-fg: #717171;
+  /* alert / message boxes (bg + fg) */
+  --alert-success-bg:#e6f4ea;  --alert-success-fg:#1e7e34;
+  --alert-warning-bg:#fdf0d5;  --alert-warning-fg:#8a5d00;
+  --alert-danger-bg: #fdecea;  --alert-danger-fg: #c62828;
 }
 
 @keyframes skeleton-pulse {
@@ -121,7 +149,7 @@ h1, h2 {
 
 .delta-down {
   font-size: 11px;
-  color: #cc4444;
+  color: var(--danger);
 }
 
 /* ─────────────────────────────────────────────
@@ -194,8 +222,8 @@ h1, h2 {
    Status pills
 ───────────────────────────────────────────── */
 .pill-paid {
-  background: #1a3a1a;
-  color: #4caf50;
+  background: var(--pill-paid-bg);
+  color: var(--pill-paid-fg);
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 10px;
@@ -203,8 +231,8 @@ h1, h2 {
 }
 
 .pill-pending {
-  background: #3a2a1a;
-  color: #ff9800;
+  background: var(--pill-pending-bg);
+  color: var(--pill-pending-fg);
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 10px;
@@ -212,8 +240,8 @@ h1, h2 {
 }
 
 .pill-overdue {
-  background: #3a1a1a;
-  color: #cc4444;
+  background: var(--pill-overdue-bg);
+  color: var(--pill-overdue-fg);
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 10px;

@@ -51,8 +51,8 @@ function fmtDate(dateStr: string): string {
 
 function StatusPill({ status }: { status: AccessRequest['status'] }) {
   const styles: Record<string, React.CSSProperties> = {
-    pending:  { background: '#2a1a00', color: '#ff9800', border: '1px solid #3a2a00' },
-    approved: { background: '#1a3a1a', color: '#4caf50', border: '1px solid #2a4a2a' },
+    pending:  { background: 'var(--pill-pending-bg)', color: 'var(--pill-pending-fg)', border: '1px solid var(--pill-pending-bg)' },
+    approved: { background: 'var(--pill-paid-bg)', color: 'var(--pill-paid-fg)', border: '1px solid var(--pill-paid-bg)' },
     archived: { background: 'var(--bg-secondary)', color: 'var(--text-faint)', border: '1px solid var(--border-emphasis)' },
     // legacy denied records
     denied:   { background: 'var(--bg-secondary)', color: 'var(--text-faint)', border: '1px solid var(--border-emphasis)' },
@@ -209,7 +209,7 @@ export default function AccessRequestsClient() {
   const reviewed = requests.filter((r) => r.status !== 'pending')
 
   if (fetchError) {
-    return <div style={{ color: '#cc4444', fontSize: 13, padding: 16 }}>Failed to load: {fetchError}</div>
+    return <div style={{ color: 'var(--danger)', fontSize: 13, padding: 16 }}>Failed to load: {fetchError}</div>
   }
 
   const selectStyle: React.CSSProperties = {
@@ -559,7 +559,7 @@ export default function AccessRequestsClient() {
                   </div>
 
                   {actionError && (
-                    <div style={{ fontSize: 12, color: '#cc4444', padding: '8px 10px', background: '#2a1a1a', borderRadius: 6 }}>
+                    <div style={{ fontSize: 12, color: 'var(--alert-danger-fg)', padding: '8px 10px', background: 'var(--alert-danger-bg)', borderRadius: 6 }}>
                       {actionError}
                     </div>
                   )}
@@ -598,7 +598,7 @@ export default function AccessRequestsClient() {
                 </div>
 
                 {actionError && (
-                  <div style={{ fontSize: 12, color: '#cc4444', marginBottom: 12 }}>{actionError}</div>
+                  <div style={{ fontSize: 12, color: 'var(--danger)', marginBottom: 12 }}>{actionError}</div>
                 )}
 
                 <div style={{ display: 'flex', gap: 8 }}>
