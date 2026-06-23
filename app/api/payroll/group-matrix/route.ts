@@ -113,10 +113,14 @@ export async function GET(request: Request): Promise<NextResponse> {
       for (const o of (overridesRes.data ?? []) as AllocationOverride[]) (empOverrides[o.employee_id] ??= []).push(o)
     }
 
-    // ── Accumulate matrix[branchId][groupName] ───────────────────────────────
+    // ── Accumulate matrix[branchId][groupName] + per-employee wage-by-branch ──
     const matrix: Record<string, Record<string, number>> = {}
+    const empBranchWage: Record<string, Record<string, number>> = {}  // for splitting taxes
     const add = (branchId: string, group: string, amt: number) => {
       ;(matrix[branchId] ??= {})[group] = (matrix[branchId]?.[group] ?? 0) + amt
+    }
+    const addEmpWage = (empId: string, branchId: string, amt: number) => {
+      ;(empBranchWage[empId] ??= {})[branchId] = (empBranchWage[empId]?.[branchId] ?? 0) + amt
     }
 
     for (const t of directTxns) {
@@ -127,22 +131,28 @@ export async function GET(request: Request): Promise<NextResponse> {
         t.employee_id, t.period_date, home,
         empOverrides[t.employee_id] ?? [], empDefaults[t.employee_id] ?? []
       )
-      for (const s of splits) add(s.branchId, g, t.amount * (s.percentage / 100))
+      for (const s of splits) {
+        const amt = t.amount * (s.percentage / 100)
+        add(s.branchId, g, amt)
+        addEmpWage(t.employee_id, s.branchId, amt)
+      }
     }
     for (const t of adminTxns) {
       const b = t.payroll_codes?.branch_id
       if (!b) continue
       add(b, groupForItem(t.payroll_item_id), t.amount)
+      addEmpWage(t.employee_id, b, t.amount)
     }
 
-    // ── Employer taxes (scoped to active employees, company-level) ───────────
-    let employerTax = 0
+    // ── Employer taxes (per employee) → split to branches by that employee's
+    //    wage allocation (same branch split as their labor) ─────────────────
+    const empTax: Record<string, number> = {}
     if (allEmpIds.length > 0) {
       let from = 0
       while (true) {
         const { data, error } = await supabase
           .from('payroll_taxes')
-          .select('amount')
+          .select('employee_id, amount')
           .in('employee_id', allEmpIds)
           .is('business_tag', null)
           .gte('period_date', startDate)
@@ -150,10 +160,25 @@ export async function GET(request: Request): Promise<NextResponse> {
           .range(from, from + PAGE - 1)
         if (error) throw new Error(`Failed to query taxes: ${error.message}`)
         if (!data || data.length === 0) break
-        for (const t of data) employerTax += t.amount as number
+        for (const t of data) empTax[t.employee_id as string] = (empTax[t.employee_id as string] ?? 0) + (t.amount as number)
         if (data.length < PAGE) break
         from += PAGE
       }
+    }
+
+    const taxByBranch: Record<string, number> = {}
+    let employerTaxTotal = 0
+    for (const [empId, taxAmt] of Object.entries(empTax)) {
+      employerTaxTotal += taxAmt
+      const wages = empBranchWage[empId]
+      const totalWage = wages ? Object.values(wages).reduce((s, v) => s + v, 0) : 0
+      if (wages && totalWage > 0) {
+        for (const [bId, w] of Object.entries(wages)) {
+          taxByBranch[bId] = (taxByBranch[bId] ?? 0) + taxAmt * (w / totalWage)
+        }
+      }
+      // totalWage === 0 (tax but no attributed wages) is a rare edge case: the amount
+      // still counts in the grand total but isn't placed in a branch column.
     }
 
     // ── Branch columns (only branches with data, ordered by name) ────────────
@@ -193,7 +218,10 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
 
     const fringesOtherTotal = (groupTotals['Fringes'] ?? 0) + (groupTotals['Other'] ?? 0)
-    const grandTotal = r2(grossTotal + fringesOtherTotal + employerTax)
+    const grandTotal = r2(grossTotal + fringesOtherTotal + employerTaxTotal)
+
+    const taxByBranchRounded: Record<string, number> = {}
+    for (const b of branches) taxByBranchRounded[b.id] = r2(taxByBranch[b.id] ?? 0)
 
     return NextResponse.json({
       success: true,
@@ -201,7 +229,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         branches,
         groups,
         gross: { byBranch: grossByBranch, total: r2(grossTotal) },
-        employerTax: r2(employerTax),
+        employerTax: { byBranch: taxByBranchRounded, total: r2(employerTaxTotal) },
         grandTotal,
       },
     })

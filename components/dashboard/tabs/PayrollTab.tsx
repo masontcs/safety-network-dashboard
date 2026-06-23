@@ -22,7 +22,7 @@ export default function PayrollTab({ role, data, branches, allocationOn, startDa
     branches: { id: string; name: string }[]
     groups: MatrixRow[]
     gross: { byBranch: Record<string, number>; total: number }
-    employerTax: number
+    employerTax: { byBranch: Record<string, number>; total: number }
     grandTotal: number
   }
   const [matrix, setMatrix] = useState<GroupMatrix | null>(null)
@@ -122,14 +122,16 @@ export default function PayrollTab({ role, data, branches, allocationOn, startDa
                 ))}
                 <tr>
                   <td style={{ ...mTd, textAlign: 'left', color: 'var(--text-secondary)' }}>Employer Taxes</td>
-                  {matrix.branches.map((b) => <td key={b.id} style={{ ...mTd, color: 'var(--text-faint)' }}>—</td>)}
-                  <td style={{ ...mTd, color: 'var(--text-primary)' }}>{cell(matrix.employerTax)}</td>
+                  {matrix.branches.map((b) => <td key={b.id} style={mTd}>{cell(matrix.employerTax.byBranch[b.id])}</td>)}
+                  <td style={{ ...mTd, color: 'var(--text-primary)' }}>{cell(matrix.employerTax.total)}</td>
                 </tr>
                 <tr style={{ borderTop: '1px solid var(--border-emphasis)' }}>
                   <td style={{ ...mTd, textAlign: 'left', color: 'var(--text-primary)', fontWeight: 600 }}>Total Payroll</td>
                   {matrix.branches.map((b) => {
-                    const labor = (matrix.gross.byBranch[b.id] ?? 0) + matrix.groups.filter((g) => !g.isEarnings).reduce((s, g) => s + (g.byBranch[b.id] ?? 0), 0)
-                    return <td key={b.id} style={{ ...mTd, color: 'var(--text-muted)' }}>{cell(labor)}</td>
+                    const total = (matrix.gross.byBranch[b.id] ?? 0)
+                      + matrix.groups.filter((g) => !g.isEarnings).reduce((s, g) => s + (g.byBranch[b.id] ?? 0), 0)
+                      + (matrix.employerTax.byBranch[b.id] ?? 0)
+                    return <td key={b.id} style={{ ...mTd, color: 'var(--text-primary)', fontWeight: 600 }}>{cell(total)}</td>
                   })}
                   <td style={{ ...mTd, color: '#ff6b00', fontWeight: 600 }}>{cell(matrix.grandTotal)}</td>
                 </tr>
@@ -137,7 +139,7 @@ export default function PayrollTab({ role, data, branches, allocationOn, startDa
             </table>
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 8, lineHeight: 1.4 }}>
-            Employer taxes are company-wide (no branch in the source data), so the branch columns total to labor only; the grand Total includes taxes.
+            Employer taxes are split to each branch by the employee&rsquo;s wage allocation. Branch columns and the grand Total tie out to the Total Payroll KPI.
           </div>
         </div>
       )}
