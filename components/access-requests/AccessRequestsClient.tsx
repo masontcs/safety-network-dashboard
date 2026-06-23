@@ -251,6 +251,8 @@ export default function AccessRequestsClient() {
               No pending requests.
             </div>
           ) : (
+            <>
+            <div className="ar-table-wrap table-scroll">
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
@@ -312,6 +314,35 @@ export default function AccessRequestsClient() {
                 ))}
               </tbody>
             </table>
+            </div>
+
+            {/* Mobile: stacked, tap-friendly cards */}
+            <div className="ar-card-list" style={{ padding: 12 }}>
+              {pending.map((r) => (
+                <div key={r.id} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>{r.firstName} {r.lastName}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12, color: 'var(--text-muted)' }}>
+                    <div style={{ wordBreak: 'break-all' }}>{r.email}</div>
+                    {r.username && <div style={{ fontFamily: 'monospace' }}>{r.username}</div>}
+                    <div>{ROLE_LABELS[r.requestedRole] ?? r.requestedRole}{r.branchName ? ` · ${r.branchName}` : ''}</div>
+                    <div style={{ color: 'var(--text-faint)' }}>Submitted {fmtDate(r.createdAt)}</div>
+                    {r.notes && <div style={{ color: 'var(--text-faint)', lineHeight: 1.4 }}>{r.notes}</div>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+                    <button onClick={() => openReview(r)} className="btn-primary" style={{ flex: 1, fontSize: 13, padding: '9px 0' }}>
+                      Review →
+                    </button>
+                    <button
+                      onClick={() => openArchive(r)}
+                      style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-faint)', fontSize: 12, padding: '9px 14px', cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      Archive
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            </>
           )}
         </div>
 
@@ -321,6 +352,7 @@ export default function AccessRequestsClient() {
             <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)' }}>
               Reviewed
             </div>
+            <div className="ar-table-wrap table-scroll">
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
@@ -354,6 +386,23 @@ export default function AccessRequestsClient() {
                 ))}
               </tbody>
             </table>
+            </div>
+
+            {/* Mobile: stacked cards */}
+            <div className="ar-card-list" style={{ padding: 12 }}>
+              {reviewed.map((r) => (
+                <div key={r.id} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, display: 'flex', flexDirection: 'column', gap: 6, opacity: 0.85 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-secondary)' }}>{r.firstName} {r.lastName}</span>
+                    <StatusPill status={r.status} />
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', wordBreak: 'break-all' }}>{r.email}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>
+                    {ROLE_LABELS[r.requestedRole] ?? r.requestedRole}{r.branchName ? ` · ${r.branchName}` : ''} · {fmtDate(r.createdAt)}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

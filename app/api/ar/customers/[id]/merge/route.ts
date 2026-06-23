@@ -44,10 +44,13 @@ export async function POST(
     if (!source) return NextResponse.json({ error: 'Source customer not found' }, { status: 404 })
 
     // Atomic merge — moves every related table and deletes the source in one transaction.
-    const { error } = await supabase.rpc('merge_ar_customer', {
-      p_target: targetId,
-      p_source: sourceId,
-    })
+    // merge_ar_customer is defined in migration 20260618000001 but isn't in the generated
+    // DB types, so the rpc call is typed locally.
+    const callMerge = supabase.rpc as unknown as (
+      fn: 'merge_ar_customer',
+      args: { p_target: string; p_source: string },
+    ) => Promise<{ error: { message: string } | null }>
+    const { error } = await callMerge('merge_ar_customer', { p_target: targetId, p_source: sourceId })
     if (error) {
       return NextResponse.json({ error: `Merge failed: ${error.message}` }, { status: 500 })
     }
