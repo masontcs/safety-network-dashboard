@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import MetricCard from '@/components/ui/MetricCard'
 import WeeklyChart from '@/components/charts/WeeklyChart'
 import { formatCurrency } from '@/lib/utils/format'
@@ -13,13 +13,26 @@ function fmtDate(iso: string): string {
   return `${MONTHS[d.getMonth()]} ${d.getDate()}`
 }
 
-export default function PayrollTab({ role, data, branches, allocationOn }: TabProps) {
+export default function PayrollTab({ role, data, branches, allocationOn, startDate, endDate }: TabProps) {
+  const isAdminOrExec = role === 'admin' || role === 'executive'
+
+  // Exec/admin: company-wide payroll cost breakdown — Gross / Employer Taxes / Fringes / Other
+  const [breakdown, setBreakdown] = useState<{ gross: number; employerTax: number; fringes: number; other: number; total: number } | null>(null)
+  useEffect(() => {
+    if (!isAdminOrExec || !startDate || !endDate) { setBreakdown(null); return }
+    let cancelled = false
+    fetch(`/api/payroll/group-breakdown?startDate=${startDate}&endDate=${endDate}`)
+      .then((r) => r.json())
+      .then((j) => { if (!cancelled && j.success) setBreakdown(j.data) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [isAdminOrExec, startDate, endDate])
+
   const pay = data.payroll
   if (!pay) {
     return <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: 24 }}>No payroll data for this period.</div>
   }
 
-  const isAdminOrExec = role === 'admin' || role === 'executive'
   const branchNameMap: Record<string, string> = {}
   for (const b of branches) branchNameMap[b.id] = b.name
 
@@ -58,6 +71,44 @@ export default function PayrollTab({ role, data, branches, allocationOn }: TabPr
           value={formatCurrency(totalPayroll)}
         />
       </div>
+
+      {/* ── Payroll cost breakdown (exec/admin): Gross / Employer Taxes / Fringes / Other ── */}
+      {isAdminOrExec && breakdown && breakdown.total > 0 && (
+        <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Payroll Cost Breakdown</div>
+            <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>Company-wide · all branches</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+            {([
+              { label: 'Gross Wages',    value: breakdown.gross,       color: '#ff6b00' },
+              { label: 'Employer Taxes', value: breakdown.employerTax, color: 'var(--danger)' },
+              { label: 'Fringes',        value: breakdown.fringes,     color: 'var(--text-muted)' },
+              { label: 'Other',          value: breakdown.other,       color: 'var(--text-dim)' },
+            ] as const).map((row) => {
+              const pct = breakdown.total > 0 ? (row.value / breakdown.total) * 100 : 0
+              return (
+                <div key={row.label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{row.label}</span>
+                    <span style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                      {formatCurrency(row.value)}
+                      <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 6 }}>{pct.toFixed(1)}%</span>
+                    </span>
+                  </div>
+                  <div style={{ height: 4, background: 'var(--bg-secondary)', borderRadius: 2, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.min(100, pct)}%`, background: row.color, borderRadius: 2 }} />
+                  </div>
+                </div>
+              )
+            })}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderTop: '1px solid var(--border-emphasis)', paddingTop: 11, marginTop: 2 }}>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Total Payroll Cost</span>
+              <span style={{ fontSize: 14, color: 'var(--text-primary)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(breakdown.total)}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Corp/HQ overhead breakdown */}
       {allocationOn && isAdminOrExec && (corpOverhead > 0 || hqOverhead > 0) && (
