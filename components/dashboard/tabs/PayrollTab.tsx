@@ -28,6 +28,10 @@ export default function PayrollTab({ role, data, branches, allocationOn, startDa
     return () => { cancelled = true }
   }, [isAdminOrExec, startDate, endDate])
 
+  // Direct Labor / Admin Payroll detail sections — collapsible, collapsed by default
+  const [directOpen, setDirectOpen] = useState(false)
+  const [adminOpen, setAdminOpen] = useState(false)
+
   const pay = data.payroll
   if (!pay) {
     return <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: 24 }}>No payroll data for this period.</div>
@@ -136,19 +140,39 @@ export default function PayrollTab({ role, data, branches, allocationOn, startDa
         </div>
       )}
 
-      {/* ── Direct labor detail — drill-down table ────────────────────────────── */}
+      {/* ── Direct labor detail — collapsible drill-down table ─────────────────── */}
       {pay.total.directDetail && pay.total.directDetail.length > 0 && (
         <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Direct Labor</div>
-          <DrilldownTable rows={pay.total.directDetail} branchNameMap={branchNameMap} />
+          <button
+            onClick={() => setDirectOpen((v) => !v)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', width: '100%', textAlign: 'left' }}
+          >
+            <span style={{ display: 'inline-block', fontSize: 13, color: 'var(--text-faint)', transition: 'transform 180ms ease', transform: directOpen ? 'rotate(90deg)' : 'rotate(0deg)', lineHeight: 1 }}>›</span>
+            <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Direct Labor</span>
+          </button>
+          {directOpen && (
+            <div style={{ marginTop: 12 }}>
+              <DrilldownTable rows={pay.total.directDetail} branchNameMap={branchNameMap} />
+            </div>
+          )}
         </div>
       )}
 
-      {/* ── Admin payroll detail — admin/exec only ────────────────────────────── */}
+      {/* ── Admin payroll detail — admin/exec only, collapsible ────────────────── */}
       {isAdminOrExec && pay.total.adminDetail && pay.total.adminDetail.length > 0 && (
         <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 12 }}>Admin Payroll</div>
-          <DrilldownTable rows={pay.total.adminDetail} branchNameMap={branchNameMap} />
+          <button
+            onClick={() => setAdminOpen((v) => !v)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', width: '100%', textAlign: 'left' }}
+          >
+            <span style={{ display: 'inline-block', fontSize: 13, color: 'var(--text-faint)', transition: 'transform 180ms ease', transform: adminOpen ? 'rotate(90deg)' : 'rotate(0deg)', lineHeight: 1 }}>›</span>
+            <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Admin Payroll</span>
+          </button>
+          {adminOpen && (
+            <div style={{ marginTop: 12 }}>
+              <DrilldownTable rows={pay.total.adminDetail} branchNameMap={branchNameMap} />
+            </div>
+          )}
         </div>
       )}
 
