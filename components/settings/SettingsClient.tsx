@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Skeleton from '@/components/ui/Skeleton'
+import PayrollGroupsCard from '@/components/settings/PayrollGroupsCard'
 
 interface HqPct {
   safetyNetwork: number
@@ -207,6 +208,8 @@ export default function SettingsClient() {
           </div>
         )}
       </div>
+
+      <PayrollGroupsCard />
     </div>
   )
 }
