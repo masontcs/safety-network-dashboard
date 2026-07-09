@@ -16,6 +16,30 @@ export type Vendor = 'interstate' | 'flyers'
 export type ImportStatus = 'pending' | 'confirmed' | 'replaced'
 export type BusinessTag = 'western_highways' | 'signs'
 
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+
+// ── TCR Billing enums (mirror the Postgres enum types) ────────────────────────
+// Money in every billing_* table is INTEGER CENTS. Dates are 'YYYY-MM-DD'.
+
+export type BillingItemCategory = 'Equipment' | 'Labor' | 'Lump Sum' | 'Misc'
+
+/** <rental cadence>_billed_<rate unit>. No proration: each cell is an entered rate. */
+export type BillingType =
+  | 'daily'
+  | 'weekly_billed_weekly'
+  | 'weekly_billed_daily'
+  | 'monthly_billed_monthly'
+  | 'monthly_billed_weekly'
+  | 'monthly_billed_daily'
+
+export type BillingJobStatus = 'new' | 'in_progress' | 'on_hold' | 'completed' | 'closed'
+export type BillingTicketStatus = 'active' | 'in_review' | 'final_edit' | 'invoiced'
+export type BillingLedgerEvent = 'pickup' | 'return' | 'lost'
+export type BillingLineKind = 'sale' | 'lost' | 'labor' | 'lump_sum' | 'misc'
+export type BillingInvoiceLineKind = 'rental' | BillingLineKind | 'adjustment'
+export type BillingInvoiceStatus = 'draft' | 'issued' | 'void'
+export type BillingQueueStatus = 'needs_update' | 'updated'
+
 export type Database = {
   public: {
     Tables: {
@@ -259,8 +283,180 @@ export type Database = {
         Update: { id?: string; import_id?: string; customer_id?: string; entity_code?: string; branch_id?: string | null; raw_class_code?: string | null; invoice_number?: string | null; po_number?: string | null; job_name?: string | null; invoice_date?: string | null; due_date?: string | null; terms?: string | null; open_balance?: number; aging_bucket?: string | null; aging_days?: number | null; row_type?: string; invoice_status?: string | null }
         Relationships: []
       }
+
+      // ── TCR Billing v2 ────────────────────────────────────────────────────
+      billing_entity_settings: {
+        Row: { entity_id: string; letter: string; billing_enabled: boolean }
+        Insert: { entity_id: string; letter: string; billing_enabled?: boolean }
+        Update: { entity_id?: string; letter?: string; billing_enabled?: boolean }
+        Relationships: []
+      }
+      billing_branch_settings: {
+        Row: { branch_id: string; code: string; tax_rate_pct: number | null; billing_enabled: boolean }
+        Insert: { branch_id: string; code: string; tax_rate_pct?: number | null; billing_enabled?: boolean }
+        Update: { branch_id?: string; code?: string; tax_rate_pct?: number | null; billing_enabled?: boolean }
+        Relationships: []
+      }
+      billing_payment_terms: {
+        Row: { id: string; name: string; net_days: number; sort_order: number; is_active: boolean }
+        Insert: { id?: string; name: string; net_days?: number; sort_order?: number; is_active?: boolean }
+        Update: { id?: string; name?: string; net_days?: number; sort_order?: number; is_active?: boolean }
+        Relationships: []
+      }
+      billing_customers: {
+        Row: { id: string; code: string; name: string; ar_customer_id: string | null; default_payment_term_id: string | null; is_active: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; code: string; name: string; ar_customer_id?: string | null; default_payment_term_id?: string | null; is_active?: boolean }
+        Update: { id?: string; code?: string; name?: string; ar_customer_id?: string | null; default_payment_term_id?: string | null; is_active?: boolean }
+        Relationships: []
+      }
+      billing_profiles: {
+        Row: { id: string; customer_id: string; branch_id: string; code: string; name: string; payment_term_id: string | null; rental_minimum_enabled: boolean; rental_minimum_cents: number; field_rules: Json; is_active: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; customer_id: string; branch_id: string; code: string; name: string; payment_term_id?: string | null; rental_minimum_enabled?: boolean; rental_minimum_cents?: number; field_rules?: Json; is_active?: boolean }
+        Update: { id?: string; customer_id?: string; branch_id?: string; code?: string; name?: string; payment_term_id?: string | null; rental_minimum_enabled?: boolean; rental_minimum_cents?: number; field_rules?: Json; is_active?: boolean }
+        Relationships: []
+      }
+      billing_profile_contacts: {
+        Row: { id: string; profile_id: string; name: string; email: string | null; phone: string | null; is_invoice_recipient: boolean; created_at: string }
+        Insert: { id?: string; profile_id: string; name: string; email?: string | null; phone?: string | null; is_invoice_recipient?: boolean }
+        Update: { id?: string; profile_id?: string; name?: string; email?: string | null; phone?: string | null; is_invoice_recipient?: boolean }
+        Relationships: []
+      }
+      billing_items: {
+        Row: { id: string; code: string; name: string; category: BillingItemCategory; group_name: string | null; cost_cents: number; salable: boolean; sale_price_cents: number | null; taxable: boolean; tracked: boolean; is_active: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; code: string; name: string; category: BillingItemCategory; group_name?: string | null; cost_cents?: number; salable?: boolean; sale_price_cents?: number | null; taxable?: boolean; tracked?: boolean; is_active?: boolean }
+        Update: { id?: string; code?: string; name?: string; category?: BillingItemCategory; group_name?: string | null; cost_cents?: number; salable?: boolean; sale_price_cents?: number | null; taxable?: boolean; tracked?: boolean; is_active?: boolean }
+        Relationships: []
+      }
+      billing_item_default_rates: {
+        Row: { item_id: string; billing_type: BillingType; rate_cents: number }
+        Insert: { item_id: string; billing_type: BillingType; rate_cents: number }
+        Update: { item_id?: string; billing_type?: BillingType; rate_cents?: number }
+        Relationships: []
+      }
+      billing_item_variations: {
+        Row: { id: string; item_id: string; name: string; adj_cents: number; sort_order: number }
+        Insert: { id?: string; item_id: string; name: string; adj_cents?: number; sort_order?: number }
+        Update: { id?: string; item_id?: string; name?: string; adj_cents?: number; sort_order?: number }
+        Relationships: []
+      }
+      billing_price_lists: {
+        Row: { id: string; name: string; entity_id: string; is_active: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; name: string; entity_id: string; is_active?: boolean }
+        Update: { id?: string; name?: string; entity_id?: string; is_active?: boolean }
+        Relationships: []
+      }
+      billing_price_list_tiers: {
+        Row: { id: string; price_list_id: string; position: number; name: string; pct_off_previous: number }
+        Insert: { id?: string; price_list_id: string; position: number; name: string; pct_off_previous?: number }
+        Update: { id?: string; price_list_id?: string; position?: number; name?: string; pct_off_previous?: number }
+        Relationships: []
+      }
+      billing_price_list_items: {
+        Row: { id: string; price_list_id: string; item_id: string; freeze_after_position: number | null; tier_exception_tier_id: string | null }
+        Insert: { id?: string; price_list_id: string; item_id: string; freeze_after_position?: number | null; tier_exception_tier_id?: string | null }
+        Update: { id?: string; price_list_id?: string; item_id?: string; freeze_after_position?: number | null; tier_exception_tier_id?: string | null }
+        Relationships: []
+      }
+      billing_price_list_item_bases: {
+        Row: { price_list_item_id: string; billing_type: BillingType; base_cents: number }
+        Insert: { price_list_item_id: string; billing_type: BillingType; base_cents: number }
+        Update: { price_list_item_id?: string; billing_type?: BillingType; base_cents?: number }
+        Relationships: []
+      }
+      billing_price_list_item_overrides: {
+        Row: { price_list_item_id: string; tier_id: string; billing_type: BillingType; rate_cents: number }
+        Insert: { price_list_item_id: string; tier_id: string; billing_type: BillingType; rate_cents: number }
+        Update: { price_list_item_id?: string; tier_id?: string; billing_type?: BillingType; rate_cents?: number }
+        Relationships: []
+      }
+      /** The COMPILED explicit grid. Pricing reads this. */
+      billing_price_list_rates: {
+        Row: { price_list_item_id: string; tier_id: string; billing_type: BillingType; rate_cents: number; compiled_at: string }
+        Insert: { price_list_item_id: string; tier_id: string; billing_type: BillingType; rate_cents: number; compiled_at?: string }
+        Update: { price_list_item_id?: string; tier_id?: string; billing_type?: BillingType; rate_cents?: number; compiled_at?: string }
+        Relationships: []
+      }
+      billing_price_list_variation_overrides: {
+        Row: { price_list_id: string; variation_id: string; adj_cents: number }
+        Insert: { price_list_id: string; variation_id: string; adj_cents: number }
+        Update: { price_list_id?: string; variation_id?: string; adj_cents?: number }
+        Relationships: []
+      }
+      billing_profile_entities: {
+        Row: { id: string; profile_id: string; entity_id: string; enabled: boolean; price_list_id: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; profile_id: string; entity_id: string; enabled?: boolean; price_list_id?: string | null }
+        Update: { id?: string; profile_id?: string; entity_id?: string; enabled?: boolean; price_list_id?: string | null }
+        Relationships: []
+      }
+      billing_profile_entity_category_tiers: {
+        Row: { profile_entity_id: string; category: BillingItemCategory; price_list_id: string; tier_id: string }
+        Insert: { profile_entity_id: string; category: BillingItemCategory; price_list_id: string; tier_id: string }
+        Update: { profile_entity_id?: string; category?: BillingItemCategory; price_list_id?: string; tier_id?: string }
+        Relationships: []
+      }
+      billing_counters: {
+        Row: { kind: string; entity_id: string; branch_id: string | null; next_seq: number }
+        Insert: { kind: string; entity_id: string; branch_id?: string | null; next_seq?: number }
+        Update: { kind?: string; entity_id?: string; branch_id?: string | null; next_seq?: number }
+        Relationships: []
+      }
+      billing_jobs: {
+        Row: { id: string; job_number: string; profile_id: string; entity_id: string; branch_id: string; name: string | null; status: BillingJobStatus; certified: boolean; dir_number: string | null; cert_payroll_contact: string | null; contract_number: string | null; pay_classification: string | null; address: string | null; cross_streets: string | null; city: string | null; county: string | null; state: string | null; zip: string | null; tax_exempt: boolean; require_signature: boolean; enable_second_signature: boolean; ticket_labor_minimum_minutes: number | null; po_number: string | null; notes: string | null; date_opened: string; date_completed: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; job_number: string; profile_id: string; entity_id: string; branch_id: string; name?: string | null; status?: BillingJobStatus; certified: boolean; dir_number?: string | null; cert_payroll_contact?: string | null; contract_number?: string | null; pay_classification?: string | null; address?: string | null; cross_streets?: string | null; city?: string | null; county?: string | null; state?: string | null; zip?: string | null; tax_exempt?: boolean; require_signature?: boolean; enable_second_signature?: boolean; ticket_labor_minimum_minutes?: number | null; po_number?: string | null; notes?: string | null; date_opened?: string; date_completed?: string | null }
+        Update: { id?: string; job_number?: string; profile_id?: string; entity_id?: string; branch_id?: string; name?: string | null; status?: BillingJobStatus; certified?: boolean; dir_number?: string | null; cert_payroll_contact?: string | null; contract_number?: string | null; pay_classification?: string | null; address?: string | null; cross_streets?: string | null; city?: string | null; county?: string | null; state?: string | null; zip?: string | null; tax_exempt?: boolean; require_signature?: boolean; enable_second_signature?: boolean; ticket_labor_minimum_minutes?: number | null; po_number?: string | null; notes?: string | null; date_opened?: string; date_completed?: string | null }
+        Relationships: []
+      }
+      billing_tickets: {
+        Row: { id: string; ticket_number: string; job_id: string; entity_id: string; ticket_date: string; status: BillingTicketStatus; feature_add: boolean; feature_return: boolean; feature_dtc: boolean; billing_type: BillingType | null; recurring: boolean; final_edited_at: string | null; notes: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; ticket_number: string; job_id: string; entity_id: string; ticket_date: string; status?: BillingTicketStatus; feature_add?: boolean; feature_return?: boolean; feature_dtc?: boolean; billing_type?: BillingType | null; recurring?: boolean; final_edited_at?: string | null; notes?: string | null }
+        Update: { id?: string; ticket_number?: string; job_id?: string; entity_id?: string; ticket_date?: string; status?: BillingTicketStatus; feature_add?: boolean; feature_return?: boolean; feature_dtc?: boolean; billing_type?: BillingType | null; recurring?: boolean; final_edited_at?: string | null; notes?: string | null }
+        Relationships: []
+      }
+      billing_ticket_ledger: {
+        Row: { id: string; ticket_id: string; job_id: string; item_id: string; variation_id: string | null; event_type: BillingLedgerEvent; event_date: string; qty: number; equipment_id: string | null; created_at: string }
+        Insert: { id?: string; ticket_id: string; job_id: string; item_id: string; variation_id?: string | null; event_type: BillingLedgerEvent; event_date: string; qty: number; equipment_id?: string | null }
+        Update: { id?: string; ticket_id?: string; job_id?: string; item_id?: string; variation_id?: string | null; event_type?: BillingLedgerEvent; event_date?: string; qty?: number; equipment_id?: string | null }
+        Relationships: []
+      }
+      /** Ongoing-rental accruals, keyed by PICKUP LOT (lot_date). Cumulative qty-units billed. */
+      billing_rental_accruals: {
+        Row: { id: string; ticket_id: string; item_id: string; variation_id: string | null; lot_date: string; qty_units_billed: number; updated_at: string }
+        Insert: { id?: string; ticket_id: string; item_id: string; variation_id?: string | null; lot_date: string; qty_units_billed?: number }
+        Update: { id?: string; ticket_id?: string; item_id?: string; variation_id?: string | null; lot_date?: string; qty_units_billed?: number }
+        Relationships: []
+      }
+      billing_ticket_lines: {
+        Row: { id: string; ticket_id: string; kind: BillingLineKind; item_id: string | null; variation_id: string | null; description: string; qty: number; units: number; unit_rate_cents: number; amount_cents: number; taxable: boolean; created_at: string }
+        Insert: { id?: string; ticket_id: string; kind: BillingLineKind; item_id?: string | null; variation_id?: string | null; description: string; qty?: number; units?: number; unit_rate_cents: number; amount_cents: number; taxable?: boolean }
+        Update: { id?: string; ticket_id?: string; kind?: BillingLineKind; item_id?: string | null; variation_id?: string | null; description?: string; qty?: number; units?: number; unit_rate_cents?: number; amount_cents?: number; taxable?: boolean }
+        Relationships: []
+      }
+      billing_invoices: {
+        Row: { id: string; invoice_number: string; job_id: string; profile_id: string; entity_id: string; branch_id: string; through_date: string; invoice_date: string; status: BillingInvoiceStatus; tax_rate_pct: number; rental_subtotal_cents: number; sales_subtotal_cents: number; other_subtotal_cents: number; rental_minimum_adjustment_cents: number; subtotal_cents: number; taxable_base_cents: number; tax_cents: number; total_cents: number; created_by: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; invoice_number: string; job_id: string; profile_id: string; entity_id: string; branch_id: string; through_date: string; invoice_date?: string; status?: BillingInvoiceStatus; tax_rate_pct?: number; rental_subtotal_cents?: number; sales_subtotal_cents?: number; other_subtotal_cents?: number; rental_minimum_adjustment_cents?: number; subtotal_cents?: number; taxable_base_cents?: number; tax_cents?: number; total_cents?: number; created_by?: string | null }
+        Update: { id?: string; invoice_number?: string; status?: BillingInvoiceStatus; tax_rate_pct?: number; rental_subtotal_cents?: number; sales_subtotal_cents?: number; other_subtotal_cents?: number; rental_minimum_adjustment_cents?: number; subtotal_cents?: number; taxable_base_cents?: number; tax_cents?: number; total_cents?: number }
+        Relationships: []
+      }
+      billing_invoice_lines: {
+        Row: { id: string; invoice_id: string; ticket_id: string | null; kind: BillingInvoiceLineKind; item_id: string | null; variation_id: string | null; description: string; lot_date: string | null; qty: number; units: number; unit_rate_cents: number; amount_cents: number; taxable: boolean; created_at: string }
+        Insert: { id?: string; invoice_id: string; ticket_id?: string | null; kind: BillingInvoiceLineKind; item_id?: string | null; variation_id?: string | null; description: string; lot_date?: string | null; qty?: number; units?: number; unit_rate_cents: number; amount_cents: number; taxable?: boolean }
+        Update: { id?: string; invoice_id?: string; ticket_id?: string | null; kind?: BillingInvoiceLineKind; item_id?: string | null; variation_id?: string | null; description?: string; lot_date?: string | null; qty?: number; units?: number; unit_rate_cents?: number; amount_cents?: number; taxable?: boolean }
+        Relationships: []
+      }
+      billing_accounting_queue: {
+        Row: { id: string; invoice_id: string; reason: string; status: BillingQueueStatus; waived: boolean; notes: string | null; created_by: string | null; created_at: string; resolved_by: string | null; resolved_at: string | null }
+        Insert: { id?: string; invoice_id: string; reason: string; status?: BillingQueueStatus; waived?: boolean; notes?: string | null; created_by?: string | null }
+        Update: { id?: string; invoice_id?: string; reason?: string; status?: BillingQueueStatus; waived?: boolean; notes?: string | null; resolved_by?: string | null; resolved_at?: string | null }
+        Relationships: []
+      }
     }
-    Views: Record<string, never>
+    Views: {
+      /** Derived QuickBooks customer name: "{customer.name} - {profile.name}" */
+      billing_profile_qb_names: {
+        Row: { profile_id: string; qb_name: string }
+        Relationships: []
+      }
+    }
     Functions: Record<string, never>
   }
 }

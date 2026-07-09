@@ -180,6 +180,10 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/executive/data-explorer', label: 'Data Explorer', icon: <DatabaseIcon />, roles: ['executive'] },
   { href: '/executive/employees', label: 'Employees', icon: <PeopleIcon />, roles: ['executive'] },
   { href: '/fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['admin'] },
+  // TCR Billing — admin-only until billing roles are defined.
+  { href: '/billing/profiles',     label: 'Billing',        icon: <TagIcon />,      roles: ['admin'] },
+  { href: '/billing/items',        label: 'Items',          icon: <LayersIcon />,   roles: ['admin'] },
+  { href: '/billing/price-lists',  label: 'Price Lists',    icon: <TagIcon />,      roles: ['admin'] },
   { href: '/admin/import',         label: 'Import',         icon: <UploadIcon />,   roles: ['admin'] },
   { href: '/admin/review',         label: 'Review',         icon: <ChartIcon />,    roles: ['admin'] },
   { href: '/admin/payroll-items',  label: 'Pay Items',      icon: <TagIcon />,      roles: ['admin'] },

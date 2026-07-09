@@ -1,0 +1,402 @@
+'use client'
+
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import Skeleton from '@/components/ui/Skeleton'
+import { CATEGORIES, BILLING_TYPES, BILLING_TYPE_LABELS } from '@/lib/billing/constants'
+import type { BillingItemCategory, BillingType } from '@/lib/supabase/database.types'
+
+/**
+ * The item catalog. Items are the general library price lists are built from.
+ * All money is entered in dollars and converted to integer cents once, here.
+ */
+
+interface ItemRow {
+  id: string
+  code: string
+  name: string
+  category: BillingItemCategory
+  groupName: string | null
+  costCents: number
+  salable: boolean
+  salePriceCents: number | null
+  taxable: boolean
+  tracked: boolean
+  isActive: boolean
+  variationCount: number
+  defaultRateCount: number
+}
+
+interface Variation { id?: string; name: string; adjCents: number }
+interface DefaultRate { billingType: BillingType; rateCents: number }
+interface ItemDetail extends Omit<ItemRow, 'variationCount' | 'defaultRateCount'> {
+  variations: Variation[]
+  defaultRates: DefaultRate[]
+}
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)',
+  borderRadius: 6, padding: '7px 10px', fontSize: 13, color: 'var(--text-primary)',
+  outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+}
+const labelStyle: React.CSSProperties = {
+  display: 'block', fontSize: 11, color: 'var(--text-muted)',
+  textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6,
+}
+const thStyle: React.CSSProperties = {
+  textAlign: 'left', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em',
+  color: 'var(--text-muted)', padding: '8px 12px', borderBottom: '1px solid var(--border-emphasis)', whiteSpace: 'nowrap',
+}
+const tdStyle: React.CSSProperties = {
+  padding: '10px 12px', borderBottom: '1px solid var(--border-subtle, var(--border-emphasis))',
+  color: 'var(--text-primary)', verticalAlign: 'middle',
+}
+const ghostBtn: React.CSSProperties = {
+  background: 'transparent', border: '1px solid var(--border-emphasis)', borderRadius: 6,
+  padding: '6px 12px', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit',
+}
+
+// Money helpers — dollars in the UI, integer cents everywhere else. Round once.
+const toCents = (dollars: string) => Math.round(Number(dollars) * 100)
+const toDollars = (cents: number | null | undefined) => ((cents ?? 0) / 100).toFixed(2)
+const validMoney = (s: string) => Number.isFinite(Number(s)) && Number(s) >= 0
+
+export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
+  const [items, setItems] = useState<ItemRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const [showNew, setShowNew] = useState(false)
+  const [nCode, setNCode] = useState('')
+  const [nName, setNName] = useState('')
+  const [nCategory, setNCategory] = useState<BillingItemCategory>('Equipment')
+  const [nGroup, setNGroup] = useState('')
+  const [nCost, setNCost] = useState('0.00')
+  const [nSalable, setNSalable] = useState(false)
+  const [nSalePrice, setNSalePrice] = useState('0.00')
+  const [nTracked, setNTracked] = useState(false)
+
+  const [editing, setEditing] = useState<ItemDetail | null>(null)
+  const [editCost, setEditCost] = useState('0.00')
+  const [editSalePrice, setEditSalePrice] = useState('0.00')
+
+  const load = useCallback(() => {
+    setLoading(true)
+    fetch('/api/billing/items')
+      .then((r) => r.json())
+      .then((json) => {
+        if (!json.success) throw new Error(json.error)
+        setItems(json.data)
+        setFetchError(null)
+      })
+      .catch((err: Error) => setFetchError(err.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return items
+    return items.filter(
+      (i) =>
+        i.code.toLowerCase().includes(q) ||
+        i.name.toLowerCase().includes(q) ||
+        i.category.toLowerCase().includes(q) ||
+        (i.groupName ?? '').toLowerCase().includes(q)
+    )
+  }, [items, search])
+
+  async function createItem() {
+    if (busy) return
+    if (!validMoney(nCost)) { setActionError('Cost must be a valid amount'); return }
+    if (nSalable && !validMoney(nSalePrice)) { setActionError('Sale price must be a valid amount'); return }
+    setBusy(true); setActionError(null)
+    try {
+      const res = await fetch('/api/billing/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: nCode, name: nName, category: nCategory, groupName: nGroup || null,
+          costCents: toCents(nCost), salable: nSalable,
+          salePriceCents: nSalable ? toCents(nSalePrice) : null,
+          tracked: nTracked,
+        }),
+      })
+      const json = await res.json()
+      if (!json.success) { setActionError(json.error); return }
+      setNCode(''); setNName(''); setNGroup(''); setNCost('0.00'); setNSalable(false); setNSalePrice('0.00'); setNTracked(false)
+      setShowNew(false); load()
+    } catch { setActionError('Network error — please try again.') }
+    finally { setBusy(false) }
+  }
+
+  async function openEditor(id: string) {
+    setActionError(null)
+    const res = await fetch(`/api/billing/items/${id}`)
+    const json = await res.json()
+    if (!json.success) { setActionError(json.error); return }
+    const d = json.data as ItemDetail
+    setEditing(d)
+    setEditCost(toDollars(d.costCents))
+    setEditSalePrice(toDollars(d.salePriceCents))
+  }
+
+  async function saveEditor() {
+    if (!editing || busy) return
+    if (!validMoney(editCost)) { setActionError('Cost must be a valid amount'); return }
+    if (editing.salable && !validMoney(editSalePrice)) { setActionError('Sale price must be a valid amount'); return }
+    setBusy(true); setActionError(null)
+    try {
+      const res = await fetch(`/api/billing/items/${editing.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editing.name,
+          category: editing.category,
+          groupName: editing.groupName,
+          costCents: toCents(editCost),
+          salable: editing.salable,
+          salePriceCents: editing.salable ? toCents(editSalePrice) : null,
+          taxable: editing.taxable,
+          tracked: editing.tracked,
+          isActive: editing.isActive,
+          variations: editing.variations,
+          defaultRates: editing.defaultRates,
+        }),
+      })
+      const json = await res.json()
+      if (!json.success) { setActionError(json.error); return }
+      setEditing(null); load()
+    } catch { setActionError('Network error — please try again.') }
+    finally { setBusy(false) }
+  }
+
+  function patchEdit(next: Partial<ItemDetail>) {
+    setEditing((e) => (e ? { ...e, ...next } : e))
+  }
+
+  const canCreate = !!(nCode.trim() && nName.trim()) && !busy
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Items</div>
+        {isAdmin && (
+          <button onClick={() => setShowNew((v) => !v)} className="btn-primary" style={{ marginLeft: 'auto', padding: '8px 16px' }}>
+            + New item
+          </button>
+        )}
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -12 }}>
+        The general library price lists are built from. Lost or stolen units bill at <strong>cost</strong>,
+        never sale price, and are never taxed.
+      </div>
+
+      {actionError && (
+        <div style={{ fontSize: 12, color: 'var(--alert-danger-fg)', padding: '8px 10px', background: 'var(--alert-danger-bg)', borderRadius: 6 }}>
+          {actionError}
+        </div>
+      )}
+
+      {showNew && isAdmin && (
+        <div className="card">
+          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 16, color: 'var(--text-primary)' }}>New item</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 14 }}>
+            <div><label style={labelStyle}>Code</label><input value={nCode} onChange={(e) => setNCode(e.target.value)} placeholder="CONE28" style={inputStyle} /></div>
+            <div><label style={labelStyle}>Name</label><input value={nName} onChange={(e) => setNName(e.target.value)} placeholder='28" Cone' style={inputStyle} /></div>
+            <div>
+              <label style={labelStyle}>Category</label>
+              <select value={nCategory} onChange={(e) => setNCategory(e.target.value as BillingItemCategory)} style={inputStyle}>
+                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div><label style={labelStyle}>Group</label><input value={nGroup} onChange={(e) => setNGroup(e.target.value)} placeholder="REG" style={inputStyle} /></div>
+            <div><label style={labelStyle}>Cost ($)</label><input value={nCost} onChange={(e) => setNCost(e.target.value)} style={inputStyle} /></div>
+            <div>
+              <label style={labelStyle}>Salable</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" checked={nSalable} onChange={(e) => setNSalable(e.target.checked)} />
+                <input value={nSalePrice} onChange={(e) => setNSalePrice(e.target.value)} disabled={!nSalable}
+                  placeholder="sale $" style={{ ...inputStyle, opacity: nSalable ? 1 : 0.5 }} />
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Tracked</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 34 }}>
+                <input type="checkbox" checked={nTracked} onChange={(e) => setNTracked(e.target.checked)} />
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>needs equipment ID</span>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <button onClick={createItem} disabled={!canCreate} className="btn-primary" style={{ padding: '8px 18px', opacity: canCreate ? 1 : 0.5 }}>Create item</button>
+            <button onClick={() => setShowNew(false)} style={ghostBtn}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {editing && (
+        <div className="card">
+          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4, color: 'var(--text-primary)' }}>
+            Edit {editing.code}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 18 }}>
+            Variations carry a per-unit adjustment from the item&apos;s resolved price. Default rates are the
+            fallback used only when a price list prices no cell for this item.
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 14 }}>
+            <div><label style={labelStyle}>Name</label><input value={editing.name} onChange={(e) => patchEdit({ name: e.target.value })} style={inputStyle} /></div>
+            <div>
+              <label style={labelStyle}>Category</label>
+              <select value={editing.category} onChange={(e) => patchEdit({ category: e.target.value as BillingItemCategory })} style={inputStyle}>
+                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div><label style={labelStyle}>Group</label><input value={editing.groupName ?? ''} onChange={(e) => patchEdit({ groupName: e.target.value || null })} style={inputStyle} /></div>
+            <div><label style={labelStyle}>Cost ($)</label><input value={editCost} onChange={(e) => setEditCost(e.target.value)} style={inputStyle} /></div>
+            <div>
+              <label style={labelStyle}>Salable</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="checkbox" checked={editing.salable} onChange={(e) => patchEdit({ salable: e.target.checked, taxable: e.target.checked })} />
+                <input value={editSalePrice} onChange={(e) => setEditSalePrice(e.target.value)} disabled={!editing.salable}
+                  style={{ ...inputStyle, opacity: editing.salable ? 1 : 0.5 }} />
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Flags</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, height: 34, fontSize: 12, color: 'var(--text-muted)' }}>
+                <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={editing.tracked} onChange={(e) => patchEdit({ tracked: e.target.checked })} /> tracked
+                </label>
+                <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={editing.isActive} onChange={(e) => patchEdit({ isActive: e.target.checked })} /> active
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Variations */}
+          <div style={{ marginTop: 22 }}>
+            <label style={labelStyle}>Variations</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {editing.variations.map((v, idx) => (
+                <div key={v.id ?? `new-${idx}`} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input value={v.name} placeholder="Name (e.g. Detour)"
+                    onChange={(e) => {
+                      const next = [...editing.variations]; next[idx] = { ...v, name: e.target.value }; patchEdit({ variations: next })
+                    }}
+                    style={{ ...inputStyle, maxWidth: 260 }} />
+                  <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>adj $</span>
+                  <input value={(v.adjCents / 100).toFixed(2)}
+                    onChange={(e) => {
+                      const n = Number(e.target.value)
+                      if (!Number.isFinite(n)) return
+                      const next = [...editing.variations]; next[idx] = { ...v, adjCents: Math.round(n * 100) }; patchEdit({ variations: next })
+                    }}
+                    style={{ ...inputStyle, maxWidth: 110 }} />
+                  <button style={ghostBtn}
+                    onClick={() => patchEdit({ variations: editing.variations.filter((_, i) => i !== idx) })}>
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <button style={{ ...ghostBtn, alignSelf: 'flex-start' }}
+                onClick={() => patchEdit({ variations: [...editing.variations, { name: '', adjCents: 0 }] })}>
+                + Add variation
+              </button>
+            </div>
+          </div>
+
+          {/* Catalog default rates */}
+          <div style={{ marginTop: 22 }}>
+            <label style={labelStyle}>Catalog default rates (fallback only)</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 10 }}>
+              {BILLING_TYPES.map((bt) => {
+                const existing = editing.defaultRates.find((r) => r.billingType === bt)
+                return (
+                  <div key={bt} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)', flex: 1 }}>{BILLING_TYPE_LABELS[bt]}</span>
+                    <input
+                      value={existing ? (existing.rateCents / 100).toFixed(2) : ''}
+                      placeholder="—"
+                      onChange={(e) => {
+                        const raw = e.target.value.trim()
+                        const rest = editing.defaultRates.filter((r) => r.billingType !== bt)
+                        if (raw === '') { patchEdit({ defaultRates: rest }); return }
+                        const n = Number(raw)
+                        if (!Number.isFinite(n) || n < 0) return
+                        patchEdit({ defaultRates: [...rest, { billingType: bt, rateCents: Math.round(n * 100) }] })
+                      }}
+                      style={{ ...inputStyle, maxWidth: 100 }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+            <button onClick={saveEditor} disabled={busy} className="btn-primary" style={{ padding: '8px 18px', opacity: busy ? 0.5 : 1 }}>
+              {busy ? 'Saving…' : 'Save item'}
+            </button>
+            <button onClick={() => setEditing(null)} style={ghostBtn}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      <div className="card">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search items…" style={{ ...inputStyle, maxWidth: 300 }} />
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>{filtered.length} of {items.length}</span>
+        </div>
+
+        {fetchError ? (
+          <div style={{ color: 'var(--danger)', fontSize: 13 }}>Failed to load: {fetchError}</div>
+        ) : loading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{[1, 2, 3, 4].map((i) => <Skeleton key={i} height={40} />)}</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '18px 2px' }}>
+            {items.length === 0 ? 'No items yet.' : 'No items match that search.'}
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr>
+                  {['Code', 'Name', 'Category', 'Group', 'Cost', 'Sale', 'Flags', 'Variations', ''].map((h, i) => (
+                    <th key={i} style={{ ...thStyle, textAlign: ['Cost', 'Sale', 'Variations'].includes(h) ? 'right' : 'left' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((i) => (
+                  <tr key={i.id} style={{ opacity: i.isActive ? 1 : 0.5 }}>
+                    <td style={{ ...tdStyle, fontWeight: 500 }}>{i.code}</td>
+                    <td style={tdStyle}>{i.name}</td>
+                    <td style={tdStyle}>{i.category}</td>
+                    <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{i.groupName ?? '—'}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>${toDollars(i.costCents)}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                      {i.salable ? `$${toDollars(i.salePriceCents)}` : <span style={{ color: 'var(--text-dim)' }}>—</span>}
+                    </td>
+                    <td style={{ ...tdStyle, fontSize: 11, color: 'var(--text-muted)' }}>
+                      {[i.tracked && 'tracked', i.taxable && 'taxable'].filter(Boolean).join(' · ') || '—'}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{i.variationCount || '—'}</td>
+                    <td style={tdStyle}>
+                      {isAdmin && <button style={ghostBtn} onClick={() => openEditor(i.id)}>Edit</button>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
