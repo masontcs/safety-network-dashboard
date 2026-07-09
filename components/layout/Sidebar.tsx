@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createBrowserClient } from '@/lib/supabase/client'
 import { useTheme } from '@/lib/theme/ThemeContext'
+import InterfaceSwitcher from '@/components/billing/InterfaceSwitcher'
 import type { Role } from '@/lib/supabase/database.types'
 
 interface NavItem {
@@ -180,10 +181,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/executive/data-explorer', label: 'Data Explorer', icon: <DatabaseIcon />, roles: ['executive'] },
   { href: '/executive/employees', label: 'Employees', icon: <PeopleIcon />, roles: ['executive'] },
   { href: '/fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['admin'] },
-  // TCR Billing — admin-only until billing roles are defined.
-  { href: '/billing/profiles',     label: 'Billing',        icon: <TagIcon />,      roles: ['admin'] },
-  { href: '/billing/items',        label: 'Items',          icon: <LayersIcon />,   roles: ['admin'] },
-  { href: '/billing/price-lists',  label: 'Price Lists',    icon: <TagIcon />,      roles: ['admin'] },
+  // TCR Billing is a SEPARATE interface — reached via the switcher below the
+  // brand, not as a nav item here. See app/billing/layout.tsx.
   { href: '/admin/import',         label: 'Import',         icon: <UploadIcon />,   roles: ['admin'] },
   { href: '/admin/review',         label: 'Review',         icon: <ChartIcon />,    roles: ['admin'] },
   { href: '/admin/payroll-items',  label: 'Pay Items',      icon: <TagIcon />,      roles: ['admin'] },
@@ -300,6 +299,17 @@ export default function Sidebar({ role }: SidebarProps) {
           Safety Network
         </span>
       </div>
+
+      {/* Interface switcher — only when expanded, so the collapsed rail keeps
+          showing just the brand mark rather than two stacked marks. */}
+      {expanded && (
+        <div style={{ padding: '0 6px 6px' }}>
+          <InterfaceSwitcher
+            current="dashboards"
+            available={role === 'admin' ? ['dashboards', 'billing'] : ['dashboards']}
+          />
+        </div>
+      )}
 
       {/* Nav items */}
       <div style={{

@@ -1,0 +1,159 @@
+/* ============================================================================
+   TCR Billing v2 — design tokens, scoped to the /billing interface only.
+
+   Strategy: rather than rewrite every card, table and button, we OVERRIDE the
+   same CSS variable names the shared components already consume. Anything
+   rendered inside `.billing-root` picks up the v2 palette automatically, and
+   the dashboards are untouched.
+
+   IMPORTANT — theme structure mirrors globals.css exactly:
+   the inline theme script only sets `data-theme` when the user has SAVED a
+   preference. With no saved preference the attribute is absent and the app is
+   dark. So DARK must be the base here, with `[data-theme="light"]` as the
+   override. (Keying dark off `[data-theme="dark"]` would leave billing light
+   against a dark dashboard for every user who never toggled the theme.)
+
+   The system (from Mason's design board):
+     - graphite is the PRIMARY action colour (buttons)
+     - yellow is the BRAND mark only
+     - Apple-system colours carry STATUS
+     - orange is a small, deliberate INTERACTION accent (focus, links, active nav)
+     - colour never decorates; it always means something
+   ========================================================================== */
+
+/* ── base = DARK (matches :root in globals.css) ──────────────────────────── */
+.billing-root {
+  --bg-base:         #0f1012;   /* app canvas */
+  --bg-nav:          #191a1d;   /* sidebar */
+  --bg-surface:      #191a1d;   /* cards */
+  --bg-secondary:    #202226;   /* inputs */
+  --bg-tertiary:     #26282d;
+
+  --border:          #2a2c31;
+  --border-emphasis: #35373d;
+  --border-subtle:   #232529;
+
+  --text-primary:    #f5f5f7;
+  --text-secondary:  #b5b5bc;
+  --text-muted:      #8b8b93;
+  --text-dim:        #77777f;
+  --text-faint:      #5c5c63;
+
+  --skeleton-bg:     #26282d;
+  --sidebar-hover-bg:#202226;
+  --icon-btn-hover:  #26282d;
+
+  --brand:           #ffcc00;   /* logo mark ONLY */
+  /* In dark the primary button inverts: light fill, dark label. */
+  --primary:         #f5f5f7;
+  --on-primary:      #1d1d1f;
+
+  /* The dashboard theme never defined --accent (only --accent-soft-bg), and
+     billing links/active states depend on it. Define it here. */
+  --accent:          #ff6a00;
+  --accent-soft-bg:  #3a2411;
+  --accent-ring:     0 0 0 3px rgba(255, 106, 0, 0.22);
+
+  --success:         #34c759;
+  --warning:         #ff9f0a;
+  --danger:          #ff453a;
+
+  --pill-paid-bg:    #12301c;  --pill-paid-fg:    #5fd884;
+  --pill-pending-bg: #33260a;  --pill-pending-fg: #f0b354;
+  --pill-overdue-bg: #3a1512;  --pill-overdue-fg: #ff8078;
+  --pill-neutral-bg: #26282d;  --pill-neutral-fg: #b5b5bc;
+
+  --alert-success-bg:#12301c;  --alert-success-fg:#5fd884;
+  --alert-warning-bg:#33260a;  --alert-warning-fg:#f0b354;
+  --alert-danger-bg: #3a1512;  --alert-danger-fg: #ff8078;
+
+  --b-radius:        12px;
+  --shadow-card:     0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-pop:      0 12px 36px -10px rgba(0, 0, 0, 0.7);
+
+  font-family: -apple-system, "SF Pro Text", "SF Pro Display", "Helvetica Neue",
+               Inter, system-ui, sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+}
+
+/* ── light override (matches [data-theme="light"] in globals.css) ────────── */
+[data-theme="light"] .billing-root {
+  --bg-base:         #f4f5f7;
+  --bg-nav:          #ffffff;
+  --bg-surface:      #ffffff;
+  --bg-secondary:    #ffffff;
+  --bg-tertiary:     #f2f2f4;
+
+  --border:          #ececef;
+  --border-emphasis: #e3e5ea;
+  --border-subtle:   #f1f2f5;
+
+  --text-primary:    #1d1d1f;
+  --text-secondary:  #5c5c62;
+  --text-muted:      #8e8e93;
+  --text-dim:        #a1a1a6;
+  --text-faint:      #c7c7cc;
+
+  --skeleton-bg:     #ededf0;
+  --sidebar-hover-bg:#f7f7f9;
+  --icon-btn-hover:  #f2f2f4;
+
+  /* Graphite is the primary action colour in light mode. */
+  --primary:         #1d1d1f;
+  --on-primary:      #ffffff;
+
+  --accent-soft-bg:  #fff3ea;
+  --accent-ring:     0 0 0 3px rgba(255, 106, 0, 0.16);
+
+  --danger:          #ff3b30;
+
+  --pill-paid-bg:    #e7f8ec;  --pill-paid-fg:    #1e7a3a;
+  --pill-pending-bg: #fff4e2;  --pill-pending-fg: #9a6207;
+  --pill-overdue-bg: #fdeceb;  --pill-overdue-fg: #c0271d;
+  --pill-neutral-bg: #f2f2f4;  --pill-neutral-fg: #5c5c62;
+
+  --alert-success-bg:#e7f8ec;  --alert-success-fg:#1e7a3a;
+  --alert-warning-bg:#fff4e2;  --alert-warning-fg:#9a6207;
+  --alert-danger-bg: #fdeceb;  --alert-danger-fg: #c0271d;
+
+  --shadow-card:     0 1px 2px rgba(20, 24, 40, 0.05), 0 1px 3px rgba(20, 24, 40, 0.04);
+  --shadow-pop:      0 10px 34px -10px rgba(20, 24, 40, 0.28);
+}
+
+/* ── component overrides, confined to billing ───────────────────────────── */
+
+.billing-root .card {
+  border-radius: var(--b-radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+}
+
+/* Primary action is GRAPHITE (inverted in dark), not the dashboard's orange. */
+.billing-root .btn-primary {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-radius: 10px;
+  font-weight: 500;
+  box-shadow: var(--shadow-card);
+  transition: filter 0.14s, transform 0.06s;
+}
+.billing-root .btn-primary:hover { background: var(--primary); filter: brightness(1.12); }
+.billing-root .btn-primary:active { transform: translateY(0.5px); }
+.billing-root .btn-primary:disabled { cursor: not-allowed; }
+
+/* Focus is the accent ring, never the browser default. */
+.billing-root input:focus,
+.billing-root select:focus,
+.billing-root textarea:focus {
+  border-color: var(--accent) !important;
+  box-shadow: var(--accent-ring);
+}
+
+/* Money and quantities must line up on the decimal. */
+.billing-root table { font-variant-numeric: tabular-nums; }
+.billing-root th { font-variant-numeric: normal; background: transparent; }
+.billing-root tbody tr:hover td { background: var(--accent-soft-bg); }
+
+.billing-root a { color: var(--accent); }
