@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { apiError } from '@/lib/utils/errors'
+import { nextNumber } from '@/lib/billing/rpc'
 
 /**
  * Jobs. A job attaches to a BILLING PROFILE (customer + branch derived) and
@@ -163,22 +164,12 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // Generate the per-entity job number (service-role only RPC). Validation is
     // done above so a burned number on failure is unlikely.
-    // Typed at the call site: the Functions type is kept empty (see database.types.ts).
-    const rpc = supabase.rpc as unknown as (
-      fn: string,
-      args: { p_kind: string; p_entity: string; p_branch: string | null }
-    ) => Promise<{ data: string | null; error: { message: string } | null }>
-    const { data: jobNumber, error: nErr } = await rpc('billing_next_number', {
-      p_kind: 'job',
-      p_entity: body.entityId,
-      p_branch: null,
-    })
-    if (nErr || !jobNumber) throw new Error(nErr?.message ?? 'Failed to generate job number')
+    const jobNumber = await nextNumber(supabase, 'job', body.entityId)
 
     const { data: created, error } = await supabase
       .from('billing_jobs')
       .insert({
-        job_number: jobNumber as string,
+        job_number: jobNumber,
         profile_id: body.profileId,
         entity_id: body.entityId,
         branch_id: profile.branch_id,

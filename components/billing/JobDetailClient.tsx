@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
+import JobTicketsSection from '@/components/billing/JobTicketsSection'
 
 interface Job {
   id: string
@@ -180,10 +181,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
         )}
       </div>
 
-      <div className="card" style={{ opacity: 0.7 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Tickets</div>
-        <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>Ticket entry is next — this is where a job&apos;s equipment, labor and charges will live.</div>
-      </div>
+      <JobTicketsSection jobId={jobId} isAdmin={isAdmin} />
     </div>
   )
 }
