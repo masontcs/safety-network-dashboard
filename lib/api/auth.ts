@@ -79,9 +79,22 @@ export function guardRevenueAccess(role: Role): NextResponse | null {
 
 export async function getAccessContext(): Promise<AccessResult> {
   const routeClient = createRouteClient()
-  const { data: { user }, error: authError } = await routeClient.auth.getUser()
 
-  if (authError || !user) {
+  // Performance: getClaims() verifies the JWT's signature + expiry LOCALLY when
+  // the project uses asymmetric JWT signing keys, instead of getUser()'s network
+  // round-trip to the Auth server on EVERY request. Since all ~100 API routes
+  // funnel through this helper, that hop was a per-click latency floor across
+  // both interfaces.
+  //
+  // Trade-off: a session is trusted until its token expires (<= 1h) rather than
+  // being revalidated server-side each call — fine for an internal tool. If the
+  // project has NOT migrated to asymmetric keys, getClaims() falls back to a
+  // network verify, so this change is safe either way (no speedup until the
+  // "JWT Signing Keys" migration is enabled in Supabase Auth settings).
+  const { data: claimsData, error: authError } = await routeClient.auth.getClaims()
+  const userId = claimsData?.claims?.sub as string | undefined
+
+  if (authError || !userId) {
     return {
       ok: false,
       response: NextResponse.json(
@@ -96,7 +109,7 @@ export async function getAccessContext(): Promise<AccessResult> {
   const { data: profile, error: profileError } = await supabase
     .from('user_profiles')
     .select('id, role, display_name')
-    .eq('id', user.id)
+    .eq('id', userId)
     .single()
 
   if (profileError || !profile) {
@@ -123,14 +136,14 @@ export async function getAccessContext(): Promise<AccessResult> {
 
   // Roles with null branchIds — either full access or customer-scoped (handled per AR route)
   if (role === 'admin' || role === 'executive' || role === 'ar_manager' || role === 'ar_team' || role === 'office_team') {
-    return { ok: true, access: { userId: user.id, role, displayName, branchIds: null } }
+    return { ok: true, access: { userId, role, displayName, branchIds: null } }
   }
 
   // sales, project_manager, district_manager, branch_manager: branch-scoped via assignments
   const { data: assignments, error: assignError } = await supabase
     .from('user_branch_assignments')
     .select('branch_id')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
 
   if (assignError) {
     return {
@@ -144,7 +157,7 @@ export async function getAccessContext(): Promise<AccessResult> {
 
   const branchIds = (assignments ?? []).map((a) => a.branch_id)
 
-  return { ok: true, access: { userId: user.id, role, displayName, branchIds } }
+  return { ok: true, access: { userId, role, displayName, branchIds } }
 }
 
 // ── AR team customer scope helper ──────────────────────────────────────────────
