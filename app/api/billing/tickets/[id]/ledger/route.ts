@@ -202,6 +202,44 @@ export async function PATCH(
   }
 }
 
+/**
+ * Set the SAME date on every equipment row of this ticket. Used by the
+ * "match the other items?" prompt after a single date edit — on a normal
+ * add ticket everything is picked up the same day. Only event_date changes.
+ */
+export async function PUT(
+  request: Request,
+  { params }: { params: { id: string } }
+): Promise<NextResponse> {
+  try {
+    const ctx = await getAccessContext()
+    if (!ctx.ok) return ctx.response
+    const guard = guardAdminOnly(ctx.access.role)
+    if (guard) return guard
+
+    const supabase = createServiceClient()
+    const ticket = await loadTicket(supabase, params.id)
+    if (!ticket) return bad('Ticket not found', 'NOT_FOUND', 404)
+    if (ctx.access.branchIds !== null && (!ticket.billing_jobs || !ctx.access.branchIds.includes(ticket.billing_jobs.branch_id))) {
+      return bad('You do not have access to this ticket’s branch.', 'FORBIDDEN', 403)
+    }
+    if (ticket.status === 'final_edit' || ticket.status === 'invoiced') {
+      return bad('This ticket is locked. Reopen it to change equipment.', 'CONFLICT', 409)
+    }
+
+    const body = (await request.json()) as { eventDate?: string }
+    if (!body.eventDate) return bad('A date is required')
+
+    const patch: LedgerUpdate = { event_date: body.eventDate }
+    const { error } = await supabase.from('billing_ticket_ledger').update(patch).eq('ticket_id', params.id)
+    if (error) throw new Error(error.message)
+
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    return billingApiError(err)
+  }
+}
+
 export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }

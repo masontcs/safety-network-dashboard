@@ -51,6 +51,8 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
   // ledger inline edit
   const [editEv, setEditEv] = useState<string | null>(null)
   const [evQty, setEvQty] = useState(''); const [evDate, setEvDate] = useState(''); const [evEquip, setEvEquip] = useState('')
+  // After a date edit, offer to match the rest of the ticket's items to it.
+  const [datePrompt, setDatePrompt] = useState<{ date: string; count: number } | null>(null)
 
   // line add form
   const [cKind, setCKind] = useState('sale'); const [cItem, setCItem] = useState(''); const [cDesc, setCDesc] = useState(''); const [cQty, setCQty] = useState('1'); const [cRate, setCRate] = useState('0.00')
@@ -102,7 +104,21 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
   async function removeLedger(id: string) { if (await call(`/api/billing/tickets/${ticketId}/ledger?eventId=${id}`, 'DELETE')) load() }
   function startEditEv(e: LedgerEvent) { setEditEv(e.id); setEvQty(String(e.qty)); setEvDate(e.date); setEvEquip(e.equipmentId ?? '') }
   async function saveEv() {
-    if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'PATCH', { eventId: editEv, qty: parseInt(evQty, 10), eventDate: evDate, equipmentId: evEquip || null })) { setEditEv(null); load() }
+    const newDate = evDate
+    // How many OTHER items on the ticket don't already share this date?
+    const mismatched = t ? t.ledger.filter((x) => x.id !== editEv && x.date !== newDate).length : 0
+    if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'PATCH', { eventId: editEv, qty: parseInt(evQty, 10), eventDate: newDate, equipmentId: evEquip || null })) {
+      setEditEv(null)
+      if (mismatched > 0) setDatePrompt({ date: newDate, count: mismatched })
+      load()
+    }
+  }
+  // Set every item on the ticket to the same date (the "match the rest" prompt).
+  async function applyDateToAll() {
+    if (!datePrompt) return
+    const date = datePrompt.date
+    setDatePrompt(null)
+    if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'PUT', { eventDate: date })) load()
   }
 
   async function addLine() {
@@ -129,6 +145,23 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1000 }}>
+      {datePrompt && (
+        <div
+          onClick={() => setDatePrompt(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}
+        >
+          <div onClick={(e) => e.stopPropagation()} className="card" style={{ maxWidth: 380, width: '100%', background: 'var(--bg-surface)' }}>
+            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>Match the other items?</div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 18 }}>
+              Set the date on the other {datePrompt.count} item{datePrompt.count > 1 ? 's' : ''} on this ticket to {datePrompt.date} too?
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setDatePrompt(null)} style={ghost}>Just this one</button>
+              <button onClick={applyDateToAll} disabled={busy} className="btn-primary" style={{ padding: '8px 16px', opacity: busy ? 0.5 : 1 }}>Yes, update all</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div>
         <Link href={t.job ? `/billing/jobs/${t.job.id}` : '/billing/tickets'} style={{ fontSize: 12, color: 'var(--text-muted)', textDecoration: 'none' }}>
           ← {t.job ? `Job ${t.job.number}` : 'Tickets'}
