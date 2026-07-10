@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Skeleton from '@/components/ui/Skeleton'
+import Select from '@/components/billing/Select'
+import Toggle from '@/components/billing/Toggle'
 
 /**
  * Billing profile x entity configuration.
@@ -23,19 +25,6 @@ interface EntityRow {
   enabled: boolean
   priceListId: string | null
   tierByCategory: Partial<Record<Category, string>>
-}
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  background: 'var(--bg-secondary)',
-  border: '1px solid var(--border-emphasis)',
-  borderRadius: 6,
-  padding: '7px 10px',
-  fontSize: 13,
-  color: 'var(--text-primary)',
-  outline: 'none',
-  fontFamily: 'inherit',
-  boxSizing: 'border-box',
 }
 
 const labelStyle: React.CSSProperties = {
@@ -161,15 +150,14 @@ export default function ProfileEntityConfigCard({ profileId }: { profileId: stri
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <input
-                    type="checkbox"
-                    id={`en-${e.entityId}`}
+                  <Toggle
+                    ariaLabel={`Enable ${e.code}`}
                     checked={e.enabled}
-                    onChange={(ev) => patch(e.entityId, { enabled: ev.target.checked })}
+                    onChange={(v) => patch(e.entityId, { enabled: v })}
                   />
-                  <label htmlFor={`en-${e.entityId}`} style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)', cursor: 'pointer' }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
                     {e.code}
-                  </label>
+                  </span>
                   <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{e.name}</span>
                   <span style={{
                     marginLeft: 'auto', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.04em',
@@ -183,14 +171,14 @@ export default function ProfileEntityConfigCard({ profileId }: { profileId: stri
                   <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <div style={{ maxWidth: 340 }}>
                       <label style={labelStyle}>Price list</label>
-                      <select
+                      <Select
+                        ariaLabel="Price list"
                         value={e.priceListId ?? ''}
-                        onChange={(ev) => changePriceList(e.entityId, ev.target.value)}
-                        style={inputStyle}
+                        onChange={(v) => changePriceList(e.entityId, v)}
                       >
                         <option value="">Select a price list…</option>
                         {lists.map((pl) => <option key={pl.id} value={pl.id}>{pl.name}</option>)}
-                      </select>
+                      </Select>
                       {lists.length === 0 && (
                         <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 6 }}>
                           No price lists exist for {e.code} yet.
@@ -205,16 +193,16 @@ export default function ProfileEntityConfigCard({ profileId }: { profileId: stri
                           {categories.map((cat) => (
                             <div key={cat}>
                               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{cat}</div>
-                              <select
+                              <Select
+                                ariaLabel={`Tier for ${cat}`}
                                 value={e.tierByCategory[cat] ?? ''}
-                                onChange={(ev) =>
-                                  patch(e.entityId, { tierByCategory: { ...e.tierByCategory, [cat]: ev.target.value } })
+                                onChange={(v) =>
+                                  patch(e.entityId, { tierByCategory: { ...e.tierByCategory, [cat]: v } })
                                 }
-                                style={inputStyle}
                               >
                                 <option value="">Select…</option>
                                 {tiers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                              </select>
+                              </Select>
                             </div>
                           ))}
                         </div>

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
 import Combobox from '@/components/billing/Combobox'
 import MoneyInput from '@/components/billing/MoneyInput'
+import Select from '@/components/billing/Select'
 import { BILLING_TYPES, BILLING_TYPE_LABELS } from '@/lib/billing/constants'
 import { buildTierGrid } from '@/lib/billing/pricing/tier-grid'
 import type { BillingType } from '@/lib/supabase/database.types'
@@ -259,9 +260,9 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
           <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)' }}>Rate grid</div>
           <div style={{ marginLeft: 'auto', minWidth: 240 }}>
             <label style={labelStyle}>Billing type</label>
-            <select value={billingType} onChange={(e) => setBillingType(e.target.value as BillingType)} style={inputStyle}>
+            <Select ariaLabel="Billing type" value={billingType} onChange={(v) => setBillingType(v as BillingType)}>
               {BILLING_TYPES.map((bt) => <option key={bt} value={bt}>{BILLING_TYPE_LABELS[bt]}</option>)}
-            </select>
+            </Select>
           </div>
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
@@ -336,25 +337,27 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
                     })}
 
                     <td style={tdStyle}>
-                      <select
-                        value={it.freezeAfterPosition ?? ''}
-                        onChange={(e) => patchItem(it.key, { freezeAfterPosition: e.target.value ? Number(e.target.value) : null })}
-                        style={{ ...inputStyle, maxWidth: 110 }}
+                      <Select
+                        ariaLabel="Freeze after"
+                        value={it.freezeAfterPosition ? String(it.freezeAfterPosition) : ''}
+                        onChange={(v) => patchItem(it.key, { freezeAfterPosition: v ? Number(v) : null })}
+                        style={{ maxWidth: 110 }}
                       >
                         <option value="">—</option>
                         {tiers.map((t, i) => <option key={t.key} value={i + 1}>{t.name}</option>)}
-                      </select>
+                      </Select>
                     </td>
 
                     <td style={tdStyle}>
-                      <select
+                      <Select
+                        ariaLabel="Tier exception"
                         value={it.tierExceptionTierId ?? ''}
-                        onChange={(e) => patchItem(it.key, { tierExceptionTierId: e.target.value || null })}
-                        style={{ ...inputStyle, maxWidth: 120 }}
+                        onChange={(v) => patchItem(it.key, { tierExceptionTierId: v || null })}
+                        style={{ maxWidth: 120 }}
                       >
                         <option value="">—</option>
                         {tiers.filter((t) => t.id).map((t) => <option key={t.key} value={t.id}>{t.name}</option>)}
-                      </select>
+                      </Select>
                     </td>
 
                     <td style={tdStyle}>

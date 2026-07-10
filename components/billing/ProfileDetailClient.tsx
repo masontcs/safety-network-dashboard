@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
 import ProfileEntityConfigCard from '@/components/billing/ProfileEntityConfigCard'
+import Select from '@/components/billing/Select'
+import Toggle from '@/components/billing/Toggle'
 
 /**
  * Billing profile detail. Two cards: the profile's own settings, and its
@@ -144,18 +146,18 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
             </div>
             <div>
               <label style={labelStyle}>Payment term</label>
-              <select value={termId} onChange={(e) => { setTermId(e.target.value); setSaveSuccess(false) }} disabled={!isAdmin} style={inputStyle}>
+              <Select ariaLabel="Payment term" value={termId} onChange={(v) => { setTermId(v); setSaveSuccess(false) }} disabled={!isAdmin}>
                 <option value="">Use customer default</option>
                 {terms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
+              </Select>
             </div>
           </div>
 
           <div>
             <label style={labelStyle}>Rental minimum (applied per invoice)</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, maxWidth: 300 }}>
-              <input type="checkbox" checked={minEnabled} disabled={!isAdmin}
-                onChange={(e) => { setMinEnabled(e.target.checked); setSaveSuccess(false) }} />
+              <Toggle ariaLabel="Enable rental minimum" checked={minEnabled} disabled={!isAdmin}
+                onChange={(v) => { setMinEnabled(v); setSaveSuccess(false) }} />
               <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>$</span>
               <input value={minDollars} disabled={!isAdmin || !minEnabled}
                 onChange={(e) => { setMinDollars(e.target.value); setSaveSuccess(false) }}

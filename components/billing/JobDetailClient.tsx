@@ -5,6 +5,8 @@ import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
 import JobTicketsSection from '@/components/billing/JobTicketsSection'
 import Tabs from '@/components/billing/Tabs'
+import Toggle from '@/components/billing/Toggle'
+import Select from '@/components/billing/Select'
 
 interface Job {
   id: string
@@ -141,9 +143,9 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
           <div><label style={labelStyle}>Job name</label><input value={name} onChange={(e) => { setName(e.target.value); setSaveOk(false) }} disabled={!isAdmin} style={inputStyle} /></div>
           <div>
             <label style={labelStyle}>Status</label>
-            <select value={status} onChange={(e) => { setStatus(e.target.value); setSaveOk(false) }} disabled={!isAdmin} style={inputStyle}>
+            <Select ariaLabel="Status" value={status} onChange={(v) => { setStatus(v); setSaveOk(false) }} disabled={!isAdmin}>
               {job.statuses.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-            </select>
+            </Select>
           </div>
           <div><label style={labelStyle}>PO number</label><input value={po} onChange={(e) => { setPo(e.target.value); setSaveOk(false) }} disabled={!isAdmin} style={inputStyle} /></div>
         </div>
@@ -163,16 +165,10 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 20, marginTop: 16, fontSize: 12.5, color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: isAdmin ? 'pointer' : 'default' }}>
-            <input type="checkbox" checked={reqSig} disabled={!isAdmin} onChange={(e) => { setReqSig(e.target.checked); setSaveOk(false) }} /> Require signature
-          </label>
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: isAdmin ? 'pointer' : 'default' }}>
-            <input type="checkbox" checked={secondSig} disabled={!isAdmin} onChange={(e) => { setSecondSig(e.target.checked); setSaveOk(false) }} /> Second signature
-          </label>
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: isAdmin ? 'pointer' : 'default' }}>
-            <input type="checkbox" checked={taxExempt} disabled={!isAdmin} onChange={(e) => { setTaxExempt(e.target.checked); setSaveOk(false) }} /> Tax exempt
-          </label>
+        <div style={{ display: 'flex', gap: '14px 32px', marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--border-subtle, var(--border-emphasis))', flexWrap: 'wrap' }}>
+          <Toggle label="Require signature" disabled={!isAdmin} checked={reqSig} onChange={(v) => { setReqSig(v); setSaveOk(false) }} />
+          <Toggle label="Second signature" disabled={!isAdmin} checked={secondSig} onChange={(v) => { setSecondSig(v); setSaveOk(false) }} />
+          <Toggle label="Tax exempt" disabled={!isAdmin} checked={taxExempt} onChange={(v) => { setTaxExempt(v); setSaveOk(false) }} />
         </div>
 
         <div style={{ marginTop: 14 }}>

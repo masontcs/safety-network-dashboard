@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
 import Combobox from '@/components/billing/Combobox'
+import Select from '@/components/billing/Select'
+import Toggle from '@/components/billing/Toggle'
 
 /**
  * Billing profiles list. Profiles are branch-owned and are where jobs attach —
@@ -224,10 +226,10 @@ export default function ProfilesClient() {
             </div>
             <div>
               <label style={labelStyle}>Branch</label>
-              <select value={pBranchId} onChange={(e) => setPBranchId(e.target.value)} style={inputStyle}>
+              <Select ariaLabel="Branch" value={pBranchId} onChange={setPBranchId}>
                 <option value="">Select…</option>
                 {ref.branches.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.code})</option>)}
-              </select>
+              </Select>
             </div>
             <div>
               <label style={labelStyle}>Profile code</label>
@@ -239,16 +241,16 @@ export default function ProfilesClient() {
             </div>
             <div>
               <label style={labelStyle}>Payment term</label>
-              <select value={pTermId} onChange={(e) => setPTermId(e.target.value)} style={inputStyle}>
+              <Select ariaLabel="Payment term" value={pTermId} onChange={setPTermId}>
                 <option value="">Use customer default</option>
                 {ref.paymentTerms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
+              </Select>
             </div>
             <div>
               <label style={labelStyle}>Rental minimum (per invoice)</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="checkbox" checked={pMinEnabled} onChange={(e) => setPMinEnabled(e.target.checked)} />
-                <input value={pMinDollars} onChange={(e) => setPMinDollars(e.target.value)} disabled={!pMinEnabled} style={{ ...inputStyle, opacity: pMinEnabled ? 1 : 0.5 }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, height: 34 }}>
+                <Toggle ariaLabel="Enable rental minimum" checked={pMinEnabled} onChange={setPMinEnabled} />
+                <input value={pMinDollars} onChange={(e) => setPMinDollars(e.target.value)} disabled={!pMinEnabled} placeholder="$" style={{ ...inputStyle, opacity: pMinEnabled ? 1 : 0.5 }} />
               </div>
             </div>
           </div>

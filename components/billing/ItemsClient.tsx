@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Skeleton from '@/components/ui/Skeleton'
+import Toggle from '@/components/billing/Toggle'
+import Select from '@/components/billing/Select'
 import { CATEGORIES, BILLING_TYPES, BILLING_TYPE_LABELS } from '@/lib/billing/constants'
 import type { BillingItemCategory, BillingType } from '@/lib/supabase/database.types'
 
@@ -54,6 +56,11 @@ const tdStyle: React.CSSProperties = {
 const ghostBtn: React.CSSProperties = {
   background: 'transparent', border: '1px solid var(--border-emphasis)', borderRadius: 6,
   padding: '6px 12px', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit',
+}
+// On/off controls live in their own row, separated from the text fields above.
+const optionsRow: React.CSSProperties = {
+  display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '18px 32px',
+  marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--border-subtle, var(--border-emphasis))',
 }
 
 // Money helpers — dollars in the UI, integer cents everywhere else. Round once.
@@ -211,39 +218,31 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
       {showNew && isAdmin && (
         <div className="card">
           <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 16, color: 'var(--text-primary)' }}>New item</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
             <div><label style={labelStyle}>Code</label><input value={nCode} onChange={(e) => setNCode(e.target.value)} placeholder="CONE28" style={inputStyle} /></div>
             <div><label style={labelStyle}>Name</label><input value={nName} onChange={(e) => setNName(e.target.value)} placeholder='28" Cone' style={inputStyle} /></div>
             <div>
               <label style={labelStyle}>Category</label>
-              <select value={nCategory} onChange={(e) => setNCategory(e.target.value as BillingItemCategory)} style={inputStyle}>
+              <Select ariaLabel="Category" value={nCategory} onChange={(v) => setNCategory(v as BillingItemCategory)}>
                 {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              </Select>
             </div>
             <div><label style={labelStyle}>Group</label><input value={nGroup} onChange={(e) => setNGroup(e.target.value)} placeholder="REG" style={inputStyle} /></div>
             <div><label style={labelStyle}>Cost ($)</label><input value={nCost} onChange={(e) => setNCost(e.target.value)} style={inputStyle} /></div>
-            <div>
-              <label style={labelStyle}>Rentable</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 34 }}>
-                <input type="checkbox" checked={nRentable} onChange={(e) => setNRentable(e.target.checked)} />
-                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{nRentable ? 'can be rented' : 'sale-only'}</span>
-              </div>
+          </div>
+
+          <div style={optionsRow}>
+            <Toggle label="Rentable" hint={nRentable ? 'can be rented' : 'sale-only'} checked={nRentable} onChange={setNRentable} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Toggle label="Salable" checked={nSalable} onChange={setNSalable} />
+              {nSalable && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>$</span>
+                  <input value={nSalePrice} onChange={(e) => setNSalePrice(e.target.value)} placeholder="sale price" style={{ ...inputStyle, width: 100 }} />
+                </span>
+              )}
             </div>
-            <div>
-              <label style={labelStyle}>Salable</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="checkbox" checked={nSalable} onChange={(e) => setNSalable(e.target.checked)} />
-                <input value={nSalePrice} onChange={(e) => setNSalePrice(e.target.value)} disabled={!nSalable}
-                  placeholder="sale $" style={{ ...inputStyle, opacity: nSalable ? 1 : 0.5 }} />
-              </div>
-            </div>
-            <div>
-              <label style={labelStyle}>Tracked</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 34 }}>
-                <input type="checkbox" checked={nTracked} onChange={(e) => setNTracked(e.target.checked)} />
-                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>needs equipment ID</span>
-              </div>
-            </div>
+            <Toggle label="Tracked" hint="needs equipment ID" checked={nTracked} onChange={setNTracked} />
           </div>
 
           {/* Variations — addable at create time */}
@@ -286,38 +285,31 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
             fallback used only when a price list prices no cell for this item.
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
             <div><label style={labelStyle}>Name</label><input value={editing.name} onChange={(e) => patchEdit({ name: e.target.value })} style={inputStyle} /></div>
             <div>
               <label style={labelStyle}>Category</label>
-              <select value={editing.category} onChange={(e) => patchEdit({ category: e.target.value as BillingItemCategory })} style={inputStyle}>
+              <Select ariaLabel="Category" value={editing.category} onChange={(v) => patchEdit({ category: v as BillingItemCategory })}>
                 {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              </Select>
             </div>
             <div><label style={labelStyle}>Group</label><input value={editing.groupName ?? ''} onChange={(e) => patchEdit({ groupName: e.target.value || null })} style={inputStyle} /></div>
             <div><label style={labelStyle}>Cost ($)</label><input value={editCost} onChange={(e) => setEditCost(e.target.value)} style={inputStyle} /></div>
-            <div>
-              <label style={labelStyle}>Salable</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="checkbox" checked={editing.salable} onChange={(e) => patchEdit({ salable: e.target.checked, taxable: e.target.checked })} />
-                <input value={editSalePrice} onChange={(e) => setEditSalePrice(e.target.value)} disabled={!editing.salable}
-                  style={{ ...inputStyle, opacity: editing.salable ? 1 : 0.5 }} />
-              </div>
+          </div>
+
+          <div style={optionsRow}>
+            <Toggle label="Rentable" hint={editing.rentable ? 'can be rented' : 'sale-only'} checked={editing.rentable} onChange={(v) => patchEdit({ rentable: v })} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Toggle label="Salable" checked={editing.salable} onChange={(v) => patchEdit({ salable: v, taxable: v })} />
+              {editing.salable && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>$</span>
+                  <input value={editSalePrice} onChange={(e) => setEditSalePrice(e.target.value)} placeholder="sale price" style={{ ...inputStyle, width: 100 }} />
+                </span>
+              )}
             </div>
-            <div>
-              <label style={labelStyle}>Flags</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, height: 34, fontSize: 12, color: 'var(--text-muted)' }}>
-                <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={editing.rentable} onChange={(e) => patchEdit({ rentable: e.target.checked })} /> rentable
-                </label>
-                <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={editing.tracked} onChange={(e) => patchEdit({ tracked: e.target.checked })} /> tracked
-                </label>
-                <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={editing.isActive} onChange={(e) => patchEdit({ isActive: e.target.checked })} /> active
-                </label>
-              </div>
-            </div>
+            <Toggle label="Tracked" hint="needs equipment ID" checked={editing.tracked} onChange={(v) => patchEdit({ tracked: v })} />
+            <Toggle label="Active" checked={editing.isActive} onChange={(v) => patchEdit({ isActive: v })} />
           </div>
 
           {/* Variations */}

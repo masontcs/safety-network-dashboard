@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
 import Tabs from '@/components/billing/Tabs'
 import Combobox from '@/components/billing/Combobox'
+import Select from '@/components/billing/Select'
 import { BILLING_TYPE_LABELS } from '@/lib/billing/constants'
 import type { BillingType } from '@/lib/supabase/database.types'
 
@@ -162,10 +163,10 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
             <div><label style={labelStyle}>Ticket date</label><input type="date" value={date} disabled={disabled} onChange={(e) => setDate(e.target.value)} style={inputStyle} /></div>
             <div>
               <label style={labelStyle}>Billing type</label>
-              <select value={billingType} disabled={disabled} onChange={(e) => setBillingType(e.target.value)} style={inputStyle}>
+              <Select ariaLabel="Billing type" value={billingType} disabled={disabled} onChange={setBillingType} style={{ ...inputStyle }}>
                 <option value="">Not set</option>
                 {t.billingTypes.map((bt) => <option key={bt} value={bt}>{BILLING_TYPE_LABELS[bt]}</option>)}
-              </select>
+              </Select>
             </div>
           </div>
           <div style={{ marginTop: 12 }}><label style={labelStyle}>Notes</label><textarea value={notes} disabled={disabled} onChange={(e) => setNotes(e.target.value)} rows={2} style={{ ...inputStyle, resize: 'vertical' }} /></div>
@@ -242,10 +243,10 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
               </div>
               {pickItem && pickItem.variations.length > 0 && (
                 <div style={{ minWidth: 130 }}><label style={labelStyle}>Variation</label>
-                  <select value={lVar} onChange={(e) => setLVar(e.target.value)} style={inputStyle}><option value="">—</option>{pickItem.variations.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select>
+                  <Select ariaLabel="Variation" value={lVar} onChange={setLVar} style={inputStyle}><option value="">—</option>{pickItem.variations.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</Select>
                 </div>
               )}
-              <div style={{ width: 110 }}><label style={labelStyle}>Event</label><select value={lType} onChange={(e) => setLType(e.target.value)} style={inputStyle}><option value="pickup">Pickup</option><option value="return">Return</option><option value="lost">Lost</option></select></div>
+              <div style={{ width: 120 }}><label style={labelStyle}>Event</label><Select ariaLabel="Event" value={lType} onChange={setLType} style={inputStyle}><option value="pickup">Pickup</option><option value="return">Return</option><option value="lost">Lost</option></Select></div>
               <div style={{ width: 140 }}><label style={labelStyle}>Date</label><input type="date" value={lDate} onChange={(e) => setLDate(e.target.value)} style={inputStyle} /></div>
               <div style={{ width: 70 }}><label style={labelStyle}>Qty</label><input value={lQty} onChange={(e) => setLQty(e.target.value)} style={inputStyle} /></div>
               {pickItem?.tracked && <div style={{ width: 130 }}><label style={labelStyle}>Equip ID *</label><input value={lEquip} onChange={(e) => setLEquip(e.target.value)} style={inputStyle} /></div>}
@@ -293,7 +294,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
           {!locked && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid var(--border-subtle, var(--border-emphasis))', paddingTop: 14 }}>
               <div style={{ width: 120 }}><label style={labelStyle}>Kind</label>
-                <select value={cKind} onChange={(e) => setCKind(e.target.value)} style={inputStyle}><option value="sale">Sale</option><option value="labor">Labor</option><option value="lump_sum">Lump sum</option><option value="misc">Misc</option></select>
+                <Select ariaLabel="Kind" value={cKind} onChange={setCKind} style={inputStyle}><option value="sale">Sale</option><option value="labor">Labor</option><option value="lump_sum">Lump sum</option><option value="misc">Misc</option></Select>
               </div>
               {cKind === 'sale' ? (
                 <div style={{ minWidth: 260 }}><label style={labelStyle}>Salable item</label>

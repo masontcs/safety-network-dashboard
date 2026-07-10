@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
 import Combobox from '@/components/billing/Combobox'
+import Select from '@/components/billing/Select'
 
 /**
  * Jobs list + create. A job attaches to a billing profile (customer + branch
@@ -205,10 +206,10 @@ export default function JobsClient({ isAdmin }: { isAdmin: boolean }) {
             </div>
             <div>
               <label style={labelStyle}>Entity</label>
-              <select value={pEntityId} onChange={(e) => setPEntityId(e.target.value)} disabled={!selectedProfile} style={inputStyle}>
+              <Select ariaLabel="Entity" value={pEntityId} onChange={setPEntityId} disabled={!selectedProfile}>
                 <option value="">{selectedProfile ? 'Select…' : 'Pick a profile first'}</option>
                 {entityChoices.map((e) => <option key={e.entityId} value={e.entityId}>{e.code}</option>)}
-              </select>
+              </Select>
               {selectedProfile && entityChoices.length === 0 && (
                 <div style={{ fontSize: 11.5, color: 'var(--danger)', marginTop: 6 }}>
                   This profile has no billable entities. Configure a price list on the profile first.

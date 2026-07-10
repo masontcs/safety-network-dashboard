@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
+import Select from '@/components/billing/Select'
 
 interface PriceListRow {
   id: string
@@ -112,10 +113,10 @@ export default function PriceListsClient({ isAdmin }: { isAdmin: boolean }) {
             </div>
             <div style={{ minWidth: 180 }}>
               <label style={labelStyle}>Entity</label>
-              <select value={nEntity} onChange={(e) => setNEntity(e.target.value)} style={inputStyle}>
+              <Select ariaLabel="Entity" value={nEntity} onChange={setNEntity}>
                 <option value="">Select…</option>
                 {entities.map((e) => <option key={e.entityId} value={e.entityId}>{e.code}</option>)}
-              </select>
+              </Select>
             </div>
             <button onClick={create} disabled={busy || !nName.trim() || !nEntity} className="btn-primary"
               style={{ padding: '8px 18px', opacity: busy || !nName.trim() || !nEntity ? 0.5 : 1 }}>Create</button>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
+import Select from '@/components/billing/Select'
 
 /**
  * Global tickets list — across all jobs. Create happens from a job (see the
@@ -67,13 +68,15 @@ export default function TicketsClient() {
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search tickets, jobs, customers…" style={{ ...inputStyle, maxWidth: 320 }} />
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ ...inputStyle, maxWidth: 160 }}>
-            <option value="">All statuses</option>
-            <option value="active">Active</option>
-            <option value="in_review">In review</option>
-            <option value="final_edit">Final edit</option>
-            <option value="invoiced">Invoiced</option>
-          </select>
+          <div style={{ width: 160 }}>
+            <Select ariaLabel="Status filter" value={statusFilter} onChange={setStatusFilter}>
+              <option value="">All statuses</option>
+              <option value="active">Active</option>
+              <option value="in_review">In review</option>
+              <option value="final_edit">Final edit</option>
+              <option value="invoiced">Invoiced</option>
+            </Select>
+          </div>
           <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>{filtered.length} of {tickets.length}</span>
         </div>
 
