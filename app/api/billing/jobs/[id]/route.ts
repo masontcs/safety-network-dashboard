@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
-import { apiError } from '@/lib/utils/errors'
+import { billingApiError } from '@/lib/billing/http'
 import type { Database } from '@/lib/supabase/database.types'
 
 /**
@@ -120,7 +120,7 @@ export async function GET(
       },
     })
   } catch (err) {
-    return apiError(err)
+    return billingApiError(err)
   }
 }
 
@@ -220,6 +220,6 @@ export async function PATCH(
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    return apiError(err)
+    return billingApiError(err)
   }
 }

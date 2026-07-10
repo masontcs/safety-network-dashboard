@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAccessContext } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
-import { apiError } from '@/lib/utils/errors'
+import { billingApiError } from '@/lib/billing/http'
 
 /**
  * Lightweight item picker for ticket entry: active items with the fields the
@@ -51,6 +51,6 @@ export async function GET(): Promise<NextResponse> {
       })),
     })
   } catch (err) {
-    return apiError(err)
+    return billingApiError(err)
   }
 }

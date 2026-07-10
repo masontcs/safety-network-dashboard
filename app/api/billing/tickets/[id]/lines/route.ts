@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
-import { apiError } from '@/lib/utils/errors'
+import { billingApiError } from '@/lib/billing/http'
 
 /**
  * Non-rental ticket charge lines: Sale, Labor, Lump Sum, Misc.
@@ -117,7 +117,7 @@ export async function POST(
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    return apiError(err)
+    return billingApiError(err)
   }
 }
 
@@ -150,6 +150,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    return apiError(err)
+    return billingApiError(err)
   }
 }

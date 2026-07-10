@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
-import { apiError } from '@/lib/utils/errors'
+import { billingApiError } from '@/lib/billing/http'
 import { BILLING_TYPES } from '@/lib/billing/constants'
 import type { BillingType, Database } from '@/lib/supabase/database.types'
 
@@ -22,7 +22,9 @@ type Status = (typeof STATUSES)[number]
 function bad(error: string, code = 'VALIDATION_ERROR', status = 400) {
   return NextResponse.json({ success: false, error, code }, { status })
 }
-export const isLocked = (s: string) => s === 'final_edit' || s === 'invoiced'
+// Local helper — must NOT be exported from a route file (Next.js only allows HTTP
+// handlers / recognised route config to be exported; anything else fails the build).
+const isLocked = (s: string) => s === 'final_edit' || s === 'invoiced'
 
 interface TicketRow {
   id: string
@@ -132,7 +134,7 @@ export async function GET(
       },
     })
   } catch (err) {
-    return apiError(err)
+    return billingApiError(err)
   }
 }
 
@@ -216,6 +218,6 @@ export async function PATCH(
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    return apiError(err)
+    return billingApiError(err)
   }
 }

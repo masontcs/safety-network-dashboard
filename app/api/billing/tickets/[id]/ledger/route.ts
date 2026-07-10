@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
-import { apiError } from '@/lib/utils/errors'
+import { billingApiError } from '@/lib/billing/http'
 
 /**
  * The ticket quantity ledger — the Equipment tab.
@@ -126,7 +126,7 @@ export async function POST(
     await refreshRecurring(supabase, params.id)
     return NextResponse.json({ success: true })
   } catch (err) {
-    return apiError(err)
+    return billingApiError(err)
   }
 }
 
@@ -160,6 +160,6 @@ export async function DELETE(
     await refreshRecurring(supabase, params.id)
     return NextResponse.json({ success: true })
   } catch (err) {
-    return apiError(err)
+    return billingApiError(err)
   }
 }

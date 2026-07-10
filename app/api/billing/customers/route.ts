@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
-import { apiError } from '@/lib/utils/errors'
+import { billingApiError } from '@/lib/billing/http'
 
 /**
  * Billing customers. A customer is entity-agnostic and branch-agnostic — it
@@ -41,7 +41,7 @@ export async function GET(): Promise<NextResponse> {
       })),
     })
   } catch (err) {
-    return apiError(err)
+    return billingApiError(err)
   }
 }
 
@@ -83,6 +83,6 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     return NextResponse.json({ success: true, data: created })
   } catch (err) {
-    return apiError(err)
+    return billingApiError(err)
   }
 }

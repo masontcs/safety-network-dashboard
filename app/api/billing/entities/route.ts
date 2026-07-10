@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAccessContext } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
-import { apiError } from '@/lib/utils/errors'
+import { billingApiError } from '@/lib/billing/http'
 
 /**
  * Billing-enabled entities (INC / STS / TCS) with their invoice-number letter.
@@ -41,6 +41,6 @@ export async function GET(): Promise<NextResponse> {
         .sort((a, b) => a.code.localeCompare(b.code)),
     })
   } catch (err) {
-    return apiError(err)
+    return billingApiError(err)
   }
 }
