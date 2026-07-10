@@ -130,18 +130,29 @@ export async function POST(request: Request): Promise<NextResponse> {
     const costCents = body.costCents ?? 0
     if (!Number.isInteger(costCents) || costCents < 0) return bad('Cost must be a whole number of cents, zero or greater')
 
-    const rentable = body.rentable ?? true
-    const salable = body.salable ?? false
-    // Sale-only items can't be rented; an item that's neither is useless.
-    if (!rentable && !salable) return bad('A sale-only item must be marked salable (it has to be sellable).')
-    const salePriceCents = salable ? body.salePriceCents ?? null : null
-    if (salable) {
-      if (salePriceCents == null) return bad('A salable item needs a sale price')
-      if (!Number.isInteger(salePriceCents) || salePriceCents < 0) return bad('Sale price must be a whole number of cents')
-    }
+    // Category is the item's nature. Only Equipment is a rentable/salable good;
+    // Labor / Lump Sum / Misc are charge items — never rentable, salable,
+    // tracked, or taxable (the DB enforces this too).
+    const isEquipment = category === 'Equipment'
+    let rentable = false
+    let salable = false
+    let salePriceCents: number | null = null
+    let taxable = false
+    let tracked = false
 
-    // Tax only ever applies to sales lines, so a non-salable item cannot be taxable.
-    const taxable = salable ? body.taxable ?? true : false
+    if (isEquipment) {
+      rentable = body.rentable ?? true
+      salable = body.salable ?? false
+      if (!rentable && !salable) return bad('An equipment item must be rentable, salable, or both.')
+      salePriceCents = salable ? body.salePriceCents ?? null : null
+      if (salable) {
+        if (salePriceCents == null) return bad('A salable item needs a sale price')
+        if (!Number.isInteger(salePriceCents) || salePriceCents < 0) return bad('Sale price must be a whole number of cents')
+      }
+      // Tax only ever applies to sales lines, so a non-salable item cannot be taxable.
+      taxable = salable ? body.taxable ?? true : false
+      tracked = body.tracked ?? false
+    }
 
     const supabase = createServiceClient()
 
@@ -161,7 +172,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         salable,
         sale_price_cents: salePriceCents,
         taxable,
-        tracked: body.tracked ?? false,
+        tracked,
       })
       .select('id, code, name')
       .single()

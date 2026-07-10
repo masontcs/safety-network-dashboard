@@ -121,7 +121,7 @@ export async function PATCH(
 
     const { data: existing, error: exErr } = await supabase
       .from('billing_items')
-      .select('id, rentable, salable, sale_price_cents')
+      .select('id, category, rentable, salable, sale_price_cents')
       .eq('id', params.id)
       .maybeSingle()
     if (exErr) throw new Error(exErr.message)
@@ -134,38 +134,56 @@ export async function PATCH(
       if (!name) return bad('Item name cannot be empty')
       patch.name = name
     }
+
+    // Effective category (may be changing this request) — it drives the flags.
+    let category = existing.category as BillingItemCategory
     if (body.category !== undefined) {
-      const category = body.category as BillingItemCategory
+      category = body.category as BillingItemCategory
       if (!CATEGORIES.includes(category)) return bad(`Category must be one of: ${CATEGORIES.join(', ')}`)
       patch.category = category
     }
+    const isEquipment = category === 'Equipment'
+
     if (body.groupName !== undefined) patch.group_name = body.groupName?.trim() || null
     if (body.costCents !== undefined) {
       if (!Number.isInteger(body.costCents) || body.costCents < 0) return bad('Cost must be a whole number of cents')
       patch.cost_cents = body.costCents
     }
-    if (body.tracked !== undefined) patch.tracked = body.tracked
     if (body.isActive !== undefined) patch.is_active = body.isActive
 
-    // rentable / salable: an item must stay usable for at least one of the two.
-    const rentable = body.rentable ?? existing.rentable
-    const salable = body.salable ?? existing.salable
-    if (!rentable && !salable) return bad('An item must be rentable or salable (or both). A sale-only item must stay salable.')
-    if (body.rentable !== undefined) patch.rentable = rentable
+    if (!isEquipment) {
+      // Charge item (Labor / Lump Sum / Misc): never a good. Zero the flags,
+      // including when the category is being switched away from Equipment.
+      patch.rentable = false
+      patch.salable = false
+      patch.tracked = false
+      patch.taxable = false
+      patch.sale_price_cents = null
+    } else {
+      if (body.tracked !== undefined) patch.tracked = body.tracked
 
-    // salable / sale price / taxable move together: the DB enforces that a
-    // salable item has a sale price, and tax only ever applies to sales lines.
-    if (body.salable !== undefined || body.salePriceCents !== undefined) {
-      const salePriceCents = salable ? body.salePriceCents ?? existing.sale_price_cents : null
-      if (salable) {
-        if (salePriceCents == null) return bad('A salable item needs a sale price')
-        if (!Number.isInteger(salePriceCents) || salePriceCents < 0) return bad('Sale price must be a whole number of cents')
+      // rentable / salable: an equipment item must stay usable for one of the two.
+      const rentable = body.rentable ?? existing.rentable
+      const salable = body.salable ?? existing.salable
+      if (!rentable && !salable) return bad('An equipment item must be rentable or salable (or both).')
+      // Switching category INTO Equipment: make sure a good flag is set.
+      if (body.category !== undefined) { patch.rentable = rentable; patch.salable = salable }
+      else if (body.rentable !== undefined) patch.rentable = rentable
+
+      // salable / sale price / taxable move together: the DB enforces that a
+      // salable item has a sale price, and tax only ever applies to sales lines.
+      if (body.salable !== undefined || body.salePriceCents !== undefined || body.category !== undefined) {
+        const salePriceCents = salable ? body.salePriceCents ?? existing.sale_price_cents : null
+        if (salable) {
+          if (salePriceCents == null) return bad('A salable item needs a sale price')
+          if (!Number.isInteger(salePriceCents) || salePriceCents < 0) return bad('Sale price must be a whole number of cents')
+        }
+        patch.salable = salable
+        patch.sale_price_cents = salePriceCents
       }
-      patch.salable = salable
-      patch.sale_price_cents = salePriceCents
-    }
-    if (body.taxable !== undefined || body.salable !== undefined) {
-      patch.taxable = salable ? body.taxable ?? true : false
+      if (body.taxable !== undefined || body.salable !== undefined || body.category !== undefined) {
+        patch.taxable = salable ? body.taxable ?? true : false
+      }
     }
 
     if (Object.keys(patch).length > 0) {

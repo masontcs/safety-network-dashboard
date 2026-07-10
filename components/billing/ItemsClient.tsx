@@ -122,9 +122,10 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
 
   async function createItem() {
     if (busy) return
+    const equip = nCategory === 'Equipment'
     if (!validMoney(nCost)) { setActionError('Cost must be a valid amount'); return }
-    if (nSalable && !validMoney(nSalePrice)) { setActionError('Sale price must be a valid amount'); return }
-    if (!nRentable && !nSalable) { setActionError('A sale-only item must be marked salable.'); return }
+    if (equip && nSalable && !validMoney(nSalePrice)) { setActionError('Sale price must be a valid amount'); return }
+    if (equip && !nRentable && !nSalable) { setActionError('An equipment item must be rentable or salable.'); return }
     setBusy(true); setActionError(null)
     try {
       const res = await fetch('/api/billing/items', {
@@ -132,9 +133,11 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: nCode, name: nName, category: nCategory, groupName: nGroup || null,
-          costCents: toCents(nCost), rentable: nRentable, salable: nSalable,
-          salePriceCents: nSalable ? toCents(nSalePrice) : null,
-          tracked: nTracked,
+          costCents: toCents(nCost),
+          rentable: equip ? nRentable : false,
+          salable: equip ? nSalable : false,
+          salePriceCents: equip && nSalable ? toCents(nSalePrice) : null,
+          tracked: equip ? nTracked : false,
           variations: nVars.filter((v) => v.name.trim()),
         }),
       })
@@ -159,9 +162,10 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
 
   async function saveEditor() {
     if (!editing || busy) return
+    const equip = editing.category === 'Equipment'
     if (!validMoney(editCost)) { setActionError('Cost must be a valid amount'); return }
-    if (editing.salable && !validMoney(editSalePrice)) { setActionError('Sale price must be a valid amount'); return }
-    if (!editing.rentable && !editing.salable) { setActionError('An item must be rentable or salable. A sale-only item must stay salable.'); return }
+    if (equip && editing.salable && !validMoney(editSalePrice)) { setActionError('Sale price must be a valid amount'); return }
+    if (equip && !editing.rentable && !editing.salable) { setActionError('An equipment item must be rentable or salable.'); return }
     setBusy(true); setActionError(null)
     try {
       const res = await fetch(`/api/billing/items/${editing.id}`, {
@@ -232,19 +236,25 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
             <div><label style={labelStyle}>Cost ($)</label><input value={nCost} onChange={(e) => setNCost(e.target.value)} style={inputStyle} /></div>
           </div>
 
-          <div style={optionsRow}>
-            <Toggle label="Rentable" hint={nRentable ? 'can be rented' : 'sale-only'} checked={nRentable} onChange={setNRentable} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Toggle label="Salable" checked={nSalable} onChange={setNSalable} />
-              {nSalable && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>$</span>
-                  <input value={nSalePrice} onChange={(e) => setNSalePrice(e.target.value)} placeholder="sale price" style={{ ...inputStyle, width: 100 }} />
-                </span>
-              )}
+          {nCategory === 'Equipment' ? (
+            <div style={optionsRow}>
+              <Toggle label="Rentable" hint={nRentable ? 'can be rented' : 'sale-only'} checked={nRentable} onChange={setNRentable} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Toggle label="Salable" checked={nSalable} onChange={setNSalable} />
+                {nSalable && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>$</span>
+                    <input value={nSalePrice} onChange={(e) => setNSalePrice(e.target.value)} placeholder="sale price" style={{ ...inputStyle, width: 100 }} />
+                  </span>
+                )}
+              </div>
+              <Toggle label="Tracked" hint="needs equipment ID" checked={nTracked} onChange={setNTracked} />
             </div>
-            <Toggle label="Tracked" hint="needs equipment ID" checked={nTracked} onChange={setNTracked} />
-          </div>
+          ) : (
+            <div style={{ ...optionsRow, fontSize: 12.5, color: 'var(--text-muted)' }}>
+              {nCategory} is a charge item — billed as a {nCategory.toLowerCase()} line on a ticket, not rented or sold.
+            </div>
+          )}
 
           {/* Variations — addable at create time */}
           <div style={{ marginTop: 20 }}>
@@ -290,7 +300,12 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
             <div><label style={labelStyle}>Name</label><input value={editing.name} onChange={(e) => patchEdit({ name: e.target.value })} style={inputStyle} /></div>
             <div>
               <label style={labelStyle}>Category</label>
-              <Select ariaLabel="Category" value={editing.category} onChange={(v) => patchEdit({ category: v as BillingItemCategory })}>
+              <Select ariaLabel="Category" value={editing.category} onChange={(v) => {
+                const cat = v as BillingItemCategory
+                // Switching to a charge category zeroes the goods flags.
+                if (cat !== 'Equipment') patchEdit({ category: cat, rentable: false, salable: false, tracked: false, taxable: false })
+                else patchEdit({ category: cat })
+              }}>
                 {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </Select>
             </div>
@@ -299,17 +314,25 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
           </div>
 
           <div style={optionsRow}>
-            <Toggle label="Rentable" hint={editing.rentable ? 'can be rented' : 'sale-only'} checked={editing.rentable} onChange={(v) => patchEdit({ rentable: v })} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Toggle label="Salable" checked={editing.salable} onChange={(v) => patchEdit({ salable: v, taxable: v })} />
-              {editing.salable && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>$</span>
-                  <input value={editSalePrice} onChange={(e) => setEditSalePrice(e.target.value)} placeholder="sale price" style={{ ...inputStyle, width: 100 }} />
-                </span>
-              )}
-            </div>
-            <Toggle label="Tracked" hint="needs equipment ID" checked={editing.tracked} onChange={(v) => patchEdit({ tracked: v })} />
+            {editing.category === 'Equipment' ? (
+              <>
+                <Toggle label="Rentable" hint={editing.rentable ? 'can be rented' : 'sale-only'} checked={editing.rentable} onChange={(v) => patchEdit({ rentable: v })} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <Toggle label="Salable" checked={editing.salable} onChange={(v) => patchEdit({ salable: v, taxable: v })} />
+                  {editing.salable && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>$</span>
+                      <input value={editSalePrice} onChange={(e) => setEditSalePrice(e.target.value)} placeholder="sale price" style={{ ...inputStyle, width: 100 }} />
+                    </span>
+                  )}
+                </div>
+                <Toggle label="Tracked" hint="needs equipment ID" checked={editing.tracked} onChange={(v) => patchEdit({ tracked: v })} />
+              </>
+            ) : (
+              <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
+                {editing.category} is a charge item — billed as a {editing.category.toLowerCase()} line on a ticket, not rented or sold.
+              </span>
+            )}
             <Toggle label="Active" checked={editing.isActive} onChange={(v) => patchEdit({ isActive: v })} />
           </div>
 
@@ -422,10 +445,16 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
                       {i.salable ? `$${toDollars(i.salePriceCents)}` : <span style={{ color: 'var(--text-dim)' }}>—</span>}
                     </td>
                     <td style={{ ...tdStyle, fontSize: 11, color: 'var(--text-muted)' }}>
-                      {!i.rentable && (
-                        <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 600, color: 'var(--pill-pending-fg)', background: 'var(--pill-pending-bg)', padding: '1px 6px', borderRadius: 999, marginRight: 6 }}>SALE-ONLY</span>
+                      {i.category !== 'Equipment' ? (
+                        <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 600, color: 'var(--pill-neutral-fg)', background: 'var(--pill-neutral-bg)', padding: '1px 6px', borderRadius: 999 }}>CHARGE</span>
+                      ) : (
+                        <>
+                          {!i.rentable && (
+                            <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 600, color: 'var(--pill-pending-fg)', background: 'var(--pill-pending-bg)', padding: '1px 6px', borderRadius: 999, marginRight: 6 }}>SALE-ONLY</span>
+                          )}
+                          {[i.tracked && 'tracked', i.taxable && 'taxable'].filter(Boolean).join(' · ') || (i.rentable ? '—' : '')}
+                        </>
                       )}
-                      {[i.tracked && 'tracked', i.taxable && 'taxable'].filter(Boolean).join(' · ') || (i.rentable ? '—' : '')}
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{i.variationCount || '—'}</td>
                     <td style={tdStyle}>
