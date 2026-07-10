@@ -6,6 +6,7 @@ import Skeleton from '@/components/ui/Skeleton'
 import Tabs from '@/components/billing/Tabs'
 import Combobox from '@/components/billing/Combobox'
 import Select from '@/components/billing/Select'
+import { rowOpen } from '@/components/billing/rowOpen'
 import { BILLING_TYPE_LABELS } from '@/lib/billing/constants'
 import type { BillingType } from '@/lib/supabase/database.types'
 
@@ -215,14 +216,14 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
                       <td style={td}><div style={{ display: 'flex', gap: 4 }}><button onClick={saveEv} disabled={busy} style={{ ...ghost, borderColor: 'var(--accent)', color: 'var(--accent)', padding: '4px 8px' }}>Save</button><button onClick={() => setEditEv(null)} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div></td>
                     </tr>
                   ) : (
-                    <tr key={e.id}>
+                    <tr key={e.id} {...rowOpen(!locked ? () => startEditEv(e) : undefined)} style={{ cursor: locked ? 'default' : 'pointer' }}>
                       <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{e.date}</td>
                       <td style={{ ...td, textTransform: 'capitalize', color: e.eventType === 'pickup' ? 'var(--pill-paid-fg)' : e.eventType === 'lost' ? 'var(--pill-overdue-fg)' : 'var(--text-secondary)' }}>{e.eventType}</td>
                       <td style={td}>{e.item?.code ?? '—'}</td>
                       <td style={{ ...td, color: 'var(--text-muted)' }}>{e.variation?.name ?? '—'}</td>
                       <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{e.qty}</td>
                       <td style={{ ...td, color: 'var(--text-muted)' }}>{e.equipmentId ?? '—'}</td>
-                      <td style={td}>{!locked && <div style={{ display: 'flex', gap: 4 }}><button onClick={() => startEditEv(e)} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>Edit</button><button onClick={() => removeLedger(e.id)} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div>}</td>
+                      <td style={td}>{!locked && <div style={{ display: 'flex', gap: 4 }}><button onClick={(ev) => { ev.stopPropagation(); startEditEv(e) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>Edit</button><button onClick={(ev) => { ev.stopPropagation(); removeLedger(e.id) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -276,14 +277,14 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
                       <td style={td}><div style={{ display: 'flex', gap: 4 }}><button onClick={() => saveLn(l)} disabled={busy} style={{ ...ghost, borderColor: 'var(--accent)', color: 'var(--accent)', padding: '4px 8px' }}>Save</button><button onClick={() => setEditLn(null)} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div></td>
                     </tr>
                   ) : (
-                    <tr key={l.id}>
+                    <tr key={l.id} {...rowOpen(!locked ? () => startEditLn(l) : undefined)} style={{ cursor: locked ? 'default' : 'pointer' }}>
                       <td style={{ ...td, textTransform: 'capitalize' }}>{l.kind.replace('_', ' ')}</td>
                       <td style={td}>{l.description}{l.itemCode ? <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>{l.itemCode}</span> : null}</td>
                       <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{l.qty}{l.units > 1 ? ` × ${l.units}` : ''}</td>
                       <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(l.unitRateCents)}</td>
                       <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(l.amountCents)}</td>
                       <td style={{ ...td, color: 'var(--text-dim)' }}>{l.taxable ? 'yes' : '—'}</td>
-                      <td style={td}>{!locked && <div style={{ display: 'flex', gap: 4 }}><button onClick={() => startEditLn(l)} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>Edit</button><button onClick={() => removeLine(l.id)} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div>}</td>
+                      <td style={td}>{!locked && <div style={{ display: 'flex', gap: 4 }}><button onClick={(ev) => { ev.stopPropagation(); startEditLn(l) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>Edit</button><button onClick={(ev) => { ev.stopPropagation(); removeLine(l.id) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div>}</td>
                     </tr>
                   ))}
                 </tbody>

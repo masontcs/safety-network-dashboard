@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Skeleton from '@/components/ui/Skeleton'
 import Combobox from '@/components/billing/Combobox'
+import { rowOpen } from '@/components/billing/rowOpen'
 import Select from '@/components/billing/Select'
 
 /**
@@ -71,6 +73,7 @@ function statusPill(s: string) {
 }
 
 export default function JobsClient({ isAdmin }: { isAdmin: boolean }) {
+  const router = useRouter()
   const [jobs, setJobs] = useState<JobRow[]>([])
   const [profiles, setProfiles] = useState<ProfileOpt[]>([])
   const [entities, setEntities] = useState<EntityOpt[]>([])
@@ -280,9 +283,9 @@ export default function JobsClient({ isAdmin }: { isAdmin: boolean }) {
               </thead>
               <tbody>
                 {filtered.map((j) => (
-                  <tr key={j.id}>
+                  <tr key={j.id} {...rowOpen(() => router.push(`/billing/jobs/${j.id}`))} style={{ cursor: 'pointer' }}>
                     <td style={tdStyle}>
-                      <Link href={`/billing/jobs/${j.id}`} style={{ color: 'var(--accent)', fontWeight: 500, textDecoration: 'none', fontVariantNumeric: 'tabular-nums' }}>{j.jobNumber}</Link>
+                      <Link href={`/billing/jobs/${j.id}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--accent)', fontWeight: 500, textDecoration: 'none', fontVariantNumeric: 'tabular-nums' }}>{j.jobNumber}</Link>
                       {j.certified && <span title="Certified" style={{ marginLeft: 6, fontSize: 10, color: 'var(--pill-pending-fg)' }}>CERT</span>}
                     </td>
                     <td style={tdStyle}>{j.name ?? '—'}</td>

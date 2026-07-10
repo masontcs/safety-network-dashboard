@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Skeleton from '@/components/ui/Skeleton'
 import Combobox from '@/components/billing/Combobox'
 import Select from '@/components/billing/Select'
 import Toggle from '@/components/billing/Toggle'
+import { rowOpen } from '@/components/billing/rowOpen'
 
 /**
  * Billing profiles list. Profiles are branch-owned and are where jobs attach —
@@ -52,6 +54,7 @@ const labelStyle: React.CSSProperties = {
 }
 
 export default function ProfilesClient() {
+  const router = useRouter()
   const [profiles, setProfiles] = useState<ProfileRow[]>([])
   const [ref, setRef] = useState<Reference | null>(null)
   const [loading, setLoading] = useState(true)
@@ -298,9 +301,9 @@ export default function ProfilesClient() {
               </thead>
               <tbody>
                 {filtered.map((p) => (
-                  <tr key={p.id}>
+                  <tr key={p.id} {...rowOpen(() => router.push(`/billing/profiles/${p.id}`))} style={{ cursor: 'pointer' }}>
                     <td style={tdStyle}>
-                      <Link href={`/billing/profiles/${p.id}`} style={{ color: 'var(--accent)', fontWeight: 500, textDecoration: 'none' }}>
+                      <Link href={`/billing/profiles/${p.id}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--accent)', fontWeight: 500, textDecoration: 'none' }}>
                         {p.name}
                       </Link>
                       <span style={{ color: 'var(--text-dim)', marginLeft: 6, fontSize: 12 }}>{p.code}</span>

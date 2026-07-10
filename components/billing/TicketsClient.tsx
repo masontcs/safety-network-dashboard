@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Skeleton from '@/components/ui/Skeleton'
 import Select from '@/components/billing/Select'
+import { rowOpen } from '@/components/billing/rowOpen'
 
 /**
  * Global tickets list — across all jobs. Create happens from a job (see the
@@ -29,6 +31,7 @@ const th: React.CSSProperties = { textAlign: 'left', fontSize: 11, fontWeight: 5
 const td: React.CSSProperties = { padding: '10px 12px', borderBottom: '1px solid var(--border-subtle, var(--border-emphasis))', color: 'var(--text-primary)' }
 
 export default function TicketsClient() {
+  const router = useRouter()
   const [tickets, setTickets] = useState<TicketRow[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -92,13 +95,13 @@ export default function TicketsClient() {
               <thead><tr>{['Ticket #', 'Date', 'Job', 'Customer', 'Features', 'Status'].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
               <tbody>
                 {filtered.map((t) => (
-                  <tr key={t.id}>
+                  <tr key={t.id} {...rowOpen(() => router.push(`/billing/tickets/${t.id}`))} style={{ cursor: 'pointer' }}>
                     <td style={td}>
-                      <Link href={`/billing/tickets/${t.id}`} style={{ color: 'var(--accent)', fontWeight: 500, textDecoration: 'none', fontVariantNumeric: 'tabular-nums' }}>{t.ticketNumber}</Link>
+                      <Link href={`/billing/tickets/${t.id}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--accent)', fontWeight: 500, textDecoration: 'none', fontVariantNumeric: 'tabular-nums' }}>{t.ticketNumber}</Link>
                       {t.recurring && <span title="Equipment still out" style={{ marginLeft: 6, fontSize: 9.5, color: 'var(--pill-pending-fg)' }}>REC</span>}
                     </td>
                     <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{t.date}</td>
-                    <td style={td}>{t.job ? <Link href={`/billing/jobs/${t.job.id}`} style={{ color: 'var(--accent)', textDecoration: 'none' }}>{t.job.number}</Link> : '—'}</td>
+                    <td style={td}>{t.job ? <Link href={`/billing/jobs/${t.job.id}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--accent)', textDecoration: 'none' }}>{t.job.number}</Link> : '—'}</td>
                     <td style={{ ...td, color: 'var(--text-muted)' }}>{t.customer ?? '—'}</td>
                     <td style={{ ...td, color: 'var(--text-secondary)' }}>{t.features.join(' + ') || '—'}</td>
                     <td style={{ ...td, fontSize: 11, fontWeight: 600, color: statusColors[t.status], textTransform: 'capitalize' }}>{t.status.replace('_', ' ')}</td>

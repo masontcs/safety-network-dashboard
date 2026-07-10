@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import Skeleton from '@/components/ui/Skeleton'
 import Toggle from '@/components/billing/Toggle'
 import Select from '@/components/billing/Select'
+import { rowOpen } from '@/components/billing/rowOpen'
 import { CATEGORIES, BILLING_TYPES, BILLING_TYPE_LABELS } from '@/lib/billing/constants'
 import type { BillingItemCategory, BillingType } from '@/lib/supabase/database.types'
 
@@ -407,7 +408,11 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
               </thead>
               <tbody>
                 {filtered.map((i) => (
-                  <tr key={i.id} style={{ opacity: i.isActive ? 1 : 0.5 }}>
+                  <tr
+                    key={i.id}
+                    {...rowOpen(isAdmin ? () => openEditor(i.id) : undefined)}
+                    style={{ opacity: i.isActive ? 1 : 0.5, cursor: isAdmin ? 'pointer' : 'default' }}
+                  >
                     <td style={{ ...tdStyle, fontWeight: 500 }}>{i.code}</td>
                     <td style={tdStyle}>{i.name}</td>
                     <td style={tdStyle}>{i.category}</td>
@@ -424,7 +429,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{i.variationCount || '—'}</td>
                     <td style={tdStyle}>
-                      {isAdmin && <button style={ghostBtn} onClick={() => openEditor(i.id)}>Edit</button>}
+                      {isAdmin && <button style={ghostBtn} onClick={(e) => { e.stopPropagation(); openEditor(i.id) }}>Edit</button>}
                     </td>
                   </tr>
                 ))}

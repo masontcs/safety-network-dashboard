@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Skeleton from '@/components/ui/Skeleton'
 import Select from '@/components/billing/Select'
+import { rowOpen } from '@/components/billing/rowOpen'
 
 interface PriceListRow {
   id: string
@@ -39,6 +41,7 @@ const ghostBtn: React.CSSProperties = {
 }
 
 export default function PriceListsClient({ isAdmin }: { isAdmin: boolean }) {
+  const router = useRouter()
   const [lists, setLists] = useState<PriceListRow[]>([])
   const [entities, setEntities] = useState<Entity[]>([])
   const [loading, setLoading] = useState(true)
@@ -143,9 +146,9 @@ export default function PriceListsClient({ isAdmin }: { isAdmin: boolean }) {
             </thead>
             <tbody>
               {lists.map((p) => (
-                <tr key={p.id}>
+                <tr key={p.id} {...rowOpen(() => router.push(`/billing/price-lists/${p.id}`))} style={{ cursor: 'pointer' }}>
                   <td style={tdStyle}>
-                    <Link href={`/billing/price-lists/${p.id}`} style={{ color: 'var(--accent)', fontWeight: 500, textDecoration: 'none' }}>{p.name}</Link>
+                    <Link href={`/billing/price-lists/${p.id}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--accent)', fontWeight: 500, textDecoration: 'none' }}>{p.name}</Link>
                   </td>
                   <td style={tdStyle}>{p.entityCode}</td>
                   <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{p.tierCount}</td>
