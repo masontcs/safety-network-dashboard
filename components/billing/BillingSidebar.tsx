@@ -23,7 +23,7 @@ const SECTIONS: NavSection[] = [
     heading: 'Billing',
     items: [
       { href: '/billing/profiles', label: 'Billing Profiles', icon: '❏' },
-      { href: '/billing/jobs', label: 'Jobs', icon: '▤', soon: true },
+      { href: '/billing/jobs', label: 'Jobs', icon: '▤' },
       { href: '/billing/tickets', label: 'Tickets', icon: '▣', soon: true },
       { href: '/billing/invoices', label: 'Invoices', icon: '⌗', soon: true },
     ],

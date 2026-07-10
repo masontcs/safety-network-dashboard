@@ -457,6 +457,9 @@ export type Database = {
         Relationships: []
       }
     }
+    // NOTE: kept empty on purpose. Populating this changes supabase-js's generic
+    // resolution enough to break embed-cast inference in unrelated dashboard
+    // routes. RPC calls are typed at the call site instead (see billing_next_number).
     Functions: Record<string, never>
   }
 }

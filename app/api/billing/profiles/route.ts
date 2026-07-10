@@ -63,6 +63,10 @@ export async function GET(): Promise<NextResponse> {
           // an enabled entity with no price list is a misconfiguration worth surfacing
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           unconfiguredEntityCount: enabled.filter((e: any) => !e.price_list_id).length,
+          // entities this profile can actually bill under (enabled AND priced) —
+          // the New Job form offers only these.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          billableEntityIds: enabled.filter((e: any) => e.price_list_id).map((e: any) => e.entity_id),
         }
       }),
     })
