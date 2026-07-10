@@ -71,7 +71,8 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
       setT(d)
       setAdd(d.featureAdd); setRet(d.featureReturn); setDtc(d.featureDtc)
       setDate(d.date); setBillingType(d.billingType ?? ''); setNotes(d.notes ?? '')
-      if (!lDate) setLDate(d.date)
+      // Default the Add-item date: existing items' date if any, else the ticket date.
+      if (!lDate) { const last = d.ledger[d.ledger.length - 1]; setLDate(last ? last.date : d.date) }
       if (it.success) setItems(it.data)
       setErr(null)
     }).catch((e: Error) => setErr(e.message)).finally(() => setLoading(false))
