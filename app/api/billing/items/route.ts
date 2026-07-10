@@ -100,12 +100,24 @@ export async function POST(request: Request): Promise<NextResponse> {
       salePriceCents?: number | null
       taxable?: boolean
       tracked?: boolean
+      variations?: { name: string; adjCents: number }[]
     }
 
     const code = body.code?.trim().toUpperCase()
     const name = body.name?.trim()
     if (!code) return bad('Item code is required')
     if (!name) return bad('Item name is required')
+
+    // Validate variations up front so we don't create a half-built item.
+    const variations = body.variations ?? []
+    const seenVar = new Set<string>()
+    for (const v of variations) {
+      const vn = v.name?.trim()
+      if (!vn) return bad('A variation needs a name')
+      if (seenVar.has(vn.toLowerCase())) return bad(`Duplicate variation name "${vn}"`)
+      seenVar.add(vn.toLowerCase())
+      if (!Number.isInteger(v.adjCents)) return bad('Variation adjustment must be a whole number of cents')
+    }
 
     const category = body.category as BillingItemCategory | undefined
     if (!category || !CATEGORIES.includes(category)) {
@@ -147,6 +159,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       .select('id, code, name')
       .single()
     if (error || !created) throw new Error(error?.message ?? 'Failed to create item')
+
+    // Variations entered on the create form (they need the item id, so insert now).
+    if (variations.length > 0) {
+      const rows = variations.map((v, i) => ({ item_id: created.id, name: v.name.trim(), adj_cents: v.adjCents, sort_order: i }))
+      const { error: vErr } = await supabase.from('billing_item_variations').insert(rows)
+      if (vErr) throw new Error(vErr.message)
+    }
 
     return NextResponse.json({ success: true, data: created })
   } catch (err) {

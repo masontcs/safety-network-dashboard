@@ -77,6 +77,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
   const [nSalable, setNSalable] = useState(false)
   const [nSalePrice, setNSalePrice] = useState('0.00')
   const [nTracked, setNTracked] = useState(false)
+  const [nVars, setNVars] = useState<{ name: string; adjCents: number }[]>([])
 
   const [editing, setEditing] = useState<ItemDetail | null>(null)
   const [editCost, setEditCost] = useState('0.00')
@@ -123,11 +124,12 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
           costCents: toCents(nCost), salable: nSalable,
           salePriceCents: nSalable ? toCents(nSalePrice) : null,
           tracked: nTracked,
+          variations: nVars.filter((v) => v.name.trim()),
         }),
       })
       const json = await res.json()
       if (!json.success) { setActionError(json.error); return }
-      setNCode(''); setNName(''); setNGroup(''); setNCost('0.00'); setNSalable(false); setNSalePrice('0.00'); setNTracked(false)
+      setNCode(''); setNName(''); setNGroup(''); setNCost('0.00'); setNSalable(false); setNSalePrice('0.00'); setNTracked(false); setNVars([])
       setShowNew(false); load()
     } catch { setActionError('Network error — please try again.') }
     finally { setBusy(false) }
@@ -231,9 +233,33 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+
+          {/* Variations — addable at create time */}
+          <div style={{ marginTop: 20 }}>
+            <label style={labelStyle}>Variations (optional)</label>
+            <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginBottom: 8 }}>
+              Each variation carries a per-unit adjustment from the item&apos;s price (e.g. Detour +$2.00). Add them here or later via Edit.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {nVars.map((v, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input value={v.name} placeholder="Name (e.g. Detour)"
+                    onChange={(e) => setNVars((r) => r.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
+                    style={{ ...inputStyle, maxWidth: 240 }} />
+                  <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>adj $</span>
+                  <input value={(v.adjCents / 100).toFixed(2)}
+                    onChange={(e) => { const n = Number(e.target.value); if (!Number.isFinite(n)) return; setNVars((r) => r.map((x, i) => i === idx ? { ...x, adjCents: Math.round(n * 100) } : x)) }}
+                    style={{ ...inputStyle, maxWidth: 100 }} />
+                  <button style={ghostBtn} onClick={() => setNVars((r) => r.filter((_, i) => i !== idx))}>Remove</button>
+                </div>
+              ))}
+              <button style={{ ...ghostBtn, alignSelf: 'flex-start' }} onClick={() => setNVars((r) => [...r, { name: '', adjCents: 0 }])}>+ Add variation</button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
             <button onClick={createItem} disabled={!canCreate} className="btn-primary" style={{ padding: '8px 18px', opacity: canCreate ? 1 : 0.5 }}>Create item</button>
-            <button onClick={() => setShowNew(false)} style={ghostBtn}>Cancel</button>
+            <button onClick={() => { setShowNew(false); setNVars([]) }} style={ghostBtn}>Cancel</button>
           </div>
         </div>
       )}

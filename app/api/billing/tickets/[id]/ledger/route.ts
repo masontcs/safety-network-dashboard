@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
+import type { Database } from '@/lib/supabase/database.types'
+
+type LedgerUpdate = Database['public']['Tables']['billing_ticket_ledger']['Update']
 
 /**
  * The ticket quantity ledger — the Equipment tab.
@@ -121,6 +124,74 @@ export async function POST(
       qty,
       equipment_id: item.tracked ? body.equipmentId?.trim() ?? null : (body.equipmentId?.trim() || null),
     })
+    if (error) throw new Error(error.message)
+
+    await refreshRecurring(supabase, params.id)
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    return billingApiError(err)
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+): Promise<NextResponse> {
+  try {
+    const ctx = await getAccessContext()
+    if (!ctx.ok) return ctx.response
+    const guard = guardAdminOnly(ctx.access.role)
+    if (guard) return guard
+
+    const supabase = createServiceClient()
+    const ticket = await loadTicket(supabase, params.id)
+    if (!ticket) return bad('Ticket not found', 'NOT_FOUND', 404)
+    if (ctx.access.branchIds !== null && (!ticket.billing_jobs || !ctx.access.branchIds.includes(ticket.billing_jobs.branch_id))) {
+      return bad('You do not have access to this ticket’s branch.', 'FORBIDDEN', 403)
+    }
+    if (ticket.status === 'final_edit' || ticket.status === 'invoiced') {
+      return bad('This ticket is locked. Reopen it to change equipment.', 'CONFLICT', 409)
+    }
+
+    const body = (await request.json()) as { eventId?: string; qty?: number; eventDate?: string; equipmentId?: string | null }
+    if (!body.eventId) return bad('eventId is required')
+
+    // Load the event being edited (to know its item/variation/type).
+    const { data: ev, error: evErr } = await supabase
+      .from('billing_ticket_ledger')
+      .select('id, item_id, variation_id, event_type, qty, billing_items(tracked)')
+      .eq('id', body.eventId)
+      .eq('ticket_id', params.id)
+      .maybeSingle()
+    if (evErr) throw new Error(evErr.message)
+    const event = ev as unknown as { id: string; item_id: string; variation_id: string | null; event_type: string; qty: number; billing_items: { tracked: boolean } | null } | null
+    if (!event) return bad('Ledger entry not found', 'NOT_FOUND', 404)
+
+    const newQty = body.qty ?? event.qty
+    if (!Number.isInteger(newQty) || newQty <= 0) return bad('Quantity must be a whole number greater than zero')
+    if (event.billing_items?.tracked && body.equipmentId !== undefined && !body.equipmentId?.trim()) {
+      return bad('This item is tracked — an equipment ID is required')
+    }
+
+    // Editing must not drive the (item, variation) balance negative at the end.
+    let q = supabase
+      .from('billing_ticket_ledger')
+      .select('id, event_type, qty')
+      .eq('ticket_id', params.id)
+      .eq('item_id', event.item_id)
+    q = event.variation_id ? q.eq('variation_id', event.variation_id) : q.is('variation_id', null)
+    const { data: sibs } = await q
+    const balance = ((sibs ?? []) as { id: string; event_type: string; qty: number }[]).reduce((s, e) => {
+      const useQty = e.id === event.id ? newQty : e.qty
+      return s + (e.event_type === 'pickup' ? useQty : -useQty)
+    }, 0)
+    if (balance < 0) return bad('That change would return/lose more than was ever picked up.', 'CONFLICT', 409)
+
+    const patch: LedgerUpdate = { qty: newQty }
+    if (body.eventDate !== undefined) patch.event_date = body.eventDate
+    if (body.equipmentId !== undefined) patch.equipment_id = body.equipmentId?.trim() || null
+
+    const { error } = await supabase.from('billing_ticket_ledger').update(patch).eq('id', body.eventId).eq('ticket_id', params.id)
     if (error) throw new Error(error.message)
 
     await refreshRecurring(supabase, params.id)

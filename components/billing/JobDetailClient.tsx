@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
 import JobTicketsSection from '@/components/billing/JobTicketsSection'
+import Tabs from '@/components/billing/Tabs'
 
 interface Job {
   id: string
@@ -49,6 +50,7 @@ const labelStyle: React.CSSProperties = {
 
 export default function JobDetailClient({ jobId }: { jobId: string }) {
   const [job, setJob] = useState<Job | null>(null)
+  const [tab, setTab] = useState<'details' | 'tickets'>('details')
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -110,6 +112,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   if (loading || !job) return <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}><Skeleton height={40} /><Skeleton height={260} /></div>
 
   const isAdmin = job.isAdmin
+  const currentTab = tab
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 900 }}>
@@ -124,6 +127,13 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
         </div>
       </div>
 
+      <Tabs
+        active={currentTab}
+        onChange={setTab}
+        tabs={[{ id: 'details', label: 'Details' }, { id: 'tickets', label: 'Tickets' }]}
+      />
+
+      {currentTab === 'details' && (
       <div className="card">
         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 16 }}>Details</div>
 
@@ -180,8 +190,9 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
           </button>
         )}
       </div>
+      )}
 
-      <JobTicketsSection jobId={jobId} isAdmin={isAdmin} />
+      {currentTab === 'tickets' && <JobTicketsSection jobId={jobId} isAdmin={isAdmin} />}
     </div>
   )
 }

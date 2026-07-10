@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
+import type { Database } from '@/lib/supabase/database.types'
+
+type LineUpdate = Database['public']['Tables']['billing_ticket_lines']['Update']
 
 /**
  * Non-rental ticket charge lines: Sale, Labor, Lump Sum, Misc.
@@ -113,6 +116,78 @@ export async function POST(
       amount_cents: amountCents,
       taxable,
     })
+    if (error) throw new Error(error.message)
+
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    return billingApiError(err)
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+): Promise<NextResponse> {
+  try {
+    const ctx = await getAccessContext()
+    if (!ctx.ok) return ctx.response
+    const guard = guardAdminOnly(ctx.access.role)
+    if (guard) return guard
+
+    const supabase = createServiceClient()
+    const ticket = await loadTicket(supabase, params.id)
+    if (!ticket) return bad('Ticket not found', 'NOT_FOUND', 404)
+    if (ctx.access.branchIds !== null && (!ticket.billing_jobs || !ctx.access.branchIds.includes(ticket.billing_jobs.branch_id))) {
+      return bad('You do not have access to this ticket’s branch.', 'FORBIDDEN', 403)
+    }
+    if (ticket.status === 'final_edit' || ticket.status === 'invoiced') {
+      return bad('This ticket is locked. Reopen it to change charges.', 'CONFLICT', 409)
+    }
+
+    const body = (await request.json()) as {
+      lineId?: string
+      description?: string
+      qty?: number
+      unitRateCents?: number
+      units?: number
+    }
+    if (!body.lineId) return bad('lineId is required')
+
+    const { data: line, error: lErr } = await supabase
+      .from('billing_ticket_lines')
+      .select('id, kind, qty, units, unit_rate_cents')
+      .eq('id', body.lineId)
+      .eq('ticket_id', params.id)
+      .maybeSingle()
+    if (lErr) throw new Error(lErr.message)
+    const cur = line as { id: string; kind: string; qty: number; units: number; unit_rate_cents: number } | null
+    if (!cur) return bad('Charge not found', 'NOT_FOUND', 404)
+
+    const qty = body.qty ?? Number(cur.qty)
+    if (!(qty > 0)) return bad('Quantity must be greater than zero')
+    const units = body.units ?? cur.units
+    if (!Number.isInteger(units) || units < 0) return bad('Units must be a whole number, zero or greater')
+
+    // Sale lines keep their item's rate (edit qty only); others allow a manual rate.
+    let unitRateCents = cur.unit_rate_cents
+    if (cur.kind !== 'sale' && body.unitRateCents !== undefined) {
+      if (!Number.isInteger(body.unitRateCents) || body.unitRateCents < 0) return bad('Rate must be a whole number of cents')
+      unitRateCents = body.unitRateCents
+    }
+
+    const patch: LineUpdate = {
+      qty,
+      units,
+      unit_rate_cents: unitRateCents,
+      amount_cents: Math.round(qty * units * unitRateCents),
+    }
+    if (body.description !== undefined && cur.kind !== 'sale') {
+      const d = body.description.trim()
+      if (!d) return bad('A description is required')
+      patch.description = d
+    }
+
+    const { error } = await supabase.from('billing_ticket_lines').update(patch).eq('id', body.lineId).eq('ticket_id', params.id)
     if (error) throw new Error(error.message)
 
     return NextResponse.json({ success: true })
