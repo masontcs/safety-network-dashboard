@@ -15,6 +15,7 @@ interface Row {
   name: string
   category: string
   tracked: boolean
+  rentable: boolean
   salable: boolean
   sale_price_cents: number | null
   billing_item_variations: { id: string; name: string; sort_order: number }[]
@@ -28,7 +29,7 @@ export async function GET(): Promise<NextResponse> {
     const supabase = createServiceClient()
     const { data, error } = await supabase
       .from('billing_items')
-      .select('id, code, name, category, tracked, salable, sale_price_cents, billing_item_variations(id, name, sort_order)')
+      .select('id, code, name, category, tracked, rentable, salable, sale_price_cents, billing_item_variations(id, name, sort_order)')
       .eq('is_active', true)
       .order('code')
     if (error) throw new Error(error.message)
@@ -42,6 +43,7 @@ export async function GET(): Promise<NextResponse> {
         name: i.name,
         category: i.category,
         tracked: i.tracked,
+        rentable: i.rentable,
         salable: i.salable,
         salePriceCents: i.sale_price_cents,
         variations: (i.billing_item_variations ?? [])

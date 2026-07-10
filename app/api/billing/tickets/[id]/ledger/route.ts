@@ -92,11 +92,12 @@ export async function POST(
 
     const { data: item, error: iErr } = await supabase
       .from('billing_items')
-      .select('id, tracked')
+      .select('id, tracked, rentable')
       .eq('id', body.itemId)
       .maybeSingle()
     if (iErr) throw new Error(iErr.message)
     if (!item) return bad('Item not found', 'NOT_FOUND', 404)
+    if (!item.rentable) return bad('That item is sale-only — it can’t go on the equipment ledger. Add it as a Sale charge instead.')
     if (item.tracked && !body.equipmentId?.trim()) return bad('This item is tracked — an equipment ID is required')
 
     // Returns/losses can't exceed what's currently on rent for this (item, variation).

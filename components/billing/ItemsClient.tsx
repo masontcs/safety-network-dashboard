@@ -17,6 +17,7 @@ interface ItemRow {
   category: BillingItemCategory
   groupName: string | null
   costCents: number
+  rentable: boolean
   salable: boolean
   salePriceCents: number | null
   taxable: boolean
@@ -74,6 +75,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
   const [nCategory, setNCategory] = useState<BillingItemCategory>('Equipment')
   const [nGroup, setNGroup] = useState('')
   const [nCost, setNCost] = useState('0.00')
+  const [nRentable, setNRentable] = useState(true)
   const [nSalable, setNSalable] = useState(false)
   const [nSalePrice, setNSalePrice] = useState('0.00')
   const [nTracked, setNTracked] = useState(false)
@@ -114,6 +116,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
     if (busy) return
     if (!validMoney(nCost)) { setActionError('Cost must be a valid amount'); return }
     if (nSalable && !validMoney(nSalePrice)) { setActionError('Sale price must be a valid amount'); return }
+    if (!nRentable && !nSalable) { setActionError('A sale-only item must be marked salable.'); return }
     setBusy(true); setActionError(null)
     try {
       const res = await fetch('/api/billing/items', {
@@ -121,7 +124,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: nCode, name: nName, category: nCategory, groupName: nGroup || null,
-          costCents: toCents(nCost), salable: nSalable,
+          costCents: toCents(nCost), rentable: nRentable, salable: nSalable,
           salePriceCents: nSalable ? toCents(nSalePrice) : null,
           tracked: nTracked,
           variations: nVars.filter((v) => v.name.trim()),
@@ -129,7 +132,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
       })
       const json = await res.json()
       if (!json.success) { setActionError(json.error); return }
-      setNCode(''); setNName(''); setNGroup(''); setNCost('0.00'); setNSalable(false); setNSalePrice('0.00'); setNTracked(false); setNVars([])
+      setNCode(''); setNName(''); setNGroup(''); setNCost('0.00'); setNRentable(true); setNSalable(false); setNSalePrice('0.00'); setNTracked(false); setNVars([])
       setShowNew(false); load()
     } catch { setActionError('Network error — please try again.') }
     finally { setBusy(false) }
@@ -150,6 +153,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
     if (!editing || busy) return
     if (!validMoney(editCost)) { setActionError('Cost must be a valid amount'); return }
     if (editing.salable && !validMoney(editSalePrice)) { setActionError('Sale price must be a valid amount'); return }
+    if (!editing.rentable && !editing.salable) { setActionError('An item must be rentable or salable. A sale-only item must stay salable.'); return }
     setBusy(true); setActionError(null)
     try {
       const res = await fetch(`/api/billing/items/${editing.id}`, {
@@ -160,6 +164,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
           category: editing.category,
           groupName: editing.groupName,
           costCents: toCents(editCost),
+          rentable: editing.rentable,
           salable: editing.salable,
           salePriceCents: editing.salable ? toCents(editSalePrice) : null,
           taxable: editing.taxable,
@@ -217,6 +222,13 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
             </div>
             <div><label style={labelStyle}>Group</label><input value={nGroup} onChange={(e) => setNGroup(e.target.value)} placeholder="REG" style={inputStyle} /></div>
             <div><label style={labelStyle}>Cost ($)</label><input value={nCost} onChange={(e) => setNCost(e.target.value)} style={inputStyle} /></div>
+            <div>
+              <label style={labelStyle}>Rentable</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 34 }}>
+                <input type="checkbox" checked={nRentable} onChange={(e) => setNRentable(e.target.checked)} />
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{nRentable ? 'can be rented' : 'sale-only'}</span>
+              </div>
+            </div>
             <div>
               <label style={labelStyle}>Salable</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -295,6 +307,9 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
             <div>
               <label style={labelStyle}>Flags</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, height: 34, fontSize: 12, color: 'var(--text-muted)' }}>
+                <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={editing.rentable} onChange={(e) => patchEdit({ rentable: e.target.checked })} /> rentable
+                </label>
                 <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
                   <input type="checkbox" checked={editing.tracked} onChange={(e) => patchEdit({ tracked: e.target.checked })} /> tracked
                 </label>
@@ -410,7 +425,10 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
                       {i.salable ? `$${toDollars(i.salePriceCents)}` : <span style={{ color: 'var(--text-dim)' }}>—</span>}
                     </td>
                     <td style={{ ...tdStyle, fontSize: 11, color: 'var(--text-muted)' }}>
-                      {[i.tracked && 'tracked', i.taxable && 'taxable'].filter(Boolean).join(' · ') || '—'}
+                      {!i.rentable && (
+                        <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 600, color: 'var(--pill-pending-fg)', background: 'var(--pill-pending-bg)', padding: '1px 6px', borderRadius: 999, marginRight: 6 }}>SALE-ONLY</span>
+                      )}
+                      {[i.tracked && 'tracked', i.taxable && 'taxable'].filter(Boolean).join(' · ') || (i.rentable ? '—' : '')}
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{i.variationCount || '—'}</td>
                     <td style={tdStyle}>

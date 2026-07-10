@@ -8,7 +8,7 @@ import Combobox from '@/components/billing/Combobox'
 import { BILLING_TYPE_LABELS } from '@/lib/billing/constants'
 import type { BillingType } from '@/lib/supabase/database.types'
 
-interface PickerItem { id: string; code: string; name: string; category: string; tracked: boolean; salable: boolean; salePriceCents: number | null; variations: { id: string; name: string }[] }
+interface PickerItem { id: string; code: string; name: string; category: string; tracked: boolean; rentable: boolean; salable: boolean; salePriceCents: number | null; variations: { id: string; name: string }[] }
 interface LedgerEvent { id: string; eventType: string; date: string; qty: number; equipmentId: string | null; item: { id: string; code: string; name: string; tracked: boolean } | null; variation: { id: string; name: string } | null }
 interface Line { id: string; kind: string; description: string; qty: number; units: number; unitRateCents: number; amountCents: number; taxable: boolean; itemCode: string | null }
 interface Ticket {
@@ -121,6 +121,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
   const locked = t.locked
   const disabled = locked || busy
   const pickItem = items.find((i) => i.id === lItem)
+  const rentItems = items.filter((i) => i.rentable) // equipment ledger = rentals only
   const saleItems = items.filter((i) => i.salable)
   const statusColors: Record<string, string> = { active: 'var(--pill-neutral-fg)', in_review: 'var(--pill-pending-fg)', final_edit: 'var(--pill-paid-fg)', invoiced: 'var(--accent)' }
 
@@ -236,7 +237,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
                   ariaLabel="Item"
                   value={lItem}
                   onChange={(v) => { setLItem(v); setLVar('') }}
-                  options={items.map((i) => ({ value: i.id, label: i.name, hint: i.code }))}
+                  options={rentItems.map((i) => ({ value: i.id, label: i.name, hint: i.code }))}
                 />
               </div>
               {pickItem && pickItem.variations.length > 0 && (

@@ -28,6 +28,7 @@ interface ItemListRow {
   category: BillingItemCategory
   group_name: string | null
   cost_cents: number
+  rentable: boolean
   salable: boolean
   sale_price_cents: number | null
   taxable: boolean
@@ -46,7 +47,7 @@ export async function GET(): Promise<NextResponse> {
     const { data, error } = await supabase
       .from('billing_items')
       .select(`
-        id, code, name, category, group_name, cost_cents, salable, sale_price_cents,
+        id, code, name, category, group_name, cost_cents, rentable, salable, sale_price_cents,
         taxable, tracked, is_active,
         billing_item_variations(id),
         billing_item_default_rates(billing_type)
@@ -66,6 +67,7 @@ export async function GET(): Promise<NextResponse> {
         category: i.category,
         groupName: i.group_name,
         costCents: i.cost_cents,
+        rentable: i.rentable,
         salable: i.salable,
         salePriceCents: i.sale_price_cents,
         taxable: i.taxable,
@@ -96,6 +98,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       category?: string
       groupName?: string | null
       costCents?: number
+      rentable?: boolean
       salable?: boolean
       salePriceCents?: number | null
       taxable?: boolean
@@ -127,7 +130,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     const costCents = body.costCents ?? 0
     if (!Number.isInteger(costCents) || costCents < 0) return bad('Cost must be a whole number of cents, zero or greater')
 
+    const rentable = body.rentable ?? true
     const salable = body.salable ?? false
+    // Sale-only items can't be rented; an item that's neither is useless.
+    if (!rentable && !salable) return bad('A sale-only item must be marked salable (it has to be sellable).')
     const salePriceCents = salable ? body.salePriceCents ?? null : null
     if (salable) {
       if (salePriceCents == null) return bad('A salable item needs a sale price')
@@ -151,6 +157,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         category,
         group_name: body.groupName?.trim() || null,
         cost_cents: costCents,
+        rentable,
         salable,
         sale_price_cents: salePriceCents,
         taxable,

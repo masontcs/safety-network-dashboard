@@ -89,11 +89,13 @@ export async function GET(
       overrides = (o ?? []) as OverrideRow[]
     }
 
-    // Catalog items for the "add item" picker.
+    // Catalog items for the "add item" picker. Price lists set RENTAL rates, so
+    // sale-only items (rentable=false) are excluded — they never get a rate.
     const { data: catalog, error: cErr } = await supabase
       .from('billing_items')
       .select('id, code, name, category')
       .eq('is_active', true)
+      .eq('rentable', true)
       .order('code')
     if (cErr) throw new Error(cErr.message)
 

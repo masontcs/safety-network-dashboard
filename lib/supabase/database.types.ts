@@ -322,9 +322,9 @@ export type Database = {
         Relationships: []
       }
       billing_items: {
-        Row: { id: string; code: string; name: string; category: BillingItemCategory; group_name: string | null; cost_cents: number; salable: boolean; sale_price_cents: number | null; taxable: boolean; tracked: boolean; is_active: boolean; created_at: string; updated_at: string }
-        Insert: { id?: string; code: string; name: string; category: BillingItemCategory; group_name?: string | null; cost_cents?: number; salable?: boolean; sale_price_cents?: number | null; taxable?: boolean; tracked?: boolean; is_active?: boolean }
-        Update: { id?: string; code?: string; name?: string; category?: BillingItemCategory; group_name?: string | null; cost_cents?: number; salable?: boolean; sale_price_cents?: number | null; taxable?: boolean; tracked?: boolean; is_active?: boolean }
+        Row: { id: string; code: string; name: string; category: BillingItemCategory; group_name: string | null; cost_cents: number; rentable: boolean; salable: boolean; sale_price_cents: number | null; taxable: boolean; tracked: boolean; is_active: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; code: string; name: string; category: BillingItemCategory; group_name?: string | null; cost_cents?: number; rentable?: boolean; salable?: boolean; sale_price_cents?: number | null; taxable?: boolean; tracked?: boolean; is_active?: boolean }
+        Update: { id?: string; code?: string; name?: string; category?: BillingItemCategory; group_name?: string | null; cost_cents?: number; rentable?: boolean; salable?: boolean; sale_price_cents?: number | null; taxable?: boolean; tracked?: boolean; is_active?: boolean }
         Relationships: []
       }
       billing_item_default_rates: {

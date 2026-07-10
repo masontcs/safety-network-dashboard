@@ -27,6 +27,7 @@ interface ItemDetailRow {
   category: BillingItemCategory
   group_name: string | null
   cost_cents: number
+  rentable: boolean
   salable: boolean
   sale_price_cents: number | null
   taxable: boolean
@@ -48,7 +49,7 @@ export async function GET(
     const { data, error } = await supabase
       .from('billing_items')
       .select(`
-        id, code, name, category, group_name, cost_cents, salable, sale_price_cents,
+        id, code, name, category, group_name, cost_cents, rentable, salable, sale_price_cents,
         taxable, tracked, is_active,
         billing_item_variations(id, name, adj_cents, sort_order),
         billing_item_default_rates(billing_type, rate_cents)
@@ -69,6 +70,7 @@ export async function GET(
         category: i.category,
         groupName: i.group_name,
         costCents: i.cost_cents,
+        rentable: i.rentable,
         salable: i.salable,
         salePriceCents: i.sale_price_cents,
         taxable: i.taxable,
@@ -105,6 +107,7 @@ export async function PATCH(
       category?: string
       groupName?: string | null
       costCents?: number
+      rentable?: boolean
       salable?: boolean
       salePriceCents?: number | null
       taxable?: boolean
@@ -118,7 +121,7 @@ export async function PATCH(
 
     const { data: existing, error: exErr } = await supabase
       .from('billing_items')
-      .select('id, salable, sale_price_cents')
+      .select('id, rentable, salable, sale_price_cents')
       .eq('id', params.id)
       .maybeSingle()
     if (exErr) throw new Error(exErr.message)
@@ -144,9 +147,14 @@ export async function PATCH(
     if (body.tracked !== undefined) patch.tracked = body.tracked
     if (body.isActive !== undefined) patch.is_active = body.isActive
 
+    // rentable / salable: an item must stay usable for at least one of the two.
+    const rentable = body.rentable ?? existing.rentable
+    const salable = body.salable ?? existing.salable
+    if (!rentable && !salable) return bad('An item must be rentable or salable (or both). A sale-only item must stay salable.')
+    if (body.rentable !== undefined) patch.rentable = rentable
+
     // salable / sale price / taxable move together: the DB enforces that a
     // salable item has a sale price, and tax only ever applies to sales lines.
-    const salable = body.salable ?? existing.salable
     if (body.salable !== undefined || body.salePriceCents !== undefined) {
       const salePriceCents = salable ? body.salePriceCents ?? existing.sale_price_cents : null
       if (salable) {
