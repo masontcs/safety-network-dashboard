@@ -16,11 +16,17 @@ export async function nextNumber(
   entityId: string,
   branchId: string | null = null
 ): Promise<string> {
-  const rpc = supabase.rpc as unknown as (
-    fn: string,
-    args: { p_kind: string; p_entity: string; p_branch: string | null }
-  ) => Promise<{ data: string | null; error: { message: string } | null }>
-  const { data, error } = await rpc('billing_next_number', { p_kind: kind, p_entity: entityId, p_branch: branchId })
+  // Call `.rpc` AS A MEMBER of the client — do NOT pull it into a local const.
+  // supabase-js's rpc() relies on `this` (this.rest); a detached reference
+  // throws "Cannot read properties of undefined (reading 'rest')" at runtime.
+  // We cast to any only because the Database `Functions` type is kept empty
+  // (see database.types.ts), which erases rpc's argument types.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = (await (supabase as any).rpc('billing_next_number', {
+    p_kind: kind,
+    p_entity: entityId,
+    p_branch: branchId,
+  })) as { data: string | null; error: { message: string } | null }
   if (error || !data) throw new Error(error?.message ?? `Failed to generate ${kind} number`)
   return data
 }
