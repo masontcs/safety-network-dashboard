@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
 import Tabs from '@/components/billing/Tabs'
+import Combobox from '@/components/billing/Combobox'
 import { BILLING_TYPE_LABELS } from '@/lib/billing/constants'
 import type { BillingType } from '@/lib/supabase/database.types'
 
@@ -229,11 +230,14 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
 
           {!locked && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid var(--border-subtle, var(--border-emphasis))', paddingTop: 14 }}>
-              <div style={{ minWidth: 180 }}>
+              <div style={{ minWidth: 240 }}>
                 <label style={labelStyle}>Item</label>
-                <select value={lItem} onChange={(e) => { setLItem(e.target.value); setLVar('') }} style={inputStyle}>
-                  <option value="">Select…</option>{items.map((i) => <option key={i.id} value={i.id}>{i.code} — {i.name}</option>)}
-                </select>
+                <Combobox
+                  ariaLabel="Item"
+                  value={lItem}
+                  onChange={(v) => { setLItem(v); setLVar('') }}
+                  options={items.map((i) => ({ value: i.id, label: i.name, hint: i.code }))}
+                />
               </div>
               {pickItem && pickItem.variations.length > 0 && (
                 <div style={{ minWidth: 130 }}><label style={labelStyle}>Variation</label>
@@ -291,8 +295,13 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
                 <select value={cKind} onChange={(e) => setCKind(e.target.value)} style={inputStyle}><option value="sale">Sale</option><option value="labor">Labor</option><option value="lump_sum">Lump sum</option><option value="misc">Misc</option></select>
               </div>
               {cKind === 'sale' ? (
-                <div style={{ minWidth: 200 }}><label style={labelStyle}>Salable item</label>
-                  <select value={cItem} onChange={(e) => setCItem(e.target.value)} style={inputStyle}><option value="">Select…</option>{saleItems.map((i) => <option key={i.id} value={i.id}>{i.code} — {i.name} ({money(i.salePriceCents ?? 0)})</option>)}</select>
+                <div style={{ minWidth: 260 }}><label style={labelStyle}>Salable item</label>
+                  <Combobox
+                    ariaLabel="Salable item"
+                    value={cItem}
+                    onChange={setCItem}
+                    options={saleItems.map((i) => ({ value: i.id, label: `${i.name} (${money(i.salePriceCents ?? 0)})`, hint: i.code }))}
+                  />
                 </div>
               ) : (
                 <>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
+import Combobox from '@/components/billing/Combobox'
 
 /**
  * Billing profiles list. Profiles are branch-owned and are where jobs attach —
@@ -211,10 +212,12 @@ export default function ProfilesClient() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
             <div>
               <label style={labelStyle}>Customer</label>
-              <select value={pCustomerId} onChange={(e) => setPCustomerId(e.target.value)} style={inputStyle}>
-                <option value="">Select…</option>
-                {ref.customers.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
-              </select>
+              <Combobox
+                ariaLabel="Customer"
+                value={pCustomerId}
+                onChange={setPCustomerId}
+                options={ref.customers.map((c) => ({ value: c.id, label: c.name, hint: c.code }))}
+              />
               {ref.customers.length === 0 && (
                 <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 6 }}>Create a customer first.</div>
               )}

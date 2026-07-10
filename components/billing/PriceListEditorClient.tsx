@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
+import Combobox from '@/components/billing/Combobox'
 import { BILLING_TYPES, BILLING_TYPE_LABELS } from '@/lib/billing/constants'
 import { buildTierGrid } from '@/lib/billing/pricing/tier-grid'
 import type { BillingType } from '@/lib/supabase/database.types'
@@ -376,10 +377,15 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
         )}
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 16 }}>
-          <select value={addItemId} onChange={(e) => setAddItemId(e.target.value)} style={{ ...inputStyle, maxWidth: 320 }}>
-            <option value="">Add an item from the catalog…</option>
-            {unusedCatalog.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
-          </select>
+          <div style={{ width: 320 }}>
+            <Combobox
+              ariaLabel="Add an item from the catalog"
+              placeholder="Add an item from the catalog…"
+              value={addItemId}
+              onChange={setAddItemId}
+              options={unusedCatalog.map((c) => ({ value: c.id, label: c.name, hint: c.code }))}
+            />
+          </div>
           <button style={ghostBtn} onClick={addItem} disabled={!addItemId}>+ Add item</button>
           <span style={{ fontSize: 11.5, color: 'var(--text-dim)', marginLeft: 'auto' }}>
             A <strong>tier exception</strong> makes this item ignore the profile&apos;s category tier rule.

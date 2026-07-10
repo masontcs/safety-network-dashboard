@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
+import Combobox from '@/components/billing/Combobox'
 
 /**
  * Jobs list + create. A job attaches to a billing profile (customer + branch
@@ -195,12 +196,12 @@ export default function JobsClient({ isAdmin }: { isAdmin: boolean }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
             <div>
               <label style={labelStyle}>Billing profile</label>
-              <select value={pProfileId} onChange={(e) => { setPProfileId(e.target.value); setPEntityId('') }} style={inputStyle}>
-                <option value="">Select…</option>
-                {profiles.map((p) => (
-                  <option key={p.id} value={p.id}>{p.customer?.name ?? '—'} — {p.name} ({p.branch.name})</option>
-                ))}
-              </select>
+              <Combobox
+                ariaLabel="Billing profile"
+                value={pProfileId}
+                onChange={(v) => { setPProfileId(v); setPEntityId('') }}
+                options={profiles.map((p) => ({ value: p.id, label: `${p.customer?.name ?? '—'} — ${p.name} (${p.branch.name})` }))}
+              />
             </div>
             <div>
               <label style={labelStyle}>Entity</label>
