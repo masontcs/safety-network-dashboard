@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
 import Combobox from '@/components/billing/Combobox'
+import MoneyInput from '@/components/billing/MoneyInput'
 import { BILLING_TYPES, BILLING_TYPE_LABELS } from '@/lib/billing/constants'
 import { buildTierGrid } from '@/lib/billing/pricing/tier-grid'
 import type { BillingType } from '@/lib/supabase/database.types'
@@ -56,14 +57,6 @@ const ghostBtn: React.CSSProperties = {
   padding: '5px 10px', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit',
 }
 
-const toDollars = (c: number | undefined | null) => (c == null ? '' : (c / 100).toFixed(2))
-const parseDollars = (s: string): number | null => {
-  const t = s.trim()
-  if (t === '') return null
-  const n = Number(t)
-  if (!Number.isFinite(n) || n < 0) return null
-  return Math.round(n * 100) // integer cents, rounded once
-}
 const ovKey = (tierId: string, bt: BillingType) => `${tierId}|${bt}`
 
 let tmp = 0
@@ -307,10 +300,9 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
                       if (i === 0) {
                         return (
                           <td key={t.key} style={{ ...tdStyle, textAlign: 'right' }}>
-                            <input
-                              value={toDollars(it.bases[billingType])}
-                              placeholder="—"
-                              onChange={(e) => setBase(it.key, parseDollars(e.target.value))}
+                            <MoneyInput
+                              valueCents={it.bases[billingType]}
+                              onChangeCents={(c) => setBase(it.key, c)}
                               style={{ ...inputStyle, maxWidth: 90, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
                             />
                           </td>
@@ -319,12 +311,11 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
                       return (
                         <td key={t.key} style={{ ...tdStyle, textAlign: 'right' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
-                            <input
-                              value={toDollars(computed)}
-                              placeholder="—"
+                            <MoneyInput
+                              valueCents={computed}
                               disabled={!t.id}
                               title={!t.id ? 'Save the price list before locking cells on a new tier' : undefined}
-                              onChange={(e) => setOverride(it.key, t.id, parseDollars(e.target.value))}
+                              onChangeCents={(c) => setOverride(it.key, t.id, c)}
                               style={{
                                 ...inputStyle, maxWidth: 90, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
                                 borderColor: locked ? 'var(--accent)' : 'var(--border-emphasis)',
