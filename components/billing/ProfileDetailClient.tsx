@@ -4,6 +4,9 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
 import ProfileEntityConfigCard from '@/components/billing/ProfileEntityConfigCard'
+import ProfileJobsTab from '@/components/billing/ProfileJobsTab'
+import ProfileInvoicesTab from '@/components/billing/ProfileInvoicesTab'
+import Tabs from '@/components/billing/Tabs'
 import Select from '@/components/billing/Select'
 import Toggle from '@/components/billing/Toggle'
 
@@ -42,6 +45,7 @@ const labelStyle: React.CSSProperties = {
 export default function ProfileDetailClient({ profileId }: { profileId: string }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [terms, setTerms] = useState<PaymentTerm[]>([])
+  const [tab, setTab] = useState<'details' | 'jobs' | 'invoices'>('details')
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
 
@@ -131,6 +135,16 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
         </div>
       </div>
 
+      <Tabs
+        active={tab}
+        onChange={setTab}
+        tabs={[{ id: 'details', label: 'Details' }, { id: 'jobs', label: 'Jobs' }, { id: 'invoices', label: 'Invoices' }]}
+      />
+
+      {tab === 'jobs' && <ProfileJobsTab profileId={profileId} />}
+      {tab === 'invoices' && <ProfileInvoicesTab profileId={profileId} />}
+
+      {tab === 'details' && (<>
       <div className="card">
         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Profile settings</div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 20 }}>
@@ -192,6 +206,7 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
       </div>
 
       <ProfileEntityConfigCard profileId={profileId} />
+      </>)}
     </div>
   )
 }
