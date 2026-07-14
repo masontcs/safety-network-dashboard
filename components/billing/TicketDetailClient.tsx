@@ -39,7 +39,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
   const [err, setErr] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [tab, setTab] = useState<'details' | 'equipment' | 'charges'>('details')
+  const [tab, setTab] = useState<'details' | 'equipment' | 'sale' | 'labor' | 'lump_sum' | 'misc' | 'photos'>('details')
 
   // details form
   const [add, setAdd] = useState(false); const [ret, setRet] = useState(false); const [dtc, setDtc] = useState(false)
@@ -55,7 +55,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
   const [datePrompt, setDatePrompt] = useState<{ date: string; count: number } | null>(null)
 
   // line add form
-  const [cKind, setCKind] = useState('sale'); const [cItem, setCItem] = useState(''); const [cDesc, setCDesc] = useState(''); const [cQty, setCQty] = useState('1'); const [cRate, setCRate] = useState('0.00')
+  const [cItem, setCItem] = useState(''); const [cDesc, setCDesc] = useState(''); const [cQty, setCQty] = useState('1'); const [cRate, setCRate] = useState('0.00')
   // line inline edit
   const [editLn, setEditLn] = useState<string | null>(null)
   const [lnQty, setLnQty] = useState(''); const [lnRate, setLnRate] = useState(''); const [lnDesc, setLnDesc] = useState('')
@@ -122,8 +122,8 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
     if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'PUT', { eventDate: date })) load()
   }
 
-  async function addLine() {
-    const payload = cKind === 'sale' ? { kind: 'sale', itemId: cItem, qty: parseFloat(cQty) } : { kind: cKind, description: cDesc, qty: parseFloat(cQty), unitRateCents: Math.round(parseFloat(cRate) * 100) }
+  async function addLine(kind: 'sale' | 'labor' | 'lump_sum' | 'misc') {
+    const payload = kind === 'sale' ? { kind: 'sale', itemId: cItem, qty: parseFloat(cQty) } : { kind, description: cDesc, qty: parseFloat(cQty), unitRateCents: Math.round(parseFloat(cRate) * 100) }
     if (await call(`/api/billing/tickets/${ticketId}/lines`, 'POST', payload)) { setCDesc(''); setCQty('1'); setCRate('0.00'); setCItem(''); load() }
   }
   async function removeLine(id: string) { if (await call(`/api/billing/tickets/${ticketId}/lines?lineId=${id}`, 'DELETE')) load() }
@@ -143,6 +143,75 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
   const rentItems = items.filter((i) => i.rentable) // equipment ledger = rentals only
   const saleItems = items.filter((i) => i.salable)
   const statusColors: Record<string, string> = { active: 'var(--pill-neutral-fg)', in_review: 'var(--pill-pending-fg)', final_edit: 'var(--pill-paid-fg)', invoiced: 'var(--accent)' }
+
+  const chargeBlurb: Record<'sale' | 'labor' | 'lump_sum' | 'misc', string> = {
+    sale: 'Sold goods. Only sales are taxed.',
+    labor: 'Labor charges — a description and rate per unit.',
+    lump_sum: 'Lump-sum charges — a flat amount.',
+    misc: 'Miscellaneous charges.',
+  }
+
+  // One charge kind's tab: its lines + a kind-locked add form. Shares the line
+  // edit state (only one line is ever edited at a time).
+  const renderChargeTab = (kind: 'sale' | 'labor' | 'lump_sum' | 'misc') => {
+    if (!t) return null
+    const rows = t.lines.filter((l) => l.kind === kind)
+    const isSale = kind === 'sale'
+    const label = kind === 'lump_sum' ? 'lump sum' : kind
+    return (
+      <div className="card">
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>{chargeBlurb[kind]}</div>
+
+        {rows.length > 0 ? (
+          <div style={{ overflowX: 'auto', marginBottom: 14 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead><tr>{['Description', 'Qty', 'Rate', 'Amount', ...(isSale ? ['Tax'] : []), ''].map((h, hi) => <th key={hi} style={{ ...th, textAlign: ['Qty', 'Rate', 'Amount'].includes(h) ? 'right' : 'left' }}>{h}</th>)}</tr></thead>
+              <tbody>
+                {rows.map((l) => editLn === l.id ? (
+                  <tr key={l.id}>
+                    <td style={td}>{isSale ? l.description : <input value={lnDesc} onChange={(e) => setLnDesc(e.target.value)} style={inputStyle} />}</td>
+                    <td style={{ ...td, textAlign: 'right' }}><input value={lnQty} onChange={(e) => setLnQty(e.target.value)} style={{ ...inputStyle, width: 60, textAlign: 'right' }} /></td>
+                    <td style={{ ...td, textAlign: 'right' }}>{isSale ? money(l.unitRateCents) : <input value={lnRate} onChange={(e) => setLnRate(e.target.value)} style={{ ...inputStyle, width: 80, textAlign: 'right' }} />}</td>
+                    <td style={{ ...td, textAlign: 'right', color: 'var(--text-dim)' }}>—</td>
+                    {isSale && <td style={td}>{l.taxable ? 'yes' : '—'}</td>}
+                    <td style={td}><div style={{ display: 'flex', gap: 4 }}><button onClick={() => saveLn(l)} disabled={busy} style={{ ...ghost, borderColor: 'var(--accent)', color: 'var(--accent)', padding: '4px 8px' }}>Save</button><button onClick={() => setEditLn(null)} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div></td>
+                  </tr>
+                ) : (
+                  <tr key={l.id} {...rowOpen(!locked ? () => startEditLn(l) : undefined)} style={{ cursor: locked ? 'default' : 'pointer' }}>
+                    <td style={td}>{l.description}{l.itemCode ? <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>{l.itemCode}</span> : null}</td>
+                    <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{l.qty}{l.units > 1 ? ` × ${l.units}` : ''}</td>
+                    <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(l.unitRateCents)}</td>
+                    <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(l.amountCents)}</td>
+                    {isSale && <td style={{ ...td, color: 'var(--text-dim)' }}>{l.taxable ? 'yes' : '—'}</td>}
+                    <td style={td}>{!locked && <div style={{ display: 'flex', gap: 4 }}><button onClick={(ev) => { ev.stopPropagation(); startEditLn(l) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>Edit</button><button onClick={(ev) => { ev.stopPropagation(); removeLine(l.id) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{ fontSize: 12.5, color: 'var(--text-dim)', marginBottom: 14 }}>No {label} charges yet.</div>
+        )}
+
+        {!locked && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid var(--border-subtle, var(--border-emphasis))', paddingTop: 14 }}>
+            {isSale ? (
+              <div style={{ minWidth: 260 }}><label style={labelStyle}>Salable item</label>
+                <Combobox ariaLabel="Salable item" value={cItem} onChange={setCItem} options={saleItems.map((i) => ({ value: i.id, label: `${i.name} (${money(i.salePriceCents ?? 0)})`, hint: i.code }))} />
+              </div>
+            ) : (
+              <>
+                <div style={{ minWidth: 200 }}><label style={labelStyle}>Description</label><input value={cDesc} onChange={(e) => setCDesc(e.target.value)} style={inputStyle} /></div>
+                <div style={{ width: 100 }}><label style={labelStyle}>Rate ($)</label><input value={cRate} onChange={(e) => setCRate(e.target.value)} style={inputStyle} /></div>
+              </>
+            )}
+            <div style={{ width: 70 }}><label style={labelStyle}>Qty</label><input value={cQty} onChange={(e) => setCQty(e.target.value)} style={inputStyle} /></div>
+            <button onClick={() => addLine(kind)} disabled={busy || (isSale && !cItem)} style={{ ...ghost, height: 30 }}>+ Add</button>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1000 }}>
@@ -181,7 +250,10 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
       <Tabs active={tab} onChange={setTab} tabs={[
         { id: 'details', label: 'Details' },
         { id: 'equipment', label: 'Equipment', badge: t.ledger.length },
-        { id: 'charges', label: 'Charges', badge: t.lines.length },
+        { id: 'sale', label: 'Sale', badge: t.lines.filter((l) => l.kind === 'sale').length },
+        { id: 'labor', label: 'Labor', badge: t.lines.filter((l) => l.kind === 'labor').length },
+        { id: 'lump_sum', label: 'Lump sum', badge: t.lines.filter((l) => l.kind === 'lump_sum').length },
+        { id: 'misc', label: 'Misc', badge: t.lines.filter((l) => l.kind === 'misc').length },
       ]} />
 
       {tab === 'details' && (
@@ -291,67 +363,10 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
         </div>
       )}
 
-      {tab === 'charges' && (
-        <div className="card">
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>Sales, labor, lump sums and misc. Only sales are taxed. (Rentals and lost/stolen come from the Equipment ledger.)</div>
-
-          {t.lines.length > 0 && (
-            <div style={{ overflowX: 'auto', marginBottom: 14 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-                <thead><tr>{['Kind', 'Description', 'Qty', 'Rate', 'Amount', 'Tax', ''].map((h) => <th key={h} style={{ ...th, textAlign: ['Qty', 'Rate', 'Amount'].includes(h) ? 'right' : 'left' }}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {t.lines.map((l) => editLn === l.id ? (
-                    <tr key={l.id}>
-                      <td style={{ ...td, textTransform: 'capitalize' }}>{l.kind.replace('_', ' ')}</td>
-                      <td style={td}>{l.kind === 'sale' ? l.description : <input value={lnDesc} onChange={(e) => setLnDesc(e.target.value)} style={inputStyle} />}</td>
-                      <td style={{ ...td, textAlign: 'right' }}><input value={lnQty} onChange={(e) => setLnQty(e.target.value)} style={{ ...inputStyle, width: 60, textAlign: 'right' }} /></td>
-                      <td style={{ ...td, textAlign: 'right' }}>{l.kind === 'sale' ? money(l.unitRateCents) : <input value={lnRate} onChange={(e) => setLnRate(e.target.value)} style={{ ...inputStyle, width: 80, textAlign: 'right' }} />}</td>
-                      <td style={{ ...td, textAlign: 'right', color: 'var(--text-dim)' }}>—</td>
-                      <td style={td}>{l.taxable ? 'yes' : '—'}</td>
-                      <td style={td}><div style={{ display: 'flex', gap: 4 }}><button onClick={() => saveLn(l)} disabled={busy} style={{ ...ghost, borderColor: 'var(--accent)', color: 'var(--accent)', padding: '4px 8px' }}>Save</button><button onClick={() => setEditLn(null)} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div></td>
-                    </tr>
-                  ) : (
-                    <tr key={l.id} {...rowOpen(!locked ? () => startEditLn(l) : undefined)} style={{ cursor: locked ? 'default' : 'pointer' }}>
-                      <td style={{ ...td, textTransform: 'capitalize' }}>{l.kind.replace('_', ' ')}</td>
-                      <td style={td}>{l.description}{l.itemCode ? <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>{l.itemCode}</span> : null}</td>
-                      <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{l.qty}{l.units > 1 ? ` × ${l.units}` : ''}</td>
-                      <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(l.unitRateCents)}</td>
-                      <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(l.amountCents)}</td>
-                      <td style={{ ...td, color: 'var(--text-dim)' }}>{l.taxable ? 'yes' : '—'}</td>
-                      <td style={td}>{!locked && <div style={{ display: 'flex', gap: 4 }}><button onClick={(ev) => { ev.stopPropagation(); startEditLn(l) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>Edit</button><button onClick={(ev) => { ev.stopPropagation(); removeLine(l.id) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {!locked && (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid var(--border-subtle, var(--border-emphasis))', paddingTop: 14 }}>
-              <div style={{ width: 120 }}><label style={labelStyle}>Kind</label>
-                <Select ariaLabel="Kind" value={cKind} onChange={setCKind} style={inputStyle}><option value="sale">Sale</option><option value="labor">Labor</option><option value="lump_sum">Lump sum</option><option value="misc">Misc</option></Select>
-              </div>
-              {cKind === 'sale' ? (
-                <div style={{ minWidth: 260 }}><label style={labelStyle}>Salable item</label>
-                  <Combobox
-                    ariaLabel="Salable item"
-                    value={cItem}
-                    onChange={setCItem}
-                    options={saleItems.map((i) => ({ value: i.id, label: `${i.name} (${money(i.salePriceCents ?? 0)})`, hint: i.code }))}
-                  />
-                </div>
-              ) : (
-                <>
-                  <div style={{ minWidth: 200 }}><label style={labelStyle}>Description</label><input value={cDesc} onChange={(e) => setCDesc(e.target.value)} style={inputStyle} /></div>
-                  <div style={{ width: 100 }}><label style={labelStyle}>Rate ($)</label><input value={cRate} onChange={(e) => setCRate(e.target.value)} style={inputStyle} /></div>
-                </>
-              )}
-              <div style={{ width: 70 }}><label style={labelStyle}>Qty</label><input value={cQty} onChange={(e) => setCQty(e.target.value)} style={inputStyle} /></div>
-              <button onClick={addLine} disabled={busy || (cKind === 'sale' && !cItem)} style={{ ...ghost, height: 30 }}>+ Add</button>
-            </div>
-          )}
-        </div>
-      )}
+      {tab === 'sale' && renderChargeTab('sale')}
+      {tab === 'labor' && renderChargeTab('labor')}
+      {tab === 'lump_sum' && renderChargeTab('lump_sum')}
+      {tab === 'misc' && renderChargeTab('misc')}
     </div>
   )
 }
