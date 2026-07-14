@@ -6,6 +6,7 @@ import Skeleton from '@/components/ui/Skeleton'
 import Tabs from '@/components/billing/Tabs'
 import Combobox from '@/components/billing/Combobox'
 import Select from '@/components/billing/Select'
+import TicketPhotosTab from '@/components/billing/TicketPhotosTab'
 import { rowOpen } from '@/components/billing/rowOpen'
 import { BILLING_TYPE_LABELS } from '@/lib/billing/constants'
 import type { BillingType } from '@/lib/supabase/database.types'
@@ -254,6 +255,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
         { id: 'labor', label: 'Labor', badge: t.lines.filter((l) => l.kind === 'labor').length },
         { id: 'lump_sum', label: 'Lump sum', badge: t.lines.filter((l) => l.kind === 'lump_sum').length },
         { id: 'misc', label: 'Misc', badge: t.lines.filter((l) => l.kind === 'misc').length },
+        { id: 'photos', label: 'Photos' },
       ]} />
 
       {tab === 'details' && (
@@ -367,6 +369,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
       {tab === 'labor' && renderChargeTab('labor')}
       {tab === 'lump_sum' && renderChargeTab('lump_sum')}
       {tab === 'misc' && renderChargeTab('misc')}
+      {tab === 'photos' && <TicketPhotosTab ticketId={ticketId} canEdit={t.isAdmin} />}
     </div>
   )
 }

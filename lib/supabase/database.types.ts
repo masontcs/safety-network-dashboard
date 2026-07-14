@@ -418,6 +418,12 @@ export type Database = {
         Update: { id?: string; ticket_id?: string; job_id?: string; item_id?: string; variation_id?: string | null; event_type?: BillingLedgerEvent; event_date?: string; qty?: number; equipment_id?: string | null }
         Relationships: []
       }
+      billing_ticket_photos: {
+        Row: { id: string; ticket_id: string; storage_path: string; file_name: string; content_type: string | null; size_bytes: number | null; uploaded_by: string | null; created_at: string }
+        Insert: { id?: string; ticket_id: string; storage_path: string; file_name: string; content_type?: string | null; size_bytes?: number | null; uploaded_by?: string | null }
+        Update: { id?: string; ticket_id?: string; storage_path?: string; file_name?: string; content_type?: string | null; size_bytes?: number | null; uploaded_by?: string | null }
+        Relationships: []
+      }
       /** Ongoing-rental accruals, keyed by PICKUP LOT (lot_date). Cumulative qty-units billed. */
       billing_rental_accruals: {
         Row: { id: string; ticket_id: string; item_id: string; variation_id: string | null; lot_date: string; qty_units_billed: number; updated_at: string }
