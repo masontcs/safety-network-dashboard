@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createRouteClient, createServiceClient } from '@/lib/supabase/server'
 import type { UserAccess } from '@/lib/utils/access'
 import type { Role } from '@/lib/supabase/database.types'
+import { DASHBOARD_ROLES, isFieldRole } from '@/lib/utils/interfaces'
 
 type AccessResult =
   | { ok: true; access: UserAccess }
@@ -9,27 +10,23 @@ type AccessResult =
 
 // ── Valid roles — used for runtime validation of DB values ─────────────────────
 //
-// DASHBOARD roles only. 'tech' is deliberately ABSENT: field techs must never reach a
-// dashboard or billing API, so getAccessContext rejects them outright and /api/tech/*
-// uses its own context that requires role === 'tech'. Two disjoint sets.
-//
-// This matters because the access guards below are DENY-lists (fail-open): a role that
-// isn't listed in NO_PAYROLL_ROLES / NO_FUEL_ROLES / NO_REVENUE_ROLES is GRANTED access.
-// Adding 'tech' here would silently hand field techs payroll, fuel and revenue data.
-// Keep techs out of this list; don't rely on remembering the deny-lists.
-const VALID_ROLES: Role[] = [
-  'admin', 'executive', 'ar_manager', 'ar_team', 'office_team',
-  'district_manager', 'branch_manager', 'project_manager', 'sales',
-]
-
-/** Field-only roles: valid accounts, but with zero dashboard access. */
-const FIELD_ROLES: Role[] = ['tech']
+// DASHBOARD roles only, from the single source of truth in lib/utils/interfaces.
+// Field roles ('tech') are deliberately absent: they must never reach a dashboard or
+// billing API. getAccessContext rejects them outright and /api/tech/* requires
+// role === 'tech'. Two disjoint sets.
+const VALID_ROLES: readonly Role[] = DASHBOARD_ROLES
 
 // ── Role sets ──────────────────────────────────────────────────────────────────
+//
+// ALLOW-lists, deliberately. These were previously deny-lists
+// (`if (NO_PAYROLL_ROLES.includes(role)) deny; else allow`) which FAIL OPEN: any role
+// not named was granted access, so adding a role silently handed it payroll, fuel and
+// revenue data. Inverted so a role gets nothing unless it's listed here. Membership is
+// identical to the old behaviour — this changes nothing for existing roles.
 
-const NO_PAYROLL_ROLES: Role[] = ['ar_manager', 'ar_team', 'office_team', 'project_manager', 'sales']
-const NO_FUEL_ROLES:    Role[] = ['ar_manager', 'ar_team', 'office_team', 'project_manager', 'sales']
-const NO_REVENUE_ROLES: Role[] = ['ar_manager', 'ar_team', 'office_team']
+const PAYROLL_ROLES: Role[] = ['admin', 'executive', 'district_manager', 'branch_manager']
+const FUEL_ROLES:    Role[] = ['admin', 'executive', 'district_manager', 'branch_manager']
+const REVENUE_ROLES: Role[] = ['admin', 'executive', 'district_manager', 'branch_manager', 'project_manager', 'sales']
 
 // ── Guard helpers ──────────────────────────────────────────────────────────────
 
@@ -65,25 +62,19 @@ export function guardArAdminOnly(role: Role): NextResponse | null {
   )
 }
 
+const deny = () =>
+  NextResponse.json({ success: false, error: 'Access denied.', code: 'FORBIDDEN' }, { status: 403 })
+
 export function guardPayrollAccess(role: Role): NextResponse | null {
-  if (NO_PAYROLL_ROLES.includes(role)) {
-    return NextResponse.json({ success: false, error: 'Access denied.', code: 'FORBIDDEN' }, { status: 403 })
-  }
-  return null
+  return PAYROLL_ROLES.includes(role) ? null : deny()
 }
 
 export function guardFuelAccess(role: Role): NextResponse | null {
-  if (NO_FUEL_ROLES.includes(role)) {
-    return NextResponse.json({ success: false, error: 'Access denied.', code: 'FORBIDDEN' }, { status: 403 })
-  }
-  return null
+  return FUEL_ROLES.includes(role) ? null : deny()
 }
 
 export function guardRevenueAccess(role: Role): NextResponse | null {
-  if (NO_REVENUE_ROLES.includes(role)) {
-    return NextResponse.json({ success: false, error: 'Access denied.', code: 'FORBIDDEN' }, { status: 403 })
-  }
-  return null
+  return REVENUE_ROLES.includes(role) ? null : deny()
 }
 
 // ── Access context ─────────────────────────────────────────────────────────────
@@ -133,9 +124,9 @@ export async function getAccessContext(): Promise<AccessResult> {
     }
   }
 
-  // Field roles are legitimate accounts with NO dashboard access — reject them here so
-  // they can never reach a role guard (several of which are deny-lists and fail open).
-  if (FIELD_ROLES.includes(profile.role as Role)) {
+  // Field roles are legitimate accounts with NO web access — reject them here so they
+  // can never reach a role guard at all.
+  if (isFieldRole(profile.role as Role)) {
     return {
       ok: false,
       response: NextResponse.json(

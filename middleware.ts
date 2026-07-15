@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import type { Database } from '@/lib/supabase/database.types'
+import { allowedPrefixesFor } from '@/lib/utils/interfaces'
 
 type Role = Database['public']['Tables']['user_profiles']['Row']['role']
 
@@ -24,20 +25,8 @@ const ROLE_HOME: Record<Role, string> = {
   tech:             '/',
 }
 
-// Path prefixes each role is allowed to visit
-const ROLE_ALLOWED_PREFIXES: Record<Role, string[]> = {
-  admin:            ['/dashboard', '/admin', '/fuel', '/ar'],
-  executive:        ['/dashboard', '/executive', '/fuel', '/ar'],
-  district_manager: ['/dashboard', '/district', '/fuel', '/ar'],
-  branch_manager:   ['/dashboard', '/manager', '/fuel', '/ar'],
-  ar_manager:       ['/ar'],
-  ar_team:          ['/ar'],
-  office_team:      ['/ar'],
-  project_manager:  ['/dashboard', '/ar'],
-  sales:            ['/dashboard', '/ar'],
-  // Intentionally EMPTY: a tech account can reach no dashboard page at all.
-  tech:             [],
-}
+// Path prefixes each role is allowed to visit come from the single source of truth in
+// lib/utils/interfaces — allow-lists only, so an unlisted role reaches nothing.
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -101,8 +90,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(ROLE_HOME[profile.role], request.url))
   }
 
-  // Block cross-role path access
-  const allowed = ROLE_ALLOWED_PREFIXES[profile.role] ?? []
+  // Block cross-role path access. allowedPrefixesFor is an allow-list: a role with no
+  // grant reaches nothing, and is bounced to its home rather than shown a 403 (a 403
+  // would confirm the page exists).
+  const allowed = allowedPrefixesFor(profile.role)
   if (!allowed.some((prefix) => pathname.startsWith(prefix))) {
     return NextResponse.redirect(new URL(ROLE_HOME[profile.role], request.url))
   }
@@ -123,5 +114,9 @@ export const config = {
     '/manager/:path*',
     '/fuel/:path*',
     '/ar/:path*',
+    // /billing was previously NOT matched, so the middleware never ran on it and the
+    // /billing layout gate was the only thing standing between a user and the billing
+    // interface. Matched now for defence in depth: two independent gates.
+    '/billing/:path*',
   ],
 }

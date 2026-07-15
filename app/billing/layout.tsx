@@ -2,25 +2,18 @@ import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase/server'
 import type { Role } from '@/lib/supabase/database.types'
 import BillingShell from '@/components/billing/BillingShell'
-import type { InterfaceKey } from '@/components/billing/InterfaceSwitcher'
+import { canUseBilling, interfacesFor } from '@/lib/utils/interfaces'
 import './billing.css'
 
 /**
  * Gate the whole /billing subtree once, here — the pages beneath no longer
- * repeat the auth check or wrap themselves in a shell.
+ * repeat the auth check or wrap themselves in a shell. The middleware also gates
+ * /billing, so this is the second of two independent gates.
  *
- * Billing roles are not defined yet, so access is admin-only. When they land,
- * this is the single place to widen it (plus the guardAdminOnly() calls in the
- * billing API routes).
+ * Who may reach billing lives in lib/utils/interfaces (BILLING_ROLES) — the single
+ * source of truth shared with the middleware and the sidebar switcher. Widen it there,
+ * not here (plus the guardAdminOnly() calls in the billing API routes).
  */
-const BILLING_ROLES: Role[] = ['admin']
-
-/** Which interfaces this user may switch between. */
-function interfacesFor(role: Role): InterfaceKey[] {
-  const keys: InterfaceKey[] = ['dashboards'] // everyone with an account has the dashboards
-  if (BILLING_ROLES.includes(role)) keys.push('billing')
-  return keys
-}
 
 export default async function BillingLayout({ children }: { children: React.ReactNode }) {
   const supabase = createServerClient()
@@ -34,7 +27,7 @@ export default async function BillingLayout({ children }: { children: React.Reac
     .single()
 
   const profile = profileRaw as { role: Role; display_name: string } | null
-  if (!profile || !BILLING_ROLES.includes(profile.role)) redirect('/dashboard')
+  if (!profile || !canUseBilling(profile.role)) redirect('/dashboard')
 
   return (
     <BillingShell userName={profile.display_name} available={interfacesFor(profile.role)}>

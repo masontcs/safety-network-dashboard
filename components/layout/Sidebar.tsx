@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createBrowserClient } from '@/lib/supabase/client'
 import { useTheme } from '@/lib/theme/ThemeContext'
 import InterfaceSwitcher from '@/components/billing/InterfaceSwitcher'
+import { interfacesFor } from '@/lib/utils/interfaces'
 import type { Role } from '@/lib/supabase/database.types'
 
 interface NavItem {
@@ -306,7 +307,7 @@ export default function Sidebar({ role }: SidebarProps) {
         <div style={{ padding: '0 6px 6px' }}>
           <InterfaceSwitcher
             current="dashboards"
-            available={role === 'admin' ? ['dashboards', 'billing'] : ['dashboards']}
+            available={interfacesFor(role)}
           />
         </div>
       )}

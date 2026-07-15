@@ -11,7 +11,10 @@ import { useRouter } from 'next/navigation'
  * Lives at the top of both sidebars, in the workspace-switcher spot.
  */
 
-export type InterfaceKey = 'dashboards' | 'billing'
+// Defined in lib/utils/interfaces — the single source of truth for interface access.
+// Re-exported here so existing importers keep working.
+export type { InterfaceKey } from '@/lib/utils/interfaces'
+import type { InterfaceKey } from '@/lib/utils/interfaces'
 
 const META: Record<InterfaceKey, { label: string; sub: string; href: string; mark: string }> = {
   dashboards: { label: 'Dashboards', sub: 'Safety Network', href: '/dashboard', mark: 'SN' },
