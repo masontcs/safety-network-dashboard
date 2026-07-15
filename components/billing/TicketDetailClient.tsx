@@ -7,6 +7,7 @@ import Tabs from '@/components/billing/Tabs'
 import Combobox from '@/components/billing/Combobox'
 import Select from '@/components/billing/Select'
 import TicketPhotosTab from '@/components/billing/TicketPhotosTab'
+import TicketLaborTab from '@/components/billing/TicketLaborTab'
 import { rowOpen } from '@/components/billing/rowOpen'
 import { BILLING_TYPE_LABELS } from '@/lib/billing/constants'
 import type { BillingType } from '@/lib/supabase/database.types'
@@ -147,7 +148,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
 
   const chargeBlurb: Record<'sale' | 'labor' | 'lump_sum' | 'misc', string> = {
     sale: 'Sold goods. Only sales are taxed.',
-    labor: 'Labor charges — a description and rate per unit.',
+    labor: 'Billed labor. Until invoicing rolls the time above up for you, these lines are entered by hand — and they never change the recorded time.',
     lump_sum: 'Lump-sum charges — a flat amount.',
     misc: 'Miscellaneous charges.',
   }
@@ -366,7 +367,10 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
       )}
 
       {tab === 'sale' && renderChargeTab('sale')}
-      {tab === 'labor' && renderChargeTab('labor')}
+      {tab === 'labor' && (<>
+        <TicketLaborTab ticketId={ticketId} canEdit={t.isAdmin && !locked} />
+        {renderChargeTab('labor')}
+      </>)}
       {tab === 'lump_sum' && renderChargeTab('lump_sum')}
       {tab === 'misc' && renderChargeTab('misc')}
       {tab === 'photos' && <TicketPhotosTab ticketId={ticketId} canEdit={t.isAdmin} />}

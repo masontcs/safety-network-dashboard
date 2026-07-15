@@ -424,6 +424,24 @@ export type Database = {
         Update: { id?: string; ticket_id?: string; storage_path?: string; file_name?: string; content_type?: string | null; size_bytes?: number | null; uploaded_by?: string | null }
         Relationships: []
       }
+      billing_activity_types: {
+        Row: { id: string; name: string; sort_order: number; is_active: boolean; created_at: string }
+        Insert: { id?: string; name: string; sort_order?: number; is_active?: boolean }
+        Update: { id?: string; name?: string; sort_order?: number; is_active?: boolean }
+        Relationships: []
+      }
+      billing_technicians: {
+        Row: { id: string; name: string; is_active: boolean; created_at: string }
+        Insert: { id?: string; name: string; is_active?: boolean }
+        Update: { id?: string; name?: string; is_active?: boolean }
+        Relationships: []
+      }
+      billing_ticket_labor: {
+        Row: { id: string; ticket_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; created_at: string }
+        Insert: { id?: string; ticket_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string }
+        Update: { id?: string; ticket_id?: string; technician_id?: string; activity_type_id?: string; start_time?: string; end_time?: string }
+        Relationships: []
+      }
       /** Ongoing-rental accruals, keyed by PICKUP LOT (lot_date). Cumulative qty-units billed. */
       billing_rental_accruals: {
         Row: { id: string; ticket_id: string; item_id: string; variation_id: string | null; lot_date: string; qty_units_billed: number; updated_at: string }
