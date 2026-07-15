@@ -289,12 +289,25 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
             <span style={{ flex: 1 }} />
             {t.status === 'active' && <button onClick={() => setStatus('in_review')} disabled={busy} style={ghost}>Move to review</button>}
             {t.status === 'in_review' && <>
-              <button onClick={() => setStatus('active')} disabled={busy} style={ghost}>Back to active</button>
+              {/* The correction loop: back to 'active' is what puts the ticket back in
+                  the crew's app so they can add what they missed and resubmit. Named
+                  for what it does, not for the status it sets. */}
+              <button onClick={() => setStatus('active')} disabled={busy} style={{ ...ghost, borderColor: 'var(--accent)', color: 'var(--accent)' }}>↩ Reopen for crew</button>
               <button onClick={() => setStatus('final_edit')} disabled={busy} className="btn-primary" style={{ padding: '7px 16px' }}>Final edit (lock)</button>
             </>}
-            {t.status === 'final_edit' && <button onClick={() => setStatus('in_review')} disabled={busy} style={ghost}>Reopen</button>}
+            {t.status === 'final_edit' && <button onClick={() => setStatus('in_review')} disabled={busy} style={ghost}>Reopen to review</button>}
           </div>
-          {t.status === 'in_review' && !billingType && <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 8 }}>Set a billing type before final edit.</div>}
+          {t.status === 'in_review' && (
+            <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 8, lineHeight: 1.6 }}>
+              Submitted by the crew. <strong>Reopen for crew</strong> puts it back in their app to add anything missing —
+              they&apos;ll submit it again.{!billingType && ' Set a billing type before final edit.'}
+            </div>
+          )}
+          {t.status === 'active' && (
+            <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 8 }}>
+              Visible to the assigned crew — they can add labor and equipment until the lead submits it.
+            </div>
+          )}
         </div>
       )}
 
