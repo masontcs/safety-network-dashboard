@@ -8,6 +8,7 @@ import Combobox from '@/components/billing/Combobox'
 import Select from '@/components/billing/Select'
 import TicketPhotosTab from '@/components/billing/TicketPhotosTab'
 import TicketLaborTab from '@/components/billing/TicketLaborTab'
+import TicketCrewCard from '@/components/billing/TicketCrewCard'
 import { rowOpen } from '@/components/billing/rowOpen'
 import { BILLING_TYPE_LABELS } from '@/lib/billing/constants'
 import type { BillingType } from '@/lib/supabase/database.types'
@@ -258,6 +259,8 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
         { id: 'misc', label: 'Misc', badge: t.lines.filter((l) => l.kind === 'misc').length },
         { id: 'photos', label: 'Photos' },
       ]} />
+
+      {tab === 'details' && <TicketCrewCard ticketId={ticketId} canEdit={t.isAdmin && !locked} />}
 
       {tab === 'details' && (
         <div className="card">

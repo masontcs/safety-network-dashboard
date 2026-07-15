@@ -122,6 +122,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
       activity_type_id: body.activityTypeId,
       start_time: norm.start,
       end_time: norm.end,
+      // The hours belong to technician_id; entered_by only records who typed them
+      // (office admin here, or a lead tech entering on a crew member's behalf).
+      entered_by: ctx.access.userId,
     })
     if (error) throw new Error(error.message)
 

@@ -171,6 +171,8 @@ const NAV_CONFIG: Record<Role, NavConfig> = {
     ],
     more: [],
   },
+  // Field techs have no dashboard pages at all — nothing to navigate to.
+  tech: { primary: [], more: [] },
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────

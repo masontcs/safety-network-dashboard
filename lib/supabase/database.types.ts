@@ -2,7 +2,10 @@
 // Regenerate after schema changes:
 //   npx supabase gen types typescript --project-id zobgzhgwgduziszzevzp > lib/supabase/database.types.ts
 
-export type Role = 'admin' | 'executive' | 'district_manager' | 'branch_manager' | 'ar_manager' | 'ar_team' | 'office_team' | 'project_manager' | 'sales'
+// 'tech' is a FIELD role for the tech app only. It is deliberately NOT a dashboard role:
+// see DASHBOARD_ROLES in lib/api/auth.ts — techs are rejected by every dashboard/billing
+// API, and /api/tech/* requires it. Never add 'tech' to a dashboard role list.
+export type Role = 'admin' | 'executive' | 'district_manager' | 'branch_manager' | 'ar_manager' | 'ar_team' | 'office_team' | 'project_manager' | 'sales' | 'tech'
 export type LaborType =
   | 'direct'
   | 'admin_hourly'
@@ -431,15 +434,21 @@ export type Database = {
         Relationships: []
       }
       billing_technicians: {
-        Row: { id: string; name: string; is_active: boolean; created_at: string }
-        Insert: { id?: string; name: string; is_active?: boolean }
-        Update: { id?: string; name?: string; is_active?: boolean }
+        Row: { id: string; name: string; is_active: boolean; user_id: string | null; created_at: string }
+        Insert: { id?: string; name: string; is_active?: boolean; user_id?: string | null }
+        Update: { id?: string; name?: string; is_active?: boolean; user_id?: string | null }
+        Relationships: []
+      }
+      billing_ticket_assignments: {
+        Row: { id: string; ticket_id: string; technician_id: string; is_lead: boolean; created_at: string }
+        Insert: { id?: string; ticket_id: string; technician_id: string; is_lead?: boolean }
+        Update: { id?: string; ticket_id?: string; technician_id?: string; is_lead?: boolean }
         Relationships: []
       }
       billing_ticket_labor: {
-        Row: { id: string; ticket_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; created_at: string }
-        Insert: { id?: string; ticket_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string }
-        Update: { id?: string; ticket_id?: string; technician_id?: string; activity_type_id?: string; start_time?: string; end_time?: string }
+        Row: { id: string; ticket_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; entered_by: string | null; created_at: string }
+        Insert: { id?: string; ticket_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; entered_by?: string | null }
+        Update: { id?: string; ticket_id?: string; technician_id?: string; activity_type_id?: string; start_time?: string; end_time?: string; entered_by?: string | null }
         Relationships: []
       }
       /** Ongoing-rental accruals, keyed by PICKUP LOT (lot_date). Cumulative qty-units billed. */

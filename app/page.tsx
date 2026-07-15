@@ -14,6 +14,9 @@ const DASHBOARD_ROUTES: Record<Role, string> = {
   office_team:      '/ar',
   project_manager:  '/dashboard',
   sales:            '/dashboard',
+  // Field techs have no web app — they use the tech mobile app. Keep them on the
+  // public landing page rather than redirecting into the dashboard.
+  tech:             '/',
 }
 
 export default async function RootPage() {

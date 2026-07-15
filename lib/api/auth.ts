@@ -8,11 +8,22 @@ type AccessResult =
   | { ok: false; response: NextResponse }
 
 // ── Valid roles — used for runtime validation of DB values ─────────────────────
-
+//
+// DASHBOARD roles only. 'tech' is deliberately ABSENT: field techs must never reach a
+// dashboard or billing API, so getAccessContext rejects them outright and /api/tech/*
+// uses its own context that requires role === 'tech'. Two disjoint sets.
+//
+// This matters because the access guards below are DENY-lists (fail-open): a role that
+// isn't listed in NO_PAYROLL_ROLES / NO_FUEL_ROLES / NO_REVENUE_ROLES is GRANTED access.
+// Adding 'tech' here would silently hand field techs payroll, fuel and revenue data.
+// Keep techs out of this list; don't rely on remembering the deny-lists.
 const VALID_ROLES: Role[] = [
   'admin', 'executive', 'ar_manager', 'ar_team', 'office_team',
   'district_manager', 'branch_manager', 'project_manager', 'sales',
 ]
+
+/** Field-only roles: valid accounts, but with zero dashboard access. */
+const FIELD_ROLES: Role[] = ['tech']
 
 // ── Role sets ──────────────────────────────────────────────────────────────────
 
@@ -118,6 +129,18 @@ export async function getAccessContext(): Promise<AccessResult> {
       response: NextResponse.json(
         { success: false, error: 'User profile not found.', code: 'NOT_FOUND' },
         { status: 404 }
+      ),
+    }
+  }
+
+  // Field roles are legitimate accounts with NO dashboard access — reject them here so
+  // they can never reach a role guard (several of which are deny-lists and fail open).
+  if (FIELD_ROLES.includes(profile.role as Role)) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { success: false, error: 'This is a field technician account. Please use the tech app.', code: 'FORBIDDEN' },
+        { status: 403 }
       ),
     }
   }

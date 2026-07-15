@@ -27,6 +27,7 @@ const ROLE_LABELS: Record<Role, string> = {
   office_team:      'Office Team',
   project_manager:  'Project Manager',
   sales:            'Sales',
+  tech:             'Field Tech',
 }
 
 const ROLE_COLORS: Record<Role, string> = {
@@ -39,6 +40,7 @@ const ROLE_COLORS: Record<Role, string> = {
   office_team:      'var(--text-secondary)',
   project_manager:  'var(--text-secondary)',
   sales:            'var(--text-secondary)',
+  tech:             'var(--text-secondary)',
 }
 
 const selectStyle: React.CSSProperties = {
