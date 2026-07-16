@@ -25,7 +25,6 @@ interface ItemDetailRow {
   code: string
   name: string
   category: BillingItemCategory
-  group_name: string | null
   cost_cents: number
   rentable: boolean
   salable: boolean
@@ -49,7 +48,7 @@ export async function GET(
     const { data, error } = await supabase
       .from('billing_items')
       .select(`
-        id, code, name, category, group_name, cost_cents, rentable, salable, sale_price_cents,
+        id, code, name, category, cost_cents, rentable, salable, sale_price_cents,
         taxable, tracked, is_active,
         billing_item_variations(id, name, adj_cents, sort_order),
         billing_item_default_rates(billing_type, rate_cents)
@@ -68,7 +67,6 @@ export async function GET(
         code: i.code,
         name: i.name,
         category: i.category,
-        groupName: i.group_name,
         costCents: i.cost_cents,
         rentable: i.rentable,
         salable: i.salable,
@@ -105,7 +103,6 @@ export async function PATCH(
     const body = (await request.json()) as {
       name?: string
       category?: string
-      groupName?: string | null
       costCents?: number
       rentable?: boolean
       salable?: boolean
@@ -144,7 +141,6 @@ export async function PATCH(
     }
     const isEquipment = category === 'Equipment'
 
-    if (body.groupName !== undefined) patch.group_name = body.groupName?.trim() || null
     if (body.costCents !== undefined) {
       if (!Number.isInteger(body.costCents) || body.costCents < 0) return bad('Cost must be a whole number of cents')
       patch.cost_cents = body.costCents

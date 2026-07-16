@@ -18,7 +18,6 @@ interface ItemRow {
   code: string
   name: string
   category: BillingItemCategory
-  groupName: string | null
   costCents: number
   rentable: boolean
   salable: boolean
@@ -81,7 +80,6 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
   const [nCode, setNCode] = useState('')
   const [nName, setNName] = useState('')
   const [nCategory, setNCategory] = useState<BillingItemCategory>('Equipment')
-  const [nGroup, setNGroup] = useState('')
   const [nCost, setNCost] = useState('0.00')
   const [nRentable, setNRentable] = useState(true)
   const [nSalable, setNSalable] = useState(false)
@@ -115,8 +113,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
       (i) =>
         i.code.toLowerCase().includes(q) ||
         i.name.toLowerCase().includes(q) ||
-        i.category.toLowerCase().includes(q) ||
-        (i.groupName ?? '').toLowerCase().includes(q)
+        i.category.toLowerCase().includes(q)
     )
   }, [items, search])
 
@@ -132,7 +129,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          code: nCode, name: nName, category: nCategory, groupName: nGroup || null,
+          code: nCode, name: nName, category: nCategory,
           costCents: toCents(nCost),
           rentable: equip ? nRentable : false,
           salable: equip ? nSalable : false,
@@ -143,7 +140,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
       })
       const json = await res.json()
       if (!json.success) { setActionError(json.error); return }
-      setNCode(''); setNName(''); setNGroup(''); setNCost('0.00'); setNRentable(true); setNSalable(false); setNSalePrice('0.00'); setNTracked(false); setNVars([])
+      setNCode(''); setNName(''); setNCost('0.00'); setNRentable(true); setNSalable(false); setNSalePrice('0.00'); setNTracked(false); setNVars([])
       setShowNew(false); load()
     } catch { setActionError('Network error — please try again.') }
     finally { setBusy(false) }
@@ -174,7 +171,6 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
         body: JSON.stringify({
           name: editing.name,
           category: editing.category,
-          groupName: editing.groupName,
           costCents: toCents(editCost),
           rentable: editing.rentable,
           salable: editing.salable,
@@ -232,7 +228,6 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
                 {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </Select>
             </div>
-            <div><label style={labelStyle}>Group</label><input value={nGroup} onChange={(e) => setNGroup(e.target.value)} placeholder="REG" style={inputStyle} /></div>
             <div><label style={labelStyle}>Cost ($)</label><input value={nCost} onChange={(e) => setNCost(e.target.value)} style={inputStyle} /></div>
           </div>
 
@@ -309,7 +304,6 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
                 {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </Select>
             </div>
-            <div><label style={labelStyle}>Group</label><input value={editing.groupName ?? ''} onChange={(e) => patchEdit({ groupName: e.target.value || null })} style={inputStyle} /></div>
             <div><label style={labelStyle}>Cost ($)</label><input value={editCost} onChange={(e) => setEditCost(e.target.value)} style={inputStyle} /></div>
           </div>
 
@@ -424,7 +418,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr>
-                  {['Code', 'Name', 'Category', 'Group', 'Cost', 'Sale', 'Flags', 'Variations', ''].map((h, i) => (
+                  {['Code', 'Name', 'Category', 'Cost', 'Sale', 'Flags', 'Variations', ''].map((h, i) => (
                     <th key={i} style={{ ...thStyle, textAlign: ['Cost', 'Sale', 'Variations'].includes(h) ? 'right' : 'left' }}>{h}</th>
                   ))}
                 </tr>
@@ -439,7 +433,6 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
                     <td style={{ ...tdStyle, fontWeight: 500 }}>{i.code}</td>
                     <td style={tdStyle}>{i.name}</td>
                     <td style={tdStyle}>{i.category}</td>
-                    <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{i.groupName ?? '—'}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>${toDollars(i.costCents)}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                       {i.salable ? `$${toDollars(i.salePriceCents)}` : <span style={{ color: 'var(--text-dim)' }}>—</span>}

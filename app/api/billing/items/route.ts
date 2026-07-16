@@ -26,7 +26,6 @@ interface ItemListRow {
   code: string
   name: string
   category: BillingItemCategory
-  group_name: string | null
   cost_cents: number
   rentable: boolean
   salable: boolean
@@ -47,7 +46,7 @@ export async function GET(): Promise<NextResponse> {
     const { data, error } = await supabase
       .from('billing_items')
       .select(`
-        id, code, name, category, group_name, cost_cents, rentable, salable, sale_price_cents,
+        id, code, name, category, cost_cents, rentable, salable, sale_price_cents,
         taxable, tracked, is_active,
         billing_item_variations(id),
         billing_item_default_rates(billing_type)
@@ -65,7 +64,6 @@ export async function GET(): Promise<NextResponse> {
         code: i.code,
         name: i.name,
         category: i.category,
-        groupName: i.group_name,
         costCents: i.cost_cents,
         rentable: i.rentable,
         salable: i.salable,
@@ -96,7 +94,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       code?: string
       name?: string
       category?: string
-      groupName?: string | null
       costCents?: number
       rentable?: boolean
       salable?: boolean
@@ -166,7 +163,6 @@ export async function POST(request: Request): Promise<NextResponse> {
         code,
         name,
         category,
-        group_name: body.groupName?.trim() || null,
         cost_cents: costCents,
         rentable,
         salable,
