@@ -459,9 +459,11 @@ export type Database = {
         Relationships: []
       }
       billing_ticket_lines: {
-        Row: { id: string; ticket_id: string; kind: BillingLineKind; item_id: string | null; variation_id: string | null; description: string; qty: number; units: number; unit_rate_cents: number; amount_cents: number; taxable: boolean; created_at: string }
-        Insert: { id?: string; ticket_id: string; kind: BillingLineKind; item_id?: string | null; variation_id?: string | null; description: string; qty?: number; units?: number; unit_rate_cents: number; amount_cents: number; taxable?: boolean }
-        Update: { id?: string; ticket_id?: string; kind?: BillingLineKind; item_id?: string | null; variation_id?: string | null; description?: string; qty?: number; units?: number; unit_rate_cents?: number; amount_cents?: number; taxable?: boolean }
+        // unit_rate_cents / amount_cents are NULL for item-priced kinds (labor, lump sum):
+        // their rate comes from the price list at invoice time, not from the ticket.
+        Row: { id: string; ticket_id: string; kind: BillingLineKind; item_id: string | null; variation_id: string | null; description: string; qty: number; units: number; unit_rate_cents: number | null; amount_cents: number | null; taxable: boolean; created_at: string }
+        Insert: { id?: string; ticket_id: string; kind: BillingLineKind; item_id?: string | null; variation_id?: string | null; description: string; qty?: number; units?: number; unit_rate_cents?: number | null; amount_cents?: number | null; taxable?: boolean }
+        Update: { id?: string; ticket_id?: string; kind?: BillingLineKind; item_id?: string | null; variation_id?: string | null; description?: string; qty?: number; units?: number; unit_rate_cents?: number | null; amount_cents?: number | null; taxable?: boolean }
         Relationships: []
       }
       billing_invoices: {

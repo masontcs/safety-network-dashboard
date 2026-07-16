@@ -15,7 +15,9 @@ import type { BillingType } from '@/lib/supabase/database.types'
 
 interface PickerItem { id: string; code: string; name: string; category: string; tracked: boolean; rentable: boolean; salable: boolean; salePriceCents: number | null; variations: { id: string; name: string }[] }
 interface LedgerEvent { id: string; eventType: string; date: string; qty: number; equipmentId: string | null; item: { id: string; code: string; name: string; tracked: boolean } | null; variation: { id: string; name: string } | null }
-interface Line { id: string; kind: string; description: string; qty: number; units: number; unitRateCents: number; amountCents: number; taxable: boolean; itemCode: string | null }
+// unitRateCents / amountCents are null for item-priced kinds (labor, lump sum) —
+// their rate comes from the price list at invoice time, not from this ticket.
+interface Line { id: string; kind: string; description: string; qty: number; units: number; unitRateCents: number | null; amountCents: number | null; taxable: boolean; itemCode: string | null }
 interface Ticket {
   id: string; ticketNumber: string; date: string; status: string; locked: boolean
   featureAdd: boolean; featureReturn: boolean; featureDtc: boolean
@@ -34,6 +36,11 @@ const th: React.CSSProperties = { textAlign: 'left', fontSize: 10.5, fontWeight:
 const td: React.CSSProperties = { padding: '8px 10px', borderBottom: '1px solid var(--border-subtle, var(--border-emphasis))', color: 'var(--text-primary)' }
 const ghost: React.CSSProperties = { background: 'transparent', border: '1px solid var(--border-emphasis)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit' }
 const money = (c: number) => `$${(c / 100).toFixed(2)}`
+/** Item-priced lines carry no rate — the price list supplies it at invoice time. */
+const fromPriceList = <span style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic' }}>from price list</span>
+const moneyCell = (c: number | null) => (c === null ? fromPriceList : money(c))
+/** Charge kinds whose item + rate come from the catalog and its price list. */
+const ITEM_PRICED_CATEGORY: Record<string, string | undefined> = { labor: 'Labor', lump_sum: 'Lump Sum' }
 
 export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
   const [t, setT] = useState<Ticket | null>(null)
@@ -126,14 +133,20 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
   }
 
   async function addLine(kind: 'sale' | 'labor' | 'lump_sum' | 'misc') {
-    const payload = kind === 'sale' ? { kind: 'sale', itemId: cItem, qty: parseFloat(cQty) } : { kind, description: cDesc, qty: parseFloat(cQty), unitRateCents: Math.round(parseFloat(cRate) * 100) }
+    // Sale, labor and lump sum are all item-based; only misc is typed by hand.
+    const payload = kind === 'misc'
+      ? { kind, description: cDesc, qty: parseFloat(cQty), unitRateCents: Math.round(parseFloat(cRate) * 100) }
+      : { kind, itemId: cItem, qty: parseFloat(cQty), ...(kind === 'sale' ? { variationId: null } : {}) }
     if (await call(`/api/billing/tickets/${ticketId}/lines`, 'POST', payload)) { setCDesc(''); setCQty('1'); setCRate('0.00'); setCItem(''); load() }
   }
   async function removeLine(id: string) { if (await call(`/api/billing/tickets/${ticketId}/lines?lineId=${id}`, 'DELETE')) load() }
-  function startEditLn(l: Line) { setEditLn(l.id); setLnQty(String(l.qty)); setLnRate((l.unitRateCents / 100).toFixed(2)); setLnDesc(l.description) }
+  // Item-priced lines have no rate to seed (null) — only misc's rate is ever editable.
+  function startEditLn(l: Line) { setEditLn(l.id); setLnQty(String(l.qty)); setLnRate(((l.unitRateCents ?? 0) / 100).toFixed(2)); setLnDesc(l.description) }
   async function saveLn(l: Line) {
     const payload: Record<string, unknown> = { lineId: l.id, qty: parseFloat(lnQty) }
-    if (l.kind !== 'sale') { payload.unitRateCents = Math.round(parseFloat(lnRate) * 100); payload.description = lnDesc }
+    // Only misc owns its description and rate; sale/labor/lump sum get both from the
+    // catalog item and its price list, so only the quantity is editable.
+    if (l.kind === 'misc') { payload.unitRateCents = Math.round(parseFloat(lnRate) * 100); payload.description = lnDesc }
     if (await call(`/api/billing/tickets/${ticketId}/lines`, 'PATCH', payload)) { setEditLn(null); load() }
   }
 
@@ -149,9 +162,9 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
 
   const chargeBlurb: Record<'sale' | 'labor' | 'lump_sum' | 'misc', string> = {
     sale: 'Sold goods. Only sales are taxed.',
-    labor: 'Billed labor. Until invoicing rolls the time above up for you, these lines are entered by hand — and they never change the recorded time.',
-    lump_sum: 'Lump-sum charges — a flat amount.',
-    misc: 'Miscellaneous charges.',
+    labor: 'Billed labor — pick a Labor item; its rate comes from the price list. Until invoicing rolls the time above up for you, these lines are added by hand, and they never change the recorded time.',
+    lump_sum: 'Lump-sum charges — pick a Lump Sum item; its rate comes from the price list.',
+    misc: 'Miscellaneous, one-off charges — the only kind typed by hand.',
   }
 
   // One charge kind's tab: its lines + a kind-locked add form. Shares the line
@@ -161,6 +174,11 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
     const rows = t.lines.filter((l) => l.kind === kind)
     const isSale = kind === 'sale'
     const label = kind === 'lump_sum' ? 'lump sum' : kind
+    // Labor / Lump Sum pick a catalog item of that category; the price list prices it.
+    const itemCategory = ITEM_PRICED_CATEGORY[kind]
+    const chargeItems = itemCategory ? items.filter((i) => i.category === itemCategory) : []
+    // Only misc is typed by hand.
+    const isTyped = kind === 'misc'
     return (
       <div className="card">
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>{chargeBlurb[kind]}</div>
@@ -172,9 +190,9 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
               <tbody>
                 {rows.map((l) => editLn === l.id ? (
                   <tr key={l.id}>
-                    <td style={td}>{isSale ? l.description : <input value={lnDesc} onChange={(e) => setLnDesc(e.target.value)} style={inputStyle} />}</td>
+                    <td style={td}>{isTyped ? <input value={lnDesc} onChange={(e) => setLnDesc(e.target.value)} style={inputStyle} /> : l.description}</td>
                     <td style={{ ...td, textAlign: 'right' }}><input value={lnQty} onChange={(e) => setLnQty(e.target.value)} style={{ ...inputStyle, width: 60, textAlign: 'right' }} /></td>
-                    <td style={{ ...td, textAlign: 'right' }}>{isSale ? money(l.unitRateCents) : <input value={lnRate} onChange={(e) => setLnRate(e.target.value)} style={{ ...inputStyle, width: 80, textAlign: 'right' }} />}</td>
+                    <td style={{ ...td, textAlign: 'right' }}>{isTyped ? <input value={lnRate} onChange={(e) => setLnRate(e.target.value)} style={{ ...inputStyle, width: 80, textAlign: 'right' }} /> : moneyCell(l.unitRateCents)}</td>
                     <td style={{ ...td, textAlign: 'right', color: 'var(--text-dim)' }}>—</td>
                     {isSale && <td style={td}>{l.taxable ? 'yes' : '—'}</td>}
                     <td style={td}><div style={{ display: 'flex', gap: 4 }}><button onClick={() => saveLn(l)} disabled={busy} style={{ ...ghost, borderColor: 'var(--accent)', color: 'var(--accent)', padding: '4px 8px' }}>Save</button><button onClick={() => setEditLn(null)} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div></td>
@@ -183,8 +201,8 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
                   <tr key={l.id} {...rowOpen(!locked ? () => startEditLn(l) : undefined)} style={{ cursor: locked ? 'default' : 'pointer' }}>
                     <td style={td}>{l.description}{l.itemCode ? <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>{l.itemCode}</span> : null}</td>
                     <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{l.qty}{l.units > 1 ? ` × ${l.units}` : ''}</td>
-                    <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(l.unitRateCents)}</td>
-                    <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(l.amountCents)}</td>
+                    <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{moneyCell(l.unitRateCents)}</td>
+                    <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{moneyCell(l.amountCents)}</td>
                     {isSale && <td style={{ ...td, color: 'var(--text-dim)' }}>{l.taxable ? 'yes' : '—'}</td>}
                     <td style={td}>{!locked && <div style={{ display: 'flex', gap: 4 }}><button onClick={(ev) => { ev.stopPropagation(); startEditLn(l) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>Edit</button><button onClick={(ev) => { ev.stopPropagation(); removeLine(l.id) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div>}</td>
                   </tr>
@@ -198,18 +216,31 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
 
         {!locked && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid var(--border-subtle, var(--border-emphasis))', paddingTop: 14 }}>
-            {isSale ? (
+            {isSale && (
               <div style={{ minWidth: 260 }}><label style={labelStyle}>Salable item</label>
                 <Combobox ariaLabel="Salable item" value={cItem} onChange={setCItem} options={saleItems.map((i) => ({ value: i.id, label: `${i.name} (${money(i.salePriceCents ?? 0)})`, hint: i.code }))} />
               </div>
-            ) : (
+            )}
+            {itemCategory && (
+              <div style={{ minWidth: 260 }}><label style={labelStyle}>{itemCategory} item</label>
+                <Combobox
+                  ariaLabel={`${itemCategory} item`}
+                  placeholder={chargeItems.length ? 'Select…' : `No ${itemCategory} items in the catalog`}
+                  disabled={chargeItems.length === 0}
+                  value={cItem}
+                  onChange={setCItem}
+                  options={chargeItems.map((i) => ({ value: i.id, label: i.name, hint: i.code }))}
+                />
+              </div>
+            )}
+            {isTyped && (
               <>
                 <div style={{ minWidth: 200 }}><label style={labelStyle}>Description</label><input value={cDesc} onChange={(e) => setCDesc(e.target.value)} style={inputStyle} /></div>
                 <div style={{ width: 100 }}><label style={labelStyle}>Rate ($)</label><input value={cRate} onChange={(e) => setCRate(e.target.value)} style={inputStyle} /></div>
               </>
             )}
             <div style={{ width: 70 }}><label style={labelStyle}>Qty</label><input value={cQty} onChange={(e) => setCQty(e.target.value)} style={inputStyle} /></div>
-            <button onClick={() => addLine(kind)} disabled={busy || (isSale && !cItem)} style={{ ...ghost, height: 30 }}>+ Add</button>
+            <button onClick={() => addLine(kind)} disabled={busy || (!isTyped && !cItem)} style={{ ...ghost, height: 30 }}>+ Add</button>
           </div>
         )}
       </div>

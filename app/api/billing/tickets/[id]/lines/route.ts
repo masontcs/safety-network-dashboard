@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
-import type { Database } from '@/lib/supabase/database.types'
+import type { Database, BillingItemCategory } from '@/lib/supabase/database.types'
 
 type LineUpdate = Database['public']['Tables']['billing_ticket_lines']['Update']
 
@@ -13,13 +13,23 @@ type LineUpdate = Database['public']['Tables']['billing_ticket_lines']['Update']
  * at invoice time. Only SALES are taxable (the DB enforces this).
  *
  *  - Sale: pick a salable item; unit rate = its sale price; taxable.
- *  - Labor / Lump Sum / Misc: entered manually (description + qty + rate).
+ *  - Labor / Lump Sum: pick a CATALOG ITEM of that category. The description comes
+ *    from the item and the rate comes from the PRICE LIST at invoice time — so these
+ *    lines store no rate (NULL = priced from the price list). Typing a rate on the
+ *    ticket would duplicate the price list and could contradict it.
+ *  - Misc: genuinely ad-hoc, so still entered by hand (description + rate).
  *
  * Money is integer cents; amount = round(qty x units x unitRate).
  */
 
 const KINDS = ['sale', 'labor', 'lump_sum', 'misc'] as const
 type Kind = (typeof KINDS)[number]
+
+/** Kinds whose description + rate come from the catalog item and its price list. */
+const ITEM_PRICED: Partial<Record<Kind, BillingItemCategory>> = {
+  labor: 'Labor',
+  lump_sum: 'Lump Sum',
+}
 
 function bad(error: string, code = 'VALIDATION_ERROR', status = 400) {
   return NextResponse.json({ success: false, error, code }, { status })
@@ -75,9 +85,11 @@ export async function POST(
     if (!Number.isInteger(units) || units < 0) return bad('Units must be a whole number, zero or greater')
 
     let description = body.description?.trim() ?? ''
-    let unitRateCents: number
+    // NULL rate/amount = priced from the price list at invoice time.
+    let unitRateCents: number | null = null
     let taxable = false
     let itemId: string | null = body.itemId ?? null
+    const itemCategory = ITEM_PRICED[kind]
 
     if (kind === 'sale') {
       if (!itemId) return bad('A sale line needs an item')
@@ -92,8 +104,23 @@ export async function POST(
       unitRateCents = item.sale_price_cents
       taxable = true // only sales are taxable
       if (!description) description = `${item.name} (sold)`
+    } else if (itemCategory) {
+      // Labor / Lump Sum: the item carries the description, the price list carries the
+      // rate. Nothing about the money is entered here.
+      if (!itemId) return bad(`A ${itemCategory.toLowerCase()} item is required`)
+      const { data: item, error: iErr } = await supabase
+        .from('billing_items')
+        .select('id, name, category, is_active')
+        .eq('id', itemId)
+        .maybeSingle()
+      if (iErr) throw new Error(iErr.message)
+      if (!item) return bad('Item not found', 'NOT_FOUND', 404)
+      if (item.category !== itemCategory) return bad(`That item is not a ${itemCategory} item.`)
+      if (!item.is_active) return bad('That item is inactive.')
+      description = item.name
+      unitRateCents = null // resolved from the price list at invoice
     } else {
-      // labor / lump_sum / misc: manual rate
+      // misc: genuinely ad-hoc, so it's the one kind still entered by hand.
       if (!description) return bad('A description is required')
       if (!Number.isInteger(body.unitRateCents) || (body.unitRateCents as number) < 0) {
         return bad('Rate must be a whole number of cents, zero or greater')
@@ -102,7 +129,7 @@ export async function POST(
       itemId = null
     }
 
-    const amountCents = Math.round(qty * units * unitRateCents)
+    const amountCents = unitRateCents === null ? null : Math.round(qty * units * unitRateCents)
 
     const { error } = await supabase.from('billing_ticket_lines').insert({
       ticket_id: params.id,
@@ -160,7 +187,7 @@ export async function PATCH(
       .eq('ticket_id', params.id)
       .maybeSingle()
     if (lErr) throw new Error(lErr.message)
-    const cur = line as { id: string; kind: string; qty: number; units: number; unit_rate_cents: number } | null
+    const cur = line as { id: string; kind: string; qty: number; units: number; unit_rate_cents: number | null } | null
     if (!cur) return bad('Charge not found', 'NOT_FOUND', 404)
 
     const qty = body.qty ?? Number(cur.qty)
@@ -168,9 +195,13 @@ export async function PATCH(
     const units = body.units ?? cur.units
     if (!Number.isInteger(units) || units < 0) return bad('Units must be a whole number, zero or greater')
 
-    // Sale lines keep their item's rate (edit qty only); others allow a manual rate.
+    // Item-priced kinds (labor / lump sum) own neither their description nor their rate —
+    // both come from the catalog item and its price list. Only the quantity is editable.
+    const isItemPriced = ITEM_PRICED[cur.kind as Kind] !== undefined
+    const canEditRate = !isItemPriced && cur.kind !== 'sale'
+
     let unitRateCents = cur.unit_rate_cents
-    if (cur.kind !== 'sale' && body.unitRateCents !== undefined) {
+    if (canEditRate && body.unitRateCents !== undefined) {
       if (!Number.isInteger(body.unitRateCents) || body.unitRateCents < 0) return bad('Rate must be a whole number of cents')
       unitRateCents = body.unitRateCents
     }
@@ -179,9 +210,10 @@ export async function PATCH(
       qty,
       units,
       unit_rate_cents: unitRateCents,
-      amount_cents: Math.round(qty * units * unitRateCents),
+      // Stays NULL for item-priced lines — the amount is computed at invoice.
+      amount_cents: unitRateCents === null ? null : Math.round(qty * units * unitRateCents),
     }
-    if (body.description !== undefined && cur.kind !== 'sale') {
+    if (body.description !== undefined && canEditRate) {
       const d = body.description.trim()
       if (!d) return bad('A description is required')
       patch.description = d
