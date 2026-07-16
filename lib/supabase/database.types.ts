@@ -35,6 +35,15 @@ export type BillingType =
   | 'monthly_billed_weekly'
   | 'monthly_billed_daily'
 
+/**
+ * How a price-list cell is keyed. The Postgres `billing_type` enum also carries 'flat':
+ * a rate with NO cadence, which is what CHARGE items (Labor / Lump Sum / Misc) price —
+ * a "1 Man Crew" has an hourly rate, not a rental cadence.
+ *
+ * 'flat' is kept OUT of BillingType so the rental engine can never see it.
+ */
+export type RateKey = BillingType | 'flat'
+
 export type BillingJobStatus = 'new' | 'in_progress' | 'on_hold' | 'completed' | 'closed'
 export type BillingTicketStatus = 'active' | 'in_review' | 'final_edit' | 'invoiced'
 export type BillingLedgerEvent = 'pickup' | 'return' | 'lost'
@@ -331,9 +340,9 @@ export type Database = {
         Relationships: []
       }
       billing_item_default_rates: {
-        Row: { item_id: string; billing_type: BillingType; rate_cents: number }
-        Insert: { item_id: string; billing_type: BillingType; rate_cents: number }
-        Update: { item_id?: string; billing_type?: BillingType; rate_cents?: number }
+        Row: { item_id: string; billing_type: RateKey; rate_cents: number }
+        Insert: { item_id: string; billing_type: RateKey; rate_cents: number }
+        Update: { item_id?: string; billing_type?: RateKey; rate_cents?: number }
         Relationships: []
       }
       billing_item_variations: {
@@ -361,22 +370,22 @@ export type Database = {
         Relationships: []
       }
       billing_price_list_item_bases: {
-        Row: { price_list_item_id: string; billing_type: BillingType; base_cents: number }
-        Insert: { price_list_item_id: string; billing_type: BillingType; base_cents: number }
-        Update: { price_list_item_id?: string; billing_type?: BillingType; base_cents?: number }
+        Row: { price_list_item_id: string; billing_type: RateKey; base_cents: number }
+        Insert: { price_list_item_id: string; billing_type: RateKey; base_cents: number }
+        Update: { price_list_item_id?: string; billing_type?: RateKey; base_cents?: number }
         Relationships: []
       }
       billing_price_list_item_overrides: {
-        Row: { price_list_item_id: string; tier_id: string; billing_type: BillingType; rate_cents: number }
-        Insert: { price_list_item_id: string; tier_id: string; billing_type: BillingType; rate_cents: number }
-        Update: { price_list_item_id?: string; tier_id?: string; billing_type?: BillingType; rate_cents?: number }
+        Row: { price_list_item_id: string; tier_id: string; billing_type: RateKey; rate_cents: number }
+        Insert: { price_list_item_id: string; tier_id: string; billing_type: RateKey; rate_cents: number }
+        Update: { price_list_item_id?: string; tier_id?: string; billing_type?: RateKey; rate_cents?: number }
         Relationships: []
       }
       /** The COMPILED explicit grid. Pricing reads this. */
       billing_price_list_rates: {
-        Row: { price_list_item_id: string; tier_id: string; billing_type: BillingType; rate_cents: number; compiled_at: string }
-        Insert: { price_list_item_id: string; tier_id: string; billing_type: BillingType; rate_cents: number; compiled_at?: string }
-        Update: { price_list_item_id?: string; tier_id?: string; billing_type?: BillingType; rate_cents?: number; compiled_at?: string }
+        Row: { price_list_item_id: string; tier_id: string; billing_type: RateKey; rate_cents: number; compiled_at: string }
+        Insert: { price_list_item_id: string; tier_id: string; billing_type: RateKey; rate_cents: number; compiled_at?: string }
+        Update: { price_list_item_id?: string; tier_id?: string; billing_type?: RateKey; rate_cents?: number; compiled_at?: string }
         Relationships: []
       }
       billing_price_list_variation_overrides: {

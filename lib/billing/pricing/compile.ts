@@ -13,7 +13,7 @@
  * cascade/freeze/override rules.
  */
 import { buildTierGrid } from './tier-grid';
-import { ALL_BILLING_TYPES, type BillingType, type Cents, type Tier } from './types';
+import { ALL_RATE_KEYS, type Cents, type Tier, type RateKey } from './types';
 
 /** A tier row as stored: identified by id, ordered by position. */
 export interface CompileTier {
@@ -26,14 +26,15 @@ export interface CompileTier {
 /** A sticky locked cell, keyed by tier id (not name). */
 export interface CompileOverride {
   tierId: string;
-  billingType: BillingType;
+  billingType: RateKey;
   rateCents: Cents;
 }
 
 export interface CompileItem {
   priceListItemId: string;
-  /** Tier-1 base per billing type. A billing type with no base is not priced. */
-  base: Partial<Record<BillingType, Cents>>;
+  /** Tier-1 base per rate key. A key with no base is not priced. Equipment prices the
+   *  rental cadences; charge items price the single 'flat' key. */
+  base: Partial<Record<RateKey, Cents>>;
   /** Hold the price from this tier POSITION onward. */
   freezeAfterPosition?: number | null;
   overrides?: CompileOverride[];
@@ -43,7 +44,7 @@ export interface CompileItem {
 export interface CompiledRate {
   price_list_item_id: string;
   tier_id: string;
-  billing_type: BillingType;
+  billing_type: RateKey;
   rate_cents: Cents;
 }
 
@@ -85,7 +86,7 @@ export function compilePriceListRates(tiers: CompileTier[], items: CompileItem[]
           })();
 
     // Re-key sticky overrides from tier id to tier name for the engine.
-    const overrides: Record<string, Partial<Record<BillingType, Cents>>> = {};
+    const overrides: Record<string, Partial<Record<RateKey, Cents>>> = {};
     for (const o of item.overrides ?? []) {
       const name = tierIdToName.get(o.tierId);
       if (!name) throw new CompileError(`Override references tier ${o.tierId}, which is not in this price list`);
@@ -98,7 +99,9 @@ export function compilePriceListRates(tiers: CompileTier[], items: CompileItem[]
     );
 
     for (const t of ordered) {
-      for (const bt of ALL_BILLING_TYPES) {
+      // Every key: an item only has a base for the ones its category prices, so
+      // equipment never compiles a 'flat' cell and a charge item never compiles cadences.
+      for (const bt of ALL_RATE_KEYS) {
         const rate = grid[t.name]?.[bt];
         if (rate == null) continue; // this item isn't priced under this billing type
         rows.push({

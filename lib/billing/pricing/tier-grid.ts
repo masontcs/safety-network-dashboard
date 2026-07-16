@@ -15,7 +15,7 @@
  * override re-bases everything after it, which is what "later tiers cascade
  * off it" means in the prototype.
  */
-import { ALL_BILLING_TYPES, type BillingType, type Cents, type PriceListItem, type Tier, type TierGrid } from './types';
+import { ALL_RATE_KEYS, type RateKey, type Cents, type PriceListItem, type Tier, type TierGrid } from './types';
 
 /** Money rounding happens once, per cell, on integer cents. */
 const roundCents = (n: number): Cents => Math.round(n);
@@ -27,7 +27,9 @@ export function buildTierGrid(item: PriceListItem, tiers: Tier[]): TierGrid {
 
   const freezeIdx = item.freezeAfterTierIndex ?? null;
 
-  for (const bt of ALL_BILLING_TYPES) {
+  // Every possible key; an item simply has no base for the ones it doesn't price, so
+  // equipment never grows a 'flat' cell and a charge item never grows cadence cells.
+  for (const bt of ALL_RATE_KEYS) {
     const base = item.base[bt];
     if (base == null) continue; // this item isn't rented under this billing type
 
@@ -57,6 +59,6 @@ export function buildTierGrid(item: PriceListItem, tiers: Tier[]): TierGrid {
 }
 
 /** Convenience: read one cell, or undefined if the list doesn't price it. */
-export function gridCell(grid: TierGrid, tierName: string, bt: BillingType): Cents | undefined {
+export function gridCell(grid: TierGrid, tierName: string, bt: RateKey): Cents | undefined {
   return grid[tierName]?.[bt];
 }

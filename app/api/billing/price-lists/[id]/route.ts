@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server'
 import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
-import { BILLING_TYPES } from '@/lib/billing/constants'
+import { BILLING_TYPES, rateKeysFor } from '@/lib/billing/constants'
 import { compilePriceListRates, type CompileItem, type CompileTier } from '@/lib/billing/pricing'
-import type { BillingType } from '@/lib/supabase/database.types'
+import type { RateKey, BillingItemCategory } from '@/lib/supabase/database.types'
 
 /**
  * The price-list editor's read + save endpoints.
@@ -26,8 +26,9 @@ function bad(error: string, code = 'VALIDATION_ERROR', status = 400) {
 }
 
 interface TierRow { id: string; name: string; position: number; pct_off_previous: number }
-interface OverrideRow { price_list_item_id: string; tier_id: string; billing_type: BillingType; rate_cents: number }
-interface BaseRow { price_list_item_id: string; billing_type: BillingType; base_cents: number }
+// billing_type here is a RateKey: a rental cadence, or 'flat' for charge items.
+interface OverrideRow { price_list_item_id: string; tier_id: string; billing_type: RateKey; rate_cents: number }
+interface BaseRow { price_list_item_id: string; billing_type: RateKey; base_cents: number }
 interface PliRow {
   id: string
   item_id: string
@@ -148,8 +149,8 @@ interface SaveItem {
   itemId: string
   freezeAfterPosition?: number | null
   tierExceptionTierId?: string | null
-  bases: Partial<Record<BillingType, number>>
-  overrides?: { tierId: string; billingType: BillingType; rateCents: number }[]
+  bases: Partial<Record<RateKey, number>>
+  overrides?: { tierId: string; billingType: RateKey; rateCents: number }[]
 }
 
 export async function PUT(
@@ -177,17 +178,39 @@ export async function PUT(
       nameSeen.add(n.toLowerCase())
       if (!(t.pctOffPrevious >= 0 && t.pctOffPrevious < 100)) return bad('Tier % off must be between 0 and 100')
     }
-    for (const it of itemsIn) {
-      for (const [bt, cents] of Object.entries(it.bases)) {
-        if (!BILLING_TYPES.includes(bt as BillingType)) return bad(`Unknown billing type "${bt}"`)
-        if (!Number.isInteger(cents) || (cents as number) < 0) return bad('Base rates must be whole cents, zero or greater')
-      }
-      for (const o of it.overrides ?? []) {
-        if (!Number.isInteger(o.rateCents) || o.rateCents < 0) return bad('Overrides must be whole cents, zero or greater')
+    const supabase = createServiceClient()
+
+    // An item's CATEGORY decides which rate keys it may price: equipment prices the
+    // rental cadences, charge items (Labor / Lump Sum / Misc) price exactly one 'flat'
+    // rate. Enforce it here so a labor rate can never end up in a 'daily' cell.
+    const savedItemIds = [...new Set(itemsIn.map((i) => i.itemId))]
+    const categoryById = new Map<string, BillingItemCategory>()
+    if (savedItemIds.length > 0) {
+      const { data: cats, error: cErr } = await supabase
+        .from('billing_items')
+        .select('id, category')
+        .in('id', savedItemIds)
+      if (cErr) throw new Error(cErr.message)
+      for (const c of (cats ?? []) as { id: string; category: BillingItemCategory }[]) {
+        categoryById.set(c.id, c.category)
       }
     }
 
-    const supabase = createServiceClient()
+    for (const it of itemsIn) {
+      const category = categoryById.get(it.itemId)
+      if (!category) return bad('An item on this price list no longer exists', 'NOT_FOUND', 404)
+      const allowed = rateKeysFor(category)
+      const allowedLabel = category === 'Equipment' ? 'a rental billing type' : 'a flat rate'
+
+      for (const [bt, cents] of Object.entries(it.bases)) {
+        if (!allowed.includes(bt as RateKey)) return bad(`A ${category} item is priced with ${allowedLabel} — "${bt}" doesn't apply to it.`)
+        if (!Number.isInteger(cents) || (cents as number) < 0) return bad('Base rates must be whole cents, zero or greater')
+      }
+      for (const o of it.overrides ?? []) {
+        if (!allowed.includes(o.billingType)) return bad(`A ${category} item is priced with ${allowedLabel} — "${o.billingType}" doesn't apply to it.`)
+        if (!Number.isInteger(o.rateCents) || o.rateCents < 0) return bad('Overrides must be whole cents, zero or greater')
+      }
+    }
 
     const { data: list, error: lErr } = await supabase
       .from('billing_price_lists')
@@ -309,7 +332,7 @@ export async function PUT(
       if (dbErr) throw new Error(dbErr.message)
       const baseRows = Object.entries(it.bases)
         .filter(([, cents]) => cents != null)
-        .map(([bt, cents]) => ({ price_list_item_id: pliId as string, billing_type: bt as BillingType, base_cents: cents as number }))
+        .map(([bt, cents]) => ({ price_list_item_id: pliId as string, billing_type: bt as RateKey, base_cents: cents as number }))
       if (baseRows.length > 0) {
         const { error } = await supabase.from('billing_price_list_item_bases').insert(baseRows)
         if (error) throw new Error(error.message)

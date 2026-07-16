@@ -1,4 +1,4 @@
-import type { BillingItemCategory, BillingType } from '@/lib/supabase/database.types'
+import type { BillingItemCategory, BillingType, RateKey } from '@/lib/supabase/database.types'
 
 /**
  * Shared billing constants. These live outside `route.ts` files on purpose:
@@ -27,3 +27,17 @@ export const BILLING_TYPE_LABELS: Record<BillingType, string> = {
   monthly_billed_weekly: 'Monthly · billed weekly',
   monthly_billed_daily: 'Monthly · billed daily',
 }
+
+/**
+ * The cadence-free rate key. Charge items (Labor / Lump Sum / Misc) price exactly one
+ * cell per tier under this — a "1 Man Crew" has an hourly rate, not a rental cadence.
+ * Equipment prices the six cadences above; the two never overlap.
+ */
+export const FLAT_RATE: RateKey = 'flat'
+
+/** Which rate keys an item's category prices. */
+export const rateKeysFor = (category: BillingItemCategory): RateKey[] =>
+  category === 'Equipment' ? BILLING_TYPES : [FLAT_RATE]
+
+/** True for categories that price a single flat rate rather than rental cadences. */
+export const isChargeCategory = (category: BillingItemCategory): boolean => category !== 'Equipment'
