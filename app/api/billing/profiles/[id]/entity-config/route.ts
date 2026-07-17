@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
+import { TIERED_CATEGORIES } from '@/lib/billing/constants'
+import type { BillingItemCategory } from '@/lib/supabase/database.types'
 import { getClientIp, logAudit } from '@/lib/audit/log'
 
 /**
@@ -19,8 +21,11 @@ import { getClientIp, logAudit } from '@/lib/audit/log'
  * fail-closed second layer, not the primary check.
  */
 
-const CATEGORIES = ['Equipment', 'Labor', 'Lump Sum', 'Misc'] as const
-type Category = (typeof CATEGORIES)[number]
+// Only categories that need a price-list TIER. 'Sale' is deliberately absent: a sale is
+// priced by the item's own sale price, so asking which tier it uses has no answer.
+// Shared with the rest of billing so the two can't drift.
+const CATEGORIES = TIERED_CATEGORIES
+type Category = BillingItemCategory
 
 interface EntityConfigInput {
   entityId: string

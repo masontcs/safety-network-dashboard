@@ -99,7 +99,8 @@ export async function GET(
       .from('billing_items')
       .select('id, code, name, category')
       .eq('is_active', true)
-      .or('category.neq.Equipment,rentable.eq.true')
+      .neq('category', 'Sale')                      // sales are priced on the item
+      .or('category.neq.Equipment,rentable.eq.true') // and rental-less equipment isn't priced here
       .order('code')
     if (cErr) throw new Error(cErr.message)
 

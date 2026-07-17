@@ -24,7 +24,12 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 // ── TCR Billing enums (mirror the Postgres enum types) ────────────────────────
 // Money in every billing_* table is INTEGER CENTS. Dates are 'YYYY-MM-DD'.
 
-export type BillingItemCategory = 'Equipment' | 'Labor' | 'Lump Sum' | 'Misc'
+/**
+ * What an item IS. The category picks its price-list tier — except 'Sale', which
+ * needs none: a sale is priced by the item's own sale_price_cents and never appears on
+ * a price list. Selling a rentable item does NOT make it 'Sale'; that's a sale LINE.
+ */
+export type BillingItemCategory = 'Equipment' | 'Labor' | 'Lump Sum' | 'Misc' | 'Sale'
 
 /** <rental cadence>_billed_<rate unit>. No proration: each cell is an entered rate. */
 export type BillingType =
@@ -334,9 +339,9 @@ export type Database = {
         Relationships: []
       }
       billing_items: {
-        Row: { id: string; code: string; name: string; category: BillingItemCategory | null; cost_cents: number; rentable: boolean; salable: boolean; sale_price_cents: number | null; taxable: boolean; tracked: boolean; is_active: boolean; created_at: string; updated_at: string }
-        Insert: { id?: string; code: string; name: string; category?: BillingItemCategory | null; cost_cents?: number; rentable?: boolean; salable?: boolean; sale_price_cents?: number | null; taxable?: boolean; tracked?: boolean; is_active?: boolean }
-        Update: { id?: string; code?: string; name?: string; category?: BillingItemCategory | null; cost_cents?: number; rentable?: boolean; salable?: boolean; sale_price_cents?: number | null; taxable?: boolean; tracked?: boolean; is_active?: boolean }
+        Row: { id: string; code: string; name: string; category: BillingItemCategory; cost_cents: number; rentable: boolean; salable: boolean; sale_price_cents: number | null; taxable: boolean; tracked: boolean; is_active: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; code: string; name: string; category: BillingItemCategory; cost_cents?: number; rentable?: boolean; salable?: boolean; sale_price_cents?: number | null; taxable?: boolean; tracked?: boolean; is_active?: boolean }
+        Update: { id?: string; code?: string; name?: string; category?: BillingItemCategory; cost_cents?: number; rentable?: boolean; salable?: boolean; sale_price_cents?: number | null; taxable?: boolean; tracked?: boolean; is_active?: boolean }
         Relationships: []
       }
       billing_item_default_rates: {

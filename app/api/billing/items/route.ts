@@ -25,7 +25,7 @@ interface ItemListRow {
   id: string
   code: string
   name: string
-  category: BillingItemCategory | null
+  category: BillingItemCategory
   cost_cents: number
   rentable: boolean
   salable: boolean
@@ -93,7 +93,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const body = (await request.json()) as {
       code?: string
       name?: string
-      category?: string | null
+      category?: string
       costCents?: number
       rentable?: boolean
       salable?: boolean
@@ -119,18 +119,18 @@ export async function POST(request: Request): Promise<NextResponse> {
       if (!Number.isInteger(v.adjCents)) return bad('Variation adjustment must be a whole number of cents')
     }
 
-    // A category picks the price-list tier. A SALE-ONLY item is priced by its own sale
-    // price and never appears on a price list, so it needs no category — null says so.
-    const category = (body.category ?? null) as BillingItemCategory | null
-    if (category !== null && !CATEGORIES.includes(category)) {
-      return bad(`Category must be one of: ${CATEGORIES.join(', ')}, or none for a sale-only item`)
+    const category = body.category as BillingItemCategory | undefined
+    if (!category || !CATEGORIES.includes(category)) {
+      return bad(`Category must be one of: ${CATEGORIES.join(', ')}`)
     }
 
     const costCents = body.costCents ?? 0
     if (!Number.isInteger(costCents) || costCents < 0) return bad('Cost must be a whole number of cents, zero or greater')
 
+    // Category is what the item IS. 'Sale' is only ever sold (priced on the item);
+    // Equipment rents and/or sells; Labor/Lump Sum/Misc are charge items.
     const isEquipment = category === 'Equipment'
-    const isSaleOnly = category === null
+    const isSaleOnly = category === 'Sale'
     let rentable = false
     let salable = false
     let salePriceCents: number | null = null
@@ -138,7 +138,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     let tracked = false
 
     if (isSaleOnly) {
-      // Uncategorised == sale-only: sold, never rented, never tracked.
+      // Sale: sold, never rented, never tracked.
       salable = true
       salePriceCents = body.salePriceCents ?? null
       if (salePriceCents == null) return bad('A sale-only item needs a sale price')

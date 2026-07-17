@@ -14,7 +14,7 @@ export type Cents = number;
 export type ISODate = string;
 
 /** Fixed set — every catalog item has exactly one. */
-export type ItemCategory = 'Equipment' | 'Labor' | 'Lump Sum' | 'Misc';
+export type ItemCategory = 'Equipment' | 'Labor' | 'Lump Sum' | 'Misc' | 'Sale';
 
 /**
  * The 6 billing types. Per spec there is NO proration/division: each
@@ -65,9 +65,9 @@ export type FlatRate = typeof FLAT_RATE;
 export type RateKey = BillingType | FlatRate;
 export const ALL_RATE_KEYS: RateKey[] = [...ALL_BILLING_TYPES, FLAT_RATE];
 
-/** Charge items price 'flat'; equipment prices cadences. Category decides. */
+/** Charge items price 'flat'; equipment prices cadences; Sale isn't on a list at all. */
 export const rateKeysFor = (category: ItemCategory): RateKey[] =>
-  category === 'Equipment' ? ALL_BILLING_TYPES : [FLAT_RATE];
+  category === 'Sale' ? [] : category === 'Equipment' ? ALL_BILLING_TYPES : [FLAT_RATE];
 
 /** A tier on a price list. tiers[0] is the base; its pctOffPrevious is ignored. */
 export interface Tier {

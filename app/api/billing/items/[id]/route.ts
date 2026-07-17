@@ -24,7 +24,7 @@ interface ItemDetailRow {
   id: string
   code: string
   name: string
-  category: BillingItemCategory | null
+  category: BillingItemCategory
   cost_cents: number
   rentable: boolean
   salable: boolean
@@ -103,7 +103,7 @@ export async function PATCH(
     const body = (await request.json()) as {
       code?: string
       name?: string
-      category?: string | null
+      category?: string
       costCents?: number
       rentable?: boolean
       salable?: boolean
@@ -152,18 +152,14 @@ export async function PATCH(
     }
 
     // Effective category (may be changing this request) — it drives the flags.
-    // null means SALE-ONLY: priced by its own sale price, never on a price list, so it
-    // needs no category at all.
-    let category = existing.category as BillingItemCategory | null
+    let category = existing.category as BillingItemCategory
     if (body.category !== undefined) {
-      category = (body.category ?? null) as BillingItemCategory | null
-      if (category !== null && !CATEGORIES.includes(category)) {
-        return bad(`Category must be one of: ${CATEGORIES.join(', ')}, or none for a sale-only item`)
-      }
+      category = body.category as BillingItemCategory
+      if (!CATEGORIES.includes(category)) return bad(`Category must be one of: ${CATEGORIES.join(', ')}`)
       patch.category = category
     }
     const isEquipment = category === 'Equipment'
-    const isSaleOnly = category === null
+    const isSaleOnly = category === 'Sale'
 
     if (body.costCents !== undefined) {
       if (!Number.isInteger(body.costCents) || body.costCents < 0) return bad('Cost must be a whole number of cents')
@@ -172,7 +168,7 @@ export async function PATCH(
     if (body.isActive !== undefined) patch.is_active = body.isActive
 
     if (isSaleOnly) {
-      // Uncategorised == sale-only: sold, never rented, never tracked.
+      // Sale: sold, never rented, never tracked.
       patch.rentable = false
       patch.salable = true
       patch.tracked = false
