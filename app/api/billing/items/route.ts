@@ -25,7 +25,7 @@ interface ItemListRow {
   id: string
   code: string
   name: string
-  category: BillingItemCategory
+  category: BillingItemCategory | null
   cost_cents: number
   rentable: boolean
   salable: boolean
@@ -93,7 +93,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const body = (await request.json()) as {
       code?: string
       name?: string
-      category?: string
+      category?: string | null
       costCents?: number
       rentable?: boolean
       salable?: boolean
@@ -119,25 +119,32 @@ export async function POST(request: Request): Promise<NextResponse> {
       if (!Number.isInteger(v.adjCents)) return bad('Variation adjustment must be a whole number of cents')
     }
 
-    const category = body.category as BillingItemCategory | undefined
-    if (!category || !CATEGORIES.includes(category)) {
-      return bad(`Category must be one of: ${CATEGORIES.join(', ')}`)
+    // A category picks the price-list tier. A SALE-ONLY item is priced by its own sale
+    // price and never appears on a price list, so it needs no category — null says so.
+    const category = (body.category ?? null) as BillingItemCategory | null
+    if (category !== null && !CATEGORIES.includes(category)) {
+      return bad(`Category must be one of: ${CATEGORIES.join(', ')}, or none for a sale-only item`)
     }
 
     const costCents = body.costCents ?? 0
     if (!Number.isInteger(costCents) || costCents < 0) return bad('Cost must be a whole number of cents, zero or greater')
 
-    // Category is the item's nature. Only Equipment is a rentable/salable good;
-    // Labor / Lump Sum / Misc are charge items — never rentable, salable,
-    // tracked, or taxable (the DB enforces this too).
     const isEquipment = category === 'Equipment'
+    const isSaleOnly = category === null
     let rentable = false
     let salable = false
     let salePriceCents: number | null = null
     let taxable = false
     let tracked = false
 
-    if (isEquipment) {
+    if (isSaleOnly) {
+      // Uncategorised == sale-only: sold, never rented, never tracked.
+      salable = true
+      salePriceCents = body.salePriceCents ?? null
+      if (salePriceCents == null) return bad('A sale-only item needs a sale price')
+      if (!Number.isInteger(salePriceCents) || salePriceCents < 0) return bad('Sale price must be a whole number of cents')
+      taxable = body.taxable ?? true
+    } else if (isEquipment) {
       rentable = body.rentable ?? true
       salable = body.salable ?? false
       if (!rentable && !salable) return bad('An equipment item must be rentable, salable, or both.')
@@ -150,6 +157,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       taxable = salable ? body.taxable ?? true : false
       tracked = body.tracked ?? false
     }
+    // Labor / Lump Sum / Misc: charge items — every flag stays false.
 
     const supabase = createServiceClient()
 

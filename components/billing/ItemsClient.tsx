@@ -17,7 +17,9 @@ interface ItemRow {
   id: string
   code: string
   name: string
-  category: BillingItemCategory
+  /** null = sale-only. A category only exists to pick a price-list tier, and a
+   *  sale-only item is priced by its own sale price and never sits on a list. */
+  category: BillingItemCategory | null
   costCents: number
   rentable: boolean
   salable: boolean
@@ -79,7 +81,8 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
   const [showNew, setShowNew] = useState(false)
   const [nCode, setNCode] = useState('')
   const [nName, setNName] = useState('')
-  const [nCategory, setNCategory] = useState<BillingItemCategory>('Equipment')
+  // '' = sale only (no category)
+  const [nCategory, setNCategory] = useState<BillingItemCategory | ''>('Equipment')
   const [nCost, setNCost] = useState('0.00')
   const [nRentable, setNRentable] = useState(true)
   const [nSalable, setNSalable] = useState(false)
@@ -113,15 +116,16 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
       (i) =>
         i.code.toLowerCase().includes(q) ||
         i.name.toLowerCase().includes(q) ||
-        i.category.toLowerCase().includes(q)
+        (i.category ?? 'sale only').toLowerCase().includes(q)
     )
   }, [items, search])
 
   async function createItem() {
     if (busy) return
     const equip = nCategory === 'Equipment'
+    const saleOnly = nCategory === ''
     if (!validMoney(nCost)) { setActionError('Cost must be a valid amount'); return }
-    if (equip && nSalable && !validMoney(nSalePrice)) { setActionError('Sale price must be a valid amount'); return }
+    if ((saleOnly || (equip && nSalable)) && !validMoney(nSalePrice)) { setActionError('Sale price must be a valid amount'); return }
     if (equip && !nRentable && !nSalable) { setActionError('An equipment item must be rentable or salable.'); return }
     setBusy(true); setActionError(null)
     try {
@@ -129,11 +133,12 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          code: nCode, name: nName, category: nCategory,
+          code: nCode, name: nName,
+          category: saleOnly ? null : nCategory,
           costCents: toCents(nCost),
           rentable: equip ? nRentable : false,
           salable: equip ? nSalable : false,
-          salePriceCents: equip && nSalable ? toCents(nSalePrice) : null,
+          salePriceCents: saleOnly || (equip && nSalable) ? toCents(nSalePrice) : null,
           tracked: equip ? nTracked : false,
           variations: nVars.filter((v) => v.name.trim()),
         }),
@@ -160,9 +165,10 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
   async function saveEditor() {
     if (!editing || busy) return
     const equip = editing.category === 'Equipment'
+    const saleOnly = editing.category === null
     if (!editing.code.trim()) { setActionError('Item code cannot be empty'); return }
     if (!validMoney(editCost)) { setActionError('Cost must be a valid amount'); return }
-    if (equip && editing.salable && !validMoney(editSalePrice)) { setActionError('Sale price must be a valid amount'); return }
+    if ((saleOnly || (equip && editing.salable)) && !validMoney(editSalePrice)) { setActionError('Sale price must be a valid amount'); return }
     if (equip && !editing.rentable && !editing.salable) { setActionError('An equipment item must be rentable or salable.'); return }
     setBusy(true); setActionError(null)
     try {
@@ -176,7 +182,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
           costCents: toCents(editCost),
           rentable: editing.rentable,
           salable: editing.salable,
-          salePriceCents: editing.salable ? toCents(editSalePrice) : null,
+          salePriceCents: saleOnly || editing.salable ? toCents(editSalePrice) : null,
           taxable: editing.taxable,
           tracked: editing.tracked,
           isActive: editing.isActive,
@@ -226,14 +232,26 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
             <div><label style={labelStyle}>Name</label><input value={nName} onChange={(e) => setNName(e.target.value)} placeholder='28" Cone' style={inputStyle} /></div>
             <div>
               <label style={labelStyle}>Category</label>
-              <Select ariaLabel="Category" value={nCategory} onChange={(v) => setNCategory(v as BillingItemCategory)}>
+              <Select ariaLabel="Category" value={nCategory} onChange={(v) => setNCategory(v as BillingItemCategory | '')}>
                 {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                <option value="">Sale only</option>
               </Select>
             </div>
             <div><label style={labelStyle}>Cost ($)</label><input value={nCost} onChange={(e) => setNCost(e.target.value)} style={inputStyle} /></div>
           </div>
 
-          {nCategory === 'Equipment' ? (
+          {nCategory === '' ? (
+            <div style={optionsRow}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Sale price</span>
+                <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>$</span>
+                <input value={nSalePrice} onChange={(e) => setNSalePrice(e.target.value)} placeholder="sale price" style={{ ...inputStyle, width: 100 }} />
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                Sold, never rented — so it needs no category and never goes on a price list.
+              </span>
+            </div>
+          ) : nCategory === 'Equipment' ? (
             <div style={optionsRow}>
               <Toggle label="Rentable" hint={nRentable ? 'can be rented' : 'sale-only'} checked={nRentable} onChange={setNRentable} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -249,7 +267,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
             </div>
           ) : (
             <div style={{ ...optionsRow, fontSize: 12.5, color: 'var(--text-muted)' }}>
-              {nCategory} is a charge item — billed as a {nCategory.toLowerCase()} line on a ticket, not rented or sold.
+              {nCategory} is a charge item — billed as a {String(nCategory).toLowerCase()} line on a ticket, not rented or sold.
             </div>
           )}
 
@@ -298,20 +316,30 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
             <div><label style={labelStyle}>Name</label><input value={editing.name} onChange={(e) => patchEdit({ name: e.target.value })} style={inputStyle} /></div>
             <div>
               <label style={labelStyle}>Category</label>
-              <Select ariaLabel="Category" value={editing.category} onChange={(v) => {
-                const cat = v as BillingItemCategory
+              <Select ariaLabel="Category" value={editing.category ?? ''} onChange={(v) => {
+                const cat = (v === '' ? null : v) as BillingItemCategory | null
+                // Sale only: sold, never rented, never tracked — and no category.
+                if (cat === null) patchEdit({ category: null, rentable: false, salable: true, tracked: false, taxable: true })
                 // Switching to a charge category zeroes the goods flags.
-                if (cat !== 'Equipment') patchEdit({ category: cat, rentable: false, salable: false, tracked: false, taxable: false })
+                else if (cat !== 'Equipment') patchEdit({ category: cat, rentable: false, salable: false, tracked: false, taxable: false })
                 else patchEdit({ category: cat })
               }}>
                 {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                <option value="">Sale only</option>
               </Select>
             </div>
             <div><label style={labelStyle}>Cost ($)</label><input value={editCost} onChange={(e) => setEditCost(e.target.value)} style={inputStyle} /></div>
           </div>
 
           <div style={optionsRow}>
-            {editing.category === 'Equipment' ? (
+            {editing.category === null ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>Sale price</span>
+                <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>$</span>
+                <input value={editSalePrice} onChange={(e) => setEditSalePrice(e.target.value)} placeholder="sale price" style={{ ...inputStyle, width: 100 }} />
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 4 }}>Sold, never rented — no category needed.</span>
+              </span>
+            ) : editing.category === 'Equipment' ? (
               <>
                 <Toggle label="Rentable" hint={editing.rentable ? 'can be rented' : 'sale-only'} checked={editing.rentable} onChange={(v) => patchEdit({ rentable: v })} />
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -327,7 +355,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
               </>
             ) : (
               <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
-                {editing.category} is a charge item — billed as a {editing.category.toLowerCase()} line on a ticket, not rented or sold.
+                {editing.category} is a charge item — billed as a {editing.category?.toLowerCase()} line on a ticket, not rented or sold.
               </span>
             )}
             <Toggle label="Active" checked={editing.isActive} onChange={(v) => patchEdit({ isActive: v })} />
@@ -435,13 +463,13 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
                   >
                     <td style={{ ...tdStyle, fontWeight: 500 }}>{i.code}</td>
                     <td style={tdStyle}>{i.name}</td>
-                    <td style={tdStyle}>{i.category}</td>
+                    <td style={tdStyle}>{i.category ?? <span style={{ color: 'var(--text-dim)' }}>Sale only</span>}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>${toDollars(i.costCents)}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                       {i.salable ? `$${toDollars(i.salePriceCents)}` : <span style={{ color: 'var(--text-dim)' }}>—</span>}
                     </td>
                     <td style={{ ...tdStyle, fontSize: 11, color: 'var(--text-muted)' }}>
-                      {i.category !== 'Equipment' ? (
+                      {i.category !== 'Equipment' && i.category !== null ? (
                         <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 600, color: 'var(--pill-neutral-fg)', background: 'var(--pill-neutral-bg)', padding: '1px 6px', borderRadius: 999 }}>CHARGE</span>
                       ) : (
                         <>

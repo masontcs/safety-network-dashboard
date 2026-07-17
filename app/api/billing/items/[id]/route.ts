@@ -24,7 +24,7 @@ interface ItemDetailRow {
   id: string
   code: string
   name: string
-  category: BillingItemCategory
+  category: BillingItemCategory | null
   cost_cents: number
   rentable: boolean
   salable: boolean
@@ -103,7 +103,7 @@ export async function PATCH(
     const body = (await request.json()) as {
       code?: string
       name?: string
-      category?: string
+      category?: string | null
       costCents?: number
       rentable?: boolean
       salable?: boolean
@@ -152,13 +152,18 @@ export async function PATCH(
     }
 
     // Effective category (may be changing this request) — it drives the flags.
-    let category = existing.category as BillingItemCategory
+    // null means SALE-ONLY: priced by its own sale price, never on a price list, so it
+    // needs no category at all.
+    let category = existing.category as BillingItemCategory | null
     if (body.category !== undefined) {
-      category = body.category as BillingItemCategory
-      if (!CATEGORIES.includes(category)) return bad(`Category must be one of: ${CATEGORIES.join(', ')}`)
+      category = (body.category ?? null) as BillingItemCategory | null
+      if (category !== null && !CATEGORIES.includes(category)) {
+        return bad(`Category must be one of: ${CATEGORIES.join(', ')}, or none for a sale-only item`)
+      }
       patch.category = category
     }
     const isEquipment = category === 'Equipment'
+    const isSaleOnly = category === null
 
     if (body.costCents !== undefined) {
       if (!Number.isInteger(body.costCents) || body.costCents < 0) return bad('Cost must be a whole number of cents')
@@ -166,7 +171,17 @@ export async function PATCH(
     }
     if (body.isActive !== undefined) patch.is_active = body.isActive
 
-    if (!isEquipment) {
+    if (isSaleOnly) {
+      // Uncategorised == sale-only: sold, never rented, never tracked.
+      patch.rentable = false
+      patch.salable = true
+      patch.tracked = false
+      const salePriceCents = body.salePriceCents ?? existing.sale_price_cents
+      if (salePriceCents == null) return bad('A sale-only item needs a sale price')
+      if (!Number.isInteger(salePriceCents) || salePriceCents < 0) return bad('Sale price must be a whole number of cents')
+      patch.sale_price_cents = salePriceCents
+      patch.taxable = body.taxable ?? true
+    } else if (!isEquipment) {
       // Charge item (Labor / Lump Sum / Misc): never a good. Zero the flags,
       // including when the category is being switched away from Equipment.
       patch.rentable = false
