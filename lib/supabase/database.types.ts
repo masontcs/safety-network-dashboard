@@ -351,9 +351,9 @@ export type Database = {
         Relationships: []
       }
       billing_item_variations: {
-        Row: { id: string; item_id: string; name: string; rate_adj_cents: number; cost_adj_cents: number; sale_adj_cents: number; sort_order: number }
-        Insert: { id?: string; item_id: string; name: string; rate_adj_cents?: number; cost_adj_cents?: number; sale_adj_cents?: number; sort_order?: number }
-        Update: { id?: string; item_id?: string; name?: string; rate_adj_cents?: number; cost_adj_cents?: number; sale_adj_cents?: number; sort_order?: number }
+        Row: { id: string; item_id: string; name: string; cost_adj_cents: number; sale_adj_cents: number; sort_order: number }
+        Insert: { id?: string; item_id: string; name: string; cost_adj_cents?: number; sale_adj_cents?: number; sort_order?: number }
+        Update: { id?: string; item_id?: string; name?: string; cost_adj_cents?: number; sale_adj_cents?: number; sort_order?: number }
         Relationships: []
       }
       billing_price_lists: {

@@ -34,8 +34,15 @@ interface EditorItem {
   tierExceptionTierId: string | null
   bases: Partial<Record<RateKey, number>>
   overrides: Override[]
+  variations: VariationAdj[]
 }
-interface CatalogItem { id: string; code: string; name: string; category: string }
+/**
+ * A variation's rate adjustment, set HERE rather than on the item: a rate is a property
+ * of a price list, so its adjustment is too. One adjustment per variation — it applies to
+ * every rate that variation is billed at, not per billing type.
+ */
+interface VariationAdj { id: string; name: string; rateAdjCents: number }
+interface CatalogItem { id: string; code: string; name: string; category: string; variations: VariationAdj[] }
 
 const inputStyle: React.CSSProperties = {
   width: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)',
@@ -89,7 +96,7 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
         setName(d.name)
         setInUse(d.inUseByProfiles)
         setTiers(d.tiers.map((t: Tier) => ({ ...t, key: nextKey() })))
-        setItems(d.items.map((i: EditorItem) => ({ ...i, key: nextKey() })))
+        setItems(d.items.map((i: EditorItem) => ({ ...i, variations: i.variations ?? [], key: nextKey() })))
         setCatalog(d.catalog)
         setFetchError(null)
       })
@@ -158,6 +165,18 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
     setSaveMsg(null)
   }
 
+  /** An adjustment may be negative (a cheaper variant); the engine floors the rate at 0. */
+  function setVariationAdj(key: string, variationId: string, cents: number | null) {
+    setItems((rows) =>
+      rows.map((r) =>
+        r.key !== key
+          ? r
+          : { ...r, variations: r.variations.map((v) => (v.id === variationId ? { ...v, rateAdjCents: cents ?? 0 } : v)) }
+      )
+    )
+    setSaveMsg(null)
+  }
+
   const hasOverride = (it: EditorItem, tierId: string | undefined, rateKey: RateKey) =>
     !!tierId && it.overrides.some((o) => o.tierId === tierId && o.billingType === rateKey)
 
@@ -198,7 +217,7 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
               </tr>
             </thead>
             <tbody>
-              {rows.map((it) => (
+              {rows.flatMap((it) => [
                 <tr key={it.key}>
                   <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                     <span style={{ fontWeight: 500 }}>{it.code}</span>
@@ -273,8 +292,34 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
                   <td style={tdStyle}>
                     <button style={ghostBtn} onClick={() => { setItems((r) => r.filter((x) => x.key !== it.key)); setSaveMsg(null) }}>Remove</button>
                   </td>
-                </tr>
-              ))}
+                </tr>,
+
+                // Variation adjustments hang off the item, not the tier columns: one
+                // adjustment per variation, applied to whatever rate the cascade lands on.
+                it.variations.length > 0 ? (
+                  <tr key={`${it.key}-vars`}>
+                    <td colSpan={tiers.length + 4} style={{ ...tdStyle, paddingTop: 0, paddingBottom: 12 }}>
+                      <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', paddingLeft: 12 }}>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Variation adj
+                        </span>
+                        {it.variations.map((v) => (
+                          <span key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{v.name}</span>
+                            <MoneyInput
+                              valueCents={v.rateAdjCents}
+                              allowNegative
+                              ariaLabel={`${it.code} ${v.name} rate adjustment`}
+                              onChangeCents={(c) => setVariationAdj(it.key, v.id, c)}
+                              style={{ ...inputStyle, maxWidth: 84, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                            />
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ) : null,
+              ]).flat()}
             </tbody>
           </table>
         </div>
@@ -288,7 +333,7 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
     if (!c || items.some((i) => i.itemId === c.id)) return
     setItems((rows) => [
       ...rows,
-      { key: nextKey(), itemId: c.id, code: c.code, name: c.name, category: c.category, freezeAfterPosition: null, tierExceptionTierId: null, bases: {}, overrides: [] },
+      { key: nextKey(), itemId: c.id, code: c.code, name: c.name, category: c.category, freezeAfterPosition: null, tierExceptionTierId: null, bases: {}, overrides: [], variations: c.variations ?? [] },
     ])
     setAddItemId('')
     setSaveMsg(null)
@@ -311,6 +356,7 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
             tierExceptionTierId: i.tierExceptionTierId,
             bases: i.bases,
             overrides: i.overrides,
+            variationAdjs: i.variations.map((v) => ({ variationId: v.id, rateAdjCents: v.rateAdjCents })),
           })),
         }),
       })

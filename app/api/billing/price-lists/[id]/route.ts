@@ -90,19 +90,72 @@ export async function GET(
       overrides = (o ?? []) as OverrideRow[]
     }
 
+    // A variation's RATE adjustment lives here, not on the item: a rate is a property
+    // of a price list, so its adjustment is too. Read the variations of every item on
+    // this list, plus whatever adjustments this list has set for them.
+    const listItemIds = plis.map((p) => p.item_id)
+    let variationsByItem: Record<string, { id: string; name: string; rateAdjCents: number }[]> = {}
+    if (listItemIds.length > 0) {
+      const { data: varsRaw, error: vErr } = await supabase
+        .from('billing_item_variations')
+        .select('id, item_id, name, sort_order')
+        .in('item_id', listItemIds)
+        .order('sort_order')
+      if (vErr) throw new Error(vErr.message)
+      const vars = (varsRaw ?? []) as { id: string; item_id: string; name: string; sort_order: number }[]
+
+      const adjByVariation = new Map<string, number>()
+      if (vars.length > 0) {
+        const { data: adjRaw, error: aErr } = await supabase
+          .from('billing_price_list_variation_overrides')
+          .select('variation_id, rate_adj_cents')
+          .eq('price_list_id', params.id)
+          .in('variation_id', vars.map((v) => v.id))
+        if (aErr) throw new Error(aErr.message)
+        for (const a of (adjRaw ?? []) as { variation_id: string; rate_adj_cents: number }[]) {
+          adjByVariation.set(a.variation_id, a.rate_adj_cents)
+        }
+      }
+
+      variationsByItem = vars.reduce((acc, v) => {
+        // No row means no adjustment. There's no item-level default to fall back to.
+        ;(acc[v.item_id] ??= []).push({ id: v.id, name: v.name, rateAdjCents: adjByVariation.get(v.id) ?? 0 })
+        return acc
+      }, {} as Record<string, { id: string; name: string; rateAdjCents: number }[]>)
+    }
+
     // Catalog items for the "add item" picker. A price list is where an item's
     // rate is set, so include everything that gets priced here: rentable
     // equipment AND charge items (Labor / Lump Sum / Misc). Exclude only
     // sale-only equipment (rentable=false Equipment) — those bill at a sale
     // price, not a list rate.
-    const { data: catalog, error: cErr } = await supabase
+    const { data: catalogRaw, error: cErr } = await supabase
       .from('billing_items')
-      .select('id, code, name, category')
+      .select('id, code, name, category, billing_item_variations(id, name, sort_order)')
       .eq('is_active', true)
       .neq('category', 'Sale')                      // sales are priced on the item
       .or('category.neq.Equipment,rentable.eq.true') // and rental-less equipment isn't priced here
       .order('code')
     if (cErr) throw new Error(cErr.message)
+
+    // Carry variations onto the catalog so an item added to the list can have its
+    // variation adjustments set immediately, without a save-and-reload round trip.
+    const catalog = (catalogRaw ?? []).map((c) => {
+      const row = c as unknown as {
+        id: string; code: string; name: string; category: string
+        billing_item_variations: { id: string; name: string; sort_order: number }[] | null
+      }
+      return {
+        id: row.id,
+        code: row.code,
+        name: row.name,
+        category: row.category,
+        variations: (row.billing_item_variations ?? [])
+          .slice()
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((v) => ({ id: v.id, name: v.name, rateAdjCents: 0 })),
+      }
+    })
 
     // How many profiles depend on this list (drives delete warnings in the UI).
     const { count: profileUse } = await supabase
@@ -134,8 +187,9 @@ export async function GET(
           overrides: overrides
             .filter((o) => o.price_list_item_id === p.id)
             .map((o) => ({ tierId: o.tier_id, billingType: o.billing_type, rateCents: o.rate_cents })),
+          variations: variationsByItem[p.item_id] ?? [],
         })),
-        catalog: catalog ?? [],
+        catalog,
       },
     })
   } catch (err) {
@@ -152,6 +206,8 @@ interface SaveItem {
   tierExceptionTierId?: string | null
   bases: Partial<Record<RateKey, number>>
   overrides?: { tierId: string; billingType: RateKey; rateCents: number }[]
+  /** Per-variation rate adjustment on THIS list. May be negative. */
+  variationAdjs?: { variationId: string; rateAdjCents: number }[]
 }
 
 export async function PUT(
@@ -210,6 +266,11 @@ export async function PUT(
       for (const o of it.overrides ?? []) {
         if (!allowed.includes(o.billingType)) return bad(`A ${category} item is priced with ${allowedLabel} — "${o.billingType}" doesn't apply to it.`)
         if (!Number.isInteger(o.rateCents) || o.rateCents < 0) return bad('Overrides must be whole cents, zero or greater')
+      }
+      // A variation adjustment MAY be negative (a cheaper variant) — unlike a rate,
+      // which is an absolute price. The resolved rate is floored at 0 by the engine.
+      for (const a of it.variationAdjs ?? []) {
+        if (!Number.isInteger(a.rateAdjCents)) return bad('A variation rate adjustment must be a whole number of cents')
       }
     }
 
@@ -285,6 +346,31 @@ export async function PUT(
     const keepPliIds = new Set(itemsIn.filter((i) => i.id).map((i) => i.id as string))
     const plisToDelete = (currentPlis ?? []).map((p) => p.id).filter((id) => !keepPliIds.has(id))
     if (plisToDelete.length > 0) {
+      // Variation adjustments are keyed (price_list_id, variation_id) — NOT by
+      // price_list_item_id — so they do NOT cascade with the price-list item. Clear them
+      // by hand, or a removed item's adjustments would linger and silently reapply if the
+      // item were ever added back.
+      const { data: goneItems } = await supabase
+        .from('billing_price_list_items')
+        .select('item_id')
+        .in('id', plisToDelete)
+      const goneItemIds = (goneItems ?? []).map((g) => g.item_id)
+      if (goneItemIds.length > 0) {
+        const { data: goneVars } = await supabase
+          .from('billing_item_variations')
+          .select('id')
+          .in('item_id', goneItemIds)
+        const goneVarIds = (goneVars ?? []).map((v) => v.id)
+        if (goneVarIds.length > 0) {
+          const { error } = await supabase
+            .from('billing_price_list_variation_overrides')
+            .delete()
+            .eq('price_list_id', params.id)
+            .in('variation_id', goneVarIds)
+          if (error) throw new Error(error.message)
+        }
+      }
+
       // bases / overrides / compiled rates cascade with the price-list item
       const { error } = await supabase.from('billing_price_list_items').delete().in('id', plisToDelete)
       if (error) throw new Error(error.message)
@@ -352,6 +438,38 @@ export async function PUT(
       if (ovRows.length > 0) {
         const { error } = await supabase.from('billing_price_list_item_overrides').insert(ovRows)
         if (error) throw new Error(error.message)
+      }
+
+      // Variation rate adjustments for this list. Authoring state — replace wholesale,
+      // scoped to THIS item's variations so we never touch another item's rows. A 0 is
+      // stored as no row: absent and zero mean the same thing, so don't keep the noise.
+      if (it.variationAdjs) {
+        const { data: ownVars } = await supabase
+          .from('billing_item_variations')
+          .select('id')
+          .eq('item_id', it.itemId)
+        const ownVarIds = new Set((ownVars ?? []).map((v) => v.id))
+
+        if (ownVarIds.size > 0) {
+          const { error: dvErr } = await supabase
+            .from('billing_price_list_variation_overrides')
+            .delete()
+            .eq('price_list_id', params.id)
+            .in('variation_id', [...ownVarIds])
+          if (dvErr) throw new Error(dvErr.message)
+
+          const adjRows = it.variationAdjs
+            .filter((a) => ownVarIds.has(a.variationId) && a.rateAdjCents !== 0)
+            .map((a) => ({
+              price_list_id: params.id,
+              variation_id: a.variationId,
+              rate_adj_cents: a.rateAdjCents,
+            }))
+          if (adjRows.length > 0) {
+            const { error } = await supabase.from('billing_price_list_variation_overrides').insert(adjRows)
+            if (error) throw new Error(error.message)
+          }
+        }
       }
 
       compileItems.push({

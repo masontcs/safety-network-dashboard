@@ -36,8 +36,8 @@ interface ItemRow {
  * move all three of the item's numbers independently — each is a +/- on a DIFFERENT
  * number, and they never touch each other.
  */
-interface Variation { id?: string; name: string; rateAdjCents: number; costAdjCents: number; saleAdjCents: number }
-const BLANK_VARIATION: Variation = { name: '', rateAdjCents: 0, costAdjCents: 0, saleAdjCents: 0 }
+interface Variation { id?: string; name: string; costAdjCents: number; saleAdjCents: number }
+const BLANK_VARIATION: Variation = { name: '', costAdjCents: 0, saleAdjCents: 0 }
 interface DefaultRate { billingType: BillingType; rateCents: number }
 interface ItemDetail extends Omit<ItemRow, 'variationCount' | 'defaultRateCount'> {
   variations: Variation[]
@@ -87,15 +87,19 @@ const validMoney = (s: string) => Number.isFinite(Number(s)) && Number(s) >= 0
  * A field for a number the item doesn't have is a question with no answer, so each
  * only appears when it applies.
  */
-function VariationRow({ v, showRate, showSale, onChange, onRemove }: {
+/**
+ * A variation moves the item's OWN numbers. There is no rate adjustment here: a rate
+ * isn't a property of an item, it's a property of a price list — so a variation's rate
+ * adjustment is set per price list, in the price-list editor.
+ */
+function VariationRow({ v, showSale, onChange, onRemove }: {
   v: Variation
-  showRate: boolean
   showSale: boolean
   onChange: (next: Variation) => void
   onRemove: () => void
 }) {
   // Adjustments may be negative (a cheaper variant), so don't reject a leading '-'.
-  const adj = (label: string, value: number, key: 'rateAdjCents' | 'costAdjCents' | 'saleAdjCents') => (
+  const adj = (label: string, value: number, key: 'costAdjCents' | 'saleAdjCents') => (
     <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
       <span style={{ fontSize: 11.5, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{label}</span>
       <input
@@ -120,7 +124,6 @@ function VariationRow({ v, showRate, showSale, onChange, onRemove }: {
         style={{ ...inputStyle, maxWidth: 200 }}
       />
       {adj('cost adj $', v.costAdjCents, 'costAdjCents')}
-      {showRate && adj('rate adj $', v.rateAdjCents, 'rateAdjCents')}
       {showSale && adj('sale adj $', v.saleAdjCents, 'saleAdjCents')}
       <button style={ghostBtn} onClick={onRemove}>Remove</button>
     </div>
@@ -337,7 +340,6 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
                 <VariationRow
                   key={idx}
                   v={v}
-                  showRate={nCategory !== 'Sale'}
                   showSale={nCategory === 'Sale' || (nCategory === 'Equipment' && nSalable)}
                   onChange={(next) => setNVars((r) => r.map((x, i) => (i === idx ? next : x)))}
                   onRemove={() => setNVars((r) => r.filter((_, i) => i !== idx))}
@@ -422,7 +424,6 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
                 <VariationRow
                   key={v.id ?? `new-${idx}`}
                   v={v}
-                  showRate={editing.category !== 'Sale'}
                   showSale={editing.category === 'Sale' || (editing.category === 'Equipment' && editing.salable)}
                   onChange={(next) => {
                     const rows = [...editing.variations]; rows[idx] = next; patchEdit({ variations: rows })

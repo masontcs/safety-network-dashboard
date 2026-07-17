@@ -77,13 +77,15 @@ export interface Tier {
 }
 
 /**
- * A variation is a real physical difference (an orange cone, a large vest), so it can
- * move all three of an item's numbers independently. Each may be negative.
+ * A variation is a real physical difference (an orange cone, a large vest), so it moves
+ * the item's numbers. Each may be negative.
+ *
+ * Note what ISN'T here: the rental RATE adjustment. An adjustment belongs where the
+ * number it moves lives — cost and sale price live on the item, but a rate lives on the
+ * PRICE LIST, so a variation's rate adjustment is set per list (PriceList.variationOverrides).
  */
 export interface ItemVariation {
   name: string;
-  /** +/- the price-list RENTAL RATE, applied after the tier cascade. */
-  rateAdjCents: Cents;
   /** +/- the item COST — what a LOST unit of this variation bills at. */
   costAdjCents: Cents;
   /** +/- the item SALE PRICE. Only meaningful when the item is salable. */
@@ -132,7 +134,10 @@ export interface PriceList {
   entityId: string;
   tiers: Tier[];
   items: Record<string, PriceListItem>;
-  /** [itemCode][variationName] = adjustment override for this list only. */
+  /**
+   * [itemCode][variationName] = the variation's RATE adjustment on this list. This is
+   * the only place a rate adjustment exists — the item carries none. Absent = 0.
+   */
   variationOverrides?: Record<string, Record<string, Cents>>;
 }
 

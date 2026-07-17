@@ -100,7 +100,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       salePriceCents?: number | null
       taxable?: boolean
       tracked?: boolean
-      variations?: { name: string; rateAdjCents?: number; costAdjCents?: number; saleAdjCents?: number }[]
+      variations?: { name: string; costAdjCents?: number; saleAdjCents?: number }[]
     }
 
     const code = body.code?.trim().toUpperCase()
@@ -116,7 +116,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       if (!vn) return bad('A variation needs a name')
       if (seenVar.has(vn.toLowerCase())) return bad(`Duplicate variation name "${vn}"`)
       seenVar.add(vn.toLowerCase())
-      for (const [label, val] of [['rate', v.rateAdjCents], ['cost', v.costAdjCents], ['sale', v.saleAdjCents]] as const) {
+      // No rate adj: a variation's rate adjustment is set per price list, not on the item.
+      for (const [label, val] of [['cost', v.costAdjCents], ['sale', v.saleAdjCents]] as const) {
         if (val !== undefined && !Number.isInteger(val)) return bad(`Variation ${label} adjustment must be a whole number of cents`)
       }
     }
@@ -186,11 +187,10 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // Variations entered on the create form (they need the item id, so insert now).
     if (variations.length > 0) {
-      // A variation can move all three of the item's numbers; each defaults to 0.
+      // A variation moves the item's own numbers (cost, sale price); each defaults to 0.
       const rows = variations.map((v, i) => ({
         item_id: created.id,
         name: v.name.trim(),
-        rate_adj_cents: v.rateAdjCents ?? 0,
         cost_adj_cents: v.costAdjCents ?? 0,
         sale_adj_cents: v.saleAdjCents ?? 0,
         sort_order: i,

@@ -12,6 +12,9 @@ import { useState } from 'react'
  * leave — so typing, clicking mid-field, and selecting all work normally.
  *
  * Reports changes as integer cents (or null when the field is empty).
+ *
+ * Negatives are rejected by default — a price is never negative. Set `allowNegative`
+ * for ADJUSTMENTS, which legitimately go both ways (a cheaper variation).
  */
 export default function MoneyInput({
   valueCents,
@@ -21,11 +24,14 @@ export default function MoneyInput({
   style,
   ariaLabel,
   title,
+  allowNegative = false,
 }: {
   valueCents: number | null | undefined
   onChangeCents: (cents: number | null) => void
   disabled?: boolean
   placeholder?: string
+  /** Permit a leading '-'. For adjustments, not prices. */
+  allowNegative?: boolean
   style?: React.CSSProperties
   ariaLabel?: string
   title?: string
@@ -37,8 +43,10 @@ export default function MoneyInput({
   const parse = (s: string): number | null => {
     const t = s.trim()
     if (t === '') return null
+    if (t === '-') return null // a lone minus isn't a number yet — mid-typing
     const n = Number(t)
-    if (!Number.isFinite(n) || n < 0) return null
+    if (!Number.isFinite(n)) return null
+    if (n < 0 && !allowNegative) return null
     return Math.round(n * 100) // integer cents, rounded once
   }
 
@@ -58,8 +66,11 @@ export default function MoneyInput({
       onBlur={() => setFocused(false)}
       onChange={(e) => {
         const raw = e.target.value
-        // Permit only a partial decimal (digits and at most one dot) or empty.
-        if (raw !== '' && !/^\d*\.?\d*$/.test(raw)) return
+        // Permit only a partial decimal (digits and at most one dot) or empty — plus a
+        // leading '-' when negatives are allowed. The lone '-' must survive as a draft or
+        // you could never type the minus before the digits.
+        const shape = allowNegative ? /^-?\d*\.?\d*$/ : /^\d*\.?\d*$/
+        if (raw !== '' && !shape.test(raw)) return
         setDraft(raw)
         onChangeCents(parse(raw))
       }}

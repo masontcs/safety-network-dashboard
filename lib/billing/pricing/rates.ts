@@ -36,16 +36,18 @@ export class RateNotFoundError extends Error {
   }
 }
 
+/**
+ * A variation's RATE adjustment, which lives only on the price list — the item carries
+ * no rate adjustment, because a rate isn't a property of an item. No entry means no
+ * adjustment; there is no item-level fallback to disagree with the list.
+ */
 export function resolveVariationAdj(
   item: Item,
   variationName: string | null | undefined,
   priceList: PriceList
 ): Cents {
   if (!variationName) return 0;
-  const listOverride = priceList.variationOverrides?.[item.code]?.[variationName];
-  if (listOverride != null) return listOverride;
-  const v = item.variations.find((x) => x.name === variationName);
-  return v ? v.rateAdjCents : 0;
+  return priceList.variationOverrides?.[item.code]?.[variationName] ?? 0;
 }
 
 export function resolveUnitRate(params: {
