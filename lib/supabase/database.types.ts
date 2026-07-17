@@ -351,9 +351,9 @@ export type Database = {
         Relationships: []
       }
       billing_item_variations: {
-        Row: { id: string; item_id: string; name: string; adj_cents: number; sort_order: number }
-        Insert: { id?: string; item_id: string; name: string; adj_cents?: number; sort_order?: number }
-        Update: { id?: string; item_id?: string; name?: string; adj_cents?: number; sort_order?: number }
+        Row: { id: string; item_id: string; name: string; rate_adj_cents: number; cost_adj_cents: number; sale_adj_cents: number; sort_order: number }
+        Insert: { id?: string; item_id: string; name: string; rate_adj_cents?: number; cost_adj_cents?: number; sale_adj_cents?: number; sort_order?: number }
+        Update: { id?: string; item_id?: string; name?: string; rate_adj_cents?: number; cost_adj_cents?: number; sale_adj_cents?: number; sort_order?: number }
         Relationships: []
       }
       billing_price_lists: {
@@ -394,9 +394,9 @@ export type Database = {
         Relationships: []
       }
       billing_price_list_variation_overrides: {
-        Row: { price_list_id: string; variation_id: string; adj_cents: number }
-        Insert: { price_list_id: string; variation_id: string; adj_cents: number }
-        Update: { price_list_id?: string; variation_id?: string; adj_cents?: number }
+        Row: { price_list_id: string; variation_id: string; rate_adj_cents: number }
+        Insert: { price_list_id: string; variation_id: string; rate_adj_cents: number }
+        Update: { price_list_id?: string; variation_id?: string; rate_adj_cents?: number }
         Relationships: []
       }
       billing_profile_entities: {

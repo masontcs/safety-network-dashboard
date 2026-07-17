@@ -31,7 +31,13 @@ interface ItemRow {
   defaultRateCount: number
 }
 
-interface Variation { id?: string; name: string; adjCents: number }
+/**
+ * A variation is a real physical difference (an orange cone, a large vest), so it can
+ * move all three of the item's numbers independently — each is a +/- on a DIFFERENT
+ * number, and they never touch each other.
+ */
+interface Variation { id?: string; name: string; rateAdjCents: number; costAdjCents: number; saleAdjCents: number }
+const BLANK_VARIATION: Variation = { name: '', rateAdjCents: 0, costAdjCents: 0, saleAdjCents: 0 }
 interface DefaultRate { billingType: BillingType; rateCents: number }
 interface ItemDetail extends Omit<ItemRow, 'variationCount' | 'defaultRateCount'> {
   variations: Variation[]
@@ -70,6 +76,57 @@ const toCents = (dollars: string) => Math.round(Number(dollars) * 100)
 const toDollars = (cents: number | null | undefined) => ((cents ?? 0) / 100).toFixed(2)
 const validMoney = (s: string) => Number.isFinite(Number(s)) && Number(s) >= 0
 
+/**
+ * One variation row, shared by the New and Edit forms so the two can't drift.
+ *
+ * Each adjustment moves a DIFFERENT number, so each is labelled with the number it
+ * moves — "adj $" alone was ambiguous enough to be a trap:
+ *   cost adj -> what a LOST unit bills at        (always relevant)
+ *   rate adj -> the price-list rental rate       (only if the item is priced by a list)
+ *   sale adj -> the sale price                   (only if the item is salable)
+ * A field for a number the item doesn't have is a question with no answer, so each
+ * only appears when it applies.
+ */
+function VariationRow({ v, showRate, showSale, onChange, onRemove }: {
+  v: Variation
+  showRate: boolean
+  showSale: boolean
+  onChange: (next: Variation) => void
+  onRemove: () => void
+}) {
+  // Adjustments may be negative (a cheaper variant), so don't reject a leading '-'.
+  const adj = (label: string, value: number, key: 'rateAdjCents' | 'costAdjCents' | 'saleAdjCents') => (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+      <span style={{ fontSize: 11.5, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{label}</span>
+      <input
+        value={(value / 100).toFixed(2)}
+        aria-label={label}
+        onChange={(e) => {
+          const n = Number(e.target.value)
+          if (!Number.isFinite(n)) return
+          onChange({ ...v, [key]: Math.round(n * 100) })
+        }}
+        style={{ ...inputStyle, width: 84 }}
+      />
+    </span>
+  )
+  return (
+    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+      <input
+        value={v.name}
+        placeholder="Name (e.g. Orange)"
+        aria-label="Variation name"
+        onChange={(e) => onChange({ ...v, name: e.target.value })}
+        style={{ ...inputStyle, maxWidth: 200 }}
+      />
+      {adj('cost adj $', v.costAdjCents, 'costAdjCents')}
+      {showRate && adj('rate adj $', v.rateAdjCents, 'rateAdjCents')}
+      {showSale && adj('sale adj $', v.saleAdjCents, 'saleAdjCents')}
+      <button style={ghostBtn} onClick={onRemove}>Remove</button>
+    </div>
+  )
+}
+
 export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
   const [items, setItems] = useState<ItemRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -87,7 +144,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
   const [nSalable, setNSalable] = useState(false)
   const [nSalePrice, setNSalePrice] = useState('0.00')
   const [nTracked, setNTracked] = useState(false)
-  const [nVars, setNVars] = useState<{ name: string; adjCents: number }[]>([])
+  const [nVars, setNVars] = useState<Variation[]>([])
 
   const [editing, setEditing] = useState<ItemDetail | null>(null)
   const [editCost, setEditCost] = useState('0.00')
@@ -273,22 +330,20 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
           <div style={{ marginTop: 20 }}>
             <label style={labelStyle}>Variations (optional)</label>
             <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginBottom: 8 }}>
-              Each variation carries a per-unit adjustment from the item&apos;s price (e.g. Detour +$2.00). Add them here or later via Edit.
+              A variation adjusts the item&apos;s numbers per unit (e.g. Orange: cost +$0.50, rate +$0.25). Each adjustment moves a different number and may be negative. Add them here or later via Edit.
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {nVars.map((v, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input value={v.name} placeholder="Name (e.g. Detour)"
-                    onChange={(e) => setNVars((r) => r.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
-                    style={{ ...inputStyle, maxWidth: 240 }} />
-                  <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>adj $</span>
-                  <input value={(v.adjCents / 100).toFixed(2)}
-                    onChange={(e) => { const n = Number(e.target.value); if (!Number.isFinite(n)) return; setNVars((r) => r.map((x, i) => i === idx ? { ...x, adjCents: Math.round(n * 100) } : x)) }}
-                    style={{ ...inputStyle, maxWidth: 100 }} />
-                  <button style={ghostBtn} onClick={() => setNVars((r) => r.filter((_, i) => i !== idx))}>Remove</button>
-                </div>
+                <VariationRow
+                  key={idx}
+                  v={v}
+                  showRate={nCategory !== 'Sale'}
+                  showSale={nCategory === 'Sale' || (nCategory === 'Equipment' && nSalable)}
+                  onChange={(next) => setNVars((r) => r.map((x, i) => (i === idx ? next : x)))}
+                  onRemove={() => setNVars((r) => r.filter((_, i) => i !== idx))}
+                />
               ))}
-              <button style={{ ...ghostBtn, alignSelf: 'flex-start' }} onClick={() => setNVars((r) => [...r, { name: '', adjCents: 0 }])}>+ Add variation</button>
+              <button style={{ ...ghostBtn, alignSelf: 'flex-start' }} onClick={() => setNVars((r) => [...r, { ...BLANK_VARIATION }])}>+ Add variation</button>
             </div>
           </div>
 
@@ -305,7 +360,8 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
             Edit {editing.code}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 18 }}>
-            Variations carry a per-unit adjustment from the item&apos;s resolved price. Default rates are the
+            A variation adjusts the item&apos;s numbers per unit — cost is what a lost unit bills at, rate is the
+            price-list rental rate, sale is the sale price. Each may be negative. Default rates are the
             fallback used only when a price list prices no cell for this item.
           </div>
 
@@ -363,28 +419,19 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
             <label style={labelStyle}>Variations</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {editing.variations.map((v, idx) => (
-                <div key={v.id ?? `new-${idx}`} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input value={v.name} placeholder="Name (e.g. Detour)"
-                    onChange={(e) => {
-                      const next = [...editing.variations]; next[idx] = { ...v, name: e.target.value }; patchEdit({ variations: next })
-                    }}
-                    style={{ ...inputStyle, maxWidth: 260 }} />
-                  <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>adj $</span>
-                  <input value={(v.adjCents / 100).toFixed(2)}
-                    onChange={(e) => {
-                      const n = Number(e.target.value)
-                      if (!Number.isFinite(n)) return
-                      const next = [...editing.variations]; next[idx] = { ...v, adjCents: Math.round(n * 100) }; patchEdit({ variations: next })
-                    }}
-                    style={{ ...inputStyle, maxWidth: 110 }} />
-                  <button style={ghostBtn}
-                    onClick={() => patchEdit({ variations: editing.variations.filter((_, i) => i !== idx) })}>
-                    Remove
-                  </button>
-                </div>
+                <VariationRow
+                  key={v.id ?? `new-${idx}`}
+                  v={v}
+                  showRate={editing.category !== 'Sale'}
+                  showSale={editing.category === 'Sale' || (editing.category === 'Equipment' && editing.salable)}
+                  onChange={(next) => {
+                    const rows = [...editing.variations]; rows[idx] = next; patchEdit({ variations: rows })
+                  }}
+                  onRemove={() => patchEdit({ variations: editing.variations.filter((_, i) => i !== idx) })}
+                />
               ))}
               <button style={{ ...ghostBtn, alignSelf: 'flex-start' }}
-                onClick={() => patchEdit({ variations: [...editing.variations, { name: '', adjCents: 0 }] })}>
+                onClick={() => patchEdit({ variations: [...editing.variations, { ...BLANK_VARIATION }] })}>
                 + Add variation
               </button>
             </div>

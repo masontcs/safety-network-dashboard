@@ -76,10 +76,18 @@ export interface Tier {
   pctOffPrevious: number;
 }
 
-/** A variation carries a per-unit adjustment FROM the item's resolved price. */
+/**
+ * A variation is a real physical difference (an orange cone, a large vest), so it can
+ * move all three of an item's numbers independently. Each may be negative.
+ */
 export interface ItemVariation {
   name: string;
-  adjCents: Cents; // may be negative
+  /** +/- the price-list RENTAL RATE, applied after the tier cascade. */
+  rateAdjCents: Cents;
+  /** +/- the item COST — what a LOST unit of this variation bills at. */
+  costAdjCents: Cents;
+  /** +/- the item SALE PRICE. Only meaningful when the item is salable. */
+  saleAdjCents: Cents;
 }
 
 export interface Item {

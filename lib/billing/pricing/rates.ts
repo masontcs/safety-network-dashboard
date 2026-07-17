@@ -22,6 +22,7 @@ export interface ResolvedRate {
   unitRateCents: Cents;
   tierUsed: string;
   baseRateCents: Cents;
+  /** The RATE adjustment applied (cost/sale adjustments don't touch a rental). */
   adjCents: Cents;
   source: 'price_list' | 'catalog';
   /** true when the item's tierException bypassed the category tier rule */
@@ -44,7 +45,7 @@ export function resolveVariationAdj(
   const listOverride = priceList.variationOverrides?.[item.code]?.[variationName];
   if (listOverride != null) return listOverride;
   const v = item.variations.find((x) => x.name === variationName);
-  return v ? v.adjCents : 0;
+  return v ? v.rateAdjCents : 0;
 }
 
 export function resolveUnitRate(params: {

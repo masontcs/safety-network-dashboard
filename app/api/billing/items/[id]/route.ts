@@ -32,7 +32,7 @@ interface ItemDetailRow {
   taxable: boolean
   tracked: boolean
   is_active: boolean
-  billing_item_variations: { id: string; name: string; adj_cents: number; sort_order: number }[]
+  billing_item_variations: { id: string; name: string; rate_adj_cents: number; cost_adj_cents: number; sale_adj_cents: number; sort_order: number }[]
   billing_item_default_rates: { billing_type: BillingType; rate_cents: number }[]
 }
 
@@ -50,7 +50,7 @@ export async function GET(
       .select(`
         id, code, name, category, cost_cents, rentable, salable, sale_price_cents,
         taxable, tracked, is_active,
-        billing_item_variations(id, name, adj_cents, sort_order),
+        billing_item_variations(id, name, rate_adj_cents, cost_adj_cents, sale_adj_cents, sort_order),
         billing_item_default_rates(billing_type, rate_cents)
       `)
       .eq('id', params.id)
@@ -77,7 +77,7 @@ export async function GET(
         variations: (i.billing_item_variations ?? [])
           .slice()
           .sort((a, b) => a.sort_order - b.sort_order)
-          .map((v) => ({ id: v.id, name: v.name, adjCents: v.adj_cents })),
+          .map((v) => ({ id: v.id, name: v.name, rateAdjCents: v.rate_adj_cents, costAdjCents: v.cost_adj_cents, saleAdjCents: v.sale_adj_cents })),
         defaultRates: (i.billing_item_default_rates ?? []).map((r) => ({
           billingType: r.billing_type,
           rateCents: r.rate_cents,
@@ -111,7 +111,7 @@ export async function PATCH(
       taxable?: boolean
       tracked?: boolean
       isActive?: boolean
-      variations?: { id?: string; name: string; adjCents: number }[]
+      variations?: { id?: string; name: string; rateAdjCents?: number; costAdjCents?: number; saleAdjCents?: number }[]
       defaultRates?: { billingType: string; rateCents: number }[]
     }
 
@@ -225,7 +225,9 @@ export async function PATCH(
         if (!n) return bad('A variation needs a name')
         if (seen.has(n.toLowerCase())) return bad(`Duplicate variation name "${n}"`)
         seen.add(n.toLowerCase())
-        if (!Number.isInteger(v.adjCents)) return bad('Variation adjustment must be a whole number of cents')
+      for (const [label, val] of [['rate', v.rateAdjCents], ['cost', v.costAdjCents], ['sale', v.saleAdjCents]] as const) {
+        if (val !== undefined && !Number.isInteger(val)) return bad(`Variation ${label} adjustment must be a whole number of cents`)
+      }
       }
 
       const { data: current, error: cErr } = await supabase
@@ -254,13 +256,13 @@ export async function PATCH(
         if (v.id) {
           const { error } = await supabase
             .from('billing_item_variations')
-            .update({ name: v.name.trim(), adj_cents: v.adjCents, sort_order: idx })
+            .update({ name: v.name.trim(), rate_adj_cents: v.rateAdjCents ?? 0, cost_adj_cents: v.costAdjCents ?? 0, sale_adj_cents: v.saleAdjCents ?? 0, sort_order: idx })
             .eq('id', v.id)
           if (error) throw new Error(error.message)
         } else {
           const { error } = await supabase
             .from('billing_item_variations')
-            .insert({ item_id: params.id, name: v.name.trim(), adj_cents: v.adjCents, sort_order: idx })
+            .insert({ item_id: params.id, name: v.name.trim(), rate_adj_cents: v.rateAdjCents ?? 0, cost_adj_cents: v.costAdjCents ?? 0, sale_adj_cents: v.saleAdjCents ?? 0, sort_order: idx })
           if (error) throw new Error(error.message)
         }
       }
