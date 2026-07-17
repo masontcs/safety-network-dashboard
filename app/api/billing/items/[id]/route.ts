@@ -101,6 +101,7 @@ export async function PATCH(
     if (guard) return guard
 
     const body = (await request.json()) as {
+      code?: string
       name?: string
       category?: string
       costCents?: number
@@ -126,6 +127,24 @@ export async function PATCH(
 
     // ── item fields ────────────────────────────────────────────────────────
     const patch: ItemUpdate = {}
+
+    // The code is a LABEL, not a key: every relationship (price lists, ledger, lines,
+    // invoices) references the item by id, so renaming it orphans nothing. Uniqueness
+    // is the only rule, and the DB enforces it too — this just gives a readable error.
+    if (body.code !== undefined) {
+      const code = body.code.trim().toUpperCase()
+      if (!code) return bad('Item code cannot be empty')
+      const { data: dup, error: dErr } = await supabase
+        .from('billing_items')
+        .select('id')
+        .eq('code', code)
+        .neq('id', params.id)
+        .maybeSingle()
+      if (dErr) throw new Error(dErr.message)
+      if (dup) return bad(`An item with code "${code}" already exists`, 'CONFLICT', 409)
+      patch.code = code
+    }
+
     if (body.name !== undefined) {
       const name = body.name.trim()
       if (!name) return bad('Item name cannot be empty')

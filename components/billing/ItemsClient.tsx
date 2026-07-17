@@ -160,6 +160,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
   async function saveEditor() {
     if (!editing || busy) return
     const equip = editing.category === 'Equipment'
+    if (!editing.code.trim()) { setActionError('Item code cannot be empty'); return }
     if (!validMoney(editCost)) { setActionError('Cost must be a valid amount'); return }
     if (equip && editing.salable && !validMoney(editSalePrice)) { setActionError('Sale price must be a valid amount'); return }
     if (equip && !editing.rentable && !editing.salable) { setActionError('An equipment item must be rentable or salable.'); return }
@@ -169,6 +170,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          code: editing.code,
           name: editing.name,
           category: editing.category,
           costCents: toCents(editCost),
@@ -292,6 +294,7 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
+            <div><label style={labelStyle}>Code</label><input value={editing.code} onChange={(e) => patchEdit({ code: e.target.value.toUpperCase() })} style={inputStyle} /></div>
             <div><label style={labelStyle}>Name</label><input value={editing.name} onChange={(e) => patchEdit({ name: e.target.value })} style={inputStyle} /></div>
             <div>
               <label style={labelStyle}>Category</label>
