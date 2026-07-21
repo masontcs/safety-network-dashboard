@@ -93,7 +93,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       featureAdd?: boolean
       featureReturn?: boolean
       featureDtc?: boolean
-      billingType?: string | null
       notes?: string | null
     }
 
@@ -132,7 +131,6 @@ export async function POST(request: Request): Promise<NextResponse> {
         feature_add: add,
         feature_return: ret,
         feature_dtc: dtc,
-        billing_type: (body.billingType as never) ?? null,
         notes: body.notes?.trim() || null,
       })
       .select('id, ticket_number')

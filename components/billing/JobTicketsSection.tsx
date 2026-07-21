@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import Select from '@/components/billing/Select'
-import { BILLING_TYPE_LABELS, BILLING_TYPES } from '@/lib/billing/constants'
 
 /**
  * The tickets list + "New ticket" form shown on a job's detail page. Tickets
@@ -36,7 +34,6 @@ export default function JobTicketsSection({ jobId, isAdmin }: { jobId: string; i
   const today = new Date().toISOString().slice(0, 10)
   const [date, setDate] = useState(today)
   const [add, setAdd] = useState(true); const [ret, setRet] = useState(false); const [dtc, setDtc] = useState(false)
-  const [billingType, setBillingType] = useState('')
 
   const load = useCallback(() => {
     setLoading(true)
@@ -56,11 +53,11 @@ export default function JobTicketsSection({ jobId, isAdmin }: { jobId: string; i
     try {
       const res = await fetch('/api/billing/tickets', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId, ticketDate: date, featureAdd: add, featureReturn: ret, featureDtc: dtc, billingType: billingType || null }),
+        body: JSON.stringify({ jobId, ticketDate: date, featureAdd: add, featureReturn: ret, featureDtc: dtc }),
       })
       const json = await res.json()
       if (!json.success) { setErr(json.error); return }
-      setShowNew(false); setDate(today); setAdd(true); setRet(false); setDtc(false); setBillingType(''); load()
+      setShowNew(false); setDate(today); setAdd(true); setRet(false); setDtc(false); load()
     } catch { setErr('Network error — please try again.') }
     finally { setBusy(false) }
   }
@@ -87,13 +84,6 @@ export default function JobTicketsSection({ jobId, isAdmin }: { jobId: string; i
             </div>
           </div>
           <div style={{ width: 150 }}><label style={labelStyle}>Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={inputStyle} /></div>
-          <div style={{ minWidth: 180 }}>
-            <label style={labelStyle}>Billing type</label>
-            <Select ariaLabel="Billing type" value={billingType} onChange={setBillingType}>
-              <option value="">Set later</option>
-              {BILLING_TYPES.map((bt) => <option key={bt} value={bt}>{BILLING_TYPE_LABELS[bt]}</option>)}
-            </Select>
-          </div>
           <button onClick={create} disabled={busy} className="btn-primary" style={{ padding: '7px 16px', opacity: busy ? 0.5 : 1 }}>Create</button>
         </div>
       )}
