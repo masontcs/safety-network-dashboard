@@ -8,7 +8,7 @@ import MoneyInput from '@/components/billing/MoneyInput'
 import Select from '@/components/billing/Select'
 import { BILLING_TYPES, BILLING_TYPE_LABELS, FLAT_RATE } from '@/lib/billing/constants'
 import { buildTierGrid } from '@/lib/billing/pricing/tier-grid'
-import type { BillingType, RateKey } from '@/lib/supabase/database.types'
+import type { RateKey } from '@/lib/supabase/database.types'
 
 /**
  * Price-list editor.
@@ -49,10 +49,6 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 6, padding: '6px 8px', fontSize: 12.5, color: 'var(--text-primary)',
   outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
 }
-const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 11, color: 'var(--text-muted)',
-  textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6,
-}
 const thStyle: React.CSSProperties = {
   textAlign: 'left', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em',
   color: 'var(--text-muted)', padding: '8px 10px', borderBottom: '1px solid var(--border-emphasis)', whiteSpace: 'nowrap',
@@ -77,7 +73,6 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
   const [items, setItems] = useState<EditorItem[]>([])
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const [inUse, setInUse] = useState(0)
-  const [billingType, setBillingType] = useState<BillingType>('daily')
 
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -327,6 +322,134 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
     </div>
   )
 
+  /**
+   * One equipment item as its own block: billing types down the side, tiers across.
+   * The billing type is NOT a property of the price list — it's chosen per line on a
+   * ticket — so every item carries a rate for all six cadences, and they're all visible
+   * here rather than hidden behind a switcher.
+   */
+  const renderEquipmentItem = (it: EditorItem) => (
+    <div key={it.key} className="card" style={{ padding: '14px 16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{ fontWeight: 500, fontSize: 13.5 }}>{it.code}</span>
+        <span style={{ color: 'var(--text-muted)', fontSize: 12.5 }}>{it.name}</span>
+        <button style={{ ...ghostBtn, marginLeft: 'auto' }} onClick={() => { setItems((r) => r.filter((x) => x.key !== it.key)); setSaveMsg(null) }}>Remove</button>
+      </div>
+
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+          <thead>
+            <tr>
+              <th style={{ ...thStyle, paddingLeft: 2 }}>Billing type</th>
+              {tiers.map((t, i) => (
+                <th key={t.key} style={{ ...thStyle, textAlign: 'right' }}>{t.name}{i === 0 ? ' (base)' : ''}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {BILLING_TYPES.map((bt) => (
+              <tr key={bt}>
+                <td style={{ ...tdStyle, paddingLeft: 2, whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>{BILLING_TYPE_LABELS[bt]}</td>
+                {tiers.map((t, i) => {
+                  const computed = preview[it.key]?.[t.key]?.[bt]
+                  const locked = hasOverride(it, t.id, bt)
+                  if (i === 0) {
+                    return (
+                      <td key={t.key} style={{ ...tdStyle, textAlign: 'right' }}>
+                        <MoneyInput
+                          valueCents={it.bases[bt]}
+                          ariaLabel={`${it.code} ${BILLING_TYPE_LABELS[bt]} base rate`}
+                          onChangeCents={(c) => setBase(it.key, c, bt)}
+                          style={{ ...inputStyle, maxWidth: 84, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                        />
+                      </td>
+                    )
+                  }
+                  return (
+                    <td key={t.key} style={{ ...tdStyle, textAlign: 'right' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
+                        <MoneyInput
+                          valueCents={computed}
+                          disabled={!t.id}
+                          ariaLabel={`${it.code} ${BILLING_TYPE_LABELS[bt]} ${t.name} rate`}
+                          title={!t.id ? 'Save the price list before locking cells on a new tier' : undefined}
+                          onChangeCents={(c) => setOverride(it.key, t.id, c, bt)}
+                          style={{
+                            ...inputStyle, maxWidth: 84, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+                            borderColor: locked ? 'var(--accent)' : 'var(--border-emphasis)',
+                            color: locked ? 'var(--accent)' : 'var(--text-primary)',
+                            fontWeight: locked ? 600 : 400,
+                            opacity: t.id ? 1 : 0.5,
+                          }}
+                        />
+                        <button
+                          title={locked ? 'Release this locked cell' : 'Not locked'}
+                          aria-label={locked ? 'Release locked cell' : 'Not locked'}
+                          disabled={!locked}
+                          onClick={() => setOverride(it.key, t.id, null, bt)}
+                          style={{ ...ghostBtn, padding: '4px 6px', opacity: locked ? 1 : 0.25, border: 'none' }}
+                        >↺</button>
+                      </div>
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Per-item authoring controls: these apply to every billing type at once, so they
+          sit under the item's grid rather than in any one cadence's row. */}
+      <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-subtle, var(--border-emphasis))' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+          Freeze after
+          <Select
+            ariaLabel={`${it.code} freeze after`}
+            value={it.freezeAfterPosition ? String(it.freezeAfterPosition) : ''}
+            onChange={(v) => patchItem(it.key, { freezeAfterPosition: v ? Number(v) : null })}
+            style={{ maxWidth: 130 }}
+          >
+            <option value="">—</option>
+            {tiers.map((t, i) => <option key={t.key} value={i + 1}>{t.name}</option>)}
+          </Select>
+        </label>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+          Tier exception
+          <Select
+            ariaLabel={`${it.code} tier exception`}
+            value={it.tierExceptionTierId ?? ''}
+            onChange={(v) => patchItem(it.key, { tierExceptionTierId: v || null })}
+            style={{ maxWidth: 140 }}
+          >
+            <option value="">—</option>
+            {tiers.filter((t) => t.id).map((t) => <option key={t.key} value={t.id}>{t.name}</option>)}
+          </Select>
+        </label>
+
+        {it.variations.length > 0 && (
+          <span style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', marginLeft: 'auto' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Variation adj</span>
+            {it.variations.map((v) => (
+              <span key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{v.name}</span>
+                <MoneyInput
+                  valueCents={v.rateAdjCents === 0 ? null : v.rateAdjCents}
+                  allowNegative
+                  placeholder="0.00"
+                  ariaLabel={`${it.code} ${v.name} rate adjustment`}
+                  onChangeCents={(c) => setVariationAdj(it.key, v.id, c ?? 0)}
+                  style={{ ...inputStyle, maxWidth: 84, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                />
+              </span>
+            ))}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+
   function addItem() {
     if (!addItemId) return
     const c = catalog.find((x) => x.id === addItemId)
@@ -424,24 +547,23 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
         </div>
       </div>
 
-      {/* Rate grids. Equipment prices the six rental cadences (pick one above the
-          grid); charge items price a single flat rate — a "1 Man Crew" has an hourly
-          rate, not a rental cadence, so it gets its own grid with one Rate column. */}
-      {renderGrid({
-        title: 'Equipment rates',
-        rows: equipmentItems,
-        rateKey: billingType,
-        empty: 'No equipment on this price list yet.',
-        blurb: 'Type a base price in the first tier and the rest cascade. Type into any later cell to lock it — locked cells never recompute, and the tiers after them re-base off the locked value. Each billing type has its own base.',
-        control: (
-          <div style={{ marginLeft: 'auto', minWidth: 240 }}>
-            <label style={labelStyle}>Billing type</label>
-            <Select ariaLabel="Billing type" value={billingType} onChange={(v) => setBillingType(v as BillingType)}>
-              {BILLING_TYPES.map((bt) => <option key={bt} value={bt}>{BILLING_TYPE_LABELS[bt]}</option>)}
-            </Select>
-          </div>
-        ),
-      })}
+      {/* Equipment: one block per item, every billing type visible. The cadence is a
+          per-ticket-line choice, not a price-list property, so an item holds a rate for
+          all six — there's nothing to "pick" at the list level. Charge items price a
+          single flat rate and keep the compact shared grid below. */}
+      <div className="card">
+        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Equipment rates</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          Each item carries a rate for every billing type — the cadence is chosen later, when the item goes on a ticket.
+          Type a base in the first tier and the rest cascade; type into any later cell to lock it (locked cells never
+          recompute, and tiers after them re-base off the locked value).
+        </div>
+      </div>
+      {equipmentItems.length === 0 ? (
+        <div className="card" style={{ fontSize: 13, color: 'var(--text-muted)' }}>No equipment on this price list yet.</div>
+      ) : (
+        equipmentItems.map(renderEquipmentItem)
+      )}
 
       {chargeItems.length > 0 && renderGrid({
         title: 'Labor, lump sum & misc rates',
