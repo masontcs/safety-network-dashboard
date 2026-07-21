@@ -15,9 +15,10 @@ import type { BillingType } from '@/lib/supabase/database.types'
 
 interface PickerItem { id: string; code: string; name: string; category: string; tracked: boolean; rentable: boolean; salable: boolean; salePriceCents: number | null; variations: { id: string; name: string }[] }
 interface LedgerEvent { id: string; eventType: string; date: string; qty: number; equipmentId: string | null; item: { id: string; code: string; name: string; tracked: boolean } | null; variation: { id: string; name: string } | null }
-// unitRateCents / amountCents are null for item-priced kinds (labor, lump sum) —
-// their rate comes from the price list at invoice time, not from this ticket.
-interface Line { id: string; kind: string; description: string; qty: number; units: number; unitRateCents: number | null; amountCents: number | null; taxable: boolean; itemCode: string | null }
+// Item-priced kinds (labor, lump sum) store no rate; the API resolves it live from the
+// price list and sets rateFromPriceList so we can show the number while marking it as
+// derived (not entered/locked). null still means genuinely unpriced.
+interface Line { id: string; kind: string; description: string; qty: number; units: number; unitRateCents: number | null; amountCents: number | null; taxable: boolean; itemCode: string | null; rateFromPriceList?: boolean }
 interface Ticket {
   id: string; ticketNumber: string; date: string; status: string; locked: boolean
   featureAdd: boolean; featureReturn: boolean; featureDtc: boolean
@@ -36,9 +37,14 @@ const th: React.CSSProperties = { textAlign: 'left', fontSize: 10.5, fontWeight:
 const td: React.CSSProperties = { padding: '8px 10px', borderBottom: '1px solid var(--border-subtle, var(--border-emphasis))', color: 'var(--text-primary)' }
 const ghost: React.CSSProperties = { background: 'transparent', border: '1px solid var(--border-emphasis)', borderRadius: 6, padding: '5px 10px', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit' }
 const money = (c: number) => `$${(c / 100).toFixed(2)}`
-/** Item-priced lines carry no rate — the price list supplies it at invoice time. */
-const fromPriceList = <span style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic' }}>from price list</span>
-const moneyCell = (c: number | null) => (c === null ? fromPriceList : money(c))
+/** Shown when an item-priced line can't be priced yet (no rate on the list for it). */
+const noRate = <span style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic' }}>no list rate</span>
+/**
+ * A money cell. `derived` marks a number resolved live from the price list (not entered),
+ * shown in the accent colour with a tooltip so the office knows where it came from.
+ */
+const moneyCell = (c: number | null, derived = false) =>
+  c === null ? noRate : <span title={derived ? 'From the price list' : undefined} style={derived ? { color: 'var(--accent)' } : undefined}>{money(c)}</span>
 /** Charge kinds whose item + rate come from the catalog and its price list. */
 const ITEM_PRICED_CATEGORY: Record<string, string | undefined> = { labor: 'Labor', lump_sum: 'Lump Sum' }
 
@@ -192,7 +198,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
                   <tr key={l.id}>
                     <td style={td}>{isTyped ? <input value={lnDesc} onChange={(e) => setLnDesc(e.target.value)} style={inputStyle} /> : l.description}</td>
                     <td style={{ ...td, textAlign: 'right' }}><input value={lnQty} onChange={(e) => setLnQty(e.target.value)} style={{ ...inputStyle, width: 60, textAlign: 'right' }} /></td>
-                    <td style={{ ...td, textAlign: 'right' }}>{isTyped ? <input value={lnRate} onChange={(e) => setLnRate(e.target.value)} style={{ ...inputStyle, width: 80, textAlign: 'right' }} /> : moneyCell(l.unitRateCents)}</td>
+                    <td style={{ ...td, textAlign: 'right' }}>{isTyped ? <input value={lnRate} onChange={(e) => setLnRate(e.target.value)} style={{ ...inputStyle, width: 80, textAlign: 'right' }} /> : moneyCell(l.unitRateCents, l.rateFromPriceList)}</td>
                     <td style={{ ...td, textAlign: 'right', color: 'var(--text-dim)' }}>—</td>
                     {isSale && <td style={td}>{l.taxable ? 'yes' : '—'}</td>}
                     <td style={td}><div style={{ display: 'flex', gap: 4 }}><button onClick={() => saveLn(l)} disabled={busy} style={{ ...ghost, borderColor: 'var(--accent)', color: 'var(--accent)', padding: '4px 8px' }}>Save</button><button onClick={() => setEditLn(null)} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div></td>
@@ -201,8 +207,8 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
                   <tr key={l.id} {...rowOpen(!locked ? () => startEditLn(l) : undefined)} style={{ cursor: locked ? 'default' : 'pointer' }}>
                     <td style={td}>{l.description}{l.itemCode ? <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>{l.itemCode}</span> : null}</td>
                     <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{l.qty}{l.units > 1 ? ` × ${l.units}` : ''}</td>
-                    <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{moneyCell(l.unitRateCents)}</td>
-                    <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{moneyCell(l.amountCents)}</td>
+                    <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{moneyCell(l.unitRateCents, l.rateFromPriceList)}</td>
+                    <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{moneyCell(l.amountCents, l.rateFromPriceList)}</td>
                     {isSale && <td style={{ ...td, color: 'var(--text-dim)' }}>{l.taxable ? 'yes' : '—'}</td>}
                     <td style={td}>{!locked && <div style={{ display: 'flex', gap: 4 }}><button onClick={(ev) => { ev.stopPropagation(); startEditLn(l) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>Edit</button><button onClick={(ev) => { ev.stopPropagation(); removeLine(l.id) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div>}</td>
                   </tr>

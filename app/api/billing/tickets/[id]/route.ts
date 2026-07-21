@@ -3,7 +3,8 @@ import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { BILLING_TYPES } from '@/lib/billing/constants'
-import type { BillingType, Database } from '@/lib/supabase/database.types'
+import { resolveItemLineRates } from '@/lib/billing/livePricing'
+import type { BillingItemCategory, BillingType, Database } from '@/lib/supabase/database.types'
 
 /**
  * A single ticket: its details, its quantity ledger (Equipment), and its
@@ -38,7 +39,7 @@ interface TicketRow {
   recurring: boolean
   notes: string | null
   entity_id: string
-  billing_jobs: { id: string; job_number: string; name: string | null; branch_id: string; entities: { code: string } | null; billing_profiles: { name: string; billing_customers: { name: string } | null } | null } | null
+  billing_jobs: { id: string; job_number: string; name: string | null; branch_id: string; profile_id: string; entities: { code: string } | null; billing_profiles: { name: string; billing_customers: { name: string } | null } | null } | null
 }
 interface LedgerRow {
   id: string; event_type: string; event_date: string; qty: number; equipment_id: string | null
@@ -46,8 +47,9 @@ interface LedgerRow {
   billing_item_variations: { id: string; name: string } | null
 }
 interface LineRow {
-  id: string; kind: string; description: string; qty: number; units: number; unit_rate_cents: number; amount_cents: number; taxable: boolean
-  billing_items: { code: string } | null
+  id: string; kind: string; description: string; qty: number; units: number; unit_rate_cents: number | null; amount_cents: number | null; taxable: boolean
+  item_id: string | null
+  billing_items: { code: string; category: BillingItemCategory } | null
 }
 
 export async function GET(
@@ -64,7 +66,7 @@ export async function GET(
       .select(`
         id, ticket_number, ticket_date, status, feature_add, feature_return, feature_dtc,
         billing_type, recurring, notes, entity_id,
-        billing_jobs(id, job_number, name, branch_id, entities(code), billing_profiles(name, billing_customers(name)))
+        billing_jobs(id, job_number, name, branch_id, profile_id, entities(code), billing_profiles(name, billing_customers(name)))
       `)
       .eq('id', params.id)
       .maybeSingle()
@@ -85,10 +87,23 @@ export async function GET(
 
     const { data: linesRaw } = await supabase
       .from('billing_ticket_lines')
-      .select('id, kind, description, qty, units, unit_rate_cents, amount_cents, taxable, billing_items(code)')
+      .select('id, kind, description, qty, units, unit_rate_cents, amount_cents, taxable, item_id, billing_items(code, category)')
       .eq('ticket_id', params.id)
       .order('created_at')
     const lines = (linesRaw ?? []) as unknown as LineRow[]
+
+    // Live pricing: Labor / Lump-Sum lines store no rate — resolve it from the price list
+    // now, so the ticket shows the actual number instead of "from price list". Uses the
+    // same compiled rates the invoice will. A stored rate (sale, misc) always wins.
+    const priced = t.billing_jobs
+      ? await resolveItemLineRates(supabase, {
+          profileId: t.billing_jobs.profile_id,
+          entityId: t.entity_id,
+          lines: lines
+            .filter((l) => l.unit_rate_cents === null)
+            .map((l) => ({ id: l.id, itemId: l.item_id, category: l.billing_items?.category ?? null, qty: Number(l.qty), units: l.units })),
+        })
+      : new Map()
 
     // On-rent per (item, variation): pickups minus returns minus lost.
     const onRent = new Map<string, { code: string; name: string; variation: string | null; qty: number }>()
@@ -124,11 +139,20 @@ export async function GET(
           item: e.billing_items ? { id: e.billing_items.id, code: e.billing_items.code, name: e.billing_items.name, tracked: e.billing_items.tracked } : null,
           variation: e.billing_item_variations ? { id: e.billing_item_variations.id, name: e.billing_item_variations.name } : null,
         })),
-        lines: lines.map((l) => ({
-          id: l.id, kind: l.kind, description: l.description, qty: Number(l.qty), units: l.units,
-          unitRateCents: l.unit_rate_cents, amountCents: l.amount_cents, taxable: l.taxable,
-          itemCode: l.billing_items?.code ?? null,
-        })),
+        lines: lines.map((l) => {
+          // A stored rate (sale, misc) is authoritative. An item-priced line has none, so
+          // fall back to the live price-list resolution.
+          const live = l.unit_rate_cents === null ? priced.get(l.id) : undefined
+          const unitRateCents = l.unit_rate_cents ?? live?.unitRateCents ?? null
+          const amountCents = l.amount_cents ?? live?.amountCents ?? null
+          return {
+            id: l.id, kind: l.kind, description: l.description, qty: Number(l.qty), units: l.units,
+            unitRateCents, amountCents, taxable: l.taxable,
+            itemCode: l.billing_items?.code ?? null,
+            // true when the number shown was resolved from the price list, not stored.
+            rateFromPriceList: l.unit_rate_cents === null && unitRateCents !== null,
+          }
+        }),
         onRent: [...onRent.values()].filter((r) => r.qty !== 0),
         isAdmin: ctx.access.role === 'admin',
       },
