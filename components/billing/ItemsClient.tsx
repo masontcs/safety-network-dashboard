@@ -43,7 +43,15 @@ interface DefaultRate { billingType: BillingType; rateCents: number }
 interface ItemDetail extends Omit<ItemRow, 'variationCount' | 'defaultRateCount'> {
   variations: Variation[]
   defaultRates: DefaultRate[]
+  usage: ItemUsage
 }
+/** Where an item is referenced. `canDelete` is false the moment it's used anywhere. */
+interface ItemUsage {
+  priceLists: number; ticketLedger: number; ticketLines: number
+  accruals: number; invoiceLines: number
+  blockers: string[]; canDelete: boolean
+}
+type StatusFilter = 'active' | 'archived' | 'all'
 
 const inputStyle: React.CSSProperties = {
   width: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border-emphasis)',
@@ -138,6 +146,9 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  // Archived items stay out of the way by default — that's the point of archiving.
+  const [status, setStatus] = useState<StatusFilter>('active')
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const [showNew, setShowNew] = useState(false)
@@ -172,14 +183,19 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return items
-    return items.filter(
+    const byStatus = items.filter(
+      (i) => status === 'all' || (status === 'active' ? i.isActive : !i.isActive)
+    )
+    if (!q) return byStatus
+    return byStatus.filter(
       (i) =>
         i.code.toLowerCase().includes(q) ||
         i.name.toLowerCase().includes(q) ||
         i.category.toLowerCase().includes(q)
     )
-  }, [items, search])
+  }, [items, search, status])
+
+  const archivedCount = useMemo(() => items.filter((i) => !i.isActive).length, [items])
 
   async function createItem() {
     if (busy) return
@@ -219,8 +235,44 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
     if (!json.success) { setActionError(json.error); return }
     const d = json.data as ItemDetail
     setEditing(d)
+    setConfirmDelete(false)
     setEditCost(toDollars(d.costCents))
     setEditSalePrice(toDollars(d.salePriceCents))
+  }
+
+  /**
+   * Archive / restore. Sends only isActive, so toggling an item's availability can never
+   * be blocked by unrelated validation on fields the user didn't touch.
+   */
+  async function setArchived(item: { id: string; code: string }, archived: boolean) {
+    if (busy) return
+    setBusy(true); setActionError(null)
+    try {
+      const res = await fetch(`/api/billing/items/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !archived }),
+      })
+      const json = await res.json()
+      if (!json.success) { setActionError(json.error); return }
+      setEditing(null)
+      load()
+    } catch { setActionError('Network error — please try again.') }
+    finally { setBusy(false) }
+  }
+
+  /** Only offered for an item that has never been used; the server checks again anyway. */
+  async function deleteItem() {
+    if (!editing || busy) return
+    setBusy(true); setActionError(null)
+    try {
+      const res = await fetch(`/api/billing/items/${editing.id}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!json.success) { setActionError(json.error); setConfirmDelete(false); return }
+      setEditing(null)
+      load()
+    } catch { setActionError('Network error — please try again.') }
+    finally { setBusy(false) }
   }
 
   async function saveEditor() {
@@ -467,11 +519,57 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 20, alignItems: 'center', flexWrap: 'wrap' }}>
             <button onClick={saveEditor} disabled={busy} className="btn-primary" style={{ padding: '8px 18px', opacity: busy ? 0.5 : 1 }}>
               {busy ? 'Saving…' : 'Save item'}
             </button>
             <button onClick={() => setEditing(null)} style={ghostBtn}>Cancel</button>
+
+            {/* Retiring an item lives on the right, away from Save — destructive actions
+                shouldn't sit under the cursor's path to the primary button. */}
+            <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                onClick={() => setArchived(editing, editing.isActive)}
+                disabled={busy}
+                style={ghostBtn}
+                title={editing.isActive
+                  ? 'Hide from pickers. Existing tickets and invoices keep it.'
+                  : 'Make selectable again.'}
+              >
+                {editing.isActive ? 'Archive' : 'Restore'}
+              </button>
+
+              {editing.usage.canDelete ? (
+                confirmDelete ? (
+                  <>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Delete permanently?</span>
+                    <button
+                      onClick={deleteItem}
+                      disabled={busy}
+                      style={{ ...ghostBtn, color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                    >
+                      {busy ? 'Deleting…' : 'Yes, delete'}
+                    </button>
+                    <button onClick={() => setConfirmDelete(false)} style={ghostBtn}>No</button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDelete(true)}
+                    disabled={busy}
+                    style={{ ...ghostBtn, color: 'var(--danger)' }}
+                    title="This item has never been used, so it can be removed for good."
+                  >
+                    Delete
+                  </button>
+                )
+              ) : (
+                // Say WHY there's no delete button, rather than leaving a gap that reads
+                // as a missing feature.
+                <span style={{ fontSize: 11.5, color: 'var(--text-dim)', maxWidth: 320, textAlign: 'right' }}>
+                  Can’t delete — {editing.usage.blockers.join(', ')}. Archive instead.
+                </span>
+              )}
+            </span>
           </div>
         </div>
       )}
@@ -479,6 +577,16 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search items…" style={{ ...inputStyle, maxWidth: 300 }} />
+          <Select
+            ariaLabel="Status filter"
+            value={status}
+            onChange={(v) => setStatus(v as StatusFilter)}
+            style={{ maxWidth: 150 }}
+          >
+            <option value="active">Active</option>
+            <option value="archived">Archived{archivedCount > 0 ? ` (${archivedCount})` : ''}</option>
+            <option value="all">All</option>
+          </Select>
           <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-muted)' }}>{filtered.length} of {items.length}</span>
         </div>
 
@@ -488,7 +596,11 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{[1, 2, 3, 4].map((i) => <Skeleton key={i} height={40} />)}</div>
         ) : filtered.length === 0 ? (
           <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '18px 2px' }}>
-            {items.length === 0 ? 'No items yet.' : 'No items match that search.'}
+            {items.length === 0
+              ? 'No items yet.'
+              : status === 'archived' && !search.trim()
+                ? 'No archived items.'
+                : `No ${status === 'all' ? '' : status + ' '}items match that search.`}
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -507,7 +619,12 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
                     {...rowOpen(isAdmin ? () => openEditor(i.id) : undefined)}
                     style={{ opacity: i.isActive ? 1 : 0.5, cursor: isAdmin ? 'pointer' : 'default' }}
                   >
-                    <td style={{ ...tdStyle, fontWeight: 500 }}>{i.code}</td>
+                    <td style={{ ...tdStyle, fontWeight: 500, whiteSpace: 'nowrap' }}>
+                      {i.code}
+                      {!i.isActive && (
+                        <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 600, color: 'var(--pill-neutral-fg)', background: 'var(--pill-neutral-bg)', padding: '1px 6px', borderRadius: 999, marginLeft: 6 }}>ARCHIVED</span>
+                      )}
+                    </td>
                     <td style={tdStyle}>{i.name}</td>
                     <td style={tdStyle}>{i.category}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>${toDollars(i.costCents)}</td>
@@ -528,7 +645,18 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{i.variationCount || '—'}</td>
                     <td style={tdStyle}>
-                      {isAdmin && <button style={ghostBtn} onClick={(e) => { e.stopPropagation(); openEditor(i.id) }}>Edit</button>}
+                      {isAdmin && (
+                        <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <button style={ghostBtn} onClick={(e) => { e.stopPropagation(); openEditor(i.id) }}>Edit</button>
+                          <button
+                            style={ghostBtn}
+                            title={i.isActive ? 'Hide from pickers; existing records keep it' : 'Make selectable again'}
+                            onClick={(e) => { e.stopPropagation(); setArchived(i, i.isActive) }}
+                          >
+                            {i.isActive ? 'Archive' : 'Restore'}
+                          </button>
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}

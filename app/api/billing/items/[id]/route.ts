@@ -36,6 +36,44 @@ interface ItemDetailRow {
   billing_item_default_rates: { billing_type: BillingType; rate_cents: number }[]
 }
 
+
+/**
+ * Everywhere an item can be referenced. Deleting is only ever safe when all of these are
+ * empty — the billing tables (ledger / lines / accruals / invoices) are ON DELETE NO
+ * ACTION so the database would refuse anyway, but price-list membership CASCADES, which
+ * would silently strip the item from every list without a word. So it counts as usage.
+ *
+ * Recomputed on the server for the DELETE itself: the UI hides the button when an item is
+ * in use, but a hidden button is a UI convenience, not a permission check.
+ */
+async function itemUsage(supabase: ReturnType<typeof createServiceClient>, itemId: string) {
+  const count = async (table: string) => {
+    const { count: n, error } = await supabase
+      .from(table as 'billing_ticket_lines')
+      .select('id', { count: 'exact', head: true })
+      .eq('item_id', itemId)
+    if (error) throw new Error(error.message)
+    return n ?? 0
+  }
+  const [priceLists, ticketLedger, ticketLines, accruals, invoiceLines] = await Promise.all([
+    count('billing_price_list_items'),
+    count('billing_ticket_ledger'),
+    count('billing_ticket_lines'),
+    count('billing_rental_accruals'),
+    count('billing_invoice_lines'),
+  ])
+
+  // Phrased for a person reading a refusal, not for a log.
+  const blockers: string[] = []
+  if (invoiceLines > 0) blockers.push(`on ${invoiceLines} invoice line${invoiceLines === 1 ? '' : 's'}`)
+  if (ticketLedger > 0) blockers.push(`on ${ticketLedger} ticket equipment ${ticketLedger === 1 ? 'entry' : 'entries'}`)
+  if (ticketLines > 0) blockers.push(`on ${ticketLines} ticket charge line${ticketLines === 1 ? '' : 's'}`)
+  if (accruals > 0) blockers.push(`in ${accruals} rental accrual${accruals === 1 ? '' : 's'}`)
+  if (priceLists > 0) blockers.push(`on ${priceLists} price list${priceLists === 1 ? '' : 's'}`)
+
+  return { priceLists, ticketLedger, ticketLines, accruals, invoiceLines, blockers, canDelete: blockers.length === 0 }
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: { id: string } }
@@ -60,6 +98,8 @@ export async function GET(
     const i = data as unknown as ItemDetailRow | null
     if (!i) return bad('Item not found', 'NOT_FOUND', 404)
 
+    const usage = await itemUsage(supabase, params.id)
+
     return NextResponse.json({
       success: true,
       data: {
@@ -82,6 +122,7 @@ export async function GET(
           billingType: r.billing_type,
           rateCents: r.rate_cents,
         })),
+        usage,
       },
     })
   } catch (err) {
@@ -287,6 +328,62 @@ export async function PATCH(
         const { error } = await supabase.from('billing_item_default_rates').insert(rows)
         if (error) throw new Error(error.message)
       }
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    return billingApiError(err)
+  }
+}
+
+/**
+ * Permanently delete an item — only ever allowed when it has never been used.
+ *
+ * Archiving (PATCH isActive:false) is the normal way to retire an item: it keeps the item
+ * readable on every old ticket and invoice while hiding it from pickers. Delete exists for
+ * the other case — the typo'd item created five minutes ago that should just go away.
+ */
+export async function DELETE(
+  _request: Request,
+  { params }: { params: { id: string } }
+): Promise<NextResponse> {
+  try {
+    const ctx = await getAccessContext()
+    if (!ctx.ok) return ctx.response
+
+    const guard = guardAdminOnly(ctx.access.role)
+    if (guard) return guard
+
+    const supabase = createServiceClient()
+
+    const { data: existing, error: exErr } = await supabase
+      .from('billing_items')
+      .select('id, code')
+      .eq('id', params.id)
+      .maybeSingle()
+    if (exErr) throw new Error(exErr.message)
+    if (!existing) return bad('Item not found', 'NOT_FOUND', 404)
+
+    // Recheck on the server. The UI hides the button for a used item, but that's a
+    // convenience — this is the actual gate.
+    const usage = await itemUsage(supabase, params.id)
+    if (!usage.canDelete) {
+      return bad(
+        `"${existing.code}" can't be deleted — it's ${usage.blockers.join(', ')}. Archive it instead: that hides it from pickers but keeps it readable on existing records.`,
+        'CONFLICT',
+        409
+      )
+    }
+
+    // Variations and default rates cascade. Nothing else references the item by now.
+    const { error } = await supabase.from('billing_items').delete().eq('id', params.id)
+    if (error) {
+      // A reference we don't know about. Never force it — billing history wins.
+      return bad(
+        `"${existing.code}" is still referenced somewhere and can't be deleted. Archive it instead.`,
+        'CONFLICT',
+        409
+      )
     }
 
     return NextResponse.json({ success: true })
