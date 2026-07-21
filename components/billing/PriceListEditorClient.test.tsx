@@ -1,88 +1,98 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, cleanup, waitFor, fireEvent, within } from '@testing-library/react'
+import { render, screen, cleanup, waitFor, fireEvent } from '@testing-library/react'
 import PriceListEditorClient from './PriceListEditorClient'
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <a>{children}</a> }))
 
+const TIERS = [
+  { id: 't1', name: 'Tier 1', position: 1, pctOffPrevious: 0 },
+  { id: 't2', name: 'Tier 2', position: 2, pctOffPrevious: 10 },
+]
+
 const PRICE_LIST = {
   id: 'pl1', name: 'Test List', entityId: 'e1', isActive: true, inUseByProfiles: 0,
-  billingTypes: [],
-  tiers: [
-    { id: 't1', name: 'Tier 1', position: 1, pctOffPrevious: 0 },
-    { id: 't2', name: 'Tier 2', position: 2, pctOffPrevious: 10 },
-    { id: 't3', name: 'Tier 3', position: 3, pctOffPrevious: 10 },
-  ],
+  billingTypes: [], tiers: TIERS,
   items: [
-    {
-      id: 'pli1', itemId: 'i1', code: 'CONE-28', name: 'Traffic Cone', category: 'Equipment',
-      freezeAfterPosition: null, tierExceptionTierId: null,
-      bases: { daily: 200, weekly_billed_weekly: 1000 },
-      overrides: [],
-      variations: [{ id: 'v1', name: 'Orange', rateAdjCents: 0 }],
+    { // by-cadence equipment, no variations
+      id: 'pli1', itemId: 'i1', code: 'MSG-BOARD', name: 'Message Board', category: 'Equipment',
+      freezeAfterPosition: null, tierExceptionTierId: null, singleRate: false,
+      variations: [],
+      grids: { '': { bases: { daily: 4500, weekly_billed_weekly: 22500 }, overrides: [] } },
     },
-    {
-      id: 'pli2', itemId: 'i2', code: 'CREW-1', name: '1 Man Crew', category: 'Labor',
-      freezeAfterPosition: null, tierExceptionTierId: null,
-      bases: { flat: 5000 }, overrides: [], variations: [],
+    { // single-rate equipment with variations — priced per variation
+      id: 'pli2', itemId: 'i2', code: 'CONE-28', name: 'Traffic Cone', category: 'Equipment',
+      freezeAfterPosition: null, tierExceptionTierId: null, singleRate: true,
+      variations: [{ id: 'v-orange', name: 'Orange' }, { id: 'v-green', name: 'Green' }],
+      grids: { 'v-orange': { bases: { flat: 150 }, overrides: [] }, 'v-green': { bases: { flat: 175 }, overrides: [] } },
+    },
+    { // charge item — flat
+      id: 'pli3', itemId: 'i3', code: 'CREW-1', name: '1 Man Crew', category: 'Labor',
+      freezeAfterPosition: null, tierExceptionTierId: null, singleRate: false,
+      variations: [], grids: { '': { bases: { flat: 5000 }, overrides: [] } },
     },
   ],
   catalog: [],
 }
 
 beforeEach(() => {
-  global.fetch = vi.fn(() =>
-    Promise.resolve({ json: () => Promise.resolve({ success: true, data: PRICE_LIST }) })
-  ) as unknown as typeof fetch
+  global.fetch = vi.fn(() => Promise.resolve({ json: () => Promise.resolve({ success: true, data: PRICE_LIST }) })) as unknown as typeof fetch
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
-describe('price-list editor — per-item equipment blocks', () => {
-  it('renders every billing type as its own row for an equipment item', async () => {
-    render(<PriceListEditorClient priceListId="pl1" />)
-    await waitFor(() => expect(screen.getByText('CONE-28')).toBeTruthy())
+const open = (code: string) => fireEvent.click(screen.getByText(code))
 
-    // All six cadences visible for the one item — the whole point: no dropdown gating.
+describe('price-list editor — collapse + single-rate + per-variation grids', () => {
+  it('collapses items by default: no rate inputs until you open one', async () => {
+    render(<PriceListEditorClient priceListId="pl1" />)
+    await waitFor(() => expect(screen.getByText('MSG-BOARD')).toBeTruthy())
+    expect(screen.queryByLabelText('MSG-BOARD daily base')).toBeNull() // collapsed
+    open('MSG-BOARD')
+    expect(screen.getByLabelText('MSG-BOARD daily base')).toBeTruthy()   // opened
+  })
+
+  it('shows all six billing types for a by-cadence item when opened', async () => {
+    render(<PriceListEditorClient priceListId="pl1" />)
+    await waitFor(() => expect(screen.getByText('MSG-BOARD')).toBeTruthy())
+    open('MSG-BOARD')
     for (const label of ['Daily', 'Weekly · billed weekly', 'Weekly · billed daily',
       'Monthly · billed monthly', 'Monthly · billed weekly', 'Monthly · billed daily']) {
       expect(screen.getByText(label), `missing ${label}`).toBeTruthy()
     }
   })
 
-  it('shows NO global billing-type switcher (it was the confusing part)', async () => {
+  it('a single-rate item shows one Rate row, not six cadences', async () => {
     render(<PriceListEditorClient priceListId="pl1" />)
     await waitFor(() => expect(screen.getByText('CONE-28')).toBeTruthy())
-    expect(screen.queryByLabelText('Billing type')).toBeNull()
+    open('CONE-28')
+    expect(screen.queryByText('Weekly · billed weekly')).toBeNull()
+    expect(screen.getByLabelText('CONE-28 Orange rate base')).toBeTruthy()
   })
 
-  it("binds each cadence's base to its own value and lets you edit them independently", async () => {
+  it('prices each variation on its own grid', async () => {
     render(<PriceListEditorClient priceListId="pl1" />)
     await waitFor(() => expect(screen.getByText('CONE-28')).toBeTruthy())
-
-    const daily = screen.getByLabelText('CONE-28 Daily base rate') as HTMLInputElement
-    const weekly = screen.getByLabelText('CONE-28 Weekly · billed weekly base rate') as HTMLInputElement
-    expect(daily.value).toBe('2.00')
-    expect(weekly.value).toBe('10.00')
-
-    // Editing one cadence's base does not disturb another's.
-    fireEvent.focus(daily)
-    fireEvent.change(daily, { target: { value: '3.50' } })
-    expect(screen.getByLabelText('CONE-28 Weekly · billed weekly base rate')).toHaveProperty('value', '10.00')
+    open('CONE-28')
+    expect(screen.getByText('Orange')).toBeTruthy()
+    expect(screen.getByText('Green')).toBeTruthy()
+    const orange = screen.getByLabelText('CONE-28 Orange rate base') as HTMLInputElement
+    const green = screen.getByLabelText('CONE-28 Green rate base') as HTMLInputElement
+    expect(orange.value).toBe('1.50')
+    expect(green.value).toBe('1.75')
   })
 
-  it('keeps per-item Freeze after, Tier exception, and Variation adj controls', async () => {
+  it('offers the single-rate toggle for equipment', async () => {
     render(<PriceListEditorClient priceListId="pl1" />)
-    await waitFor(() => expect(screen.getByText('CONE-28')).toBeTruthy())
-    expect(screen.getByLabelText('CONE-28 freeze after')).toBeTruthy()
-    expect(screen.getByLabelText('CONE-28 tier exception')).toBeTruthy()
-    expect(screen.getByLabelText('CONE-28 Orange rate adjustment')).toBeTruthy()
+    await waitFor(() => expect(screen.getByText('MSG-BOARD')).toBeTruthy())
+    open('MSG-BOARD')
+    expect(screen.getByText('Single rate')).toBeTruthy()
   })
 
-  it('still renders charge items in the compact flat-rate grid, not a 6-row block', async () => {
+  it('does not offer single-rate for a charge item (it is inherently flat)', async () => {
     render(<PriceListEditorClient priceListId="pl1" />)
     await waitFor(() => expect(screen.getByText('CREW-1')).toBeTruthy())
-    // A labor item has no cadence rows.
-    const crew = screen.getByText('CREW-1').closest('.card') ?? document.body
-    expect(within(crew as HTMLElement).queryByText('Daily')).toBeNull()
+    open('CREW-1')
+    expect(screen.getByLabelText('CREW-1 rate base')).toBeTruthy()
+    expect(screen.queryAllByText('Single rate').length).toBe(0)
   })
 })

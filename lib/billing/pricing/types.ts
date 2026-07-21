@@ -80,9 +80,10 @@ export interface Tier {
  * A variation is a real physical difference (an orange cone, a large vest), so it moves
  * the item's numbers. Each may be negative.
  *
- * Note what ISN'T here: the rental RATE adjustment. An adjustment belongs where the
- * number it moves lives — cost and sale price live on the item, but a rate lives on the
- * PRICE LIST, so a variation's rate adjustment is set per list (PriceList.variationOverrides).
+ * Note what ISN'T here: the rental RATE. Cost and sale price live on the item, so their
+ * per-variation adjustments live here. But the RATE lives on the price list — and the
+ * variation is the priced unit there, carrying its own full grid (PriceListItem.variations),
+ * not an adjustment off the item.
  */
 export interface ItemVariation {
   name: string;
@@ -116,16 +117,31 @@ export type TierGrid = Record<string, Partial<Record<RateKey, Cents>>>;
  * overrides are the AUTHORING UI; `buildTierGrid` compiles them into the
  * explicit TierGrid above, which is what pricing actually reads.
  */
-export interface PriceListItem {
-  code: string;
-  /** Tier-1 base rate per billing type, entered by hand. */
+/** One priced grid: a Tier-1 base per rate key, plus sticky per-cell locks. */
+export interface RateGrid {
+  /** Tier-1 base rate per rate key, entered by hand. */
   base: Partial<Record<RateKey, Cents>>;
+  /** Sticky per-cell locks: [tierName][rateKey] = cents. Wins over cascade AND freeze. */
+  overrides?: Record<string, Partial<Record<RateKey, Cents>>>;
+}
+
+export interface PriceListItem extends RateGrid {
+  code: string;
   /** Hold price from this tier index onward (no further discount). */
   freezeAfterTierIndex?: number | null;
-  /** Sticky per-cell locks: [tierName][billingType] = cents. Wins over cascade AND freeze. */
-  overrides?: Record<string, Partial<Record<RateKey, Cents>>>;
   /** PriceItemTierException — this item ignores the category tier rule and uses this tier. */
   tierException?: string | null;
+  /**
+   * When true the item prices ONE rate — the 'flat' key — across tiers, instead of the six
+   * cadences. Tiers still cascade. Cones/barricades are single-rate.
+   */
+  singleRate?: boolean;
+  /**
+   * Per-variation grids, keyed by variation name. When present the item HAS variations, so
+   * the variation is the priced unit and the item's own `base`/`overrides` go unused. Freeze
+   * and tierException are still the item's (shared across its variations).
+   */
+  variations?: Record<string, RateGrid>;
 }
 
 export interface PriceList {
@@ -134,11 +150,6 @@ export interface PriceList {
   entityId: string;
   tiers: Tier[];
   items: Record<string, PriceListItem>;
-  /**
-   * [itemCode][variationName] = the variation's RATE adjustment on this list. This is
-   * the only place a rate adjustment exists — the item carries none. Absent = 0.
-   */
-  variationOverrides?: Record<string, Record<string, Cents>>;
 }
 
 /**

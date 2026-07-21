@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
-import { BILLING_TYPES, rateKeysFor } from '@/lib/billing/constants'
+import { BILLING_TYPES, FLAT_RATE, rateKeysFor } from '@/lib/billing/constants'
 import { compilePriceListRates, type CompileItem, type CompileTier } from '@/lib/billing/pricing'
 import type { RateKey, BillingItemCategory } from '@/lib/supabase/database.types'
 
@@ -26,16 +26,22 @@ function bad(error: string, code = 'VALIDATION_ERROR', status = 400) {
 }
 
 interface TierRow { id: string; name: string; position: number; pct_off_previous: number }
-// billing_type here is a RateKey: a rental cadence, or 'flat' for charge items.
-interface OverrideRow { price_list_item_id: string; tier_id: string; billing_type: RateKey; rate_cents: number }
-interface BaseRow { price_list_item_id: string; billing_type: RateKey; base_cents: number }
+// billing_type here is a RateKey: a rental cadence, or 'flat' for a single-rate/charge item.
+// variation_id NULL = the item's own grid; non-null = that variation's grid.
+interface OverrideRow { price_list_item_id: string; variation_id: string | null; tier_id: string; billing_type: RateKey; rate_cents: number }
+interface BaseRow { price_list_item_id: string; variation_id: string | null; billing_type: RateKey; base_cents: number }
 interface PliRow {
   id: string
   item_id: string
   freeze_after_position: number | null
   tier_exception_tier_id: string | null
+  single_rate: boolean
   billing_items: { id: string; code: string; name: string; category: string } | null
 }
+
+/** The gridKey groups rate rows by which grid they belong to: '' = the item's own grid,
+ *  otherwise the variation id. Keeps item-vs-variation handling in one place. */
+const gridKey = (variationId: string | null) => variationId ?? ''
 
 // ── GET ──────────────────────────────────────────────────────────────────────
 export async function GET(
@@ -66,7 +72,7 @@ export async function GET(
 
     const { data: pliRaw, error: pErr } = await supabase
       .from('billing_price_list_items')
-      .select('id, item_id, freeze_after_position, tier_exception_tier_id, billing_items(id, code, name, category)')
+      .select('id, item_id, freeze_after_position, tier_exception_tier_id, single_rate, billing_items(id, code, name, category)')
       .eq('price_list_id', params.id)
     if (pErr) throw new Error(pErr.message)
     const plis = (pliRaw ?? []) as unknown as PliRow[]
@@ -77,24 +83,23 @@ export async function GET(
     if (pliIds.length > 0) {
       const { data: b, error: bErr } = await supabase
         .from('billing_price_list_item_bases')
-        .select('price_list_item_id, billing_type, base_cents')
+        .select('price_list_item_id, variation_id, billing_type, base_cents')
         .in('price_list_item_id', pliIds)
       if (bErr) throw new Error(bErr.message)
       bases = (b ?? []) as BaseRow[]
 
       const { data: o, error: oErr } = await supabase
         .from('billing_price_list_item_overrides')
-        .select('price_list_item_id, tier_id, billing_type, rate_cents')
+        .select('price_list_item_id, variation_id, tier_id, billing_type, rate_cents')
         .in('price_list_item_id', pliIds)
       if (oErr) throw new Error(oErr.message)
       overrides = (o ?? []) as OverrideRow[]
     }
 
-    // A variation's RATE adjustment lives here, not on the item: a rate is a property
-    // of a price list, so its adjustment is too. Read the variations of every item on
-    // this list, plus whatever adjustments this list has set for them.
+    // The variations of every item on this list. When an item has any, the variation is
+    // the priced unit — its rates live in the variation-keyed grid rows above.
     const listItemIds = plis.map((p) => p.item_id)
-    let variationsByItem: Record<string, { id: string; name: string; rateAdjCents: number }[]> = {}
+    let variationsByItem: Record<string, { id: string; name: string }[]> = {}
     if (listItemIds.length > 0) {
       const { data: varsRaw, error: vErr } = await supabase
         .from('billing_item_variations')
@@ -103,25 +108,20 @@ export async function GET(
         .order('sort_order')
       if (vErr) throw new Error(vErr.message)
       const vars = (varsRaw ?? []) as { id: string; item_id: string; name: string; sort_order: number }[]
-
-      const adjByVariation = new Map<string, number>()
-      if (vars.length > 0) {
-        const { data: adjRaw, error: aErr } = await supabase
-          .from('billing_price_list_variation_overrides')
-          .select('variation_id, rate_adj_cents')
-          .eq('price_list_id', params.id)
-          .in('variation_id', vars.map((v) => v.id))
-        if (aErr) throw new Error(aErr.message)
-        for (const a of (adjRaw ?? []) as { variation_id: string; rate_adj_cents: number }[]) {
-          adjByVariation.set(a.variation_id, a.rate_adj_cents)
-        }
-      }
-
       variationsByItem = vars.reduce((acc, v) => {
-        // No row means no adjustment. There's no item-level default to fall back to.
-        ;(acc[v.item_id] ??= []).push({ id: v.id, name: v.name, rateAdjCents: adjByVariation.get(v.id) ?? 0 })
+        ;(acc[v.item_id] ??= []).push({ id: v.id, name: v.name })
         return acc
-      }, {} as Record<string, { id: string; name: string; rateAdjCents: number }[]>)
+      }, {} as Record<string, { id: string; name: string }[]>)
+    }
+
+    // Group an item's bases + overrides into grids keyed by '' (the item grid) or a
+    // variation id (that variation's grid).
+    const gridsFor = (pliId: string) => {
+      const out: Record<string, { bases: Record<string, number>; overrides: { tierId: string; billingType: RateKey; rateCents: number }[] }> = {}
+      const ensure = (k: string) => (out[k] ??= { bases: {}, overrides: [] })
+      for (const b of bases) if (b.price_list_item_id === pliId) ensure(gridKey(b.variation_id)).bases[b.billing_type] = b.base_cents
+      for (const o of overrides) if (o.price_list_item_id === pliId) ensure(gridKey(o.variation_id)).overrides.push({ tierId: o.tier_id, billingType: o.billing_type, rateCents: o.rate_cents })
+      return out
     }
 
     // Catalog items for the "add item" picker. A price list is where an item's
@@ -138,8 +138,8 @@ export async function GET(
       .order('code')
     if (cErr) throw new Error(cErr.message)
 
-    // Carry variations onto the catalog so an item added to the list can have its
-    // variation adjustments set immediately, without a save-and-reload round trip.
+    // Carry variations onto the catalog so an item added to the list can be priced per
+    // variation immediately, without a save-and-reload round trip.
     const catalog = (catalogRaw ?? []).map((c) => {
       const row = c as unknown as {
         id: string; code: string; name: string; category: string
@@ -153,7 +153,7 @@ export async function GET(
         variations: (row.billing_item_variations ?? [])
           .slice()
           .sort((a, b) => a.sort_order - b.sort_order)
-          .map((v) => ({ id: v.id, name: v.name, rateAdjCents: 0 })),
+          .map((v) => ({ id: v.id, name: v.name })),
       }
     })
 
@@ -181,13 +181,11 @@ export async function GET(
           category: p.billing_items?.category ?? '',
           freezeAfterPosition: p.freeze_after_position,
           tierExceptionTierId: p.tier_exception_tier_id,
-          bases: Object.fromEntries(
-            bases.filter((b) => b.price_list_item_id === p.id).map((b) => [b.billing_type, b.base_cents])
-          ),
-          overrides: overrides
-            .filter((o) => o.price_list_item_id === p.id)
-            .map((o) => ({ tierId: o.tier_id, billingType: o.billing_type, rateCents: o.rate_cents })),
+          singleRate: p.single_rate,
           variations: variationsByItem[p.item_id] ?? [],
+          // Rate grids keyed by '' (item grid) or variation id. The client decides which
+          // to show from whether the item has variations.
+          grids: gridsFor(p.id),
         })),
         catalog,
       },
@@ -199,15 +197,20 @@ export async function GET(
 
 // ── PUT — save authoring inputs, then recompile the grid ─────────────────────
 interface SaveTier { id?: string; name: string; pctOffPrevious: number }
+interface SaveGrid {
+  bases: Partial<Record<RateKey, number>>
+  overrides?: { tierId: string; billingType: RateKey; rateCents: number }[]
+}
 interface SaveItem {
   id?: string
   itemId: string
   freezeAfterPosition?: number | null
   tierExceptionTierId?: string | null
-  bases: Partial<Record<RateKey, number>>
-  overrides?: { tierId: string; billingType: RateKey; rateCents: number }[]
-  /** Per-variation rate adjustment on THIS list. May be negative. */
-  variationAdjs?: { variationId: string; rateAdjCents: number }[]
+  /** Price one 'flat' rate across tiers instead of the six cadences. Equipment only. */
+  singleRate?: boolean
+  /** Rate grids keyed by '' (the item's own grid) or a variation id. When the item has
+   *  variations, the variation is the priced unit, so its grids are variation-keyed. */
+  grids: Record<string, SaveGrid>
 }
 
 export async function PUT(
@@ -242,6 +245,7 @@ export async function PUT(
     // rate. Enforce it here so a labor rate can never end up in a 'daily' cell.
     const savedItemIds = [...new Set(itemsIn.map((i) => i.itemId))]
     const categoryById = new Map<string, BillingItemCategory>()
+    const varIdsByItem = new Map<string, Set<string>>()
     if (savedItemIds.length > 0) {
       const { data: cats, error: cErr } = await supabase
         .from('billing_items')
@@ -251,26 +255,46 @@ export async function PUT(
       for (const c of (cats ?? []) as { id: string; category: BillingItemCategory }[]) {
         categoryById.set(c.id, c.category)
       }
+      const { data: vrs, error: vErr } = await supabase
+        .from('billing_item_variations')
+        .select('id, item_id')
+        .in('item_id', savedItemIds)
+      if (vErr) throw new Error(vErr.message)
+      for (const v of (vrs ?? []) as { id: string; item_id: string }[]) {
+        ;(varIdsByItem.get(v.item_id) ?? varIdsByItem.set(v.item_id, new Set()).get(v.item_id)!).add(v.id)
+      }
     }
+
+    // Which rate keys an item may price: equipment prices the six cadences UNLESS it's
+    // single-rate, in which case it prices exactly one 'flat' key — same as a charge item.
+    const allowedKeysFor = (category: BillingItemCategory, singleRate: boolean): RateKey[] =>
+      category === 'Equipment' && !singleRate ? rateKeysFor('Equipment') : [FLAT_RATE]
 
     for (const it of itemsIn) {
       const category = categoryById.get(it.itemId)
       if (!category) return bad('An item on this price list no longer exists', 'NOT_FOUND', 404)
-      const allowed = rateKeysFor(category)
-      const allowedLabel = category === 'Equipment' ? 'a rental billing type' : 'a flat rate'
+      const allowed = allowedKeysFor(category, !!it.singleRate)
+      const allowedLabel = allowed.length === 1 ? 'a single flat rate' : 'a rental billing type'
+      const itemVarIds = varIdsByItem.get(it.itemId) ?? new Set<string>()
+      const hasVariations = itemVarIds.size > 0
 
-      for (const [bt, cents] of Object.entries(it.bases)) {
-        if (!allowed.includes(bt as RateKey)) return bad(`A ${category} item is priced with ${allowedLabel} — "${bt}" doesn't apply to it.`)
-        if (!Number.isInteger(cents) || (cents as number) < 0) return bad('Base rates must be whole cents, zero or greater')
-      }
-      for (const o of it.overrides ?? []) {
-        if (!allowed.includes(o.billingType)) return bad(`A ${category} item is priced with ${allowedLabel} — "${o.billingType}" doesn't apply to it.`)
-        if (!Number.isInteger(o.rateCents) || o.rateCents < 0) return bad('Overrides must be whole cents, zero or greater')
-      }
-      // A variation adjustment MAY be negative (a cheaper variant) — unlike a rate,
-      // which is an absolute price. The resolved rate is floored at 0 by the engine.
-      for (const a of it.variationAdjs ?? []) {
-        if (!Number.isInteger(a.rateAdjCents)) return bad('A variation rate adjustment must be a whole number of cents')
+      if (!it.grids || typeof it.grids !== 'object') return bad('Malformed item grids')
+      for (const [key, grid] of Object.entries(it.grids)) {
+        // The variation is the priced unit: an item WITH variations is priced only per
+        // variation, one WITHOUT only on itself ('' key).
+        if (key === '') {
+          if (hasVariations) return bad(`"${it.itemId}" has variations, so it's priced per variation, not on the item.`)
+        } else {
+          if (!itemVarIds.has(key)) return bad('A grid references a variation that does not belong to this item', 'VALIDATION_ERROR', 400)
+        }
+        for (const [bt, cents] of Object.entries(grid.bases ?? {})) {
+          if (!allowed.includes(bt as RateKey)) return bad(`This item is priced with ${allowedLabel} — "${bt}" doesn't apply to it.`)
+          if (!Number.isInteger(cents) || (cents as number) < 0) return bad('Base rates must be whole cents, zero or greater')
+        }
+        for (const o of grid.overrides ?? []) {
+          if (!allowed.includes(o.billingType)) return bad(`This item is priced with ${allowedLabel} — "${o.billingType}" doesn't apply to it.`)
+          if (!Number.isInteger(o.rateCents) || o.rateCents < 0) return bad('Overrides must be whole cents, zero or greater')
+        }
       }
     }
 
@@ -346,32 +370,8 @@ export async function PUT(
     const keepPliIds = new Set(itemsIn.filter((i) => i.id).map((i) => i.id as string))
     const plisToDelete = (currentPlis ?? []).map((p) => p.id).filter((id) => !keepPliIds.has(id))
     if (plisToDelete.length > 0) {
-      // Variation adjustments are keyed (price_list_id, variation_id) — NOT by
-      // price_list_item_id — so they do NOT cascade with the price-list item. Clear them
-      // by hand, or a removed item's adjustments would linger and silently reapply if the
-      // item were ever added back.
-      const { data: goneItems } = await supabase
-        .from('billing_price_list_items')
-        .select('item_id')
-        .in('id', plisToDelete)
-      const goneItemIds = (goneItems ?? []).map((g) => g.item_id)
-      if (goneItemIds.length > 0) {
-        const { data: goneVars } = await supabase
-          .from('billing_item_variations')
-          .select('id')
-          .in('item_id', goneItemIds)
-        const goneVarIds = (goneVars ?? []).map((v) => v.id)
-        if (goneVarIds.length > 0) {
-          const { error } = await supabase
-            .from('billing_price_list_variation_overrides')
-            .delete()
-            .eq('price_list_id', params.id)
-            .in('variation_id', goneVarIds)
-          if (error) throw new Error(error.message)
-        }
-      }
-
-      // bases / overrides / compiled rates cascade with the price-list item
+      // bases / overrides / compiled rates — both item and variation grids — cascade with
+      // the price-list item (all FK to price_list_item_id ON DELETE CASCADE).
       const { error } = await supabase.from('billing_price_list_items').delete().in('id', plisToDelete)
       if (error) throw new Error(error.message)
     }
@@ -396,7 +396,7 @@ export async function PUT(
       if (pliId) {
         const { error } = await supabase
           .from('billing_price_list_items')
-          .update({ freeze_after_position: freeze, tier_exception_tier_id: tierException })
+          .update({ freeze_after_position: freeze, tier_exception_tier_id: tierException, single_rate: !!it.singleRate })
           .eq('id', pliId)
         if (error) throw new Error(error.message)
       } else {
@@ -407,6 +407,7 @@ export async function PUT(
             item_id: it.itemId,
             freeze_after_position: freeze,
             tier_exception_tier_id: tierException,
+            single_rate: !!it.singleRate,
           })
           .select('id')
           .single()
@@ -414,70 +415,47 @@ export async function PUT(
         pliId = ins.id
       }
 
-      // Bases and overrides are pure authoring state — replace wholesale.
+      // Bases and overrides are pure authoring state — replace wholesale for the whole
+      // item (every grid), then re-insert each grid tagged with its variation_id ('' → NULL).
       const { error: dbErr } = await supabase.from('billing_price_list_item_bases').delete().eq('price_list_item_id', pliId)
       if (dbErr) throw new Error(dbErr.message)
-      const baseRows = Object.entries(it.bases)
-        .filter(([, cents]) => cents != null)
-        .map(([bt, cents]) => ({ price_list_item_id: pliId as string, billing_type: bt as RateKey, base_cents: cents as number }))
-      if (baseRows.length > 0) {
-        const { error } = await supabase.from('billing_price_list_item_bases').insert(baseRows)
-        if (error) throw new Error(error.message)
-      }
-
       const { error: doErr } = await supabase.from('billing_price_list_item_overrides').delete().eq('price_list_item_id', pliId)
       if (doErr) throw new Error(doErr.message)
-      const ovRows = (it.overrides ?? [])
-        .filter((o) => validTierIds.has(o.tierId)) // a tier removed in this same save
-        .map((o) => ({
-          price_list_item_id: pliId as string,
-          tier_id: o.tierId,
-          billing_type: o.billingType,
-          rate_cents: o.rateCents,
-        }))
-      if (ovRows.length > 0) {
-        const { error } = await supabase.from('billing_price_list_item_overrides').insert(ovRows)
-        if (error) throw new Error(error.message)
-      }
 
-      // Variation rate adjustments for this list. Authoring state — replace wholesale,
-      // scoped to THIS item's variations so we never touch another item's rows. A 0 is
-      // stored as no row: absent and zero mean the same thing, so don't keep the noise.
-      if (it.variationAdjs) {
-        const { data: ownVars } = await supabase
-          .from('billing_item_variations')
-          .select('id')
-          .eq('item_id', it.itemId)
-        const ownVarIds = new Set((ownVars ?? []).map((v) => v.id))
+      for (const [key, grid] of Object.entries(it.grids)) {
+        const variationId = key === '' ? null : key
 
-        if (ownVarIds.size > 0) {
-          const { error: dvErr } = await supabase
-            .from('billing_price_list_variation_overrides')
-            .delete()
-            .eq('price_list_id', params.id)
-            .in('variation_id', [...ownVarIds])
-          if (dvErr) throw new Error(dvErr.message)
-
-          const adjRows = it.variationAdjs
-            .filter((a) => ownVarIds.has(a.variationId) && a.rateAdjCents !== 0)
-            .map((a) => ({
-              price_list_id: params.id,
-              variation_id: a.variationId,
-              rate_adj_cents: a.rateAdjCents,
-            }))
-          if (adjRows.length > 0) {
-            const { error } = await supabase.from('billing_price_list_variation_overrides').insert(adjRows)
-            if (error) throw new Error(error.message)
-          }
+        const baseRows = Object.entries(grid.bases ?? {})
+          .filter(([, cents]) => cents != null)
+          .map(([bt, cents]) => ({ price_list_item_id: pliId as string, variation_id: variationId, billing_type: bt as RateKey, base_cents: cents as number }))
+        if (baseRows.length > 0) {
+          const { error } = await supabase.from('billing_price_list_item_bases').insert(baseRows)
+          if (error) throw new Error(error.message)
         }
-      }
 
-      compileItems.push({
-        priceListItemId: pliId,
-        base: it.bases,
-        freezeAfterPosition: freeze,
-        overrides: ovRows.map((o) => ({ tierId: o.tier_id, billingType: o.billing_type, rateCents: o.rate_cents })),
-      })
+        const ovRows = (grid.overrides ?? [])
+          .filter((o) => validTierIds.has(o.tierId)) // a tier removed in this same save
+          .map((o) => ({
+            price_list_item_id: pliId as string,
+            variation_id: variationId,
+            tier_id: o.tierId,
+            billing_type: o.billingType,
+            rate_cents: o.rateCents,
+          }))
+        if (ovRows.length > 0) {
+          const { error } = await supabase.from('billing_price_list_item_overrides').insert(ovRows)
+          if (error) throw new Error(error.message)
+        }
+
+        // One CompileItem per grid — the item's own, or one per variation.
+        compileItems.push({
+          priceListItemId: pliId,
+          variationId,
+          base: grid.bases ?? {},
+          freezeAfterPosition: freeze,
+          overrides: ovRows.map((o) => ({ tierId: o.tier_id, billingType: o.billing_type, rateCents: o.rate_cents })),
+        })
+      }
     }
 
     // ── compile the grid ──────────────────────────────────────────────────

@@ -32,8 +32,15 @@ export interface CompileOverride {
 
 export interface CompileItem {
   priceListItemId: string;
+  /**
+   * The variation this grid prices, or null for the item's own grid. When an item has
+   * variations, the caller passes ONE CompileItem per variation (variationId set) and no
+   * null-variation item, because the variation is the priced unit. When it has none, one
+   * CompileItem with variationId null.
+   */
+  variationId?: string | null;
   /** Tier-1 base per rate key. A key with no base is not priced. Equipment prices the
-   *  rental cadences; charge items price the single 'flat' key. */
+   *  rental cadences (or the single 'flat' key when single_rate); charge items 'flat'. */
   base: Partial<Record<RateKey, Cents>>;
   /** Hold the price from this tier POSITION onward. */
   freezeAfterPosition?: number | null;
@@ -43,6 +50,7 @@ export interface CompileItem {
 /** Exactly the shape of a `billing_price_list_rates` row. */
 export interface CompiledRate {
   price_list_item_id: string;
+  variation_id: string | null;
   tier_id: string;
   billing_type: RateKey;
   rate_cents: Cents;
@@ -94,18 +102,21 @@ export function compilePriceListRates(tiers: CompileTier[], items: CompileItem[]
     }
 
     const grid = buildTierGrid(
-      { code: item.priceListItemId, base: item.base, freezeAfterTierIndex: freezeIdx, overrides },
+      // A label only; a variation grid gets its own so two grids for the same item never
+      // share a memo key inside the engine.
+      { code: `${item.priceListItemId}|${item.variationId ?? ''}`, base: item.base, freezeAfterTierIndex: freezeIdx, overrides },
       engineTiers
     );
 
     for (const t of ordered) {
-      // Every key: an item only has a base for the ones its category prices, so
-      // equipment never compiles a 'flat' cell and a charge item never compiles cadences.
+      // Every key: an item only has a base for the ones it prices, so a cadence item never
+      // compiles a 'flat' cell and a single-rate item never compiles cadences.
       for (const bt of ALL_RATE_KEYS) {
         const rate = grid[t.name]?.[bt];
         if (rate == null) continue; // this item isn't priced under this billing type
         rows.push({
           price_list_item_id: item.priceListItemId,
+          variation_id: item.variationId ?? null,
           tier_id: t.id,
           billing_type: bt,
           rate_cents: rate,

@@ -369,34 +369,28 @@ export type Database = {
         Relationships: []
       }
       billing_price_list_items: {
-        Row: { id: string; price_list_id: string; item_id: string; freeze_after_position: number | null; tier_exception_tier_id: string | null }
-        Insert: { id?: string; price_list_id: string; item_id: string; freeze_after_position?: number | null; tier_exception_tier_id?: string | null }
-        Update: { id?: string; price_list_id?: string; item_id?: string; freeze_after_position?: number | null; tier_exception_tier_id?: string | null }
+        Row: { id: string; price_list_id: string; item_id: string; freeze_after_position: number | null; tier_exception_tier_id: string | null; single_rate: boolean }
+        Insert: { id?: string; price_list_id: string; item_id: string; freeze_after_position?: number | null; tier_exception_tier_id?: string | null; single_rate?: boolean }
+        Update: { id?: string; price_list_id?: string; item_id?: string; freeze_after_position?: number | null; tier_exception_tier_id?: string | null; single_rate?: boolean }
         Relationships: []
       }
       billing_price_list_item_bases: {
-        Row: { price_list_item_id: string; billing_type: RateKey; base_cents: number }
-        Insert: { price_list_item_id: string; billing_type: RateKey; base_cents: number }
-        Update: { price_list_item_id?: string; billing_type?: RateKey; base_cents?: number }
+        Row: { price_list_item_id: string; variation_id: string | null; billing_type: RateKey; base_cents: number }
+        Insert: { price_list_item_id: string; variation_id?: string | null; billing_type: RateKey; base_cents: number }
+        Update: { price_list_item_id?: string; variation_id?: string | null; billing_type?: RateKey; base_cents?: number }
         Relationships: []
       }
       billing_price_list_item_overrides: {
-        Row: { price_list_item_id: string; tier_id: string; billing_type: RateKey; rate_cents: number }
-        Insert: { price_list_item_id: string; tier_id: string; billing_type: RateKey; rate_cents: number }
-        Update: { price_list_item_id?: string; tier_id?: string; billing_type?: RateKey; rate_cents?: number }
+        Row: { price_list_item_id: string; variation_id: string | null; tier_id: string; billing_type: RateKey; rate_cents: number }
+        Insert: { price_list_item_id: string; variation_id?: string | null; tier_id: string; billing_type: RateKey; rate_cents: number }
+        Update: { price_list_item_id?: string; variation_id?: string | null; tier_id?: string; billing_type?: RateKey; rate_cents?: number }
         Relationships: []
       }
       /** The COMPILED explicit grid. Pricing reads this. */
       billing_price_list_rates: {
-        Row: { price_list_item_id: string; tier_id: string; billing_type: RateKey; rate_cents: number; compiled_at: string }
-        Insert: { price_list_item_id: string; tier_id: string; billing_type: RateKey; rate_cents: number; compiled_at?: string }
-        Update: { price_list_item_id?: string; tier_id?: string; billing_type?: RateKey; rate_cents?: number; compiled_at?: string }
-        Relationships: []
-      }
-      billing_price_list_variation_overrides: {
-        Row: { price_list_id: string; variation_id: string; rate_adj_cents: number }
-        Insert: { price_list_id: string; variation_id: string; rate_adj_cents: number }
-        Update: { price_list_id?: string; variation_id?: string; rate_adj_cents?: number }
+        Row: { price_list_item_id: string; variation_id: string | null; tier_id: string; billing_type: RateKey; rate_cents: number; compiled_at: string }
+        Insert: { price_list_item_id: string; variation_id?: string | null; tier_id: string; billing_type: RateKey; rate_cents: number; compiled_at?: string }
+        Update: { price_list_item_id?: string; variation_id?: string | null; tier_id?: string; billing_type?: RateKey; rate_cents?: number; compiled_at?: string }
         Relationships: []
       }
       billing_profile_entities: {
