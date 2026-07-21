@@ -421,9 +421,9 @@ export type Database = {
         Relationships: []
       }
       billing_ticket_ledger: {
-        Row: { id: string; ticket_id: string; job_id: string; item_id: string; variation_id: string | null; event_type: BillingLedgerEvent; event_date: string; qty: number; equipment_id: string | null; created_at: string }
-        Insert: { id?: string; ticket_id: string; job_id: string; item_id: string; variation_id?: string | null; event_type: BillingLedgerEvent; event_date: string; qty: number; equipment_id?: string | null }
-        Update: { id?: string; ticket_id?: string; job_id?: string; item_id?: string; variation_id?: string | null; event_type?: BillingLedgerEvent; event_date?: string; qty?: number; equipment_id?: string | null }
+        Row: { id: string; ticket_id: string; job_id: string; item_id: string; variation_id: string | null; event_type: BillingLedgerEvent; event_date: string; qty: number; equipment_id: string | null; billing_type: BillingType | null; created_at: string }
+        Insert: { id?: string; ticket_id: string; job_id: string; item_id: string; variation_id?: string | null; event_type: BillingLedgerEvent; event_date: string; qty: number; equipment_id?: string | null; billing_type?: BillingType | null }
+        Update: { id?: string; ticket_id?: string; job_id?: string; item_id?: string; variation_id?: string | null; event_type?: BillingLedgerEvent; event_date?: string; qty?: number; equipment_id?: string | null; billing_type?: BillingType | null }
         Relationships: []
       }
       billing_ticket_photos: {

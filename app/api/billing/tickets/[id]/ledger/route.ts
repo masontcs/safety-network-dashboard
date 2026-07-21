@@ -23,6 +23,10 @@ type LedgerUpdate = Database['public']['Tables']['billing_ticket_ledger']['Updat
 const EVENTS = ['pickup', 'return', 'lost'] as const
 type EventType = (typeof EVENTS)[number]
 
+// Equipment cadences. 'flat' is a charge-item key, never a rental cadence.
+const CADENCES = ['daily', 'weekly', 'monthly'] as const
+type Cadence = (typeof CADENCES)[number]
+
 function bad(error: string, code = 'VALIDATION_ERROR', status = 400) {
   return NextResponse.json({ success: false, error, code }, { status })
 }
@@ -94,6 +98,7 @@ export async function POST(
       eventDate?: string
       qty?: number
       equipmentId?: string | null
+      billingType?: string | null
     }
 
     if (!body.itemId) return bad('An item is required')
@@ -102,6 +107,11 @@ export async function POST(
     if (!Number.isInteger(body.qty) || (body.qty as number) <= 0) return bad('Quantity must be a whole number greater than zero')
     const qty = body.qty as number
     const eventType = body.eventType as EventType
+
+    // The rental cadence rides on the pickup — it's optional at add time (a tech can add
+    // equipment without pricing it) and enforced before final edit. Never on return/lost.
+    if (body.billingType != null && !CADENCES.includes(body.billingType as Cadence)) return bad('Billing type must be daily, weekly or monthly')
+    const billingType = eventType === 'pickup' ? ((body.billingType as Cadence | null) ?? null) : null
 
     const { data: item, error: iErr } = await supabase
       .from('billing_items')
@@ -132,6 +142,7 @@ export async function POST(
       event_date: body.eventDate,
       qty,
       equipment_id: item.tracked ? body.equipmentId?.trim() ?? null : (body.equipmentId?.trim() || null),
+      billing_type: billingType,
     })
     if (error) throw new Error(error.message)
 
@@ -162,8 +173,9 @@ export async function PATCH(
       return bad('This ticket is locked. Reopen it to change equipment.', 'CONFLICT', 409)
     }
 
-    const body = (await request.json()) as { eventId?: string; qty?: number; eventDate?: string; equipmentId?: string | null }
+    const body = (await request.json()) as { eventId?: string; qty?: number; eventDate?: string; equipmentId?: string | null; billingType?: string | null }
     if (!body.eventId) return bad('eventId is required')
+    if (body.billingType != null && !CADENCES.includes(body.billingType as Cadence)) return bad('Billing type must be daily, weekly or monthly')
 
     // Load the event being edited (to know its item/variation/type).
     const { data: ev, error: evErr } = await supabase
@@ -192,6 +204,8 @@ export async function PATCH(
     const patch: LedgerUpdate = { qty: newQty }
     if (body.eventDate !== undefined) patch.event_date = body.eventDate
     if (body.equipmentId !== undefined) patch.equipment_id = body.equipmentId?.trim() || null
+    // Cadence is a pickup-only property; a return/lost row can never carry one.
+    if (body.billingType !== undefined) patch.billing_type = event.event_type === 'pickup' ? (body.billingType as Cadence | null) : null
 
     const { error } = await supabase.from('billing_ticket_ledger').update(patch).eq('id', body.eventId).eq('ticket_id', params.id)
     if (error) throw new Error(error.message)

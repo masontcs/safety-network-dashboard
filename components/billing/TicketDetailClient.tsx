@@ -14,7 +14,7 @@ import { BILLING_TYPE_LABELS } from '@/lib/billing/constants'
 import type { BillingType } from '@/lib/supabase/database.types'
 
 interface PickerItem { id: string; code: string; name: string; category: string; tracked: boolean; rentable: boolean; salable: boolean; salePriceCents: number | null; variations: { id: string; name: string }[] }
-interface LedgerEvent { id: string; eventType: string; date: string; qty: number; equipmentId: string | null; item: { id: string; code: string; name: string; tracked: boolean } | null; variation: { id: string; name: string } | null }
+interface LedgerEvent { id: string; eventType: string; date: string; qty: number; equipmentId: string | null; billingType: string | null; item: { id: string; code: string; name: string; tracked: boolean } | null; variation: { id: string; name: string } | null }
 // Item-priced kinds (labor, lump sum) store no rate; the API resolves it live from the
 // price list and sets rateFromPriceList so we can show the number while marking it as
 // derived (not entered/locked). null still means genuinely unpriced.
@@ -26,6 +26,7 @@ interface Ticket {
   job: { id: string; number: string; name: string | null } | null
   entityCode: string; customer: string | null
   statuses: string[]; billingTypes: BillingType[]
+  pickupsMissingBillingType: number
   ledger: LedgerEvent[]; lines: Line[]
   onRent: { code: string; name: string; variation: string | null; qty: number }[]
   isAdmin: boolean
@@ -59,11 +60,11 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
 
   // details form
   const [add, setAdd] = useState(false); const [ret, setRet] = useState(false); const [dtc, setDtc] = useState(false)
-  const [date, setDate] = useState(''); const [billingType, setBillingType] = useState<string>(''); const [notes, setNotes] = useState('')
+  const [date, setDate] = useState(''); const [notes, setNotes] = useState('')
 
-  // ledger add form
+  // ledger add form (billing type is the per-item cadence, only for pickups)
   const [lItem, setLItem] = useState(''); const [lVar, setLVar] = useState(''); const [lType, setLType] = useState('pickup')
-  const [lDate, setLDate] = useState(''); const [lQty, setLQty] = useState('1'); const [lEquip, setLEquip] = useState('')
+  const [lDate, setLDate] = useState(''); const [lQty, setLQty] = useState('1'); const [lEquip, setLEquip] = useState(''); const [lBt, setLBt] = useState('')
   // ledger inline edit
   const [editEv, setEditEv] = useState<string | null>(null)
   const [evQty, setEvQty] = useState(''); const [evDate, setEvDate] = useState(''); const [evEquip, setEvEquip] = useState('')
@@ -86,7 +87,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
       const d = tk.data as Ticket
       setT(d)
       setAdd(d.featureAdd); setRet(d.featureReturn); setDtc(d.featureDtc)
-      setDate(d.date); setBillingType(d.billingType ?? ''); setNotes(d.notes ?? '')
+      setDate(d.date); setNotes(d.notes ?? '')
       // Default the Add-item date: existing items' date if any, else the ticket date.
       if (!lDate) { const last = d.ledger[d.ledger.length - 1]; setLDate(last ? last.date : d.date) }
       if (it.success) setItems(it.data)
@@ -110,13 +111,18 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
   async function saveDetails() {
     if (dtc && (add || ret)) { setMsg('DTC cannot be combined with Add or Return'); return }
     if (!add && !ret && !dtc) { setMsg('Pick at least one feature'); return }
-    if (await call(`/api/billing/tickets/${ticketId}`, 'PATCH', { ticketDate: date, featureAdd: add, featureReturn: ret, featureDtc: dtc, billingType: billingType || null, notes })) { setMsg('Saved.'); load() }
+    if (await call(`/api/billing/tickets/${ticketId}`, 'PATCH', { ticketDate: date, featureAdd: add, featureReturn: ret, featureDtc: dtc, notes })) { setMsg('Saved.'); load() }
   }
-  async function setStatus(status: string) { if (await call(`/api/billing/tickets/${ticketId}`, 'PATCH', { status, billingType: billingType || null })) load() }
+  async function setStatus(status: string) { if (await call(`/api/billing/tickets/${ticketId}`, 'PATCH', { status })) load() }
+
+  /** Set an equipment item's cadence directly from its ledger row (pickup only). */
+  async function setLedgerBillingType(id: string, bt: string) {
+    if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'PATCH', { eventId: id, billingType: bt || null })) load()
+  }
 
   async function addLedger() {
     if (!items.find((i) => i.id === lItem)) { setMsg('Pick an item'); return }
-    if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'POST', { itemId: lItem, variationId: lVar || null, eventType: lType, eventDate: lDate, qty: parseInt(lQty, 10), equipmentId: lEquip || null })) { setLQty('1'); setLEquip(''); load() }
+    if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'POST', { itemId: lItem, variationId: lVar || null, eventType: lType, eventDate: lDate, qty: parseInt(lQty, 10), equipmentId: lEquip || null, billingType: lType === 'pickup' ? (lBt || null) : null })) { setLQty('1'); setLEquip(''); setLBt(''); load() }
   }
   async function removeLedger(id: string) { if (await call(`/api/billing/tickets/${ticketId}/ledger?eventId=${id}`, 'DELETE')) load() }
   function startEditEv(e: LedgerEvent) { setEditEv(e.id); setEvQty(String(e.qty)); setEvDate(e.date); setEvEquip(e.equipmentId ?? '') }
@@ -311,13 +317,6 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
               </div>
             </div>
             <div><label style={labelStyle}>Ticket date</label><input type="date" value={date} disabled={disabled} onChange={(e) => setDate(e.target.value)} style={inputStyle} /></div>
-            <div>
-              <label style={labelStyle}>Billing type</label>
-              <Select ariaLabel="Billing type" value={billingType} disabled={disabled} onChange={setBillingType} style={{ ...inputStyle }}>
-                <option value="">Not set</option>
-                {t.billingTypes.map((bt) => <option key={bt} value={bt}>{BILLING_TYPE_LABELS[bt]}</option>)}
-              </Select>
-            </div>
           </div>
           <div style={{ marginTop: 12 }}><label style={labelStyle}>Notes</label><textarea value={notes} disabled={disabled} onChange={(e) => setNotes(e.target.value)} rows={2} style={{ ...inputStyle, resize: 'vertical' }} /></div>
 
@@ -337,7 +336,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
           {t.status === 'in_review' && (
             <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 8, lineHeight: 1.6 }}>
               Submitted by the crew. <strong>Reopen for crew</strong> puts it back in their app to add anything missing —
-              they&apos;ll submit it again.{!billingType && ' Set a billing type before final edit.'}
+              they&apos;ll submit it again.{t.pickupsMissingBillingType > 0 && ` Set a billing type on ${t.pickupsMissingBillingType} equipment item${t.pickupsMissingBillingType === 1 ? '' : 's'} before final edit.`}
             </div>
           )}
           {t.status === 'active' && (
@@ -365,7 +364,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
           {t.ledger.length > 0 && (
             <div style={{ overflowX: 'auto', marginBottom: 14 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-                <thead><tr>{['Date', 'Event', 'Item', 'Variation', 'Qty', 'Equip ID', ''].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+                <thead><tr>{['Date', 'Event', 'Item', 'Variation', 'Qty', 'Billing', 'Equip ID', ''].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
                 <tbody>
                   {t.ledger.map((e) => editEv === e.id ? (
                     <tr key={e.id}>
@@ -374,6 +373,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
                       <td style={td}>{e.item?.code ?? '—'}</td>
                       <td style={{ ...td, color: 'var(--text-muted)' }}>{e.variation?.name ?? '—'}</td>
                       <td style={td}><input value={evQty} onChange={(ev) => setEvQty(ev.target.value)} style={{ ...inputStyle, width: 60 }} /></td>
+                      <td style={{ ...td, color: 'var(--text-muted)' }}>{e.eventType === 'pickup' ? (e.billingType ? BILLING_TYPE_LABELS[e.billingType as BillingType] : '—') : '—'}</td>
                       <td style={td}>{e.item?.tracked ? <input value={evEquip} onChange={(ev) => setEvEquip(ev.target.value)} style={{ ...inputStyle, width: 110 }} /> : '—'}</td>
                       <td style={td}><div style={{ display: 'flex', gap: 4 }}><button onClick={saveEv} disabled={busy} style={{ ...ghost, borderColor: 'var(--accent)', color: 'var(--accent)', padding: '4px 8px' }}>Save</button><button onClick={() => setEditEv(null)} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div></td>
                     </tr>
@@ -384,6 +384,22 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
                       <td style={td}>{e.item?.code ?? '—'}</td>
                       <td style={{ ...td, color: 'var(--text-muted)' }}>{e.variation?.name ?? '—'}</td>
                       <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{e.qty}</td>
+                      {/* The cadence lives per equipment item. Set it right here on the pickup;
+                          return/lost rows don't bill a cadence. */}
+                      <td style={td} onClick={(ev) => ev.stopPropagation()}>
+                        {e.eventType === 'pickup' ? (
+                          <Select
+                            ariaLabel={`Billing type for ${e.item?.code ?? 'item'}`}
+                            value={e.billingType ?? ''}
+                            disabled={locked || busy}
+                            onChange={(v) => setLedgerBillingType(e.id, v)}
+                            style={{ ...inputStyle, width: 110, borderColor: e.billingType ? undefined : 'var(--pill-pending-fg)' }}
+                          >
+                            <option value="">Set…</option>
+                            {t.billingTypes.map((bt) => <option key={bt} value={bt}>{BILLING_TYPE_LABELS[bt]}</option>)}
+                          </Select>
+                        ) : <span style={{ color: 'var(--text-dim)' }}>—</span>}
+                      </td>
                       <td style={{ ...td, color: 'var(--text-muted)' }}>{e.equipmentId ?? '—'}</td>
                       <td style={td}>{!locked && <div style={{ display: 'flex', gap: 4 }}><button onClick={(ev) => { ev.stopPropagation(); startEditEv(e) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>Edit</button><button onClick={(ev) => { ev.stopPropagation(); removeLedger(e.id) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div>}</td>
                     </tr>
@@ -410,6 +426,14 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
                 </div>
               )}
               <div style={{ width: 120 }}><label style={labelStyle}>Event</label><Select ariaLabel="Event" value={lType} onChange={setLType} style={inputStyle}><option value="pickup">Pickup</option><option value="return">Return</option><option value="lost">Lost</option></Select></div>
+              {lType === 'pickup' && (
+                <div style={{ width: 120 }}><label style={labelStyle}>Billing</label>
+                  <Select ariaLabel="Billing type" value={lBt} onChange={setLBt} style={inputStyle}>
+                    <option value="">Set later</option>
+                    {t.billingTypes.map((bt) => <option key={bt} value={bt}>{BILLING_TYPE_LABELS[bt]}</option>)}
+                  </Select>
+                </div>
+              )}
               <div style={{ width: 140 }}><label style={labelStyle}>Date</label><input type="date" value={lDate} onChange={(e) => setLDate(e.target.value)} style={inputStyle} /></div>
               <div style={{ width: 70 }}><label style={labelStyle}>Qty</label><input value={lQty} onChange={(e) => setLQty(e.target.value)} style={inputStyle} /></div>
               {pickItem?.tracked && <div style={{ width: 130 }}><label style={labelStyle}>Equip ID *</label><input value={lEquip} onChange={(e) => setLEquip(e.target.value)} style={inputStyle} /></div>}

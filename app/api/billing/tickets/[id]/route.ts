@@ -42,7 +42,7 @@ interface TicketRow {
   billing_jobs: { id: string; job_number: string; name: string | null; branch_id: string; profile_id: string; entities: { code: string } | null; billing_profiles: { name: string; billing_customers: { name: string } | null } | null } | null
 }
 interface LedgerRow {
-  id: string; event_type: string; event_date: string; qty: number; equipment_id: string | null
+  id: string; event_type: string; event_date: string; qty: number; equipment_id: string | null; billing_type: BillingType | null
   billing_items: { id: string; code: string; name: string; tracked: boolean } | null
   billing_item_variations: { id: string; name: string } | null
 }
@@ -80,7 +80,7 @@ export async function GET(
 
     const { data: ledgerRaw } = await supabase
       .from('billing_ticket_ledger')
-      .select('id, event_type, event_date, qty, equipment_id, billing_items(id, code, name, tracked), billing_item_variations(id, name)')
+      .select('id, event_type, event_date, qty, equipment_id, billing_type, billing_items(id, code, name, tracked), billing_item_variations(id, name)')
       .eq('ticket_id', params.id)
       .order('event_date')
     const ledger = (ledgerRaw ?? []) as unknown as LedgerRow[]
@@ -136,9 +136,13 @@ export async function GET(
         billingTypes: BILLING_TYPES,
         ledger: ledger.map((e) => ({
           id: e.id, eventType: e.event_type, date: e.event_date, qty: e.qty, equipmentId: e.equipment_id,
+          billingType: e.billing_type,
           item: e.billing_items ? { id: e.billing_items.id, code: e.billing_items.code, name: e.billing_items.name, tracked: e.billing_items.tracked } : null,
           variation: e.billing_item_variations ? { id: e.billing_item_variations.id, name: e.billing_item_variations.name } : null,
         })),
+        // Every pickup needs a cadence before final edit. Surface how many still don't,
+        // so the UI can gate the button and say what's missing.
+        pickupsMissingBillingType: ledger.filter((e) => e.event_type === 'pickup' && e.billing_type == null).length,
         lines: lines.map((l) => {
           // A stored rate (sale, misc) is authoritative. An item-priced line has none, so
           // fall back to the live price-list resolution.
@@ -198,7 +202,7 @@ export async function PATCH(
 
     const patch: TicketUpdate = {}
     const editingContent = body.ticketDate !== undefined || body.featureAdd !== undefined ||
-      body.featureReturn !== undefined || body.featureDtc !== undefined || body.billingType !== undefined
+      body.featureReturn !== undefined || body.featureDtc !== undefined
 
     // Content edits are locked once final-edited/invoiced (status changes still allowed).
     if (editingContent && isLocked(ex.status)) {
@@ -218,18 +222,22 @@ export async function PATCH(
       patch.feature_add = add; patch.feature_return = ret; patch.feature_dtc = dtc
     }
 
-    if (body.billingType !== undefined) {
-      if (body.billingType && !BILLING_TYPES.includes(body.billingType as BillingType)) return bad('Unknown billing type')
-      patch.billing_type = (body.billingType as BillingType) ?? null
-    }
 
     if (body.status !== undefined) {
       if (!STATUSES.includes(body.status as Status)) return bad('Unknown status')
       const target = body.status as Status
-      // Moving into final_edit requires a billing type (the rate cadence).
-      const effectiveBillingType = body.billingType !== undefined ? body.billingType : ex.billing_type
-      if (target === 'final_edit' && !effectiveBillingType) {
-        return bad('Choose a billing type before final-editing this ticket.')
+      // Final edit requires a cadence on every pickup — the rate can't be resolved without
+      // it. The cadence now lives per equipment item, not on the ticket.
+      if (target === 'final_edit') {
+        const { count } = await supabase
+          .from('billing_ticket_ledger')
+          .select('id', { count: 'exact', head: true })
+          .eq('ticket_id', params.id)
+          .eq('event_type', 'pickup')
+          .is('billing_type', null)
+        if ((count ?? 0) > 0) {
+          return bad('Set a billing type on every equipment item before final-editing this ticket.')
+        }
       }
       patch.status = target
       patch.final_edited_at = target === 'final_edit' ? new Date().toISOString() : null
