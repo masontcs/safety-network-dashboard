@@ -5,6 +5,7 @@ import Skeleton from '@/components/ui/Skeleton'
 import Toggle from '@/components/billing/Toggle'
 import Select from '@/components/billing/Select'
 import { rowOpen } from '@/components/billing/rowOpen'
+import MoneyInput from '@/components/billing/MoneyInput'
 import { CATEGORIES, BILLING_TYPES, BILLING_TYPE_LABELS } from '@/lib/billing/constants'
 import type { BillingItemCategory, BillingType } from '@/lib/supabase/database.types'
 
@@ -98,18 +99,19 @@ function VariationRow({ v, showSale, onChange, onRemove }: {
   onChange: (next: Variation) => void
   onRemove: () => void
 }) {
-  // Adjustments may be negative (a cheaper variant), so don't reject a leading '-'.
+  // MoneyInput, not a raw input: a controlled field that reformats cents -> "5.00" on
+  // every keystroke overwrites what you're typing, so the value snaps after one digit and
+  // the caret jumps to the end. MoneyInput holds the raw text while focused.
+  // allowNegative because an adjustment legitimately goes both ways (a cheaper variant).
   const adj = (label: string, value: number, key: 'costAdjCents' | 'saleAdjCents') => (
     <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
       <span style={{ fontSize: 11.5, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{label}</span>
-      <input
-        value={(value / 100).toFixed(2)}
-        aria-label={label}
-        onChange={(e) => {
-          const n = Number(e.target.value)
-          if (!Number.isFinite(n)) return
-          onChange({ ...v, [key]: Math.round(n * 100) })
-        }}
+      <MoneyInput
+        valueCents={value === 0 ? null : value}
+        allowNegative
+        placeholder="0.00"
+        ariaLabel={label}
+        onChangeCents={(c) => onChange({ ...v, [key]: c ?? 0 })}
         style={{ ...inputStyle, width: 84 }}
       />
     </span>
@@ -447,16 +449,15 @@ export default function ItemsClient({ isAdmin }: { isAdmin: boolean }) {
                 return (
                   <div key={bt} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 12, color: 'var(--text-muted)', flex: 1 }}>{BILLING_TYPE_LABELS[bt]}</span>
-                    <input
-                      value={existing ? (existing.rateCents / 100).toFixed(2) : ''}
+                    <MoneyInput
+                      valueCents={existing ? existing.rateCents : null}
                       placeholder="—"
-                      onChange={(e) => {
-                        const raw = e.target.value.trim()
+                      ariaLabel={`${BILLING_TYPE_LABELS[bt]} default rate`}
+                      onChangeCents={(c) => {
                         const rest = editing.defaultRates.filter((r) => r.billingType !== bt)
-                        if (raw === '') { patchEdit({ defaultRates: rest }); return }
-                        const n = Number(raw)
-                        if (!Number.isFinite(n) || n < 0) return
-                        patchEdit({ defaultRates: [...rest, { billingType: bt, rateCents: Math.round(n * 100) }] })
+                        // Clearing the field removes the rate entirely — a blank cell means
+                        // "no catalog fallback", which is not the same as a rate of $0.00.
+                        patchEdit({ defaultRates: c == null ? rest : [...rest, { billingType: bt, rateCents: c }] })
                       }}
                       style={{ ...inputStyle, maxWidth: 100 }}
                     />
