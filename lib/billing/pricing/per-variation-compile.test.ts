@@ -46,11 +46,11 @@ describe('compile — per variation', () => {
 
   it('a by-cadence variation keeps all six cadences under its variation_id', () => {
     const items: CompileItem[] = [
-      { priceListItemId: 'pli1', variationId: 'v-lg', base: { daily: 200, weekly_billed_weekly: 1000 }, freezeAfterPosition: null },
+      { priceListItemId: 'pli1', variationId: 'v-lg', base: { daily: 200, weekly: 1000 }, freezeAfterPosition: null },
     ]
     const rows = compilePriceListRates(TIERS, items)
     expect(rows.every((r) => r.variation_id === 'v-lg')).toBe(true)
     expect(rows.some((r) => r.billing_type === 'daily')).toBe(true)
-    expect(rows.some((r) => r.billing_type === 'weekly_billed_weekly')).toBe(true)
+    expect(rows.some((r) => r.billing_type === 'weekly')).toBe(true)
   })
 })

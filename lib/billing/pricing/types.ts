@@ -26,11 +26,8 @@ export type ItemCategory = 'Equipment' | 'Labor' | 'Lump Sum' | 'Misc' | 'Sale';
  */
 export type BillingType =
   | 'daily'
-  | 'weekly_billed_weekly'
-  | 'weekly_billed_daily'
-  | 'monthly_billed_monthly'
-  | 'monthly_billed_weekly'
-  | 'monthly_billed_daily';
+  | 'weekly'
+  | 'monthly';
 
 export type RateUnit = 'day' | 'week' | 'month';
 
@@ -39,11 +36,8 @@ export const BILLING_TYPES: Record<
   { rateUnit: RateUnit; cycle: RateUnit; label: string }
 > = {
   daily: { rateUnit: 'day', cycle: 'day', label: 'Daily' },
-  weekly_billed_weekly: { rateUnit: 'week', cycle: 'week', label: 'Weekly · billed weekly' },
-  weekly_billed_daily: { rateUnit: 'day', cycle: 'week', label: 'Weekly · billed daily' },
-  monthly_billed_monthly: { rateUnit: 'month', cycle: 'month', label: 'Monthly · billed monthly' },
-  monthly_billed_weekly: { rateUnit: 'week', cycle: 'month', label: 'Monthly · billed weekly' },
-  monthly_billed_daily: { rateUnit: 'day', cycle: 'month', label: 'Monthly · billed daily' },
+  weekly: { rateUnit: 'week', cycle: 'week', label: 'Weekly' },
+  monthly: { rateUnit: 'month', cycle: 'month', label: 'Monthly' },
 };
 
 export const ALL_BILLING_TYPES = Object.keys(BILLING_TYPES) as BillingType[];

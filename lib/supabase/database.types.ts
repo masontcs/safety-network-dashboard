@@ -31,14 +31,11 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
  */
 export type BillingItemCategory = 'Equipment' | 'Labor' | 'Lump Sum' | 'Misc' | 'Sale'
 
-/** <rental cadence>_billed_<rate unit>. No proration: each cell is an entered rate. */
+/** One rate per rental cadence. No proration: each cell is an entered rate. */
 export type BillingType =
   | 'daily'
-  | 'weekly_billed_weekly'
-  | 'weekly_billed_daily'
-  | 'monthly_billed_monthly'
-  | 'monthly_billed_weekly'
-  | 'monthly_billed_daily'
+  | 'weekly'
+  | 'monthly'
 
 /**
  * How a price-list cell is keyed. The Postgres `billing_type` enum also carries 'flat':

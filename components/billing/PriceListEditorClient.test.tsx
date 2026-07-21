@@ -18,7 +18,7 @@ const PRICE_LIST = {
       id: 'pli1', itemId: 'i1', code: 'MSG-BOARD', name: 'Message Board', category: 'Equipment',
       freezeAfterPosition: null, tierExceptionTierId: null, singleRate: false,
       variations: [],
-      grids: { '': { bases: { daily: 4500, weekly_billed_weekly: 22500 }, overrides: [] } },
+      grids: { '': { bases: { daily: 4500, weekly: 22500 }, overrides: [] } },
     },
     { // single-rate equipment with variations — priced per variation
       id: 'pli2', itemId: 'i2', code: 'CONE-28', name: 'Traffic Cone', category: 'Equipment',
@@ -51,21 +51,20 @@ describe('price-list editor — collapse + single-rate + per-variation grids', (
     expect(screen.getByLabelText('MSG-BOARD daily base')).toBeTruthy()   // opened
   })
 
-  it('shows all six billing types for a by-cadence item when opened', async () => {
+  it('shows the three billing types for a by-cadence item when opened', async () => {
     render(<PriceListEditorClient priceListId="pl1" />)
     await waitFor(() => expect(screen.getByText('MSG-BOARD')).toBeTruthy())
     open('MSG-BOARD')
-    for (const label of ['Daily', 'Weekly · billed weekly', 'Weekly · billed daily',
-      'Monthly · billed monthly', 'Monthly · billed weekly', 'Monthly · billed daily']) {
+    for (const label of ['Daily', 'Weekly', 'Monthly']) {
       expect(screen.getByText(label), `missing ${label}`).toBeTruthy()
     }
   })
 
-  it('a single-rate item shows one Rate row, not six cadences', async () => {
+  it('a single-rate item shows one Rate row, not the cadences', async () => {
     render(<PriceListEditorClient priceListId="pl1" />)
     await waitFor(() => expect(screen.getByText('CONE-28')).toBeTruthy())
     open('CONE-28')
-    expect(screen.queryByText('Weekly · billed weekly')).toBeNull()
+    expect(screen.queryByText('Weekly')).toBeNull()
     expect(screen.getByLabelText('CONE-28 Orange rate base')).toBeTruthy()
   })
 

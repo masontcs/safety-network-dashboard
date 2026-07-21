@@ -6,8 +6,8 @@
  * return. This module answers: "as of today, what does this ticket still owe?"
  *
  * ── Why the naive model overbills ────────────────────────────────────────
- * Recomputing the window on each billing run charges a `monthly_billed_monthly`
- * ticket `ceil(7 days / 30) = 1 month` EVERY WEEK. Four months in a month.
+ * Recomputing the window on each billing run charges a `monthly` ticket
+ * `ceil(7 days / 30) = 1 month` EVERY WEEK. Four months in a month.
  *
  * ── The model: cumulative qty-units, per PICKUP LOT ──────────────────────
  * A **lot** is one pickup (identified by its start date). Over time a lot's
