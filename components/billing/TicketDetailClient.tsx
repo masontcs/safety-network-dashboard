@@ -66,6 +66,8 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
   // ledger add form (billing type is the per-item cadence, only for pickups)
   const [lItem, setLItem] = useState(''); const [lVar, setLVar] = useState(''); const [lType, setLType] = useState('pickup')
   const [lDate, setLDate] = useState(''); const [lQty, setLQty] = useState('1'); const [lEquip, setLEquip] = useState(''); const [lBt, setLBt] = useState('')
+  // return grid: qty typed per on-rent row, keyed `${itemId}|${variationId ?? ''}`
+  const [retQty, setRetQty] = useState<Record<string, string>>({}); const [retDate, setRetDate] = useState('')
   // ledger inline edit
   const [editEv, setEditEv] = useState<string | null>(null)
   const [evQty, setEvQty] = useState(''); const [evDate, setEvDate] = useState(''); const [evEquip, setEvEquip] = useState('')
@@ -91,6 +93,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
       setDate(d.date); setNotes(d.notes ?? '')
       // Default the Add-item date: existing items' date if any, else the ticket date.
       if (!lDate) { const last = d.ledger[d.ledger.length - 1]; setLDate(last ? last.date : d.date) }
+      setRetDate((cur) => cur || d.date) // returns default to the ticket's own date
       if (it.success) setItems(it.data)
       setErr(null)
     }).catch((e: Error) => setErr(e.message)).finally(() => setLoading(false))
@@ -142,11 +145,24 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
     if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'POST', payload)) { setLQty('1'); setLEquip(''); setLBt(''); setLItem(''); load() }
   }
 
-  /** Hand back everything still out on the job, each at its full outstanding quantity. */
-  async function returnAll() {
-    const n = t?.onRent.length ?? 0
-    if (n === 0) { setMsg('Nothing is on rent for this job.'); return }
-    if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'POST', { returnAll: true, eventDate: lDate })) load()
+  /** Fill every return field with the full quantity that's out — "they brought it all back". */
+  function fillAllReturns() {
+    const next: Record<string, string> = {}
+    for (const r of t?.onRent ?? []) next[`${r.itemId}|${r.variationId ?? ''}`] = String(r.qty)
+    setRetQty(next)
+  }
+
+  /** Post the whole return grid in one request. */
+  async function submitReturns() {
+    const rows = (t?.onRent ?? [])
+      .map((r) => ({ r, qty: parseInt(retQty[`${r.itemId}|${r.variationId ?? ''}`] ?? '', 10) }))
+      .filter(({ qty }) => Number.isFinite(qty) && qty > 0)
+    if (rows.length === 0) { setMsg('Enter a quantity to return.'); return }
+    const over = rows.find(({ r, qty }) => qty > r.qty)
+    if (over) { setMsg(`Only ${over.r.qty} of ${over.r.code} on rent — you can’t return ${over.qty}.`); return }
+
+    const payload = { eventDate: retDate || lDate, returns: rows.map(({ r, qty }) => ({ itemId: r.itemId, variationId: r.variationId, qty })) }
+    if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'POST', payload)) { setRetQty({}); load() }
   }
   async function removeLedger(id: string) { if (await call(`/api/billing/tickets/${ticketId}/ledger?eventId=${id}`, 'DELETE')) load() }
   function startEditEv(e: LedgerEvent) { setEditEv(e.id); setEvQty(String(e.qty)); setEvDate(e.date); setEvEquip(e.equipmentId ?? '') }
@@ -383,27 +399,58 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
         <div className="card">
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>The quantity ledger. Rentals are computed from this at invoice time (pickup and return day both billed). Lost units leave the pool and bill at cost.</div>
 
+          {/* Everything still out on the JOB, listed for direct entry — type quantities
+              against the rows you're handing back and post them in one go. Beats picking
+              items out of a dropdown one at a time when a job comes off rent. */}
           {t.onRent.length > 0 && (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>On rent (job)</span>
-              {t.onRent.map((r, idx) => (
-                <span key={idx} style={{ fontSize: 12, background: 'var(--bg-nav)', border: '1px solid var(--border-subtle, var(--border-emphasis))', borderRadius: 6, padding: '4px 10px', fontVariantNumeric: 'tabular-nums' }}>
-                  {r.qty} × {r.code}{r.variation ? ` (${r.variation})` : ''} out
-                </span>
-              ))}
-              {/* One click hands back everything still out, at full quantity, dated with the
-                  Add-row date below. The server recomputes the amounts, so a stale view
-                  can't return more than went out. */}
-              {!locked && (
-                <button
-                  onClick={returnAll}
-                  disabled={busy}
-                  title="Add a return for every item still out, at its full quantity"
-                  style={{ ...ghost, marginLeft: 'auto', borderColor: 'var(--accent)', color: 'var(--accent)' }}
-                >
-                  ↩ Return all ({t.onRent.length})
-                </button>
-              )}
+            <div style={{ border: '1px solid var(--border-subtle, var(--border-emphasis))', borderRadius: 8, padding: 14, marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, fontWeight: 500 }}>On rent for this job</span>
+                <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Enter what came back</span>
+                {!locked && (
+                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <label style={{ fontSize: 11.5, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      Date
+                      <input type="date" value={retDate} onChange={(e) => setRetDate(e.target.value)} style={{ ...inputStyle, width: 140 }} />
+                    </label>
+                    <button onClick={fillAllReturns} disabled={busy} title="Fill every row with the full quantity out" style={ghost}>Returned all</button>
+                    <button onClick={submitReturns} disabled={busy} className="btn-primary" style={{ padding: '6px 14px', opacity: busy ? 0.5 : 1 }}>Record returns</button>
+                  </span>
+                )}
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                  <thead><tr>{['Item', 'Variation', 'Out', 'Returning'].map((h) => <th key={h} style={{ ...th, textAlign: h === 'Out' || h === 'Returning' ? 'right' : 'left' }}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {t.onRent.map((r) => {
+                      const key = `${r.itemId}|${r.variationId ?? ''}`
+                      const typed = parseInt(retQty[key] ?? '', 10)
+                      const tooMany = Number.isFinite(typed) && typed > r.qty
+                      return (
+                        <tr key={key}>
+                          <td style={td}><span style={{ fontWeight: 500 }}>{r.code}</span><span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>{r.name}</span></td>
+                          <td style={{ ...td, color: 'var(--text-muted)' }}>{r.variation ?? '—'}</td>
+                          <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.qty}</td>
+                          <td style={{ ...td, textAlign: 'right' }}>
+                            <input
+                              value={retQty[key] ?? ''}
+                              disabled={locked || busy}
+                              placeholder="0"
+                              aria-label={`Quantity of ${r.code} returned`}
+                              onChange={(e) => setRetQty((q) => ({ ...q, [key]: e.target.value }))}
+                              style={{
+                                ...inputStyle, width: 80, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+                                borderColor: tooMany ? 'var(--danger)' : undefined,
+                                color: tooMany ? 'var(--danger)' : undefined,
+                              }}
+                            />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 

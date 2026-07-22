@@ -99,34 +99,51 @@ export async function POST(
       qty?: number
       equipmentId?: string | null
       billingType?: string | null
-      returnAll?: boolean
+      returns?: { itemId?: string; variationId?: string | null; qty?: number }[]
     }
 
     /**
-     * "Return everything" — one row per (item, variation) still out on the JOB, each at its
-     * full outstanding quantity. Computed server-side from the live balance so it can't
-     * return more than went out, even if the client's view is stale.
+     * BULK RETURN — the return grid posts every row at once instead of one request per
+     * item. Each quantity is checked against the LIVE job balance here, so a stale page
+     * can never hand back more than went out. All-or-nothing: one bad row rejects the
+     * batch rather than half-recording a return.
      */
-    if (body.returnAll) {
+    if (Array.isArray(body.returns)) {
       if (!body.eventDate) return bad('A date is required')
-      const balances = balanceFrom(await fetchJobLedger(supabase, ticket.job_id))
-      const out = [...balances.entries()].filter(([, qty]) => qty > 0)
-      if (out.length === 0) return bad('Nothing is on rent for this job.')
+      const wanted = body.returns.filter((r) => r.itemId && Number.isInteger(r.qty) && (r.qty as number) > 0)
+      if (wanted.length === 0) return bad('Enter a quantity to return.')
 
-      const rows = out.map(([key, qty]) => {
-        const [itemId, variationId] = key.split('|')
-        return {
+      const balances = balanceFrom(await fetchJobLedger(supabase, ticket.job_id))
+
+      // Codes only so a rejection can name the item instead of an opaque id.
+      const { data: itemRows } = await supabase
+        .from('billing_items')
+        .select('id, code')
+        .in('id', [...new Set(wanted.map((r) => r.itemId as string))])
+      const codeById = new Map((itemRows ?? []).map((i) => [i.id, i.code]))
+
+      const rows = []
+      for (const r of wanted) {
+        const itemId = r.itemId as string
+        const variationId = r.variationId ?? null
+        const qty = r.qty as number
+        const avail = balances.get(onRentKey(itemId, variationId)) ?? 0
+        if (qty > avail) {
+          return bad(`Only ${avail} of ${codeById.get(itemId) ?? 'that item'} on rent — can't return ${qty}.`, 'CONFLICT', 409)
+        }
+        rows.push({
           ticket_id: params.id,
           job_id: ticket.job_id,
           item_id: itemId,
-          variation_id: variationId || null,
+          variation_id: variationId,
           event_type: 'return' as const,
           event_date: body.eventDate as string,
           qty,
           equipment_id: null,
-          billing_type: null,
-        }
-      })
+          billing_type: null, // a return never carries a cadence
+        })
+      }
+
       const { error } = await supabase.from('billing_ticket_ledger').insert(rows)
       if (error) throw new Error(error.message)
 
