@@ -99,6 +99,39 @@ export async function POST(
       qty?: number
       equipmentId?: string | null
       billingType?: string | null
+      returnAll?: boolean
+    }
+
+    /**
+     * "Return everything" — one row per (item, variation) still out on the JOB, each at its
+     * full outstanding quantity. Computed server-side from the live balance so it can't
+     * return more than went out, even if the client's view is stale.
+     */
+    if (body.returnAll) {
+      if (!body.eventDate) return bad('A date is required')
+      const balances = balanceFrom(await fetchJobLedger(supabase, ticket.job_id))
+      const out = [...balances.entries()].filter(([, qty]) => qty > 0)
+      if (out.length === 0) return bad('Nothing is on rent for this job.')
+
+      const rows = out.map(([key, qty]) => {
+        const [itemId, variationId] = key.split('|')
+        return {
+          ticket_id: params.id,
+          job_id: ticket.job_id,
+          item_id: itemId,
+          variation_id: variationId || null,
+          event_type: 'return' as const,
+          event_date: body.eventDate as string,
+          qty,
+          equipment_id: null,
+          billing_type: null,
+        }
+      })
+      const { error } = await supabase.from('billing_ticket_ledger').insert(rows)
+      if (error) throw new Error(error.message)
+
+      await refreshRecurring(supabase, params.id, ticket.job_id)
+      return NextResponse.json({ success: true, data: { returned: rows.length } })
     }
 
     if (!body.itemId) return bad('An item is required')

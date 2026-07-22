@@ -28,7 +28,8 @@ interface Ticket {
   statuses: string[]; billingTypes: BillingType[]
   pickupsMissingBillingType: number
   ledger: LedgerEvent[]; lines: Line[]
-  onRent: { code: string; name: string; variation: string | null; qty: number }[]
+  /** What's still out on the JOB (not just this ticket) — the pool a return draws from. */
+  onRent: { itemId: string; variationId: string | null; code: string; name: string; variation: string | null; qty: number }[]
   isAdmin: boolean
 }
 
@@ -121,8 +122,31 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
   }
 
   async function addLedger() {
-    if (!items.find((i) => i.id === lItem)) { setMsg('Pick an item'); return }
-    if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'POST', { itemId: lItem, variationId: lVar || null, eventType: lType, eventDate: lDate, qty: parseInt(lQty, 10), equipmentId: lEquip || null, billingType: lType === 'pickup' ? (lBt || null) : null })) { setLQty('1'); setLEquip(''); setLBt(''); load() }
+    const qty = parseInt(lQty, 10)
+    // Returning/losing picks from what's on rent (item+variation packed into one value);
+    // a pickup picks any rentable item.
+    const isReturn = lType === 'return' || lType === 'lost'
+    const out = isReturn ? (t?.onRent ?? []).find((r) => `${r.itemId}|${r.variationId ?? ''}` === lItem) : null
+    if (isReturn && !out) { setMsg('Pick something that’s on rent'); return }
+    if (!isReturn && !items.find((i) => i.id === lItem)) { setMsg('Pick an item'); return }
+    if (!(qty > 0)) { setMsg('Quantity must be greater than zero'); return }
+    if (out && qty > out.qty) { setMsg(`Only ${out.qty} of that is on rent — you can’t ${lType} ${qty}.`); return }
+
+    const payload = {
+      itemId: out ? out.itemId : lItem,
+      variationId: out ? out.variationId : (lVar || null),
+      eventType: lType, eventDate: lDate, qty,
+      equipmentId: lEquip || null,
+      billingType: lType === 'pickup' ? (lBt || null) : null,
+    }
+    if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'POST', payload)) { setLQty('1'); setLEquip(''); setLBt(''); setLItem(''); load() }
+  }
+
+  /** Hand back everything still out on the job, each at its full outstanding quantity. */
+  async function returnAll() {
+    const n = t?.onRent.length ?? 0
+    if (n === 0) { setMsg('Nothing is on rent for this job.'); return }
+    if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'POST', { returnAll: true, eventDate: lDate })) load()
   }
   async function removeLedger(id: string) { if (await call(`/api/billing/tickets/${ticketId}/ledger?eventId=${id}`, 'DELETE')) load() }
   function startEditEv(e: LedgerEvent) { setEditEv(e.id); setEvQty(String(e.qty)); setEvDate(e.date); setEvEquip(e.equipmentId ?? '') }
@@ -167,7 +191,15 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
 
   const locked = t.locked
   const disabled = locked || busy
-  const pickItem = items.find((i) => i.id === lItem)
+  /**
+   * Returning/losing draws from what's actually out on the job, so the picker switches from
+   * "any rentable item" to "what's on rent", keyed by item+variation. You can't hand back
+   * something that never went out.
+   */
+  const returnMode = lType === 'return' || lType === 'lost'
+  const onRentKeyOf = (itemId: string, variationId: string | null) => `${itemId}|${variationId ?? ''}`
+  const pickedOut = returnMode ? t?.onRent.find((r) => onRentKeyOf(r.itemId, r.variationId) === lItem) ?? null : null
+  const pickItem = items.find((i) => i.id === (returnMode ? pickedOut?.itemId : lItem))
   const rentItems = items.filter((i) => i.rentable) // equipment ledger = rentals only
   const saleItems = items.filter((i) => i.salable)
   const statusColors: Record<string, string> = { active: 'var(--pill-neutral-fg)', in_review: 'var(--pill-pending-fg)', final_edit: 'var(--pill-paid-fg)', invoiced: 'var(--accent)' }
@@ -352,12 +384,26 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>The quantity ledger. Rentals are computed from this at invoice time (pickup and return day both billed). Lost units leave the pool and bill at cost.</div>
 
           {t.onRent.length > 0 && (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>On rent (job)</span>
               {t.onRent.map((r, idx) => (
                 <span key={idx} style={{ fontSize: 12, background: 'var(--bg-nav)', border: '1px solid var(--border-subtle, var(--border-emphasis))', borderRadius: 6, padding: '4px 10px', fontVariantNumeric: 'tabular-nums' }}>
                   {r.qty} × {r.code}{r.variation ? ` (${r.variation})` : ''} out
                 </span>
               ))}
+              {/* One click hands back everything still out, at full quantity, dated with the
+                  Add-row date below. The server recomputes the amounts, so a stale view
+                  can't return more than went out. */}
+              {!locked && (
+                <button
+                  onClick={returnAll}
+                  disabled={busy}
+                  title="Add a return for every item still out, at its full quantity"
+                  style={{ ...ghost, marginLeft: 'auto', borderColor: 'var(--accent)', color: 'var(--accent)' }}
+                >
+                  ↩ Return all ({t.onRent.length})
+                </button>
+              )}
             </div>
           )}
 
@@ -412,20 +458,32 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
           {!locked && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid var(--border-subtle, var(--border-emphasis))', paddingTop: 14 }}>
               <div style={{ minWidth: 240 }}>
-                <label style={labelStyle}>Item</label>
+                <label style={labelStyle}>{returnMode ? 'On rent' : 'Item'}</label>
                 <Combobox
-                  ariaLabel="Item"
+                  ariaLabel={returnMode ? 'Item on rent' : 'Item'}
                   value={lItem}
                   onChange={(v) => { setLItem(v); setLVar('') }}
-                  options={rentItems.map((i) => ({ value: i.id, label: i.name, hint: i.code }))}
+                  // Returning/losing can only draw from what's actually out, so the options
+                  // ARE the on-rent pool, each showing how many are available.
+                  options={returnMode
+                    ? t.onRent.map((r) => ({
+                        value: `${r.itemId}|${r.variationId ?? ''}`,
+                        label: `${r.name}${r.variation ? ` (${r.variation})` : ''}`,
+                        hint: `${r.qty} out · ${r.code}`,
+                      }))
+                    : rentItems.map((i) => ({ value: i.id, label: i.name, hint: i.code }))}
                 />
               </div>
-              {pickItem && pickItem.variations.length > 0 && (
+              {/* In return mode the variation is part of what you picked off the on-rent
+                  list, so there's nothing left to choose. */}
+              {!returnMode && pickItem && pickItem.variations.length > 0 && (
                 <div style={{ minWidth: 130 }}><label style={labelStyle}>Variation</label>
                   <Select ariaLabel="Variation" value={lVar} onChange={setLVar} style={inputStyle}><option value="">—</option>{pickItem.variations.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</Select>
                 </div>
               )}
-              <div style={{ width: 120 }}><label style={labelStyle}>Event</label><Select ariaLabel="Event" value={lType} onChange={setLType} style={inputStyle}><option value="pickup">Pickup</option><option value="return">Return</option><option value="lost">Lost</option></Select></div>
+              {/* Switching event type changes what the picker lists (catalog vs on-rent), so
+                  the previous selection is meaningless — clear it. */}
+              <div style={{ width: 120 }}><label style={labelStyle}>Event</label><Select ariaLabel="Event" value={lType} onChange={(v) => { setLType(v); setLItem(''); setLVar('') }} style={inputStyle}><option value="pickup">Pickup</option><option value="return">Return</option><option value="lost">Lost</option></Select></div>
               {lType === 'pickup' && (
                 <div style={{ width: 120 }}><label style={labelStyle}>Billing</label>
                   <Select ariaLabel="Billing type" value={lBt} onChange={setLBt} style={inputStyle}>
@@ -435,7 +493,18 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
                 </div>
               )}
               <div style={{ width: 140 }}><label style={labelStyle}>Date</label><input type="date" value={lDate} onChange={(e) => setLDate(e.target.value)} style={inputStyle} /></div>
-              <div style={{ width: 70 }}><label style={labelStyle}>Qty</label><input value={lQty} onChange={(e) => setLQty(e.target.value)} style={inputStyle} /></div>
+              <div style={{ width: 70 }}>
+                <label style={labelStyle}>Qty{pickedOut ? ` / ${pickedOut.qty}` : ''}</label>
+                <input value={lQty} onChange={(e) => setLQty(e.target.value)} style={inputStyle} />
+              </div>
+              {pickedOut && (
+                <button
+                  onClick={() => setLQty(String(pickedOut.qty))}
+                  disabled={busy}
+                  title={`Return all ${pickedOut.qty} that are out`}
+                  style={{ ...ghost, height: 30 }}
+                >All {pickedOut.qty}</button>
+              )}
               {pickItem?.tracked && <div style={{ width: 130 }}><label style={labelStyle}>Equip ID *</label><input value={lEquip} onChange={(e) => setLEquip(e.target.value)} style={inputStyle} /></div>}
               <button onClick={addLedger} disabled={busy || !lItem} style={{ ...ghost, height: 30 }}>+ Add</button>
             </div>

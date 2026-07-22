@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { BILLING_TYPES } from '@/lib/billing/constants'
 import { resolveItemLineRates } from '@/lib/billing/livePricing'
+import { fetchJobLedger, balanceFrom } from '@/lib/billing/onRent'
 import type { BillingItemCategory, BillingType, Database } from '@/lib/supabase/database.types'
 
 /**
@@ -105,15 +106,41 @@ export async function GET(
         })
       : new Map()
 
-    // On-rent per (item, variation): pickups minus returns minus lost.
-    const onRent = new Map<string, { code: string; name: string; variation: string | null; qty: number }>()
-    for (const e of ledger) {
-      if (!e.billing_items) continue
-      const key = `${e.billing_items.id}|${e.billing_item_variations?.id ?? ''}`
-      const cur = onRent.get(key) ?? { code: e.billing_items.code, name: e.billing_items.name, variation: e.billing_item_variations?.name ?? null, qty: 0 }
-      cur.qty += e.event_type === 'pickup' ? e.qty : -e.qty
-      onRent.set(key, cur)
+    /**
+     * What's still out — a JOB fact, not a ticket one. Equipment goes out on an Add ticket
+     * and comes back on a separate Return ticket, so a ticket-scoped balance shows a Return
+     * ticket nothing to return. Ids are included so the return picker can post against them.
+     */
+    const jobRows = t.billing_jobs ? await fetchJobLedger(supabase, t.billing_jobs.id) : []
+    const balances = balanceFrom(jobRows)
+
+    // Names for whatever is on rent (may include items this ticket never touched).
+    const outKeys = [...balances.entries()].filter(([, q]) => q > 0)
+    const outItemIds = [...new Set(outKeys.map(([k]) => k.split('|')[0]))]
+    const namesById = new Map<string, { code: string; name: string }>()
+    const variationNameById = new Map<string, string>()
+    if (outItemIds.length > 0) {
+      const { data: its } = await supabase.from('billing_items').select('id, code, name').in('id', outItemIds)
+      for (const i of (its ?? []) as { id: string; code: string; name: string }[]) namesById.set(i.id, { code: i.code, name: i.name })
+      const varIds = outKeys.map(([k]) => k.split('|')[1]).filter(Boolean)
+      if (varIds.length > 0) {
+        const { data: vs } = await supabase.from('billing_item_variations').select('id, name').in('id', varIds)
+        for (const v of (vs ?? []) as { id: string; name: string }[]) variationNameById.set(v.id, v.name)
+      }
     }
+
+    const onRent = outKeys.map(([key, qty]) => {
+      const [itemId, variationId] = key.split('|')
+      const meta = namesById.get(itemId)
+      return {
+        itemId,
+        variationId: variationId || null,
+        code: meta?.code ?? '',
+        name: meta?.name ?? '',
+        variation: variationId ? variationNameById.get(variationId) ?? null : null,
+        qty,
+      }
+    })
 
     return NextResponse.json({
       success: true,
@@ -157,7 +184,7 @@ export async function GET(
             rateFromPriceList: l.unit_rate_cents === null && unitRateCents !== null,
           }
         }),
-        onRent: [...onRent.values()].filter((r) => r.qty !== 0),
+        onRent,
         isAdmin: ctx.access.role === 'admin',
       },
     })
