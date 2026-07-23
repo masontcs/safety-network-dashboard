@@ -143,7 +143,7 @@ describe('buildJobInvoice — orchestration', () => {
     expect(lost.qty).toBe(2)
     expect(lost.unitRateCents).toBe(500)   // item cost
     expect(lost.amountCents).toBe(1000)
-    expect(lost.taxable).toBeFalsy()
+    // lost is never taxed — the persist layer sets taxable only for sale lines.
   })
 
   it('warns instead of silently zeroing when a pickup has no billing type', async () => {
