@@ -19,6 +19,7 @@ interface InvoiceRow {
   id: string
   invoice_number: string
   invoice_date: string
+  through_date: string
   status: string
   total_cents: number
   branch_id: string
@@ -32,14 +33,16 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     const url = new URL(request.url)
     const profileId = url.searchParams.get('profileId')
+    const jobId = url.searchParams.get('jobId')
 
     const supabase = createServiceClient()
     let query = supabase
       .from('billing_invoices')
-      .select('id, invoice_number, invoice_date, status, total_cents, branch_id, billing_jobs(job_number)')
+      .select('id, invoice_number, invoice_date, through_date, status, total_cents, branch_id, billing_jobs(job_number)')
       .order('invoice_date', { ascending: false })
 
     if (profileId) query = query.eq('profile_id', profileId)
+    if (jobId) query = query.eq('job_id', jobId)
     if (ctx.access.branchIds !== null) {
       if (ctx.access.branchIds.length === 0) return NextResponse.json({ success: true, data: [] })
       query = query.in('branch_id', ctx.access.branchIds)
@@ -55,6 +58,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         id: i.id,
         invoiceNumber: i.invoice_number,
         invoiceDate: i.invoice_date,
+        throughDate: i.through_date,
         status: i.status,
         totalCents: i.total_cents,
         jobNumber: i.billing_jobs?.job_number ?? null,

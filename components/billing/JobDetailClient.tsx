@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
 import JobTicketsSection from '@/components/billing/JobTicketsSection'
+import JobInvoicesSection from '@/components/billing/JobInvoicesSection'
 import Tabs from '@/components/billing/Tabs'
 import Toggle from '@/components/billing/Toggle'
 import Select from '@/components/billing/Select'
@@ -52,7 +53,7 @@ const labelStyle: React.CSSProperties = {
 
 export default function JobDetailClient({ jobId }: { jobId: string }) {
   const [job, setJob] = useState<Job | null>(null)
-  const [tab, setTab] = useState<'details' | 'tickets'>('details')
+  const [tab, setTab] = useState<'details' | 'tickets' | 'invoices'>('details')
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -132,7 +133,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       <Tabs
         active={currentTab}
         onChange={setTab}
-        tabs={[{ id: 'details', label: 'Details' }, { id: 'tickets', label: 'Tickets' }]}
+        tabs={[{ id: 'details', label: 'Details' }, { id: 'tickets', label: 'Tickets' }, { id: 'invoices', label: 'Invoices' }]}
       />
 
       {currentTab === 'details' && (
@@ -189,6 +190,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       )}
 
       {currentTab === 'tickets' && <JobTicketsSection jobId={jobId} isAdmin={isAdmin} />}
+      {currentTab === 'invoices' && <JobInvoicesSection jobId={jobId} isAdmin={isAdmin} />}
     </div>
   )
 }
