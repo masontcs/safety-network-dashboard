@@ -1,6 +1,6 @@
-import { redirect } from 'next/navigation'
+import DashboardClient from '@/components/billing/DashboardClient'
 
-/** The billing interface's entry point. */
+// The billing home is the dashboard. Auth, role gate and shell live in app/billing/layout.tsx.
 export default function BillingIndexPage() {
-  redirect('/billing/profiles')
+  return <DashboardClient />
 }

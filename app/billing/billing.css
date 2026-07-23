@@ -1,210 +1,171 @@
 /* ============================================================================
-   TCR Billing v2 — design tokens, scoped to the /billing interface only.
+   TCR Billing v2 — the design system, scoped to /billing.
 
-   Strategy: rather than rewrite every card, table and button, we OVERRIDE the
-   same CSS variable names the shared components already consume. Anything
-   rendered inside `.billing-root` picks up the v2 palette automatically, and
-   the dashboards are untouched.
+   This IS the concept we prototyped in HTML: airy light surfaces, hairline
+   borders, one green accent, brand yellow used only as a mark, dark-mode ready.
+   Light is the DEFAULT (as in the mockup); dark is the [data-theme="dark"]
+   override. Everything is scoped under `.billing-root`, so the dashboards
+   interface is untouched.
 
-   IMPORTANT — theme structure mirrors globals.css exactly:
-   the inline theme script only sets `data-theme` when the user has SAVED a
-   preference. With no saved preference the attribute is absent and the app is
-   dark. So DARK must be the base here, with `[data-theme="light"]` as the
-   override. (Keying dark off `[data-theme="dark"]` would leave billing light
-   against a dark dashboard for every user who never toggled the theme.)
-
-   The system (from Mason's design board):
-     - graphite is the PRIMARY action colour (buttons)
-     - yellow is the BRAND mark only
-     - Apple-system colours carry STATUS
-     - orange is a small, deliberate INTERACTION accent (focus, links, active nav)
-     - colour never decorates; it always means something
+   Existing billing pages consume both the concept's own classes (.kpi, .tag,
+   .chip, .pill, .toggle …) AND the legacy variable names (--bg-surface,
+   --text-primary, --accent …) — the latter are mapped onto the concept palette
+   here, so every page picks up the new look without being rewritten.
    ========================================================================== */
 
-/* ── base = DARK (matches :root in globals.css) ──────────────────────────── */
-.billing-root {
-  --bg-base:         #0f1012;   /* app canvas */
-  --bg-nav:          #191a1d;   /* sidebar */
-  --bg-surface:      #191a1d;   /* cards */
-  --bg-secondary:    #202226;   /* inputs */
-  --bg-tertiary:     #26282d;
+/* ── LIGHT (default — the mockup's resting state) ────────────────────────── */
+.billing-root{
+  --bg:#f6f6f4; --surface:#fff; --surface-2:#fbfbf9; --ink:#1b1b1d; --muted:#6c6c72; --dim:#9a9aa0;
+  --line:#ececea; --line-2:#e3e3e0; --accent:#1c6b4b; --accent-soft:#e8f2ec;
+  --brand:#e8b23a; --danger:#c0492f; --danger-soft:#faece7; --warn:#8a6d00; --warn-soft:#fbf3e4; --blue:#2f6ea5;
+  --radius:12px; --radius-sm:8px;
+  --shadow-card:0 1px 2px rgba(20,20,20,.04),0 6px 20px rgba(20,20,20,.05);
+  --shadow-pop:0 20px 60px rgba(0,0,0,.18);
 
-  --border:          #2a2c31;
-  --border-emphasis: #35373d;
-  --border-subtle:   #232529;
+  /* legacy names → concept palette (existing pages re-skin for free) */
+  --bg-base:var(--bg); --bg-nav:var(--surface); --bg-surface:var(--surface);
+  --bg-secondary:var(--surface-2); --bg-tertiary:#f1f1ef;
+  --border:var(--line); --border-emphasis:var(--line-2); --border-subtle:#f2f2f0;
+  --text-primary:var(--ink); --text-secondary:var(--muted); --text-muted:#7d7d84;
+  --text-dim:var(--dim); --text-faint:#b6b6ba;
+  --skeleton-bg:#eee; --sidebar-hover-bg:var(--surface-2); --icon-btn-hover:var(--surface-2);
+  --primary:var(--ink); --on-primary:#fff;
+  --accent-soft-bg:var(--accent-soft); --accent-ring:0 0 0 3px rgba(28,107,75,.16);
+  --success:var(--accent); --warning:var(--warn);
+  --pill-paid-bg:var(--accent-soft); --pill-paid-fg:var(--accent);
+  --pill-pending-bg:var(--warn-soft); --pill-pending-fg:var(--warn);
+  --pill-overdue-bg:var(--danger-soft); --pill-overdue-fg:var(--danger);
+  --pill-neutral-bg:var(--surface-2); --pill-neutral-fg:var(--muted);
+  --alert-success-bg:var(--accent-soft); --alert-success-fg:var(--accent);
+  --alert-warning-bg:var(--warn-soft); --alert-warning-fg:var(--warn);
+  --alert-danger-bg:var(--danger-soft); --alert-danger-fg:var(--danger);
+  --b-radius:var(--radius);
 
-  --text-primary:    #f5f5f7;
-  --text-secondary:  #b5b5bc;
-  --text-muted:      #8b8b93;
-  --text-dim:        #77777f;
-  --text-faint:      #5c5c63;
-
-  --skeleton-bg:     #26282d;
-  --sidebar-hover-bg:#202226;
-  --icon-btn-hover:  #26282d;
-
-  --brand:           #ffcc00;   /* logo mark ONLY */
-  /* In dark the primary button inverts: light fill, dark label. */
-  --primary:         #f5f5f7;
-  --on-primary:      #1d1d1f;
-
-  /* The dashboard theme never defined --accent (only --accent-soft-bg), and
-     billing links/active states depend on it. Define it here. */
-  --accent:          #ff6a00;
-  --accent-soft-bg:  #3a2411;
-  --accent-ring:     0 0 0 3px rgba(255, 106, 0, 0.22);
-
-  --success:         #34c759;
-  --warning:         #ff9f0a;
-  --danger:          #ff453a;
-
-  --pill-paid-bg:    #12301c;  --pill-paid-fg:    #5fd884;
-  --pill-pending-bg: #33260a;  --pill-pending-fg: #f0b354;
-  --pill-overdue-bg: #3a1512;  --pill-overdue-fg: #ff8078;
-  --pill-neutral-bg: #26282d;  --pill-neutral-fg: #b5b5bc;
-
-  --alert-success-bg:#12301c;  --alert-success-fg:#5fd884;
-  --alert-warning-bg:#33260a;  --alert-warning-fg:#f0b354;
-  --alert-danger-bg: #3a1512;  --alert-danger-fg: #ff8078;
-
-  --b-radius:        12px;
-  --shadow-card:     0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-pop:      0 12px 36px -10px rgba(0, 0, 0, 0.7);
-
-  font-family: -apple-system, "SF Pro Text", "SF Pro Display", "Helvetica Neue",
-               Inter, system-ui, sans-serif;
-  background: var(--bg-base);
-  color: var(--text-primary);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+  background:var(--bg); color:var(--ink);
 }
 
-/* ── light override (matches [data-theme="light"] in globals.css) ────────── */
-[data-theme="light"] .billing-root {
-  --bg-base:         #f4f5f7;
-  --bg-nav:          #ffffff;
-  --bg-surface:      #ffffff;
-  --bg-secondary:    #ffffff;
-  --bg-tertiary:     #f2f2f4;
-
-  --border:          #ececef;
-  --border-emphasis: #e3e5ea;
-  --border-subtle:   #f1f2f5;
-
-  --text-primary:    #1d1d1f;
-  --text-secondary:  #5c5c62;
-  --text-muted:      #8e8e93;
-  --text-dim:        #a1a1a6;
-  --text-faint:      #c7c7cc;
-
-  --skeleton-bg:     #ededf0;
-  --sidebar-hover-bg:#f7f7f9;
-  --icon-btn-hover:  #f2f2f4;
-
-  /* Graphite is the primary action colour in light mode. */
-  --primary:         #1d1d1f;
-  --on-primary:      #ffffff;
-
-  --accent-soft-bg:  #fff3ea;
-  --accent-ring:     0 0 0 3px rgba(255, 106, 0, 0.16);
-
-  --danger:          #ff3b30;
-
-  --pill-paid-bg:    #e7f8ec;  --pill-paid-fg:    #1e7a3a;
-  --pill-pending-bg: #fff4e2;  --pill-pending-fg: #9a6207;
-  --pill-overdue-bg: #fdeceb;  --pill-overdue-fg: #c0271d;
-  --pill-neutral-bg: #f2f2f4;  --pill-neutral-fg: #5c5c62;
-
-  --alert-success-bg:#e7f8ec;  --alert-success-fg:#1e7a3a;
-  --alert-warning-bg:#fff4e2;  --alert-warning-fg:#9a6207;
-  --alert-danger-bg: #fdeceb;  --alert-danger-fg: #c0271d;
-
-  --shadow-card:     0 1px 2px rgba(20, 24, 40, 0.05), 0 1px 3px rgba(20, 24, 40, 0.04);
-  --shadow-pop:      0 10px 34px -10px rgba(20, 24, 40, 0.28);
+/* ── DARK (the mockup's dark toggle) ─────────────────────────────────────── */
+[data-theme="dark"] .billing-root{
+  --bg:#151517; --surface:#1e1e21; --surface-2:#242427; --ink:#f2f2f0; --muted:#a0a0a6; --dim:#75757c;
+  --line:#2c2c30; --line-2:#35353a; --accent:#4cae87; --accent-soft:#1b3730;
+  --brand:#e8b23a; --danger:#e0745c; --danger-soft:#3a231d; --warn:#e8c877; --warn-soft:#332b16; --blue:#6ba3d6;
+  --shadow-card:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+  --shadow-pop:0 20px 60px rgba(0,0,0,.5);
+  --bg-tertiary:#2b2b2f; --border-subtle:#26262a; --text-muted:#93939a; --text-faint:#55555b;
+  --accent-ring:0 0 0 3px rgba(76,174,135,.22);
 }
 
-/* ── component overrides, confined to billing ───────────────────────────── */
+/* ── layout ──────────────────────────────────────────────────────────────── */
+.billing-root a{color:var(--accent);text-decoration:none}
 
-.billing-root .card {
-  border-radius: var(--b-radius);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-card);
-  padding: 20px;
-}
+.bx-topbar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 82%,transparent);
+  backdrop-filter:saturate(180%) blur(12px);border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:12px;padding:12px 26px}
+.bx-search{flex:1;max-width:440px;display:flex;align-items:center;gap:8px;background:var(--surface);
+  border:1px solid var(--line-2);border-radius:9px;padding:7px 11px;color:var(--dim);font-size:13px}
+.bx-search input{border:none;background:none;outline:none;color:var(--ink);font:inherit;flex:1}
+.bx-iconbtn{width:34px;height:34px;display:grid;place-items:center;background:var(--surface);
+  border:1px solid var(--line-2);border-radius:9px;cursor:pointer;color:var(--muted);font-size:15px}
+.bx-iconbtn:hover{border-color:var(--dim)}
 
-/* Primary action is GRAPHITE (inverted in dark), not the dashboard's orange. */
-.billing-root .btn-primary {
-  background: var(--primary);
-  color: var(--on-primary);
-  border-radius: 10px;
-  font-weight: 500;
-  box-shadow: var(--shadow-card);
-  transition: filter 0.14s, transform 0.06s;
-}
-.billing-root .btn-primary:hover { background: var(--primary); filter: brightness(1.12); }
-.billing-root .btn-primary:active { transform: translateY(0.5px); }
-.billing-root .btn-primary:disabled { cursor: not-allowed; }
+/* ── nav ─────────────────────────────────────────────────────────────────── */
+.bx-side{width:236px;flex:none;display:flex;flex-direction:column;background:var(--surface);border-right:1px solid var(--line);padding:14px 12px;overflow:auto}
+.bx-brand{display:flex;align-items:center;gap:9px;padding:6px 8px 14px;cursor:pointer}
+.bx-brand .dot{width:22px;height:22px;border-radius:6px;background:var(--ink);position:relative;flex:none}
+.bx-brand .dot::after{content:"";position:absolute;inset:6px;border-radius:2px;background:var(--brand)}
+.bx-navgroup{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);padding:14px 10px 6px;font-weight:600}
+.bx-nav{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);color:var(--muted);cursor:pointer;font-weight:500;font-size:13.5px;text-decoration:none}
+.bx-nav:hover{background:var(--surface-2);color:var(--ink)}
+.bx-nav.active{background:var(--ink);color:var(--surface)}
+.bx-nav .badge{margin-left:auto;font-size:11px;background:var(--danger-soft);color:var(--danger);padding:0 7px;border-radius:20px;font-weight:600}
+.bx-nav.active .badge{background:rgba(128,128,128,.25);color:inherit}
+.bx-nav.soon{color:var(--text-faint);cursor:default}
+.bx-nav.soon:hover{background:transparent}
+.bx-nav .soontag{margin-left:auto;font-size:9.5px;text-transform:uppercase;letter-spacing:.04em}
 
-/* Focus is the accent ring, never the browser default. */
-.billing-root input:focus,
-.billing-root select:focus,
-.billing-root textarea:focus {
-  border-color: var(--accent) !important;
-  box-shadow: var(--accent-ring);
-}
+/* ── cards / headings ────────────────────────────────────────────────────── */
+.billing-root .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:18px 20px}
+.bx-h1{font-size:22px;font-weight:600;letter-spacing:-.02em;margin:0 0 3px}
+.bx-sub{color:var(--muted);font-size:13px;margin-bottom:22px}
+.bx-crumb{font-size:12.5px;color:var(--muted);cursor:pointer;margin-bottom:10px;display:inline-block;background:none;border:none;font-family:inherit;padding:0}
+.bx-crumb:hover{color:var(--accent)}
+.bx-cardhead{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.bx-cardhead h3{font-size:14.5px;font-weight:600;margin:0}
+.bx-link{margin-left:auto;font-size:12.5px;color:var(--accent);cursor:pointer;font-weight:500;background:none;border:none;font-family:inherit}
 
-/* Money and quantities must line up on the decimal. */
-.billing-root table { font-variant-numeric: tabular-nums; }
-.billing-root th { font-variant-numeric: normal; background: transparent; }
-.billing-root tbody tr:hover td { background: var(--accent-soft-bg); }
+/* ── buttons ─────────────────────────────────────────────────────────────── */
+.billing-root .btn,.bx-btn{background:var(--ink);color:var(--surface);border:none;border-radius:9px;padding:8px 15px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:filter .12s,transform .06s}
+.billing-root .btn:hover,.bx-btn:hover{filter:brightness(1.12)} .billing-root .btn:active,.bx-btn:active{transform:scale(.98)}
+.bx-btn.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line-2)}
+.bx-btn.accent{background:var(--accent);color:#fff}
+.bx-btn.danger{background:var(--surface);color:var(--danger);border:1px solid var(--danger)}
+.bx-btn.sm{padding:6px 12px;font-size:12.5px}
+.billing-root .btn-primary{background:var(--primary);color:var(--on-primary);border-radius:9px;font-weight:600;transition:filter .12s,transform .06s}
+.billing-root .btn-primary:hover{filter:brightness(1.12)} .billing-root .btn-primary:active{transform:scale(.98)}
+.bx-pill{display:inline-flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--line-2);border-radius:9px;padding:7px 12px;font-size:13px;color:var(--muted);cursor:pointer;font-weight:500}
+.bx-pill:hover{border-color:var(--dim)}
+.bx-pill.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 
-.billing-root a { color: var(--accent); }
+/* ── tables ──────────────────────────────────────────────────────────────── */
+.billing-root table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.billing-root th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--dim);font-weight:600;padding:9px 10px;border-bottom:1px solid var(--line);background:transparent}
+.billing-root td{padding:11px 10px;border-bottom:1px solid var(--line);font-size:13px}
+.billing-root tbody tr:last-child td{border-bottom:none}
+.bx-rowlink{cursor:pointer}
+.billing-root .bx-rowlink:hover td{background:var(--surface-2)}
+.num{text-align:right} .mono{font-variant-numeric:tabular-nums} .money{font-weight:600;font-variant-numeric:tabular-nums}
 
-/* ── refined form primitives ────────────────────────────────────────────── */
+/* ── tags / chips ────────────────────────────────────────────────────────── */
+.tag{display:inline-block;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;padding:2px 8px;border-radius:20px;white-space:nowrap}
+.t-green{background:var(--accent-soft);color:var(--accent)} .t-red{background:var(--danger-soft);color:var(--danger)}
+.t-amber{background:var(--warn-soft);color:var(--warn)} .t-blue{background:color-mix(in srgb,var(--blue) 15%,transparent);color:var(--blue)}
+.t-gray{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:12.5px;font-weight:500;margin:0 6px 6px 0}
+.chip b{font-variant-numeric:tabular-nums}
+.avatar{border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:600;font-size:12px;flex:none}
 
-/* Styled select: strip the native OS chrome, keep our chevron + focus ring.
-   Chevron colour is a mid-grey that reads in both themes (~text-muted). */
-.billing-root .bx-select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none' stroke='%238b8b93' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M4 6l4 4 4-4'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 9px center;
-  padding-right: 30px !important;
-  cursor: pointer;
-  transition: border-color 0.14s ease, box-shadow 0.14s ease;
-}
-.billing-root .bx-select:disabled { cursor: not-allowed; opacity: 0.55; }
+/* ── KPI cards ───────────────────────────────────────────────────────────── */
+.kpis{display:grid;gap:16px;margin-bottom:18px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 17px;cursor:pointer;transition:transform .12s;box-shadow:var(--shadow-card)}
+.kpi:hover{transform:translateY(-2px)}
+.kpi .lbl{font-size:12px;color:var(--muted);font-weight:500}
+.kpi .val{font-size:25px;font-weight:600;letter-spacing:-.02em;margin-top:7px;font-variant-numeric:tabular-nums}
+.kpi .delta{font-size:11.5px;font-weight:600;margin-top:5px}
+.up{color:var(--accent)} .down{color:var(--danger)}
+.kpi .kbar{height:4px;border-radius:3px;background:var(--line);margin-top:12px;overflow:hidden}
+.kpi .kbar>i{display:block;height:100%;background:var(--accent);border-radius:3px}
 
-/* Toggle switch: track + sliding knob, accent-orange when on. */
-.billing-root .bx-switch {
-  position: relative;
-  flex: none;
-  width: 38px;
-  height: 22px;
-  padding: 0;
-  border-radius: 999px;
-  border: 1px solid var(--border-emphasis);
-  background: var(--bg-tertiary);
-  cursor: pointer;
-  transition: background 0.18s ease, border-color 0.18s ease;
-}
-.billing-root .bx-switch::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #fff;
-  transform: translateY(-50%);
-  transition: transform 0.18s cubic-bezier(0.34, 1.3, 0.64, 1);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-}
-.billing-root .bx-switch[aria-checked="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-.billing-root .bx-switch[aria-checked="true"]::after { transform: translate(16px, -50%); }
-.billing-root .bx-switch:focus-visible { outline: none; box-shadow: var(--accent-ring); }
-.billing-root .bx-switch:disabled { opacity: 0.45; cursor: not-allowed; }
+/* ── mini bar chart ──────────────────────────────────────────────────────── */
+.bx-chart{display:flex;align-items:flex-end;gap:10px;height:120px;padding-top:8px}
+.bx-chart .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px}
+.bx-chart .col>i{width:60%;background:linear-gradient(var(--accent),color-mix(in srgb,var(--accent) 60%,#000));border-radius:4px 4px 0 0;display:block;min-height:2px}
+.bx-chart .col small{font-size:10.5px;color:var(--dim)}
+
+/* ── inputs (concept style) ──────────────────────────────────────────────── */
+.bx-f{background:var(--surface-2);border:1px solid var(--line-2);border-radius:8px;padding:7px 10px;font-size:13px;color:var(--ink);outline:none;font-family:inherit}
+.bx-f:focus{border-color:var(--accent);box-shadow:var(--accent-ring)}
+.bx-lbl{display:block;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;font-weight:600}
+.billing-root input:focus,.billing-root select:focus,.billing-root textarea:focus{border-color:var(--accent)!important;box-shadow:var(--accent-ring)}
+
+/* keep the existing Select/Toggle primitives, now tinted by the concept accent */
+.billing-root .bx-select{appearance:none;-webkit-appearance:none;-moz-appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none' stroke='%239a9aa0' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M4 6l4 4 4-4'/></svg>");
+  background-repeat:no-repeat;background-position:right 9px center;padding-right:30px!important;cursor:pointer}
+.billing-root .bx-switch{position:relative;flex:none;width:38px;height:22px;padding:0;border-radius:999px;border:1px solid var(--line-2);background:var(--line-2);cursor:pointer;transition:background .18s,border-color .18s}
+.billing-root .bx-switch::after{content:"";position:absolute;top:50%;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transform:translateY(-50%);transition:transform .18s cubic-bezier(.34,1.3,.64,1);box-shadow:0 1px 2px rgba(0,0,0,.35)}
+.billing-root .bx-switch[aria-checked="true"]{background:var(--accent);border-color:var(--accent)}
+.billing-root .bx-switch[aria-checked="true"]::after{transform:translate(16px,-50%)}
+.billing-root .bx-switch:focus-visible{outline:none;box-shadow:var(--accent-ring)}
+
+/* ── concept toggle (new screens) ────────────────────────────────────────── */
+.bx-toggle{width:38px;height:22px;border-radius:20px;background:var(--line-2);position:relative;cursor:pointer;flex:none;transition:background .15s}
+.bx-toggle.on{background:var(--accent)}
+.bx-toggle::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.bx-toggle.on::after{left:18px}
+
+/* ── note / callout ──────────────────────────────────────────────────────── */
+.bx-note{border-radius:var(--radius-sm);padding:11px 13px;font-size:12.5px;margin-bottom:14px}
+.bx-note.amber{background:var(--warn-soft);border:1px solid color-mix(in srgb,var(--brand) 40%,transparent);color:var(--warn)}
+.bx-note.green{background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);color:var(--accent)}
+.bx-empty{color:var(--dim);font-size:13px;padding:14px 2px}

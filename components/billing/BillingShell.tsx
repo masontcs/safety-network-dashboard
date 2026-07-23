@@ -1,14 +1,12 @@
 import type { ReactNode } from 'react'
 import BillingSidebar from '@/components/billing/BillingSidebar'
+import BillingTopbar from '@/components/billing/BillingTopbar'
 import type { InterfaceKey } from '@/components/billing/InterfaceSwitcher'
 
 /**
- * The billing interface shell. Separate from DashboardShell on purpose: its own
- * navigation, its own information architecture, and its own visual language.
- *
- * `.billing-root` scopes the v2 design tokens (see app/billing/billing.css) so
- * the shared card/table/button components render in billing's palette without
- * touching the dashboards.
+ * The billing interface shell — the concept layout: a white sidebar, a sticky
+ * translucent topbar, and the scrolling content beneath. `.billing-root` scopes
+ * the v2 design system (app/billing/billing.css) so the dashboards are untouched.
  */
 export default function BillingShell({
   userName,
@@ -20,18 +18,11 @@ export default function BillingShell({
   children: ReactNode
 }) {
   return (
-    <div className="billing-root" style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+    <div className="billing-root" style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg)' }}>
       <BillingSidebar userName={userName} available={available} />
-      <main
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          background: 'var(--bg-base)',
-          padding: '24px 28px 48px',
-        }}
-      >
-        <div style={{ maxWidth: 1180, margin: '0 auto' }}>{children}</div>
+      <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <BillingTopbar />
+        <div style={{ padding: '24px 26px 70px', maxWidth: 1200, width: '100%' }}>{children}</div>
       </main>
     </div>
   )
