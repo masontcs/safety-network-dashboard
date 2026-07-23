@@ -146,6 +146,26 @@ describe('buildJobInvoice — orchestration', () => {
     // lost is never taxed — the persist layer sets taxable only for sale lines.
   })
 
+  it('bills a SINGLE-RATE item from its flat rate, metered at the pickup cadence', async () => {
+    // A barricade priced single-rate: the price list holds a 'flat' rate, NOT a daily one.
+    const client = base({
+      billing_price_list_rates: [
+        { price_list_item_id: 'pli-cone', variation_id: null, tier_id: 'tier1', billing_type: 'flat', rate_cents: 300 },
+      ],
+      billing_tickets: [{ id: 't1', ticket_number: 'T-1', status: 'final_edit', feature_dtc: false }],
+      billing_ticket_ledger: [
+        // metered daily on the ticket, but the item is single-rate
+        { ticket_id: 't1', item_id: 'cone', variation_id: null, event_type: 'pickup', event_date: '2026-01-01', qty: 5, billing_type: 'daily' },
+      ],
+    })
+    const d = await buildJobInvoice(client, { jobId: 'job1', throughDate: '2026-01-03', taxRatePct: 0 })
+    const rental = d.lines.find((l) => l.kind === 'rental')!
+    expect(rental.unitRateCents).toBe(300)   // resolved from 'flat', not a missing 'daily'
+    expect(rental.qty).toBe(15)              // 5 units × 3 days (cadence sets the period)
+    expect(rental.amountCents).toBe(4500)
+    expect(d.warnings).toEqual([])           // NOT "no daily rate — not billed"
+  })
+
   it('warns instead of silently zeroing when a pickup has no billing type', async () => {
     const client = base({
       billing_tickets: [{ id: 't1', ticket_number: 'T-1', status: 'final_edit', feature_dtc: false }],

@@ -175,12 +175,17 @@ export async function buildJobInvoice(
   }
 
   // ── price everything we need, in one batch ────────────────────────────────
+  // For each equipment pickup we ask for BOTH the cadence rate and the 'flat' rate: a
+  // by-cadence item is priced under its cadence (daily/weekly/monthly), a single-rate item
+  // under 'flat'. An item only has one of the two, so requesting both is harmless and lets
+  // resolution pick whichever exists.
   const rateRequests = [...new Set(
-    ledger.filter((l) => l.event_type === 'pickup').map((l) => {
+    ledger.filter((l) => l.event_type === 'pickup').flatMap((l) => {
       const k = `${l.ticket_id}|${keyOf(l.item_id, l.variation_id)}`
       const cadence = cadenceFor.get(k)
-      return cadence ? `${l.item_id}|${l.variation_id ?? ''}|${cadence}` : ''
-    }).filter(Boolean)
+      if (!cadence) return []
+      return [`${l.item_id}|${l.variation_id ?? ''}|${cadence}`, `${l.item_id}|${l.variation_id ?? ''}|flat`]
+    })
   )].map((s) => {
     const [itemId, variationId, rateKey] = s.split('|')
     return { itemId, variationId: variationId || null, category: 'Equipment' as const, rateKey: rateKey as RateKey }
@@ -223,9 +228,12 @@ export async function buildJobInvoice(
       continue
     }
 
-    const unitRateCents = rates.get(rateKeyOf(itemId, variationId, cadence))
+    // A by-cadence item is priced under its cadence; a single-rate item under 'flat'. The
+    // cadence still sets the accrual PERIOD in both cases — a single-rate cone metered
+    // daily bills its one flat rate per day.
+    const unitRateCents = rates.get(rateKeyOf(itemId, variationId, cadence)) ?? rates.get(rateKeyOf(itemId, variationId, 'flat'))
     if (unitRateCents == null) {
-      warnings.push(`Ticket ${ticketNumber.get(ticketId)}: no ${cadence} rate on the price list for ${item?.code ?? 'an item'} — not billed.`)
+      warnings.push(`Ticket ${ticketNumber.get(ticketId)}: no price-list rate for ${item?.code ?? 'an item'} (looked for ${cadence} and flat) — not billed.`)
       continue
     }
 
