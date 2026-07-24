@@ -27,14 +27,14 @@ const th: React.CSSProperties = { textAlign: 'left', fontSize: 10.5, fontWeight:
 const td: React.CSSProperties = { padding: '8px 10px', borderBottom: '1px solid var(--border-subtle, var(--border-emphasis))', color: 'var(--text-primary)', fontSize: 12.5 }
 const statusColor: Record<string, string> = { draft: 'var(--pill-neutral-fg)', issued: 'var(--pill-paid-fg)', void: 'var(--pill-overdue-fg)' }
 
-export default function JobInvoicesSection({ jobId, isAdmin }: { jobId: string; isAdmin: boolean }) {
+export default function JobInvoicesSection({ jobId, isAdmin, autoGenerate = false }: { jobId: string; isAdmin: boolean; autoGenerate?: boolean }) {
   const [invoices, setInvoices] = useState<InvoiceRow[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   const today = new Date().toISOString().slice(0, 10)
-  const [showGen, setShowGen] = useState(false)
+  const [showGen, setShowGen] = useState(autoGenerate && isAdmin)
   const [through, setThrough] = useState(today)
   const [taxRate, setTaxRate] = useState('')
   const [preview, setPreview] = useState<Preview | null>(null)

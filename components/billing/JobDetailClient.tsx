@@ -54,6 +54,16 @@ const labelStyle: React.CSSProperties = {
 export default function JobDetailClient({ jobId }: { jobId: string }) {
   const [job, setJob] = useState<Job | null>(null)
   const [tab, setTab] = useState<'details' | 'tickets' | 'invoices'>('details')
+  const [autoGen, setAutoGen] = useState(false)
+
+  // Deep-link from "+ New → Proof/Invoice": open the invoices tab (and its generator).
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const p = new URLSearchParams(window.location.search)
+    const t = p.get('tab')
+    if (t === 'tickets' || t === 'invoices' || t === 'details') setTab(t)
+    if (p.get('generate') === '1') { setTab('invoices'); setAutoGen(true) }
+  }, [])
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -190,7 +200,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
       )}
 
       {currentTab === 'tickets' && <JobTicketsSection jobId={jobId} isAdmin={isAdmin} />}
-      {currentTab === 'invoices' && <JobInvoicesSection jobId={jobId} isAdmin={isAdmin} />}
+      {currentTab === 'invoices' && <JobInvoicesSection jobId={jobId} isAdmin={isAdmin} autoGenerate={autoGen} />}
     </div>
   )
 }

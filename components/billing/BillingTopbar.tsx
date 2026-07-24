@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/lib/theme/ThemeContext'
 import { useBranch } from '@/components/billing/BranchContext'
+import QuickCreateModal, { type QuickMode } from '@/components/billing/QuickCreateModal'
 
 /**
  * The concept's topbar: live search (customers / jobs / tickets / invoices), the
@@ -12,15 +13,15 @@ import { useBranch } from '@/components/billing/BranchContext'
 
 interface Hit { type: string; label: string; sub: string | null; href: string }
 
-// Quick-create targets. Parent-dependent records (profile/ticket/proof/invoice) drop you
-// on the page where you pick the parent, then create from there.
-const NEW_ITEMS: { label: string; sub: string; href: string }[] = [
-  { label: 'Customer', sub: 'A new billing customer', href: '/billing/customers?new=1' },
-  { label: 'Billing profile', sub: 'Open a customer, then add a profile', href: '/billing/customers' },
-  { label: 'Job', sub: 'Under a billing profile', href: '/billing/jobs?new=1' },
-  { label: 'Ticket', sub: 'Open a job to add a ticket', href: '/billing/jobs' },
-  { label: 'Proof', sub: 'Open a job → Generate → Preview', href: '/billing/jobs' },
-  { label: 'Invoice', sub: 'Open a job → Generate', href: '/billing/jobs' },
+// Quick-create targets. Each opens a modal that asks only for the context it needs
+// (the parent), then creates the record and jumps to it.
+const NEW_ITEMS: { label: string; sub: string; mode: QuickMode }[] = [
+  { label: 'Customer', sub: 'Just name + code', mode: 'customer' },
+  { label: 'Billing profile', sub: 'Asks which customer', mode: 'profile' },
+  { label: 'Job', sub: 'Asks which billing profile', mode: 'job' },
+  { label: 'Ticket', sub: 'Asks which job', mode: 'ticket' },
+  { label: 'Proof', sub: 'Asks which job → preview', mode: 'proof' },
+  { label: 'Invoice', sub: 'Asks which job → generate', mode: 'invoice' },
 ]
 
 export default function BillingTopbar() {
@@ -30,6 +31,7 @@ export default function BillingTopbar() {
 
   const [branchOpen, setBranchOpen] = useState(false)
   const [newOpen, setNewOpen] = useState(false)
+  const [quickMode, setQuickMode] = useState<QuickMode | null>(null)
   const branchRef = useRef<HTMLDivElement>(null)
   const newRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLDivElement>(null)
@@ -126,7 +128,7 @@ export default function BillingTopbar() {
         {newOpen && (
           <div role="menu" style={{ ...menuStyle, right: 0, left: 'auto', minWidth: 240 }}>
             {NEW_ITEMS.map((it) => (
-              <button key={it.label} role="menuitem" onClick={() => go(it.href)} style={{ ...rowStyle, flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
+              <button key={it.label} role="menuitem" onClick={() => { setNewOpen(false); setQuickMode(it.mode) }} style={{ ...rowStyle, flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
                 <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{it.label}</span>
                 <span style={{ fontSize: 11, color: 'var(--dim)' }}>{it.sub}</span>
               </button>
@@ -134,6 +136,8 @@ export default function BillingTopbar() {
           </div>
         )}
       </div>
+
+      {quickMode && <QuickCreateModal mode={quickMode} onClose={() => setQuickMode(null)} />}
     </div>
   )
 }
