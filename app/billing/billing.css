@@ -169,3 +169,20 @@
 .bx-note.amber{background:var(--warn-soft);border:1px solid color-mix(in srgb,var(--brand) 40%,transparent);color:var(--warn)}
 .bx-note.green{background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);color:var(--accent)}
 .bx-empty{color:var(--dim);font-size:13px;padding:14px 2px}
+
+/* ── dispatch board (week grid: driver rows × Mon–Fri) ───────────────────── */
+.bx-board{overflow-x:auto}
+.bx-week{display:grid;grid-template-columns:150px repeat(5,1fr);min-width:880px}
+.bx-week .hcell{padding:11px 12px;font-size:11.5px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--line);background:var(--surface)}
+.bx-week .drv{padding:12px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:9px;font-weight:500;font-size:13px}
+.bx-week .dcell{border-bottom:1px solid var(--line);border-left:1px solid var(--line);min-height:84px;padding:7px;transition:background .1s}
+.bx-week .dcell.over{background:var(--accent-soft)}
+.bx-week .tk{background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);border-left:3px solid var(--accent);border-radius:7px;padding:6px 8px;font-size:11.5px;margin-bottom:6px;cursor:grab}
+.bx-week .tk:active{cursor:grabbing;opacity:.6}
+.bx-week .tk.blue{background:color-mix(in srgb,var(--blue) 12%,transparent);border-left-color:var(--blue)}
+.bx-week .tk.amber{background:var(--warn-soft);border-left-color:var(--brand)}
+.bx-week .tk b{display:block;font-weight:600}
+.bx-week .tk small{color:var(--muted)}
+
+/* ── toast ───────────────────────────────────────────────────────────────── */
+.bx-toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:10px 16px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:var(--shadow-card);z-index:60}

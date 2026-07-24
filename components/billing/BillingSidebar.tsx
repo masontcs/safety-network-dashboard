@@ -19,7 +19,7 @@ const SECTIONS: NavSection[] = [
     heading: 'Operate',
     items: [
       { href: '/billing', label: 'Dashboard', icon: '◧', exact: true },
-      { href: '/billing/dispatch', label: 'Dispatch', icon: '▦', soon: true },
+      { href: '/billing/dispatch', label: 'Dispatch', icon: '▦' },
       { href: '/billing/jobs', label: 'Jobs', icon: '▤' },
       { href: '/billing/tickets', label: 'Tickets', icon: '▣' },
       { href: '/billing/quotes', label: 'Quotes', icon: '▧' },
