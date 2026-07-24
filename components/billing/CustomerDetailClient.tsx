@@ -81,6 +81,75 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
           </table>
         )}
       </div>
+
+      <PortalAccessCard customerId={customerId} />
+    </div>
+  )
+}
+
+interface PortalAccount { id: string; email: string; name: string | null; role: string; isActive: boolean; activated: boolean; lastLoginAt: string | null }
+
+function PortalAccessCard({ customerId }: { customerId: string }) {
+  const [accounts, setAccounts] = useState<PortalAccount[] | null>(null)
+  const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(() => {
+    fetch(`/api/billing/portal-accounts?customerId=${customerId}`).then((r) => r.json())
+      .then((j) => { if (j.success) setAccounts(j.data); else setError(j.error) })
+      .catch((e: Error) => setError(e.message))
+  }, [customerId])
+  useEffect(() => { load() }, [load])
+
+  async function add(e: React.FormEvent) {
+    e.preventDefault()
+    if (busy) return
+    setBusy(true); setError(null)
+    try {
+      const res = await fetch('/api/billing/portal-accounts', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId, email: email.trim(), name: name.trim() }),
+      })
+      const j = await res.json()
+      if (!j.success) { setError(j.error); return }
+      setEmail(''); setName(''); load()
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div className="bx-cardhead"><h3>Portal access</h3></div>
+      <div className="bx-sub" style={{ margin: '-6px 0 12px' }}>
+        People here can sign in at the customer portal to see this customer&apos;s open jobs and issued invoices —
+        but only for profiles you&apos;ve switched on (toggle lives on each profile). They sign in with a magic link; no passwords.
+      </div>
+
+      {accounts === null ? <div className="bx-empty">Loading…</div>
+        : accounts.length === 0 ? <div className="bx-empty">No portal logins yet.</div>
+        : (
+          <table>
+            <thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Status</th></tr></thead>
+            <tbody>
+              {accounts.map((a) => (
+                <tr key={a.id}>
+                  <td>{a.email}</td>
+                  <td>{a.name ?? '—'}</td>
+                  <td><span className="tag t-gray">{a.role}</span></td>
+                  <td>{!a.isActive ? <span className="tag t-red">disabled</span> : a.activated ? <span className="tag t-green">active</span> : <span className="tag t-amber">invited</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+      <form onSubmit={add} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 14, flexWrap: 'wrap' }}>
+        <div><label className="bx-lbl">Email</label><input className="bx-f" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="contact@customer.com" style={{ width: 220 }} /></div>
+        <div><label className="bx-lbl">Name (optional)</label><input className="bx-f" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe" style={{ width: 180 }} /></div>
+        <button className="bx-btn accent" type="submit" disabled={busy || !email.trim()}>{busy ? 'Adding…' : 'Add login'}</button>
+      </form>
+      {error && <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 8 }}>{error}</div>}
     </div>
   )
 }

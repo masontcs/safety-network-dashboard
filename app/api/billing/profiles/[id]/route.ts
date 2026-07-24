@@ -26,6 +26,7 @@ interface ProfileDetailRow {
   payment_term_id: string | null
   rental_minimum_enabled: boolean
   rental_minimum_cents: number
+  portal_enabled: boolean
   billing_customers: { id: string; code: string; name: string; default_payment_term_id: string | null } | null
   branches: { id: string; name: string } | null
   billing_profile_contacts: {
@@ -50,7 +51,7 @@ export async function GET(
       .from('billing_profiles')
       .select(`
         id, code, name, branch_id, is_active, payment_term_id,
-        rental_minimum_enabled, rental_minimum_cents,
+        rental_minimum_enabled, rental_minimum_cents, portal_enabled,
         billing_customers(id, code, name, default_payment_term_id),
         branches(id, name),
         billing_profile_contacts(id, name, email, phone, is_invoice_recipient)
@@ -76,6 +77,7 @@ export async function GET(
         paymentTermId: p.payment_term_id,
         rentalMinimumEnabled: p.rental_minimum_enabled,
         rentalMinimumCents: p.rental_minimum_cents,
+        portalEnabled: p.portal_enabled,
         branch: { id: p.branch_id, name: p.branches?.name ?? '' },
         customer: p.billing_customers,
         qbName: p.billing_customers ? `${p.billing_customers.name} - ${p.name}` : p.name,
@@ -121,6 +123,7 @@ export async function PATCH(
       paymentTermId?: string | null
       rentalMinimumEnabled?: boolean
       rentalMinimumCents?: number
+      portalEnabled?: boolean
       isActive?: boolean
     }
 
@@ -138,6 +141,7 @@ export async function PATCH(
       }
       patch.rental_minimum_cents = body.rentalMinimumCents
     }
+    if (body.portalEnabled !== undefined) patch.portal_enabled = body.portalEnabled
     if (body.isActive !== undefined) patch.is_active = body.isActive
 
     if (Object.keys(patch).length === 0) return bad('Nothing to update')

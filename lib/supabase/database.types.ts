@@ -325,9 +325,15 @@ export type Database = {
         Relationships: []
       }
       billing_profiles: {
-        Row: { id: string; customer_id: string; branch_id: string; code: string; name: string; payment_term_id: string | null; rental_minimum_enabled: boolean; rental_minimum_cents: number; field_rules: Json; is_active: boolean; created_at: string; updated_at: string }
-        Insert: { id?: string; customer_id: string; branch_id: string; code: string; name: string; payment_term_id?: string | null; rental_minimum_enabled?: boolean; rental_minimum_cents?: number; field_rules?: Json; is_active?: boolean }
-        Update: { id?: string; customer_id?: string; branch_id?: string; code?: string; name?: string; payment_term_id?: string | null; rental_minimum_enabled?: boolean; rental_minimum_cents?: number; field_rules?: Json; is_active?: boolean }
+        Row: { id: string; customer_id: string; branch_id: string; code: string; name: string; payment_term_id: string | null; rental_minimum_enabled: boolean; rental_minimum_cents: number; field_rules: Json; portal_enabled: boolean; is_active: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; customer_id: string; branch_id: string; code: string; name: string; payment_term_id?: string | null; rental_minimum_enabled?: boolean; rental_minimum_cents?: number; field_rules?: Json; portal_enabled?: boolean; is_active?: boolean }
+        Update: { id?: string; customer_id?: string; branch_id?: string; code?: string; name?: string; payment_term_id?: string | null; rental_minimum_enabled?: boolean; rental_minimum_cents?: number; field_rules?: Json; portal_enabled?: boolean; is_active?: boolean }
+        Relationships: []
+      }
+      billing_portal_accounts: {
+        Row: { id: string; customer_id: string; auth_user_id: string | null; email: string; name: string | null; role: 'owner' | 'member'; is_active: boolean; invited_by: string | null; last_login_at: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; customer_id: string; auth_user_id?: string | null; email: string; name?: string | null; role?: 'owner' | 'member'; is_active?: boolean; invited_by?: string | null; last_login_at?: string | null }
+        Update: { id?: string; customer_id?: string; auth_user_id?: string | null; email?: string; name?: string | null; role?: 'owner' | 'member'; is_active?: boolean; invited_by?: string | null; last_login_at?: string | null; updated_at?: string }
         Relationships: []
       }
       billing_profile_contacts: {

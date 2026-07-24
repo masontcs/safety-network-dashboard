@@ -24,6 +24,7 @@ interface Profile {
   paymentTermId: string | null
   rentalMinimumEnabled: boolean
   rentalMinimumCents: number
+  portalEnabled: boolean
   branch: { id: string; name: string }
   customer: { id: string; code: string; name: string } | null
   qbName: string
@@ -53,6 +54,7 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
   const [termId, setTermId] = useState('')
   const [minEnabled, setMinEnabled] = useState(true)
   const [minDollars, setMinDollars] = useState('25.00')
+  const [portalEnabled, setPortalEnabled] = useState(false)
 
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -74,6 +76,7 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
         setTermId(prof.paymentTermId ?? '')
         setMinEnabled(prof.rentalMinimumEnabled)
         setMinDollars((prof.rentalMinimumCents / 100).toFixed(2))
+        setPortalEnabled(prof.portalEnabled)
         setFetchError(null)
       })
       .catch((err: Error) => setFetchError(err.message))
@@ -96,6 +99,7 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
           paymentTermId: termId || null,
           rentalMinimumEnabled: minEnabled,
           rentalMinimumCents: Math.round(dollars * 100), // integer cents, rounded once
+          portalEnabled,
         }),
       })
       const json = await res.json()
@@ -179,6 +183,20 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
             </div>
             <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 6 }}>
               Only applies to invoices that actually contain rentals.
+            </div>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Customer portal</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Toggle ariaLabel="Enable customer portal for this profile" checked={portalEnabled} disabled={!isAdmin}
+                onChange={(v) => { setPortalEnabled(v); setSaveSuccess(false) }} />
+              <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+                {portalEnabled ? 'This profile’s jobs and invoices are visible in the portal.' : 'Hidden from the portal.'}
+              </span>
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 6 }}>
+              Add portal logins on the customer page. Customers see only issued invoices and open jobs.
             </div>
           </div>
 
