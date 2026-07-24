@@ -17,28 +17,60 @@ interface ProfileRow {
   enabledEntityCount: number
   unconfiguredEntityCount: number
 }
+interface Branch { id: string; name: string }
+interface PaymentTerm { id: string; name: string }
 
 export default function CustomerDetailClient({ customerId }: { customerId: string }) {
   const router = useRouter()
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [profiles, setProfiles] = useState<ProfileRow[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [terms, setTerms] = useState<PaymentTerm[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
+
+  // New-profile inline form
+  const [adding, setAdding] = useState(false)
+  const [pName, setPName] = useState('')
+  const [pCode, setPCode] = useState('')
+  const [pBranch, setPBranch] = useState('')
+  const [pTerm, setPTerm] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveErr, setSaveErr] = useState<string | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
     Promise.all([
       fetch('/api/billing/customers').then((r) => r.json()),
       fetch('/api/billing/profiles').then((r) => r.json()),
-    ]).then(([cs, ps]) => {
+      fetch('/api/billing/reference').then((r) => r.json()),
+    ]).then(([cs, ps, ref]) => {
       if (!cs.success) throw new Error(cs.error)
       const c = (cs.data as Customer[]).find((x) => x.id === customerId) ?? null
       setCustomer(c)
       if (ps.success) setProfiles((ps.data as ProfileRow[]).filter((p) => p.customer?.id === customerId))
+      if (ref.success) { setBranches(ref.data.branches); setTerms(ref.data.paymentTerms) }
       setErr(null)
     }).catch((e: Error) => setErr(e.message)).finally(() => setLoading(false))
   }, [customerId])
   useEffect(() => { load() }, [load])
+
+  async function createProfile(e: React.FormEvent) {
+    e.preventDefault()
+    if (saving) return
+    setSaving(true); setSaveErr(null)
+    try {
+      const res = await fetch('/api/billing/profiles', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId, name: pName.trim(), code: pCode.trim(), branchId: pBranch, paymentTermId: pTerm || null }),
+      })
+      const j = await res.json()
+      if (!j.success) { setSaveErr(j.error); return }
+      // Land on the new profile so the entity price list can be configured next.
+      router.push(`/billing/profiles/${j.data?.id ?? ''}`)
+    } catch { setSaveErr('Network error — please try again.') }
+    finally { setSaving(false) }
+  }
 
   if (loading) return <div className="card"><div className="bx-empty">Loading…</div></div>
   if (err) return <div style={{ color: 'var(--danger)', fontSize: 13 }}>Failed to load: {err}</div>
@@ -54,11 +86,36 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
         <div className="bx-cardhead">
           <h3>Billing profiles</h3>
           <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--dim)' }}>{profiles.length}</span>
+          <button className="bx-btn ghost sm" onClick={() => { setAdding((v) => !v); setSaveErr(null) }}>
+            {adding ? 'Cancel' : '+ New profile'}
+          </button>
         </div>
         <div className="bx-sub" style={{ margin: '-6px 0 12px' }}>
           A customer can bill under several profiles — standard vs certified/prevailing-wage, a different branch, or a
           negotiated tier. Jobs attach to a <b>profile</b>, not the customer.
         </div>
+
+        {adding && (
+          <form onSubmit={createProfile} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', padding: '4px 0 16px', borderBottom: '1px solid var(--line)', marginBottom: 14 }}>
+            <div><label className="bx-lbl">Name</label><input className="bx-f" required autoFocus value={pName} onChange={(e) => setPName(e.target.value)} placeholder="Direct Bakersfield" style={{ width: 200 }} /></div>
+            <div><label className="bx-lbl">Code</label><input className="bx-f" required value={pCode} onChange={(e) => setPCode(e.target.value.toUpperCase())} placeholder="DIRECTBK" style={{ width: 120 }} /></div>
+            <div><label className="bx-lbl">Branch</label>
+              <select className="bx-f bx-select" required value={pBranch} onChange={(e) => setPBranch(e.target.value)} style={{ width: 160 }}>
+                <option value="">Select…</option>
+                {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+            <div><label className="bx-lbl">Terms</label>
+              <select className="bx-f bx-select" value={pTerm} onChange={(e) => setPTerm(e.target.value)} style={{ width: 150 }}>
+                <option value="">Customer default</option>
+                {terms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <button className="bx-btn accent" type="submit" disabled={saving || !pName.trim() || !pCode.trim() || !pBranch}>{saving ? 'Creating…' : 'Create'}</button>
+          </form>
+        )}
+        {saveErr && <div style={{ fontSize: 12, color: 'var(--danger)', marginBottom: 10 }}>{saveErr}</div>}
+
         {profiles.length === 0 ? (
           <div className="bx-empty">No profiles for this customer yet.</div>
         ) : (
