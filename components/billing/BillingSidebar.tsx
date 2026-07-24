@@ -22,7 +22,7 @@ const SECTIONS: NavSection[] = [
       { href: '/billing/dispatch', label: 'Dispatch', icon: '▦', soon: true },
       { href: '/billing/jobs', label: 'Jobs', icon: '▤' },
       { href: '/billing/tickets', label: 'Tickets', icon: '▣' },
-      { href: '/billing/quotes', label: 'Quotes', icon: '▧', soon: true },
+      { href: '/billing/quotes', label: 'Quotes', icon: '▧' },
     ],
   },
   {

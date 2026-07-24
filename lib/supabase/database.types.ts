@@ -53,6 +53,7 @@ export type BillingLineKind = 'sale' | 'lost' | 'labor' | 'lump_sum' | 'misc'
 export type BillingInvoiceLineKind = 'rental' | BillingLineKind | 'adjustment'
 export type BillingInvoiceStatus = 'draft' | 'issued' | 'void'
 export type BillingQueueStatus = 'needs_update' | 'updated'
+export type BillingQuoteStatus = 'draft' | 'sent' | 'won' | 'lost'
 
 export type Database = {
   public: {
@@ -481,6 +482,18 @@ export type Database = {
         Row: { id: string; invoice_id: string; ticket_id: string | null; kind: BillingInvoiceLineKind; item_id: string | null; variation_id: string | null; description: string; lot_date: string | null; qty: number; units: number; unit_rate_cents: number; amount_cents: number; taxable: boolean; created_at: string }
         Insert: { id?: string; invoice_id: string; ticket_id?: string | null; kind: BillingInvoiceLineKind; item_id?: string | null; variation_id?: string | null; description: string; lot_date?: string | null; qty?: number; units?: number; unit_rate_cents: number; amount_cents: number; taxable?: boolean }
         Update: { id?: string; invoice_id?: string; ticket_id?: string | null; kind?: BillingInvoiceLineKind; item_id?: string | null; variation_id?: string | null; description?: string; lot_date?: string | null; qty?: number; units?: number; unit_rate_cents?: number; amount_cents?: number; taxable?: boolean }
+        Relationships: []
+      }
+      billing_quotes: {
+        Row: { id: string; quote_number: string; profile_id: string; entity_id: string; branch_id: string; status: BillingQuoteStatus; quote_date: string; job_name: string | null; notes: string | null; tax_rate_pct: number; subtotal_cents: number; tax_cents: number; total_cents: number; converted_job_id: string | null; created_by: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; quote_number: string; profile_id: string; entity_id: string; branch_id: string; status?: BillingQuoteStatus; quote_date?: string; job_name?: string | null; notes?: string | null; tax_rate_pct?: number; subtotal_cents?: number; tax_cents?: number; total_cents?: number; converted_job_id?: string | null; created_by?: string | null }
+        Update: { id?: string; quote_number?: string; profile_id?: string; entity_id?: string; branch_id?: string; status?: BillingQuoteStatus; quote_date?: string; job_name?: string | null; notes?: string | null; tax_rate_pct?: number; subtotal_cents?: number; tax_cents?: number; total_cents?: number; converted_job_id?: string | null; updated_at?: string }
+        Relationships: []
+      }
+      billing_quote_lines: {
+        Row: { id: string; quote_id: string; kind: string; item_id: string | null; variation_id: string | null; description: string; billing_type: BillingType | null; qty: number; units: number; unit_rate_cents: number; amount_cents: number; taxable: boolean; sort_order: number; created_at: string }
+        Insert: { id?: string; quote_id: string; kind?: string; item_id?: string | null; variation_id?: string | null; description?: string; billing_type?: BillingType | null; qty?: number; units?: number; unit_rate_cents?: number; amount_cents?: number; taxable?: boolean; sort_order?: number }
+        Update: { id?: string; quote_id?: string; kind?: string; item_id?: string | null; variation_id?: string | null; description?: string; billing_type?: BillingType | null; qty?: number; units?: number; unit_rate_cents?: number; amount_cents?: number; taxable?: boolean; sort_order?: number }
         Relationships: []
       }
       billing_accounting_queue: {
