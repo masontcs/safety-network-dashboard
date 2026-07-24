@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Skeleton from '@/components/ui/Skeleton'
 import Select from '@/components/billing/Select'
 import { rowOpen } from '@/components/billing/rowOpen'
+import { useBranch } from '@/components/billing/BranchContext'
 
 /**
  * Global tickets list — across all jobs. Create happens from a job (see the
@@ -37,15 +38,16 @@ export default function TicketsClient() {
   const [err, setErr] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const { query } = useBranch()
 
   const load = useCallback(() => {
     setLoading(true)
-    fetch('/api/billing/tickets')
+    fetch('/api/billing/tickets' + query)
       .then((r) => r.json())
       .then((j) => { if (!j.success) throw new Error(j.error); setTickets(j.data); setErr(null) })
       .catch((e: Error) => setErr(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [query])
 
   useEffect(() => { load() }, [load])
 

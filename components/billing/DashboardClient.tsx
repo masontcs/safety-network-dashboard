@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useBranch } from '@/components/billing/BranchContext'
 
 /**
  * Billing home — the concept dashboard, over live aggregates from /api/billing/dashboard.
@@ -23,12 +24,14 @@ export default function DashboardClient() {
   const [d, setD] = useState<Dash | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const router = useRouter()
+  const { query } = useBranch()
 
   useEffect(() => {
-    fetch('/api/billing/dashboard').then((r) => r.json())
+    setD(null)
+    fetch('/api/billing/dashboard' + query).then((r) => r.json())
       .then((j) => { if (!j.success) throw new Error(j.error); setD(j.data) })
       .catch((e: Error) => setErr(e.message))
-  }, [])
+  }, [query])
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 

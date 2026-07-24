@@ -46,7 +46,10 @@ export async function GET(request: Request): Promise<NextResponse> {
       id: string; ticket_number: string; ticket_date: string; feature_add: boolean; feature_return: boolean; feature_dtc: boolean
       billing_jobs: { job_number: string; name: string | null; branch_id: string; billing_profiles: { billing_customers: { name: string } | null } | null } | null
     }[]
-    if (ctx.access.branchIds !== null) tickets = tickets.filter((t) => t.billing_jobs && ctx.access.branchIds!.includes(t.billing_jobs.branch_id))
+    const reqBranch = url.searchParams.get('branchId') || ''
+    let effBranchIds = ctx.access.branchIds
+    if (reqBranch) effBranchIds = effBranchIds === null ? [reqBranch] : effBranchIds.filter((b) => b === reqBranch)
+    if (effBranchIds !== null) { const allow = new Set(effBranchIds); tickets = tickets.filter((t) => t.billing_jobs && allow.has(t.billing_jobs.branch_id)) }
 
     // lead technician per ticket
     const leadByTicket = new Map<string, string>()

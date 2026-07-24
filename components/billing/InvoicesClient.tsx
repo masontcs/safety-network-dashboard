@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
+import { useBranch } from '@/components/billing/BranchContext'
 
 /** All invoices, newest first, filterable by status. Generation happens on a job. */
 
@@ -18,15 +19,16 @@ export default function InvoicesClient() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('all')
+  const { query } = useBranch()
 
   const load = useCallback(() => {
     setLoading(true)
-    fetch('/api/billing/invoices')
+    fetch('/api/billing/invoices' + query)
       .then((r) => r.json())
       .then((j) => { if (!j.success) throw new Error(j.error); setRows(j.data); setErr(null) })
       .catch((e: Error) => setErr(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [query])
   useEffect(() => { load() }, [load])
 
   const shown = useMemo(() => filter === 'all' ? rows : rows.filter((r) => r.status === filter), [rows, filter])

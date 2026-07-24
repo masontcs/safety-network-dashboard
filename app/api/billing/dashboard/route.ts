@@ -20,12 +20,25 @@ const monthLabel = (ym: string) => {
   return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(m) - 1] ?? ym
 }
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: Request): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
     const supabase = createServiceClient()
-    const branchIds = ctx.access.branchIds // null = all branches
+    // null = all branches the user may see; a ?branchId narrows within that scope.
+    const reqBranch = new URL(request.url).searchParams.get('branchId') || ''
+    let branchIds = ctx.access.branchIds
+    if (reqBranch) branchIds = branchIds === null ? [reqBranch] : branchIds.filter((b) => b === reqBranch)
+
+    // Ledger + tickets carry no branch_id (branch lives on the job), so resolve the
+    // in-scope job ids once and filter those aggregates by them. null = all jobs.
+    let scopedJobIds: string[] | null = null
+    if (branchIds !== null) {
+      const { data: jrows } = await supabase.from('billing_jobs').select('id')
+        .in('branch_id', branchIds.length ? branchIds : ['00000000-0000-0000-0000-000000000000'])
+      scopedJobIds = (jrows ?? []).map((j: { id: string }) => j.id)
+      if (scopedJobIds.length === 0) scopedJobIds = ['00000000-0000-0000-0000-000000000000']
+    }
 
     // ── invoices → billed-this-month, billing-by-month, overdue ──────────────
     let invQ = supabase.from('billing_invoices').select('total_cents, status, invoice_date, branch_id')
@@ -56,9 +69,11 @@ export async function GET(): Promise<NextResponse> {
     const overdueCents = overdue.reduce((s, i) => s + i.total_cents, 0)
 
     // ── ledger → on-rent per job (DTC excluded), needs-attention ─────────────
-    const { data: ledRaw } = await supabase
+    let ledQ = supabase
       .from('billing_ticket_ledger')
       .select('item_id, job_id, event_type, qty, billing_type, billing_tickets(feature_dtc, status)')
+    if (scopedJobIds !== null) ledQ = ledQ.in('job_id', scopedJobIds)
+    const { data: ledRaw } = await ledQ
     const ledger = (ledRaw ?? []) as unknown as {
       item_id: string; job_id: string; event_type: string; qty: number; billing_type: string | null
       billing_tickets: { feature_dtc: boolean; status: string } | null
@@ -80,7 +95,9 @@ export async function GET(): Promise<NextResponse> {
     const onRentJobCount = [...onRentByJob.values()].filter((q) => q > 0).length
 
     // ── tickets → in-review, ready-to-invoice (jobs with final_edit tickets) ─
-    const { data: tkRaw } = await supabase.from('billing_tickets').select('job_id, status')
+    let tkQ = supabase.from('billing_tickets').select('job_id, status')
+    if (scopedJobIds !== null) tkQ = tkQ.in('job_id', scopedJobIds)
+    const { data: tkRaw } = await tkQ
     const tickets = (tkRaw ?? []) as { job_id: string; status: string }[]
     const ticketsInReview = tickets.filter((t) => t.status === 'in_review').length
     const readyJobs = new Set(tickets.filter((t) => t.status === 'final_edit').map((t) => t.job_id))

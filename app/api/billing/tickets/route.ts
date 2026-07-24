@@ -55,8 +55,11 @@ export async function GET(request: Request): Promise<NextResponse> {
     let rows = (data ?? []) as unknown as TicketListRow[]
 
     // Branch scoping happens on the job's branch (tickets have no branch of their own).
-    if (ctx.access.branchIds !== null) {
-      const allowed = new Set(ctx.access.branchIds)
+    const reqBranch = url.searchParams.get('branchId') || ''
+    let effBranchIds = ctx.access.branchIds
+    if (reqBranch) effBranchIds = effBranchIds === null ? [reqBranch] : effBranchIds.filter((b) => b === reqBranch)
+    if (effBranchIds !== null) {
+      const allowed = new Set(effBranchIds)
       rows = rows.filter((t) => t.billing_jobs && allowed.has(t.billing_jobs.branch_id))
     }
 

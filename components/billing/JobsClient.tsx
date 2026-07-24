@@ -7,6 +7,7 @@ import Skeleton from '@/components/ui/Skeleton'
 import Combobox from '@/components/billing/Combobox'
 import { rowOpen } from '@/components/billing/rowOpen'
 import Select from '@/components/billing/Select'
+import { useBranch } from '@/components/billing/BranchContext'
 
 /**
  * Jobs list + create. A job attaches to a billing profile (customer + branch
@@ -99,10 +100,12 @@ export default function JobsClient({ isAdmin }: { isAdmin: boolean }) {
   const [pState, setPState] = useState('')
   const [pZip, setPZip] = useState('')
 
+  const { query } = useBranch()
+
   const load = useCallback(() => {
     setLoading(true)
     Promise.all([
-      fetch('/api/billing/jobs').then((r) => r.json()),
+      fetch('/api/billing/jobs' + query).then((r) => r.json()),
       fetch('/api/billing/profiles').then((r) => r.json()),
       fetch('/api/billing/entities').then((r) => r.json()),
     ])
@@ -115,7 +118,7 @@ export default function JobsClient({ isAdmin }: { isAdmin: boolean }) {
       })
       .catch((err: Error) => setFetchError(err.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [query])
 
   useEffect(() => { load() }, [load])
 

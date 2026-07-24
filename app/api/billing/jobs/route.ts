@@ -53,9 +53,12 @@ export async function GET(request: Request): Promise<NextResponse> {
       .order('date_opened', { ascending: false })
 
     if (profileId) query = query.eq('profile_id', profileId)
-    if (ctx.access.branchIds !== null) {
-      if (ctx.access.branchIds.length === 0) return NextResponse.json({ success: true, data: [] })
-      query = query.in('branch_id', ctx.access.branchIds)
+    const reqBranch = url.searchParams.get('branchId') || ''
+    let effBranchIds = ctx.access.branchIds
+    if (reqBranch) effBranchIds = effBranchIds === null ? [reqBranch] : effBranchIds.filter((b) => b === reqBranch)
+    if (effBranchIds !== null) {
+      if (effBranchIds.length === 0) return NextResponse.json({ success: true, data: [] })
+      query = query.in('branch_id', effBranchIds)
     }
 
     const { data, error } = await query

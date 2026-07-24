@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useBranch } from '@/components/billing/BranchContext'
 
 /**
  * Dispatch board — the concept's week grid: technicians as rows, Mon–Fri as columns,
@@ -31,13 +32,14 @@ export default function DispatchClient() {
   const [toast, setToast] = useState<string | null>(null)
   const drag = useRef<Ticket | null>(null)
   const router = useRouter()
+  const { branchId } = useBranch()
 
   const load = useCallback((w: string) => {
     setBoard(null)
-    fetch(`/api/billing/dispatch?week=${w}`).then((r) => r.json())
+    fetch(`/api/billing/dispatch?week=${w}${branchId ? `&branchId=${branchId}` : ''}`).then((r) => r.json())
       .then((j) => { if (!j.success) throw new Error(j.error); setBoard(j.data) })
       .catch((e: Error) => setErr(e.message))
-  }, [])
+  }, [branchId])
   useEffect(() => { load(week) }, [week, load])
 
   function flash(msg: string) { setToast(msg); setTimeout(() => setToast(null), 2200) }

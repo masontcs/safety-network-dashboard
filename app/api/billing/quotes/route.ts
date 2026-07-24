@@ -34,9 +34,12 @@ export async function GET(request: Request): Promise<NextResponse> {
       .select('id, quote_number, status, quote_date, job_name, total_cents, branch_id, billing_profiles(name, billing_customers(name))')
       .order('quote_date', { ascending: false })
     if (profileId) q = q.eq('profile_id', profileId)
-    if (ctx.access.branchIds !== null) {
-      if (ctx.access.branchIds.length === 0) return NextResponse.json({ success: true, data: [] })
-      q = q.in('branch_id', ctx.access.branchIds)
+    const reqBranch = url.searchParams.get('branchId') || ''
+    let effBranchIds = ctx.access.branchIds
+    if (reqBranch) effBranchIds = effBranchIds === null ? [reqBranch] : effBranchIds.filter((b) => b === reqBranch)
+    if (effBranchIds !== null) {
+      if (effBranchIds.length === 0) return NextResponse.json({ success: true, data: [] })
+      q = q.in('branch_id', effBranchIds)
     }
     const { data, error } = await q
     if (error) throw new Error(error.message)

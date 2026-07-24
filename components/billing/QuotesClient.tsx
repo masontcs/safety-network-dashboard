@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Combobox from '@/components/billing/Combobox'
+import { useBranch } from '@/components/billing/BranchContext'
 
 /** Quotes list, with a New-quote flow that starts from a billing profile. */
 
@@ -22,11 +23,12 @@ export default function QuotesClient() {
   const [profId, setProfId] = useState('')
   const [jobName, setJobName] = useState('')
   const [busy, setBusy] = useState(false)
+  const { query } = useBranch()
 
   const load = useCallback(() => {
     setLoading(true)
     Promise.all([
-      fetch('/api/billing/quotes').then((r) => r.json()),
+      fetch('/api/billing/quotes' + query).then((r) => r.json()),
       fetch('/api/billing/profiles').then((r) => r.json()),
     ]).then(([qs, ps]) => {
       if (!qs.success) throw new Error(qs.error)
@@ -34,7 +36,7 @@ export default function QuotesClient() {
       if (ps.success) setProfiles(ps.data)
       setErr(null)
     }).catch((e: Error) => setErr(e.message)).finally(() => setLoading(false))
-  }, [])
+  }, [query])
   useEffect(() => { load() }, [load])
 
   async function create() {
