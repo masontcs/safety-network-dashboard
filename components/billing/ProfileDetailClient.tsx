@@ -123,15 +123,15 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 860 }}>
       <div>
-        <Link href="/billing/profiles" style={{ fontSize: 12, color: 'var(--text-muted)', textDecoration: 'none' }}>
-          ← Billing profiles
+        <Link href={profile.customer ? `/billing/customers/${profile.customer.id}` : '/billing/customers'} className="bx-crumb">
+          ← {profile.customer?.name ?? 'Customers'}
         </Link>
-        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)', marginTop: 6 }}>
+        <div className="bx-h1" style={{ marginTop: 2 }}>
           {profile.name}
-          <span style={{ fontSize: 13, color: 'var(--text-dim)', marginLeft: 8 }}>{profile.code}</span>
+          <span style={{ fontSize: 13, color: 'var(--text-dim)', marginLeft: 8, fontWeight: 400 }}>{profile.code}</span>
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-          {profile.customer?.name ?? '—'} · {profile.branch.name}
+        <div className="bx-sub" style={{ margin: '4px 0 0' }}>
+          Billing profile · {profile.customer?.name ?? '—'} · {profile.branch.name}
         </div>
       </div>
 

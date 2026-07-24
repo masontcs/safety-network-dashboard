@@ -29,7 +29,7 @@ const SECTIONS: NavSection[] = [
     heading: 'Money',
     items: [
       { href: '/billing/invoices', label: 'Invoices', icon: '⌗' },
-      { href: '/billing/profiles', label: 'Customers', icon: '◍' },
+      { href: '/billing/customers', label: 'Customers', icon: '◍' },
     ],
   },
   {
