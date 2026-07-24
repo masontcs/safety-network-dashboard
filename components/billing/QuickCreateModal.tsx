@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Combobox from '@/components/billing/Combobox'
 
@@ -118,7 +119,11 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
 
   const jobOptions = jobs.map((jj) => ({ value: jj.id, label: `${jj.jobNumber}${jj.name ? ` — ${jj.name}` : ''}${jj.customer ? ` · ${jj.customer}` : ''}` }))
 
-  return (
+  if (typeof document === 'undefined') return null
+
+  // Portal to <body>: the topbar has a backdrop-filter, which makes position:fixed
+  // descendants resolve against the topbar box (Chrome), clipping the overlay to a strip.
+  return createPortal((
     <div onMouseDown={onClose} style={overlay}>
       <div onMouseDown={(e) => e.stopPropagation()} className="card" style={{ width: '100%', maxWidth: 460, maxHeight: '86vh', overflowY: 'auto' }}>
         <div className="bx-cardhead" style={{ marginBottom: 6 }}><h3>{TITLES[mode]}</h3>
@@ -187,7 +192,7 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
         </form>
       </div>
     </div>
-  )
+  ), document.body)
 }
 
 function Field({ label, children, grow }: { label: string; children: React.ReactNode; grow?: boolean }) {
