@@ -32,6 +32,11 @@ export default function CustomersClient() {
   }, [])
   useEffect(() => { load() }, [load])
 
+  // "+ New → Customer" from the topbar lands here with ?new=1 — open the form.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1') setAdding(true)
+  }, [])
+
   async function create(e: React.FormEvent) {
     e.preventDefault()
     if (saving) return

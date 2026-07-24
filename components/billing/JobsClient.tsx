@@ -113,6 +113,11 @@ export default function JobsClient({ isAdmin }: { isAdmin: boolean }) {
 
   useEffect(() => { load() }, [load])
 
+  // "+ New → Job" from the topbar lands here with ?new=1 — open the form.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === '1') setShowNew(true)
+  }, [])
+
   // Profiles + entities only populate the "+ New job" form — fetch them the first time
   // it opens, not on every list load.
   useEffect(() => {
