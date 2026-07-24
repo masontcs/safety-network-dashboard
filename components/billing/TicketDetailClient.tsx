@@ -93,11 +93,13 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
       setAdd(d.featureAdd); setRet(d.featureReturn); setDtc(d.featureDtc)
       setDate(d.date); setNotes(d.notes ?? '')
       // Default the Add-item date: existing items' date if any, else the ticket date.
-      if (!lDate) { const last = d.ledger[d.ledger.length - 1]; setLDate(last ? last.date : d.date) }
+      // Functional setter (not a `lDate` read) so `load` doesn't depend on lDate — that
+      // dependency made load re-create itself after the first fetch and double-load.
+      setLDate((cur) => cur || (d.ledger.length ? d.ledger[d.ledger.length - 1].date : d.date))
       setRetDate((cur) => cur || d.date) // returns default to the ticket's own date
       setErr(null)
     }).catch((e: Error) => setErr(e.message)).finally(() => { if (!silent) setLoading(false) })
-  }, [ticketId, lDate])
+  }, [ticketId])
 
   // Catalog is fetched once — it doesn't change while editing a ticket.
   useEffect(() => {
