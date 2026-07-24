@@ -104,23 +104,24 @@ export default function JobsClient({ isAdmin }: { isAdmin: boolean }) {
 
   const load = useCallback(() => {
     setLoading(true)
-    Promise.all([
-      fetch('/api/billing/jobs' + query).then((r) => r.json()),
-      fetch('/api/billing/profiles').then((r) => r.json()),
-      fetch('/api/billing/entities').then((r) => r.json()),
-    ])
-      .then(([j, p, e]) => {
-        if (!j.success) throw new Error(j.error)
-        setJobs(j.data)
-        if (p.success) setProfiles(p.data)
-        if (e.success) setEntities(e.data)
-        setFetchError(null)
-      })
+    fetch('/api/billing/jobs' + query)
+      .then((r) => r.json())
+      .then((j) => { if (!j.success) throw new Error(j.error); setJobs(j.data); setFetchError(null) })
       .catch((err: Error) => setFetchError(err.message))
       .finally(() => setLoading(false))
   }, [query])
 
   useEffect(() => { load() }, [load])
+
+  // Profiles + entities only populate the "+ New job" form — fetch them the first time
+  // it opens, not on every list load.
+  useEffect(() => {
+    if (!showNew || profiles.length > 0) return
+    Promise.all([
+      fetch('/api/billing/profiles').then((r) => r.json()),
+      fetch('/api/billing/entities').then((r) => r.json()),
+    ]).then(([p, e]) => { if (p.success) setProfiles(p.data); if (e.success) setEntities(e.data) }).catch(() => {})
+  }, [showNew, profiles.length])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()

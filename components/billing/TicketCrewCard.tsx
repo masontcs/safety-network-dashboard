@@ -29,20 +29,22 @@ export default function TicketCrewCard({ ticketId, canEdit }: { ticketId: string
   const [busy, setBusy] = useState(false)
   const [pick, setPick] = useState('')
 
-  const load = useCallback(() => {
-    setLoading(true)
-    Promise.all([
-      fetch(`/api/billing/tickets/${ticketId}/assignments`).then((r) => r.json()),
-      fetch('/api/billing/technicians').then((r) => r.json()),
-    ]).then(([c, t]) => {
+  // `silent` (default, post-mutation) refreshes the crew without flashing the skeleton.
+  const load = useCallback((silent = true) => {
+    if (!silent) setLoading(true)
+    return fetch(`/api/billing/tickets/${ticketId}/assignments`).then((r) => r.json()).then((c) => {
       if (!c.success) throw new Error(c.error)
       setCrew(c.data)
-      if (t.success) setTechs(t.data)
       setError(null)
-    }).catch((e: Error) => setError(e.message)).finally(() => setLoading(false))
+    }).catch((e: Error) => setError(e.message)).finally(() => { if (!silent) setLoading(false) })
   }, [ticketId])
 
-  useEffect(() => { load() }, [load])
+  // Technician roster is static here — fetch once, not on every crew change.
+  useEffect(() => {
+    fetch('/api/billing/technicians').then((r) => r.json()).then((t) => { if (t.success) setTechs(t.data) }).catch(() => {})
+  }, [])
+
+  useEffect(() => { load(false) }, [load])
 
   async function call(url: string, method: string, body?: unknown): Promise<boolean> {
     setBusy(true); setMsg(null)

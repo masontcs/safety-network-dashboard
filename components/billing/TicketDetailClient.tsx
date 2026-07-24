@@ -80,12 +80,13 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
   const [editLn, setEditLn] = useState<string | null>(null)
   const [lnQty, setLnQty] = useState(''); const [lnRate, setLnRate] = useState(''); const [lnDesc, setLnDesc] = useState('')
 
-  const load = useCallback(() => {
-    setLoading(true)
-    Promise.all([
-      fetch(`/api/billing/tickets/${ticketId}`).then((r) => r.json()),
-      fetch('/api/billing/items/picker').then((r) => r.json()),
-    ]).then(([tk, it]) => {
+  // Refresh the ticket. `silent` (the default, used after every mutation) keeps the
+  // current view on screen instead of flashing the skeleton — billing is fast-paced and
+  // the blank-then-repaint after each line edit is what felt choppy. The item catalog is
+  // static for the life of this screen, so it's fetched ONCE below, never on refresh.
+  const load = useCallback((silent = true) => {
+    if (!silent) setLoading(true)
+    return fetch(`/api/billing/tickets/${ticketId}`).then((r) => r.json()).then((tk) => {
       if (!tk.success) throw new Error(tk.error)
       const d = tk.data as Ticket
       setT(d)
@@ -94,12 +95,16 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
       // Default the Add-item date: existing items' date if any, else the ticket date.
       if (!lDate) { const last = d.ledger[d.ledger.length - 1]; setLDate(last ? last.date : d.date) }
       setRetDate((cur) => cur || d.date) // returns default to the ticket's own date
-      if (it.success) setItems(it.data)
       setErr(null)
-    }).catch((e: Error) => setErr(e.message)).finally(() => setLoading(false))
+    }).catch((e: Error) => setErr(e.message)).finally(() => { if (!silent) setLoading(false) })
   }, [ticketId, lDate])
 
-  useEffect(() => { load() }, [load])
+  // Catalog is fetched once — it doesn't change while editing a ticket.
+  useEffect(() => {
+    fetch('/api/billing/items/picker').then((r) => r.json()).then((it) => { if (it.success) setItems(it.data) }).catch(() => {})
+  }, [])
+
+  useEffect(() => { load(false) }, [load])
 
   async function call(url: string, method: string, body?: unknown): Promise<boolean> {
     setBusy(true); setMsg(null)

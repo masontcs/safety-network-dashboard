@@ -16,7 +16,7 @@ function bad(error: string, code = 'VALIDATION_ERROR', status = 400) {
   return NextResponse.json({ success: false, error, code }, { status })
 }
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: Request): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
@@ -32,6 +32,11 @@ export async function GET(): Promise<NextResponse> {
         billing_profile_entities(entity_id, enabled, price_list_id)
       `)
       .order('name')
+
+    // Optional scope: a customer's own profiles (avoids fetching every profile just to
+    // filter client-side on the customer detail page).
+    const customerId = new URL(request.url).searchParams.get('customerId')
+    if (customerId) query = query.eq('customer_id', customerId)
 
     if (ctx.access.branchIds !== null) {
       if (ctx.access.branchIds.length === 0) return NextResponse.json({ success: true, data: [] })

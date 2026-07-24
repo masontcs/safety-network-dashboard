@@ -68,22 +68,28 @@ export default function TicketLaborTab({ ticketId, canEdit }: { ticketId: string
   const [eTech, setETech] = useState(''); const [eAct, setEAct] = useState('')
   const [eStart, setEStart] = useState(''); const [eEnd, setEEnd] = useState('')
 
-  const load = useCallback(() => {
-    setLoading(true)
-    Promise.all([
-      fetch(`/api/billing/tickets/${ticketId}/labor`).then((r) => r.json()),
-      fetch('/api/billing/technicians').then((r) => r.json()),
-      fetch('/api/billing/activity-types').then((r) => r.json()),
-    ]).then(([l, t, a]) => {
+  // `silent` (default, post-mutation) refreshes labor lines without flashing the skeleton.
+  const load = useCallback((silent = true) => {
+    if (!silent) setLoading(true)
+    return fetch(`/api/billing/tickets/${ticketId}/labor`).then((r) => r.json()).then((l) => {
       if (!l.success) throw new Error(l.error)
       setEntries(l.data)
-      if (t.success) { setTechs(t.data); setNTech((c) => c || t.data[0]?.id || '') }
-      if (a.success) { setActs(a.data); setNAct((c) => c || a.data[0]?.id || '') }
       setError(null)
-    }).catch((e: Error) => setError(e.message)).finally(() => setLoading(false))
+    }).catch((e: Error) => setError(e.message)).finally(() => { if (!silent) setLoading(false) })
   }, [ticketId])
 
-  useEffect(() => { load() }, [load])
+  // Technicians + activity types are static here — fetch once, not on every labor edit.
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/billing/technicians').then((r) => r.json()),
+      fetch('/api/billing/activity-types').then((r) => r.json()),
+    ]).then(([t, a]) => {
+      if (t.success) { setTechs(t.data); setNTech((c) => c || t.data[0]?.id || '') }
+      if (a.success) { setActs(a.data); setNAct((c) => c || a.data[0]?.id || '') }
+    }).catch(() => {})
+  }, [])
+
+  useEffect(() => { load(false) }, [load])
 
   async function call(url: string, method: string, body?: unknown): Promise<boolean> {
     setBusy(true); setMsg(null)

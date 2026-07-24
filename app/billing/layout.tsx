@@ -17,13 +17,16 @@ import './billing.css'
 
 export default async function BillingLayout({ children }: { children: React.ReactNode }) {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  // getClaims() verifies the JWT locally (asymmetric signing keys are enabled) instead
+  // of getUser()'s network round-trip to the Auth server on every full page load.
+  const { data: claims } = await supabase.auth.getClaims()
+  const userId = claims?.claims?.sub as string | undefined
+  if (!userId) redirect('/login')
 
   const { data: profileRaw } = await supabase
     .from('user_profiles')
     .select('role, display_name')
-    .eq('id', user.id)
+    .eq('id', userId)
     .single()
 
   const profile = profileRaw as { role: Role; display_name: string } | null

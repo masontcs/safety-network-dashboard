@@ -42,18 +42,24 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
     setLoading(true)
     Promise.all([
       fetch('/api/billing/customers').then((r) => r.json()),
-      fetch('/api/billing/profiles').then((r) => r.json()),
-      fetch('/api/billing/reference').then((r) => r.json()),
-    ]).then(([cs, ps, ref]) => {
+      fetch('/api/billing/profiles?customerId=' + customerId).then((r) => r.json()), // scoped, not all profiles
+    ]).then(([cs, ps]) => {
       if (!cs.success) throw new Error(cs.error)
       const c = (cs.data as Customer[]).find((x) => x.id === customerId) ?? null
       setCustomer(c)
-      if (ps.success) setProfiles((ps.data as ProfileRow[]).filter((p) => p.customer?.id === customerId))
-      if (ref.success) { setBranches(ref.data.branches); setTerms(ref.data.paymentTerms) }
+      if (ps.success) setProfiles(ps.data as ProfileRow[])
       setErr(null)
     }).catch((e: Error) => setErr(e.message)).finally(() => setLoading(false))
   }, [customerId])
   useEffect(() => { load() }, [load])
+
+  // Branches + terms only populate the "+ New profile" form — fetch when it first opens.
+  useEffect(() => {
+    if (!adding || branches.length > 0) return
+    fetch('/api/billing/reference').then((r) => r.json())
+      .then((ref) => { if (ref.success) { setBranches(ref.data.branches); setTerms(ref.data.paymentTerms) } })
+      .catch(() => {})
+  }, [adding, branches.length])
 
   async function createProfile(e: React.FormEvent) {
     e.preventDefault()
