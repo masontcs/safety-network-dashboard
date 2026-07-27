@@ -203,3 +203,5 @@ const overlay: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,.34)',
   display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '10vh 16px 16px',
 }
+
+// redeploy trigger: ensure createPortal backdrop fix (0777f06) is actually built/deployed
