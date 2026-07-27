@@ -121,8 +121,13 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
 
   if (typeof document === 'undefined') return null
 
-  // Portal to <body>: the topbar has a backdrop-filter, which makes position:fixed
-  // descendants resolve against the topbar box (Chrome), clipping the overlay to a strip.
+  // Portal OUT of the topbar (its backdrop-filter creates a containing block that clips
+  // position:fixed children to a strip) but INTO .billing-root — that element hosts every
+  // theme CSS var (--accent, --surface, --ink…) and the light/dark switch. Portaling to
+  // <body> drops those vars, so .bx-btn.accent rendered white-on-transparent = invisible.
+  // .billing-root has no transform/filter/contain, so a fixed overlay inside it still fills
+  // the viewport (and isn't clipped by its overflow:hidden).
+  const host = document.querySelector('.billing-root') ?? document.body
   return createPortal((
     <div onMouseDown={onClose} style={overlay}>
       <div onMouseDown={(e) => e.stopPropagation()} className="card" style={{ width: '100%', maxWidth: 460, maxHeight: '86vh', overflowY: 'auto' }}>
@@ -192,7 +197,7 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
         </form>
       </div>
     </div>
-  ), document.body)
+  ), host)
 }
 
 function Field({ label, children, grow }: { label: string; children: React.ReactNode; grow?: boolean }) {
@@ -203,5 +208,3 @@ const overlay: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,.34)',
   display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '10vh 16px 16px',
 }
-
-// redeploy trigger: ensure createPortal backdrop fix (0777f06) is actually built/deployed
