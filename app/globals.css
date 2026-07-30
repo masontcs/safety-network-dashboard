@@ -404,6 +404,26 @@ a:active, button:active, [role="button"]:active {
   overflow: hidden;
 }
 
+/* Customer detail: notes (wide) left + details sidebar right.
+   NB: distinct from .ar-detail-grid (a 1fr/1fr form grid) — this is the
+   asymmetric notes+sidebar layout. Was an inline flex row with a fixed 290px
+   sidebar that never collapsed on phones (main column crushed to ~50px, sidebar
+   spilled off-screen). Grid track owns the width; stacks to one column < 768px. */
+.ar-detail-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 16px;
+  align-items: start;
+}
+.ar-detail-cols > * {
+  min-width: 0;
+}
+@media (max-width: 767px) {
+  .ar-detail-cols {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 960px) {
   /* Narrow the right column at mid-screen before stacking */
   .ar-meeting-grid {

@@ -1208,8 +1208,8 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
         </div>
       )}
 
-      {/* ── Main content: 2-column asymmetric layout ───────────────────────── */}
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+      {/* ── Main content: 2-column asymmetric layout (stacks < 768px) ───────── */}
+      <div className="ar-detail-cols">
 
         {/* Left column — Notes (wider) */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1398,8 +1398,8 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
 
         </div>{/* end left column */}
 
-        {/* Right column — Details sidebar */}
-        <div style={{ width: 290, flexShrink: 0 }}>
+        {/* Right column — Details sidebar (width comes from the .ar-detail-cols track) */}
+        <div>
           <div style={{ background: 'var(--bg-surface)', borderRadius: 12, border: '1px solid var(--border)', padding: 16, display: 'flex', flexDirection: 'column' }}>
 
             {/* Entity Links */}
