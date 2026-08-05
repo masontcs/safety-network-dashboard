@@ -20,13 +20,14 @@ export default function ProfileCustomItemsCard({ profileId }: { profileId: strin
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  // form
+  // form — editId null = creating, else editing that item
+  const [editId, setEditId] = useState<string | null>(null)
   const [category, setCategory] = useState<'Lump Sum' | 'Labor'>('Lump Sum')
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [useVars, setUseVars] = useState(false)
   const [rate, setRate] = useState('0.00')
-  const [vars, setVars] = useState<{ name: string; rate: string }[]>([{ name: '', rate: '0.00' }])
+  const [vars, setVars] = useState<{ id?: string; name: string; rate: string }[]>([{ name: '', rate: '0.00' }])
 
   const load = useCallback(async () => {
     try {
@@ -39,18 +40,33 @@ export default function ProfileCustomItemsCard({ profileId }: { profileId: strin
   useEffect(() => { load() }, [load])
 
   function reset() {
-    setName(''); setCode(''); setRate('0.00'); setUseVars(false); setVars([{ name: '', rate: '0.00' }]); setCategory('Lump Sum')
+    setEditId(null); setName(''); setCode(''); setRate('0.00'); setUseVars(false); setVars([{ name: '', rate: '0.00' }]); setCategory('Lump Sum')
   }
 
-  async function create() {
+  function startEdit(it: ScopedItem) {
+    setErr(null)
+    setEditId(it.id)
+    setCategory(it.category === 'Labor' ? 'Labor' : 'Lump Sum')
+    setName(it.name); setCode(it.code)
+    if (it.variations.length > 0) {
+      setUseVars(true)
+      setVars(it.variations.map((v) => ({ id: v.id, name: v.name, rate: ((v.ownRateCents ?? 0) / 100).toFixed(2) })))
+    } else {
+      setUseVars(false); setRate(((it.ownRateCents ?? 0) / 100).toFixed(2)); setVars([{ name: '', rate: '0.00' }])
+    }
+    setOpen(true)
+  }
+
+  async function save() {
     if (busy) return
     setBusy(true); setErr(null)
     const body = useVars
-      ? { category, name, code, variations: vars.filter((v) => v.name.trim()).map((v) => ({ name: v.name.trim(), ownRateCents: toCents(v.rate) })) }
-      : { category, name, code, ownRateCents: toCents(rate) }
+      ? { category, name, code, variations: vars.filter((v) => v.name.trim()).map((v) => ({ id: v.id, name: v.name.trim(), ownRateCents: toCents(v.rate) })) }
+      : { category, name, code, variations: [], ownRateCents: toCents(rate) }
+    const url = editId ? `/api/billing/profiles/${profileId}/items/${editId}` : `/api/billing/profiles/${profileId}/items`
     try {
-      const j = await fetch(`/api/billing/profiles/${profileId}/items`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      const j = await fetch(url, {
+        method: editId ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       }).then((r) => r.json())
       if (!j.success) { setErr(j.error); return }
       reset(); setOpen(false); load()
@@ -69,7 +85,7 @@ export default function ProfileCustomItemsCard({ profileId }: { profileId: strin
     <div className="card">
       <div className="bx-cardhead" style={{ marginBottom: 6 }}>
         <h3>Custom items</h3>
-        <button className="bx-btn ghost sm" style={{ marginLeft: 'auto' }} onClick={() => { setOpen((v) => !v); setErr(null) }}>{open ? 'Cancel' : '+ New item'}</button>
+        <button className="bx-btn ghost sm" style={{ marginLeft: 'auto' }} onClick={() => { if (open) { reset(); setOpen(false) } else { reset(); setOpen(true) } setErr(null) }}>{open ? 'Cancel' : '+ New item'}</button>
       </div>
       <div className="bx-sub" style={{ marginBottom: 12 }}>Lump-sum or labor lines priced just for this profile. They only appear on this profile’s tickets.</div>
 
@@ -107,7 +123,7 @@ export default function ProfileCustomItemsCard({ profileId }: { profileId: strin
             </div>
           )}
 
-          <button className="bx-btn accent" style={{ alignSelf: 'flex-start' }} onClick={create} disabled={busy || !name.trim() || !code.trim()}>{busy ? 'Saving…' : 'Create item'}</button>
+          <button className="bx-btn accent" style={{ alignSelf: 'flex-start' }} onClick={save} disabled={busy || !name.trim() || !code.trim()}>{busy ? 'Saving…' : editId ? 'Save changes' : 'Create item'}</button>
         </div>
       )}
 
@@ -129,7 +145,10 @@ export default function ProfileCustomItemsCard({ profileId }: { profileId: strin
                     ? `${it.variations.length} variation${it.variations.length > 1 ? 's' : ''}`
                     : money(it.ownRateCents)}
                 </td>
-                <td style={{ textAlign: 'right' }}><button className="bx-btn ghost sm" onClick={() => remove(it.id)}>Delete</button></td>
+                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <button className="bx-btn ghost sm" onClick={() => startEdit(it)}>Edit</button>
+                  <button className="bx-btn ghost sm" style={{ marginLeft: 6 }} onClick={() => remove(it.id)}>Delete</button>
+                </td>
               </tr>
             ))}
           </tbody>
