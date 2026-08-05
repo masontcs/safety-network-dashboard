@@ -18,7 +18,7 @@ import type { InterfaceKey } from '@/lib/utils/interfaces'
 
 const META: Record<InterfaceKey, { label: string; sub: string; href: string; mark: string }> = {
   dashboards: { label: 'Dashboards', sub: 'Safety Network', href: '/dashboard', mark: 'SN' },
-  billing: { label: 'Billing', sub: 'Traffic Control Rental', href: '/billing/profiles', mark: 'SN' },
+  billing: { label: 'Billing', sub: 'Rental billing', href: '/billing/profiles', mark: 'SN' },
 }
 
 interface Props {

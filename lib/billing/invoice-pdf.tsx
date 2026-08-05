@@ -116,7 +116,6 @@ export function InvoiceDocument({ data }: { data: InvoicePdfData }) {
         <View style={s.band}>
           <View>
             <Text style={s.company}>{data.companyName}</Text>
-            <Text style={s.tagline}>Traffic Control Rental</Text>
           </View>
           <View>
             <Text style={s.invWord}>INVOICE</Text>
