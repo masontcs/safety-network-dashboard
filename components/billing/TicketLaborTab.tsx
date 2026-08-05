@@ -78,16 +78,23 @@ export default function TicketLaborTab({ ticketId, canEdit }: { ticketId: string
     }).catch((e: Error) => setError(e.message)).finally(() => { if (!silent) setLoading(false) })
   }, [ticketId])
 
-  // Technicians + activity types are static here — fetch once, not on every labor edit.
+  // The technician dropdown is scoped to THIS ticket's crew (billing_ticket_assignments),
+  // not every technician in the system — you only log time for people who were on the job.
+  // Activity types are the global list. Both are static here, so fetch once.
   useEffect(() => {
     Promise.all([
-      fetch('/api/billing/technicians').then((r) => r.json()),
+      fetch(`/api/billing/tickets/${ticketId}/assignments`).then((r) => r.json()),
       fetch('/api/billing/activity-types').then((r) => r.json()),
-    ]).then(([t, a]) => {
-      if (t.success) { setTechs(t.data); setNTech((c) => c || t.data[0]?.id || '') }
+    ]).then(([crew, a]) => {
+      if (crew.success) {
+        const opts = (crew.data as { technician: Opt | null }[])
+          .map((c) => c.technician)
+          .filter((t): t is Opt => !!t)
+        setTechs(opts); setNTech((c) => c || opts[0]?.id || '')
+      }
       if (a.success) { setActs(a.data); setNAct((c) => c || a.data[0]?.id || '') }
     }).catch(() => {})
-  }, [])
+  }, [ticketId])
 
   useEffect(() => { load(false) }, [load])
 
@@ -195,7 +202,7 @@ export default function TicketLaborTab({ ticketId, canEdit }: { ticketId: string
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid var(--border-subtle, var(--border-emphasis))', paddingTop: 14 }}>
           <div style={{ minWidth: 160 }}><label style={labelStyle}>Technician</label>
             <Select ariaLabel="Technician" value={nTech} onChange={setNTech} style={inputStyle}>
-              {techs.length === 0 && <option value="">No technicians</option>}
+              {techs.length === 0 && <option value="">No crew assigned</option>}
               {techs.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </Select>
           </div>

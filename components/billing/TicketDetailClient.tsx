@@ -75,7 +75,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
   const [datePrompt, setDatePrompt] = useState<{ date: string; count: number } | null>(null)
 
   // line add form
-  const [cItem, setCItem] = useState(''); const [cDesc, setCDesc] = useState(''); const [cQty, setCQty] = useState('1'); const [cRate, setCRate] = useState('0.00')
+  const [cItem, setCItem] = useState(''); const [cVar, setCVar] = useState(''); const [cDesc, setCDesc] = useState(''); const [cQty, setCQty] = useState('1'); const [cRate, setCRate] = useState('0.00')
   // line inline edit
   const [editLn, setEditLn] = useState<string | null>(null)
   const [lnQty, setLnQty] = useState(''); const [lnRate, setLnRate] = useState(''); const [lnDesc, setLnDesc] = useState('')
@@ -195,8 +195,8 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
     // Sale, labor and lump sum are all item-based; only misc is typed by hand.
     const payload = kind === 'misc'
       ? { kind, description: cDesc, qty: parseFloat(cQty), unitRateCents: Math.round(parseFloat(cRate) * 100) }
-      : { kind, itemId: cItem, qty: parseFloat(cQty), ...(kind === 'sale' ? { variationId: null } : {}) }
-    if (await call(`/api/billing/tickets/${ticketId}/lines`, 'POST', payload)) { setCDesc(''); setCQty('1'); setCRate('0.00'); setCItem(''); load() }
+      : { kind, itemId: cItem, qty: parseFloat(cQty), variationId: cVar || null }
+    if (await call(`/api/billing/tickets/${ticketId}/lines`, 'POST', payload)) { setCDesc(''); setCQty('1'); setCRate('0.00'); setCItem(''); setCVar(''); load() }
   }
   async function removeLine(id: string) { if (await call(`/api/billing/tickets/${ticketId}/lines?lineId=${id}`, 'DELETE')) load() }
   // Item-priced lines have no rate to seed (null) — only misc's rate is ever editable.
@@ -246,6 +246,9 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
     const chargeItems = itemCategory ? items.filter((i) => i.category === itemCategory) : []
     // Only misc is typed by hand.
     const isTyped = kind === 'misc'
+    // When the picked item has variations, the variation IS the priced unit — offer it.
+    const pickedChargeItem = items.find((i) => i.id === cItem) ?? null
+    const chargeVariations = pickedChargeItem?.variations ?? []
     return (
       <div className="card">
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>{chargeBlurb[kind]}</div>
@@ -285,7 +288,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid var(--border-subtle, var(--border-emphasis))', paddingTop: 14 }}>
             {isSale && (
               <div style={{ minWidth: 260 }}><label style={labelStyle}>Salable item</label>
-                <Combobox ariaLabel="Salable item" value={cItem} onChange={setCItem} options={saleItems.map((i) => ({ value: i.id, label: `${i.name} (${money(i.salePriceCents ?? 0)})`, hint: i.code }))} />
+                <Combobox ariaLabel="Salable item" value={cItem} onChange={(v) => { setCItem(v); setCVar('') }} options={saleItems.map((i) => ({ value: i.id, label: `${i.name} (${money(i.salePriceCents ?? 0)})`, hint: i.code }))} />
               </div>
             )}
             {itemCategory && (
@@ -295,9 +298,17 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
                   placeholder={chargeItems.length ? 'Select…' : `No ${itemCategory} items in the catalog`}
                   disabled={chargeItems.length === 0}
                   value={cItem}
-                  onChange={setCItem}
+                  onChange={(v) => { setCItem(v); setCVar('') }}
                   options={chargeItems.map((i) => ({ value: i.id, label: i.name, hint: i.code }))}
                 />
+              </div>
+            )}
+            {!isTyped && chargeVariations.length > 0 && (
+              <div style={{ minWidth: 150 }}><label style={labelStyle}>Variation</label>
+                <Select ariaLabel="Variation" value={cVar} onChange={setCVar} style={inputStyle}>
+                  <option value="">Select…</option>
+                  {chargeVariations.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                </Select>
               </div>
             )}
             {isTyped && (

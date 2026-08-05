@@ -313,7 +313,7 @@ export async function buildJobInvoice(
     profileId: job.profileId,
     entityId: job.entityId,
     requests: needsRate.map((c) => ({
-      itemId: c.item_id as string, variationId: null,
+      itemId: c.item_id as string, variationId: c.variation_id,
       category: c.billing_items!.category as 'Labor' | 'Lump Sum' | 'Misc' | 'Equipment' | 'Sale',
       rateKey: 'flat' as RateKey,
     })),
@@ -321,7 +321,7 @@ export async function buildJobInvoice(
 
   for (const c of charges) {
     if (alreadyCharged.has(`${c.ticket_id}|${c.kind}`)) continue
-    const unitRateCents = c.unit_rate_cents ?? (c.item_id ? chargeRates.get(rateKeyOf(c.item_id, null, 'flat')) ?? null : null)
+    const unitRateCents = c.unit_rate_cents ?? (c.item_id ? chargeRates.get(rateKeyOf(c.item_id, c.variation_id, 'flat')) ?? null : null)
     if (unitRateCents == null) {
       warnings.push(`Ticket ${ticketNumber.get(c.ticket_id)}: "${c.description}" has no price-list rate — not billed.`)
       continue

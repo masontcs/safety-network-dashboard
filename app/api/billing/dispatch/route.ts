@@ -51,11 +51,16 @@ export async function GET(request: Request): Promise<NextResponse> {
     if (reqBranch) effBranchIds = effBranchIds === null ? [reqBranch] : effBranchIds.filter((b) => b === reqBranch)
     if (effBranchIds !== null) { const allow = new Set(effBranchIds); tickets = tickets.filter((t) => t.billing_jobs && allow.has(t.billing_jobs.branch_id)) }
 
-    // lead technician per ticket
+    // Crew + lead per ticket. A ticket shows under EVERY crew member assigned to it
+    // (billing_ticket_assignments), not just the lead — so each tech sees their day's work.
     const leadByTicket = new Map<string, string>()
+    const crewByTicket = new Map<string, string[]>()
     if (tickets.length) {
-      const { data: asg } = await supabase.from('billing_ticket_assignments').select('ticket_id, technician_id, is_lead').in('ticket_id', tickets.map((t) => t.id)).eq('is_lead', true)
-      for (const a of (asg ?? []) as { ticket_id: string; technician_id: string }[]) leadByTicket.set(a.ticket_id, a.technician_id)
+      const { data: asg } = await supabase.from('billing_ticket_assignments').select('ticket_id, technician_id, is_lead').in('ticket_id', tickets.map((t) => t.id))
+      for (const a of (asg ?? []) as { ticket_id: string; technician_id: string; is_lead: boolean }[]) {
+        crewByTicket.set(a.ticket_id, [...(crewByTicket.get(a.ticket_id) ?? []), a.technician_id])
+        if (a.is_lead) leadByTicket.set(a.ticket_id, a.technician_id)
+      }
     }
 
     return NextResponse.json({
@@ -67,6 +72,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         tickets: tickets.map((t) => ({
           id: t.id, ticketNumber: t.ticket_number, date: t.ticket_date,
           leadTechId: leadByTicket.get(t.id) ?? null,
+          crewTechIds: crewByTicket.get(t.id) ?? [],
           feature: t.feature_dtc ? 'dtc' : t.feature_return ? 'return' : 'add',
           jobNumber: t.billing_jobs?.job_number ?? '',
           jobName: t.billing_jobs?.name ?? null,
@@ -102,11 +108,16 @@ export async function PATCH(request: Request): Promise<NextResponse> {
       if (error) throw new Error(error.message)
     }
 
-    // Reassign the lead technician: clear the current lead, set the new one.
+    // Reassign the lead technician. Demote whoever is currently lead, then make the target
+    // the lead — via UPSERT so promoting an EXISTING crew member doesn't collide with the
+    // unique (ticket_id, technician_id) row (a plain insert would throw for someone already
+    // on the crew now that the board shows the whole crew).
     if (body.technicianId !== undefined) {
-      await supabase.from('billing_ticket_assignments').delete().eq('ticket_id', body.ticketId).eq('is_lead', true)
+      await supabase.from('billing_ticket_assignments').update({ is_lead: false }).eq('ticket_id', body.ticketId).eq('is_lead', true)
       if (body.technicianId) {
-        const { error } = await supabase.from('billing_ticket_assignments').insert({ ticket_id: body.ticketId, technician_id: body.technicianId, is_lead: true })
+        const { error } = await supabase
+          .from('billing_ticket_assignments')
+          .upsert({ ticket_id: body.ticketId, technician_id: body.technicianId, is_lead: true }, { onConflict: 'ticket_id,technician_id' })
         if (error) throw new Error(error.message)
       }
     }

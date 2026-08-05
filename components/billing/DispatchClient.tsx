@@ -11,7 +11,7 @@ import { useBranch } from '@/components/billing/BranchContext'
  */
 
 interface Ticket {
-  id: string; ticketNumber: string; date: string; leadTechId: string | null
+  id: string; ticketNumber: string; date: string; leadTechId: string | null; crewTechIds: string[]
   feature: 'add' | 'return' | 'dtc'; jobNumber: string; jobName: string | null; customer: string | null
 }
 interface Board { weekStart: string; days: string[]; technicians: { id: string; name: string }[]; tickets: Ticket[]; isAdmin: boolean }
@@ -47,8 +47,11 @@ export default function DispatchClient() {
   async function reassign(t: Ticket, techId: string | null, date: string) {
     const technicianId = techId === UNASSIGNED ? null : techId
     if (t.leadTechId === (technicianId ?? null) && t.date === date) return
-    // Optimistic: move the card locally, roll back on failure.
-    setBoard((b) => b && { ...b, tickets: b.tickets.map((x) => (x.id === t.id ? { ...x, leadTechId: technicianId, date } : x)) })
+    // Optimistic: move the card locally, roll back on failure. The old lead stays on the
+    // crew (demoted, not removed); the new lead joins the crew if not already on it.
+    setBoard((b) => b && { ...b, tickets: b.tickets.map((x) => (x.id === t.id
+      ? { ...x, leadTechId: technicianId, date, crewTechIds: technicianId && !x.crewTechIds.includes(technicianId) ? [...x.crewTechIds, technicianId] : x.crewTechIds }
+      : x)) })
     const res = await fetch('/api/billing/dispatch', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticketId: t.id, technicianId, ticketDate: date }),
@@ -57,8 +60,10 @@ export default function DispatchClient() {
     else flash('Reassigned — driver notified.')
   }
 
+  // A ticket appears under EVERY crew member assigned to it. Tickets with no crew at all
+  // fall into the Unassigned row so nothing is hidden.
   const cardsFor = (techId: string, day: string) =>
-    (board?.tickets ?? []).filter((t) => (t.leadTechId ?? UNASSIGNED) === techId && t.date === day)
+    (board?.tickets ?? []).filter((t) => t.date === day && (techId === UNASSIGNED ? t.crewTechIds.length === 0 : t.crewTechIds.includes(techId)))
 
   const weekRangeLabel = board
     ? `${new Date(board.weekStart + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' })}`
@@ -144,19 +149,26 @@ function DispatchRow({ tech, days, loading, cardsFor, canDrag, onDragStart, onDr
             onDragLeave={canDrag ? () => setOver(null) : undefined}
             onDrop={canDrag ? (e) => { e.preventDefault(); setOver(null); onDrop(tech.id, day) } : undefined}
           >
-            {cards.map((t) => (
-              <div
-                key={t.id}
-                className={`tk ${featureClass(t.feature)}`}
-                draggable={canDrag}
-                onDragStart={() => onDragStart(t)}
-                onClick={() => onOpen(t)}
-                title={`${t.ticketNumber} · open ticket`}
-              >
-                <b>{(t.customer ?? t.jobName ?? t.jobNumber) + ' — ' + featureLabel(t.feature)}</b>
-                <small>{t.jobName && t.customer ? t.jobName : t.jobNumber}</small>
-              </div>
-            ))}
+            {cards.map((t) => {
+              // Only the lead's card (or an unassigned ticket) is draggable — dragging
+              // reassigns the LEAD, so it must be unambiguous which instance you're moving.
+              const isLead = t.leadTechId === tech.id
+              const dragThis = canDrag && (isUnassigned || isLead)
+              return (
+                <div
+                  key={t.id}
+                  className={`tk ${featureClass(t.feature)}`}
+                  style={!isUnassigned && !isLead ? { opacity: 0.72 } : undefined}
+                  draggable={dragThis}
+                  onDragStart={dragThis ? () => onDragStart(t) : undefined}
+                  onClick={() => onOpen(t)}
+                  title={dragThis ? `${t.ticketNumber} · drag to reassign / open` : `${t.ticketNumber} · on crew · open`}
+                >
+                  <b>{(t.customer ?? t.jobName ?? t.jobNumber) + ' — ' + featureLabel(t.feature)}{!isUnassigned && isLead ? ' ·lead' : ''}</b>
+                  <small>{t.jobName && t.customer ? t.jobName : t.jobNumber}</small>
+                </div>
+              )
+            })}
           </div>
         )
       })}

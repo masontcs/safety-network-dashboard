@@ -129,13 +129,31 @@ export async function POST(
       itemId = null
     }
 
+    // Variation handling for item-based kinds. When an item has variations the priced unit
+    // IS the variation (see lib/billing/pricing/rates.ts), so labor / lump sum REQUIRE one —
+    // otherwise the rate can't be resolved and the line silently won't bill. Sale prices off
+    // the item's own sale_price, so there the variation is just a label and stays optional.
+    let variationId: string | null = null
+    if (itemId && kind !== 'misc') {
+      const { data: vars, error: vErr } = await supabase
+        .from('billing_item_variations').select('id').eq('item_id', itemId)
+      if (vErr) throw new Error(vErr.message)
+      const varIds = new Set((vars ?? []).map((v) => v.id))
+      if (body.variationId) {
+        if (!varIds.has(body.variationId)) return bad('That variation does not belong to the selected item.')
+        variationId = body.variationId
+      } else if (itemCategory && varIds.size > 0) {
+        return bad('This item has variations — choose one.')
+      }
+    }
+
     const amountCents = unitRateCents === null ? null : Math.round(qty * units * unitRateCents)
 
     const { error } = await supabase.from('billing_ticket_lines').insert({
       ticket_id: params.id,
       kind,
       item_id: itemId,
-      variation_id: kind === 'sale' ? body.variationId ?? null : null,
+      variation_id: variationId,
       description,
       qty,
       units,
