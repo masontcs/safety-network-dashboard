@@ -37,8 +37,9 @@ export const DASHBOARD_ROLES: readonly Role[] = [
 export const BILLING_ROLES: readonly Role[] = ['admin'] as const
 
 /**
- * Field-only roles: real accounts with ZERO web access. They belong to the tech
- * app and must never resolve a dashboard or billing page.
+ * Field-only roles. They reach ONLY the mobile tech web app at /tech (a money-blind
+ * capture tool) and must never resolve a dashboard or billing page. The /tech app is
+ * served here for now; a native app can follow, hitting the same /api/tech/* endpoints.
  */
 export const FIELD_ROLES: readonly Role[] = ['tech'] as const
 
@@ -62,6 +63,8 @@ export function allowedPrefixesFor(role: Role): string[] {
   const prefixes: string[] = []
   if (canUseDashboards(role)) prefixes.push(...DASHBOARD_PREFIXES[role])
   if (canUseBilling(role)) prefixes.push('/billing')
+  // Field roles reach ONLY the tech app — never a dashboard or billing prefix.
+  if (isFieldRole(role)) prefixes.push('/tech')
   return prefixes
 }
 
@@ -76,5 +79,5 @@ const DASHBOARD_PREFIXES: Record<Role, string[]> = {
   office_team:      ['/ar'],
   project_manager:  ['/dashboard', '/ar'],
   sales:            ['/dashboard', '/ar'],
-  tech:             [], // field role — no web access
+  tech:             [], // field role — dashboards none; /tech is granted via isFieldRole in allowedPrefixesFor
 }

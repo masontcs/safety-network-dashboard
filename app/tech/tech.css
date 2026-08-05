@@ -1,0 +1,163 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   Tech app — mobile-first, money-blind capture tool.
+   Scoped under .tech-root so it can't bleed into the dashboards/billing themes.
+   Sized for gloved hands in daylight: large targets, high contrast, minimal chrome.
+   Everything here is portable in spirit to the eventual native app.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.tech-root {
+  --bg: #f3f3f1;
+  --surface: #ffffff;
+  --surface-2: #f7f7f5;
+  --ink: #16161a;
+  --muted: #5b5b62;
+  --dim: #8a8a90;
+  --line: #e4e4e1;
+  --line-2: #d7d7d3;
+  --accent: #d35400;        /* restrained orange */
+  --accent-ink: #ffffff;
+  --accent-soft: #fdece1;
+  --good: #1c7a4b;
+  --good-soft: #e6f3ec;
+  --danger: #c0392b;
+  --danger-soft: #fbeae7;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --shadow: 0 1px 2px rgba(20,20,20,.05), 0 8px 24px rgba(20,20,20,.06);
+  --shadow-sheet: 0 -8px 40px rgba(0,0,0,.22);
+
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tech-root * { box-sizing: border-box; }
+
+/* ── App bar ─────────────────────────────────────────────────────────────── */
+.tech-bar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 10px;
+  padding: max(10px, env(safe-area-inset-top)) 16px 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.tech-bar h1 { font-size: 17px; font-weight: 700; margin: 0; letter-spacing: -.01em; }
+.tech-bar .sub { font-size: 12px; color: var(--muted); }
+.tech-bar .spacer { margin-left: auto; }
+
+/* Back button (ticket screen) */
+.tech-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: none; color: var(--accent);
+  font-size: 15px; font-weight: 600; cursor: pointer; padding: 6px 4px 6px 0;
+}
+
+.tech-page { padding: 14px 16px calc(28px + env(safe-area-inset-bottom)); max-width: 640px; margin: 0 auto; }
+
+/* ── Cards ───────────────────────────────────────────────────────────────── */
+.tech-card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 16px; margin-bottom: 12px;
+}
+.tech-ticketcard { display: block; text-decoration: none; color: inherit; -webkit-tap-highlight-color: transparent; }
+.tech-ticketcard:active { transform: scale(.99); }
+
+.tech-row { display: flex; align-items: center; gap: 10px; }
+.tech-num { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tech-jobname { font-size: 15px; font-weight: 600; margin-top: 2px; }
+.tech-meta { font-size: 13.5px; color: var(--muted); margin-top: 3px; line-height: 1.35; }
+.tech-hours { margin-left: auto; text-align: right; flex: none; }
+.tech-hours b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.tech-hours span { display: block; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .04em; }
+
+/* ── Labels / chips / tags ───────────────────────────────────────────────── */
+.tech-lbl { display: block; font-size: 11.5px; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 7px; }
+
+.tech-tag { display: inline-flex; align-items: center; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; padding: 3px 8px; border-radius: 999px; }
+.tech-tag.add { background: var(--good-soft); color: var(--good); }
+.tech-tag.ret { background: var(--accent-soft); color: var(--accent); }
+.tech-tag.dtc { background: #eceaf5; color: #5b4fb0; }
+.tech-tag.lead { background: var(--ink); color: #fff; }
+
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
+.tech-tabs { display: flex; gap: 6px; background: var(--surface-2); border: 1px solid var(--line); padding: 4px; border-radius: 12px; margin-bottom: 14px; }
+.tech-tab { flex: 1; text-align: center; padding: 11px 8px; border-radius: 9px; border: none; background: none; font-size: 14.5px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.tech-tab.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+/* ── Buttons (big targets) ───────────────────────────────────────────────── */
+.tech-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; min-height: 52px; padding: 0 18px;
+  border: none; border-radius: 12px; cursor: pointer;
+  font-size: 16px; font-weight: 700; font-family: inherit;
+  background: var(--accent); color: var(--accent-ink);
+}
+.tech-btn:active { filter: brightness(.94); }
+.tech-btn:disabled { opacity: .45; }
+.tech-btn.ghost { background: var(--surface); color: var(--ink); border: 1.5px solid var(--line-2); }
+.tech-btn.good { background: var(--good); }
+.tech-btn.sm { width: auto; min-height: 44px; font-size: 14.5px; padding: 0 14px; }
+.tech-btn.block { margin-top: 6px; }
+
+.tech-linkbtn { background: none; border: none; color: var(--danger); font-size: 14px; font-weight: 600; cursor: pointer; padding: 8px; }
+
+/* ── List items (labor/equipment rows) ──────────────────────────────────── */
+.tech-item { display: flex; align-items: center; gap: 12px; padding: 13px 2px; border-bottom: 1px solid var(--line); }
+.tech-item:last-child { border-bottom: none; }
+.tech-item .body { flex: 1; min-width: 0; }
+.tech-item .t1 { font-size: 15px; font-weight: 600; }
+.tech-item .t2 { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.tech-item .r { text-align: right; flex: none; font-variant-numeric: tabular-nums; }
+.tech-item .r b { font-size: 16px; }
+
+.tech-empty { text-align: center; color: var(--dim); font-size: 14px; padding: 26px 10px; }
+
+/* ── Inputs ──────────────────────────────────────────────────────────────── */
+.tech-input, .tech-select {
+  width: 100%; min-height: 50px; padding: 0 14px;
+  font-size: 16px; /* ≥16px stops iOS auto-zoom */ font-family: inherit; color: var(--ink);
+  background: var(--surface); border: 1.5px solid var(--line-2); border-radius: 11px; outline: none;
+}
+.tech-input:focus, .tech-select:focus { border-color: var(--accent); }
+
+/* Activity / choice chips */
+.tech-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.tech-chip { flex: 1 1 auto; min-height: 48px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--line-2); background: var(--surface); color: var(--ink);
+  border-radius: 11px; font-size: 15px; font-weight: 600; cursor: pointer; }
+.tech-chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Stepper (15-min time control) */
+.tech-stepper { display: flex; align-items: stretch; gap: 0; border: 1.5px solid var(--line-2); border-radius: 12px; overflow: hidden; }
+.tech-stepper button { width: 56px; flex: none; border: none; background: var(--surface-2); font-size: 26px; font-weight: 400; color: var(--ink); cursor: pointer; }
+.tech-stepper button:active { background: var(--line); }
+.tech-stepper .val { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; background: var(--surface); }
+.tech-stepper .val .d { color: var(--accent); font-size: 13px; font-weight: 700; margin-left: 6px; }
+
+.tech-hoursreadout { text-align: center; font-size: 15px; color: var(--muted); margin: 4px 0 2px; }
+.tech-hoursreadout b { font-size: 22px; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* ── Bottom sheet ────────────────────────────────────────────────────────── */
+.tech-sheet-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.4); display: flex; align-items: flex-end; justify-content: center; }
+.tech-sheet {
+  width: 100%; max-width: 640px; background: var(--surface);
+  border-radius: 20px 20px 0 0; box-shadow: var(--shadow-sheet);
+  padding: 8px 16px calc(18px + env(safe-area-inset-bottom));
+  max-height: 92dvh; overflow-y: auto;
+}
+.tech-sheet .grip { width: 40px; height: 5px; border-radius: 3px; background: var(--line-2); margin: 6px auto 12px; }
+.tech-sheet h2 { font-size: 18px; font-weight: 700; margin: 0 0 14px; }
+.tech-field { margin-bottom: 16px; }
+
+/* ── Banners / notes ─────────────────────────────────────────────────────── */
+.tech-note { font-size: 13px; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+.tech-note.err { background: var(--danger-soft); color: var(--danger); }
+.tech-note.info { background: var(--surface-2); color: var(--muted); }
+.tech-note.warn { background: #fbf3e4; color: #8a6d00; }
+
+.tech-skeleton { background: linear-gradient(90deg,#eee,#f5f5f5,#eee); background-size: 200% 100%; animation: techsk 1.2s infinite; border-radius: 10px; }
+@keyframes techsk { 0%{background-position:200% 0} 100%{background-position:-200% 0} }

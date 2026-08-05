@@ -20,9 +20,8 @@ const ROLE_HOME: Record<Role, string> = {
   office_team:      '/ar',
   project_manager:  '/dashboard',
   sales:            '/dashboard',
-  // Field techs have no web app — they use the tech mobile app. Send them to the
-  // public root rather than any dashboard page.
-  tech:             '/',
+  // Field techs land in the mobile tech web app — the only interface they can reach.
+  tech:             '/tech',
 }
 
 // Path prefixes each role is allowed to visit come from the single source of truth in
@@ -118,5 +117,8 @@ export const config = {
     // /billing layout gate was the only thing standing between a user and the billing
     // interface. Matched now for defence in depth: two independent gates.
     '/billing/:path*',
+    // The tech app — gated here (allow-list bounces non-tech roles) and again in the
+    // /tech layout, two independent gates like /billing.
+    '/tech/:path*',
   ],
 }
