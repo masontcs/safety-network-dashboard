@@ -3,8 +3,9 @@ import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import type { Style } from '@react-pdf/types'
 
 /**
- * Printable invoice PDF (server-rendered via @react-pdf/renderer, same approach as the
- * AR statement). Money-in-cents in, formatted dollars out.
+ * Invoice PDF — "header band" design: a graphite masthead with a warm-gold INVOICE mark,
+ * tinted bill-to / date panels, hairline line rows, and a bold graphite Total Due block.
+ * Server-rendered via @react-pdf/renderer. Money-in-cents in, formatted dollars out.
  */
 
 export interface InvoicePdfLine {
@@ -38,52 +39,61 @@ const fmtDate = (s: string | null) => {
 }
 const kindLabel = (k: string) => ({ rental: 'Rental', sale: 'Sale', lost: 'Lost/Stolen', labor: 'Labor', lump_sum: 'Lump Sum', misc: 'Misc', adjustment: 'Adjustment' }[k] ?? k)
 
-const ORANGE = '#ff6b00', INK = '#1d1d1f', LABEL = '#6e6e73', RULE = '#d2d2d7', SURFACE = '#f5f5f7', WHITE = '#ffffff'
+const GRAPHITE = '#1e1e22'
+const GOLD = '#e0a83e'
+const INK = '#1a1a1a'
+const MUTED = '#8a8a8f'
+const LABEL = '#9a9a9f'
+const PANEL = '#f6f6f4'
+const HEADROW = '#f0f0ee'
+const HAIR = '#ececea'
+const WHITE = '#ffffff'
 
 const s = StyleSheet.create({
-  page: { fontFamily: 'Helvetica', fontSize: 9, color: INK, backgroundColor: WHITE, paddingTop: 28, paddingBottom: 48 },
-  topStripe: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: ORANGE, height: 4 },
-  header: { paddingHorizontal: 40, paddingTop: 24, paddingBottom: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  companyName: { fontSize: 18, fontFamily: 'Helvetica-Bold', color: INK, letterSpacing: -0.3 },
-  companyTagline: { fontSize: 8, color: LABEL, marginTop: 3 },
-  headerRight: { alignItems: 'flex-end' },
-  docTitle: { fontSize: 11, fontFamily: 'Helvetica-Bold', color: ORANGE, textTransform: 'uppercase', letterSpacing: 1.5 },
-  invNum: { fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK, marginTop: 4 },
-  metaSmall: { fontSize: 8, color: LABEL, marginTop: 3 },
-  rule: { borderBottomColor: RULE, borderBottomWidth: 1, marginHorizontal: 40 },
-  body: { paddingHorizontal: 40, paddingTop: 24 },
+  page: { fontFamily: 'Helvetica', fontSize: 9, color: INK, backgroundColor: WHITE, paddingBottom: 54 },
 
-  billRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 22 },
-  billToLabel: { fontSize: 7, color: LABEL, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 5 },
-  customerName: { fontSize: 15, fontFamily: 'Helvetica-Bold', color: INK },
-  sub: { fontSize: 8, color: LABEL, marginTop: 3 },
-  metaBox: { alignItems: 'flex-end' },
-  metaLine: { flexDirection: 'row', gap: 10, marginBottom: 3 },
-  metaLabel: { fontSize: 8, color: LABEL, width: 70, textAlign: 'right' },
-  metaVal: { fontSize: 8, color: INK, width: 90, textAlign: 'right', fontFamily: 'Helvetica-Bold' },
+  // masthead band (page 1)
+  band: { backgroundColor: GRAPHITE, paddingHorizontal: 40, paddingVertical: 26, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  company: { fontSize: 19, fontFamily: 'Helvetica-Bold', color: WHITE, letterSpacing: -0.3 },
+  tagline: { fontSize: 8, color: '#a7a7b0', marginTop: 4 },
+  invWord: { fontSize: 12, fontFamily: 'Helvetica-Bold', color: GOLD, letterSpacing: 3, textAlign: 'right' },
+  invMeta: { fontSize: 9, color: '#c9c9d0', marginTop: 5, textAlign: 'right' },
 
-  tableHeaderRow: { flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 6, borderBottomColor: INK, borderBottomWidth: 1 },
-  th: { fontSize: 7, color: LABEL, textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: 'Helvetica-Bold' },
-  row: { flexDirection: 'row', paddingVertical: 7, paddingHorizontal: 6, borderBottomColor: RULE, borderBottomWidth: 1 },
-  rowShaded: { flexDirection: 'row', paddingVertical: 7, paddingHorizontal: 6, backgroundColor: SURFACE, borderBottomColor: RULE, borderBottomWidth: 1 },
-  cell: { fontSize: 8, color: INK },
-  cellMuted: { fontSize: 8, color: LABEL },
-  cellRight: { fontSize: 8, color: INK, textAlign: 'right' },
-  cellRightB: { fontSize: 8, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' },
+  body: { paddingHorizontal: 40, paddingTop: 26 },
 
-  cKind: { width: '13%' }, cDesc: { width: '43%' }, cQty: { width: '12%' }, cRate: { width: '16%' }, cAmt: { width: '16%' },
+  // bill-to + dates panels
+  panelsRow: { flexDirection: 'row', gap: 14, marginBottom: 26 },
+  panel: { flex: 1, backgroundColor: PANEL, borderRadius: 10, paddingVertical: 14, paddingHorizontal: 16 },
+  datePanel: { width: 165, backgroundColor: PANEL, borderRadius: 10, paddingVertical: 14, paddingHorizontal: 16 },
+  panelLabel: { fontSize: 7, letterSpacing: 1.1, color: LABEL, textTransform: 'uppercase', marginBottom: 6 },
+  custName: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: INK },
+  panelSub: { fontSize: 9, color: MUTED, marginTop: 3 },
+  dLabel: { fontSize: 8, color: LABEL },
+  dVal: { fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: INK, marginTop: 1 },
 
-  totalsBlock: { marginTop: 16, paddingHorizontal: 6, alignItems: 'flex-end' },
-  totalLine: { flexDirection: 'row', justifyContent: 'flex-end', gap: 24, paddingVertical: 2 },
-  totalLabel: { fontSize: 8, color: LABEL, width: 110, textAlign: 'right' },
-  totalAmount: { fontSize: 8, color: INK, width: 80, textAlign: 'right', fontFamily: 'Helvetica-Bold' },
+  // line table
+  headerRow: { flexDirection: 'row', backgroundColor: HEADROW, borderRadius: 6, paddingVertical: 8, paddingHorizontal: 12 },
+  th: { fontSize: 7, letterSpacing: 0.6, color: MUTED, textTransform: 'uppercase' },
+  row: { flexDirection: 'row', paddingVertical: 11, paddingHorizontal: 12, borderBottomColor: HAIR, borderBottomWidth: 1 },
+  desc: { fontSize: 9, color: INK },
+  descSub: { fontSize: 8.5, color: '#a8a8ad' },
+  cellQty: { fontSize: 9, color: MUTED, textAlign: 'right' },
+  cellRate: { fontSize: 9, color: MUTED, textAlign: 'right' },
+  cellAmt: { fontSize: 9, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' },
 
-  balanceBlock: { marginTop: 18, alignItems: 'flex-end' },
-  balancePill: { borderRadius: 10, paddingHorizontal: 20, paddingVertical: 14, backgroundColor: SURFACE, alignItems: 'flex-end' },
-  balanceLabel: { fontSize: 8, color: LABEL, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
-  balanceAmount: { fontSize: 20, fontFamily: 'Helvetica-Bold', color: ORANGE },
+  colDesc: { flex: 1 }, colQty: { width: 60 }, colRate: { width: 78 }, colAmt: { width: 80 },
 
-  pageFooter: { position: 'absolute', bottom: 18, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between', borderTopColor: RULE, borderTopWidth: 1, paddingTop: 6 },
+  // totals
+  totalsWrap: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 22 },
+  totals: { width: 250 },
+  tLine: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3, paddingHorizontal: 2 },
+  tLabel: { fontSize: 8.5, color: MUTED },
+  tVal: { fontSize: 8.5, color: INK },
+  totalBox: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: GRAPHITE, borderRadius: 8, paddingVertical: 13, paddingHorizontal: 16, marginTop: 10 },
+  totalBoxLabel: { fontSize: 8, letterSpacing: 1.2, color: '#c9c9d0', textTransform: 'uppercase' },
+  totalBoxAmt: { fontSize: 18, fontFamily: 'Helvetica-Bold', color: GOLD },
+
+  footer: { position: 'absolute', bottom: 20, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between', borderTopColor: HAIR, borderTopWidth: 1, paddingTop: 7 },
   footerText: { fontSize: 7, color: LABEL },
 })
 
@@ -95,79 +105,84 @@ export function InvoiceDocument({ data }: { data: InvoicePdfData }) {
   const { totals: t } = data
   const totalRow = (label: string, cents: number, always = false) =>
     cents === 0 && !always ? null : (
-      <View style={s.totalLine}><Text style={s.totalLabel}>{label}</Text><Text style={s.totalAmount}>{fmt(cents)}</Text></View>
+      <View style={s.tLine}><Text style={s.tLabel}>{label}</Text><Text style={s.tVal}>{fmt(cents)}</Text></View>
     )
 
   return (
     <Document title={`Invoice ${data.invoiceNumber}`} author={data.companyName}>
       <Page size="LETTER" style={s.page}>
-        <View style={s.topStripe} fixed />
 
-        <View style={s.header}>
+        {/* Masthead */}
+        <View style={s.band}>
           <View>
-            <Text style={s.companyName}>{data.companyName}</Text>
-            <Text style={s.companyTagline}>Traffic Control Rental</Text>
+            <Text style={s.company}>{data.companyName}</Text>
+            <Text style={s.tagline}>Traffic Control Rental</Text>
           </View>
-          <View style={s.headerRight}>
-            <Text style={s.docTitle}>Invoice</Text>
-            <Text style={s.invNum}>{data.invoiceNumber}</Text>
-            {data.status !== 'issued' ? <Text style={s.metaSmall}>{data.status.toUpperCase()}</Text> : null}
+          <View>
+            <Text style={s.invWord}>INVOICE</Text>
+            <Text style={s.invMeta}>{data.invoiceNumber}  ·  {fmtDate(data.invoiceDate)}</Text>
+            {data.status !== 'issued' ? <Text style={[s.invMeta, { color: GOLD }]}>{data.status.toUpperCase()}</Text> : null}
           </View>
         </View>
 
-        <View style={s.rule} />
-
         <View style={s.body}>
-          <View style={s.billRow}>
-            <View>
-              <Text style={s.billToLabel}>Bill To</Text>
-              <Text style={s.customerName}>{data.customer ?? '—'}</Text>
-              {data.profile ? <Text style={s.sub}>{data.profile}{data.entityCode ? `  ·  ${data.entityCode}` : ''}</Text> : null}
-              {data.jobNumber ? <Text style={s.sub}>Job {data.jobNumber}{data.jobName ? ` — ${data.jobName}` : ''}</Text> : null}
+          {/* Bill-to + dates */}
+          <View style={s.panelsRow}>
+            <View style={s.panel}>
+              <Text style={s.panelLabel}>Billed to</Text>
+              <Text style={s.custName}>{data.customer ?? '—'}</Text>
+              <Text style={s.panelSub}>
+                {[data.profile, data.entityCode].filter(Boolean).join('  ·  ')}
+                {data.jobNumber ? `${data.profile || data.entityCode ? '  ·  ' : ''}Job ${data.jobNumber}` : ''}
+              </Text>
+              {data.jobName ? <Text style={s.panelSub}>{data.jobName}</Text> : null}
             </View>
-            <View style={s.metaBox}>
-              <View style={s.metaLine}><Text style={s.metaLabel}>Invoice date</Text><Text style={s.metaVal}>{fmtDate(data.invoiceDate)}</Text></View>
-              <View style={s.metaLine}><Text style={s.metaLabel}>Billed through</Text><Text style={s.metaVal}>{fmtDate(data.throughDate)}</Text></View>
+            <View style={s.datePanel}>
+              <Text style={s.dLabel}>Invoice date</Text>
+              <Text style={[s.dVal, { marginBottom: 9 }]}>{fmtDate(data.invoiceDate)}</Text>
+              <Text style={s.dLabel}>Billed through</Text>
+              <Text style={s.dVal}>{fmtDate(data.throughDate)}</Text>
             </View>
           </View>
 
-          <View style={s.tableHeaderRow} fixed>
-            <TH style={s.cKind}>Type</TH>
-            <TH style={s.cDesc}>Description</TH>
-            <TH style={s.cQty} right>Qty</TH>
-            <TH style={s.cRate} right>Rate</TH>
-            <TH style={s.cAmt} right>Amount</TH>
+          {/* Line items */}
+          <View style={s.headerRow} fixed>
+            <TH style={s.colDesc}>Description</TH>
+            <TH style={s.colQty} right>Qty</TH>
+            <TH style={s.colRate} right>Rate</TH>
+            <TH style={s.colAmt} right>Amount</TH>
           </View>
 
-          {data.lines.map((l, idx) => (
-            <View key={l.id} style={idx % 2 === 0 ? s.row : s.rowShaded} wrap={false}>
-              <Text style={[s.cellMuted, s.cKind]}>{kindLabel(l.kind)}</Text>
-              <Text style={[s.cell, s.cDesc]}>{l.description}{l.taxable ? '  (taxable)' : ''}</Text>
-              <Text style={[s.cellMuted, s.cQty]}>{l.qty}{l.units > 1 ? ` × ${l.units}` : ''}</Text>
-              <Text style={[s.cellRight, s.cRate]}>{fmt(l.unitRateCents)}</Text>
-              <Text style={[s.cellRightB, s.cAmt]}>{fmt(l.amountCents)}</Text>
+          {data.lines.map((l) => (
+            <View key={l.id} style={s.row} wrap={false}>
+              <View style={s.colDesc}>
+                <Text style={s.desc}>{l.description}</Text>
+                <Text style={s.descSub}>{kindLabel(l.kind)}{l.taxable ? '  ·  taxable' : ''}</Text>
+              </View>
+              <Text style={[s.cellQty, s.colQty]}>{l.qty}{l.units > 1 ? ` × ${l.units}` : ''}</Text>
+              <Text style={[s.cellRate, s.colRate]}>{fmt(l.unitRateCents)}</Text>
+              <Text style={[s.cellAmt, s.colAmt]}>{fmt(l.amountCents)}</Text>
             </View>
           ))}
 
-          <View style={s.totalsBlock}>
-            {totalRow('Rental', t.rentalSubtotalCents)}
-            {totalRow('Rental minimum', t.rentalMinimumAdjustmentCents)}
-            {totalRow('Sales', t.salesSubtotalCents)}
-            {totalRow('Other charges', t.otherSubtotalCents)}
-            {totalRow('Subtotal', t.subtotalCents, true)}
-            {totalRow(`Tax (${data.taxRatePct}%)`, t.taxCents)}
-            {totalRow('Total', t.totalCents, true)}
-          </View>
-
-          <View style={s.balanceBlock}>
-            <View style={s.balancePill}>
-              <Text style={s.balanceLabel}>Total Due</Text>
-              <Text style={s.balanceAmount}>{fmt(t.totalCents)}</Text>
+          {/* Totals */}
+          <View style={s.totalsWrap}>
+            <View style={s.totals}>
+              {totalRow('Rental', t.rentalSubtotalCents)}
+              {totalRow('Rental minimum', t.rentalMinimumAdjustmentCents)}
+              {totalRow('Sales', t.salesSubtotalCents)}
+              {totalRow('Other charges', t.otherSubtotalCents)}
+              {totalRow('Subtotal', t.subtotalCents, true)}
+              {totalRow(`Tax (${data.taxRatePct}%)`, t.taxCents)}
+              <View style={s.totalBox}>
+                <Text style={s.totalBoxLabel}>Total due</Text>
+                <Text style={s.totalBoxAmt}>{fmt(t.totalCents)}</Text>
+              </View>
             </View>
           </View>
         </View>
 
-        <View style={s.pageFooter} fixed>
+        <View style={s.footer} fixed>
           <Text style={s.footerText}>{data.companyName}  ·  Invoice {data.invoiceNumber}</Text>
           <Text style={s.footerText} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>
