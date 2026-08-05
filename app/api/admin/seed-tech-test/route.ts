@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
 import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
-import { apiError } from '@/lib/utils/errors'
 
 /**
  * TEST UTILITY (admin-only) — seed a working tech login so the /tech app can be tested.
@@ -102,6 +101,8 @@ export async function POST(): Promise<NextResponse> {
       },
     })
   } catch (err) {
-    return apiError(err)
+    // Temp util: surface the real error (apiError would mask it as "unexpected error").
+    const message = err instanceof Error ? err.message : String(err)
+    return NextResponse.json({ success: false, error: message, code: 'SEED_ERROR' }, { status: 500 })
   }
 }
