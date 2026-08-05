@@ -13,7 +13,7 @@ import { rowOpen } from '@/components/billing/rowOpen'
 import { BILLING_TYPE_LABELS } from '@/lib/billing/constants'
 import type { BillingType } from '@/lib/supabase/database.types'
 
-interface PickerItem { id: string; code: string; name: string; category: string; tracked: boolean; rentable: boolean; salable: boolean; salePriceCents: number | null; variations: { id: string; name: string }[] }
+interface PickerItem { id: string; code: string; name: string; category: string; tracked: boolean; rentable: boolean; salable: boolean; salePriceCents: number | null; ownerProfileId: string | null; variations: { id: string; name: string }[] }
 interface LedgerEvent { id: string; eventType: string; date: string; qty: number; equipmentId: string | null; billingType: string | null; item: { id: string; code: string; name: string; tracked: boolean } | null; variation: { id: string; name: string } | null }
 // Item-priced kinds (labor, lump sum) store no rate; the API resolves it live from the
 // price list and sets rateFromPriceList so we can show the number while marking it as
@@ -24,6 +24,7 @@ interface Ticket {
   featureAdd: boolean; featureReturn: boolean; featureDtc: boolean
   billingType: BillingType | null; recurring: boolean; notes: string | null
   job: { id: string; number: string; name: string | null } | null
+  profileId: string | null
   entityCode: string; customer: string | null
   statuses: string[]; billingTypes: BillingType[]
   pickupsMissingBillingType: number
@@ -243,7 +244,10 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
     const label = kind === 'lump_sum' ? 'lump sum' : kind
     // Labor / Lump Sum pick a catalog item of that category; the price list prices it.
     const itemCategory = ITEM_PRICED_CATEGORY[kind]
-    const chargeItems = itemCategory ? items.filter((i) => i.category === itemCategory) : []
+    // Global items (no owner) plus THIS ticket's profile's custom items — never another profile's.
+    const chargeItems = itemCategory
+      ? items.filter((i) => i.category === itemCategory && (i.ownerProfileId == null || i.ownerProfileId === t.profileId))
+      : []
     // Only misc is typed by hand.
     const isTyped = kind === 'misc'
     // When the picked item has variations, the variation IS the priced unit — offer it.

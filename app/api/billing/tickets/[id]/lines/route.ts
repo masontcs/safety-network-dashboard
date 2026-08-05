@@ -39,11 +39,11 @@ type SB = ReturnType<typeof createServiceClient>
 async function loadTicket(supabase: SB, id: string) {
   const { data, error } = await supabase
     .from('billing_tickets')
-    .select('id, status, billing_jobs(branch_id)')
+    .select('id, status, billing_jobs(branch_id, profile_id)')
     .eq('id', id)
     .maybeSingle()
   if (error) throw new Error(error.message)
-  return data as unknown as { id: string; status: string; billing_jobs: { branch_id: string } | null } | null
+  return data as unknown as { id: string; status: string; billing_jobs: { branch_id: string; profile_id: string } | null } | null
 }
 
 export async function POST(
@@ -90,6 +90,8 @@ export async function POST(
     let taxable = false
     let itemId: string | null = body.itemId ?? null
     const itemCategory = ITEM_PRICED[kind]
+    // Set for a profile-scoped custom item (Labor / Lump Sum), which carries its own price.
+    let scoped: { ownerProfileId: string | null; ownRateCents: number | null } | null = null
 
     if (kind === 'sale') {
       if (!itemId) return bad('A sale line needs an item')
@@ -105,12 +107,13 @@ export async function POST(
       taxable = true // only sales are taxable
       if (!description) description = `${item.name} (sold)`
     } else if (itemCategory) {
-      // Labor / Lump Sum: the item carries the description, the price list carries the
-      // rate. Nothing about the money is entered here.
+      // Labor / Lump Sum: the item carries the description. A GLOBAL item is priced by the
+      // price list at invoice time (rate stays NULL). A PROFILE-SCOPED custom item carries
+      // its own negotiated price, captured below.
       if (!itemId) return bad(`A ${itemCategory.toLowerCase()} item is required`)
       const { data: item, error: iErr } = await supabase
         .from('billing_items')
-        .select('id, name, category, is_active')
+        .select('id, name, category, is_active, owner_profile_id, own_rate_cents')
         .eq('id', itemId)
         .maybeSingle()
       if (iErr) throw new Error(iErr.message)
@@ -118,7 +121,8 @@ export async function POST(
       if (item.category !== itemCategory) return bad(`That item is not a ${itemCategory} item.`)
       if (!item.is_active) return bad('That item is inactive.')
       description = item.name
-      unitRateCents = null // resolved from the price list at invoice
+      unitRateCents = null // global → priced from the list; scoped → set after variation check
+      scoped = { ownerProfileId: item.owner_profile_id as string | null, ownRateCents: item.own_rate_cents as number | null }
     } else {
       // misc: genuinely ad-hoc, so it's the one kind still entered by hand.
       if (!description) return bad('A description is required')
@@ -134,17 +138,31 @@ export async function POST(
     // otherwise the rate can't be resolved and the line silently won't bill. Sale prices off
     // the item's own sale_price, so there the variation is just a label and stays optional.
     let variationId: string | null = null
+    let pickedVarOwnRate: number | null = null
     if (itemId && kind !== 'misc') {
       const { data: vars, error: vErr } = await supabase
-        .from('billing_item_variations').select('id').eq('item_id', itemId)
+        .from('billing_item_variations').select('id, own_rate_cents').eq('item_id', itemId)
       if (vErr) throw new Error(vErr.message)
-      const varIds = new Set((vars ?? []).map((v) => v.id))
+      const ownRateById = new Map((vars ?? []).map((v) => [v.id, v.own_rate_cents as number | null]))
       if (body.variationId) {
-        if (!varIds.has(body.variationId)) return bad('That variation does not belong to the selected item.')
+        if (!ownRateById.has(body.variationId)) return bad('That variation does not belong to the selected item.')
         variationId = body.variationId
-      } else if (itemCategory && varIds.size > 0) {
+        pickedVarOwnRate = ownRateById.get(body.variationId) ?? null
+      } else if (itemCategory && ownRateById.size > 0) {
         return bad('This item has variations — choose one.')
       }
+    }
+
+    // A profile-scoped custom item carries its OWN negotiated price (per variation, design
+    // "B", or a single rate when it has no variations). Capture it on the line now — and
+    // never let one profile's item be charged to another profile's ticket.
+    if (itemCategory && scoped?.ownerProfileId) {
+      if (scoped.ownerProfileId !== ticket.billing_jobs?.profile_id) {
+        return bad('That custom item belongs to a different billing profile.', 'FORBIDDEN', 403)
+      }
+      const rate = variationId ? pickedVarOwnRate : scoped.ownRateCents
+      if (rate == null) return bad('This custom item has no price set — set its price on the profile first.')
+      unitRateCents = rate
     }
 
     const amountCents = unitRateCents === null ? null : Math.round(qty * units * unitRateCents)

@@ -343,9 +343,9 @@ export type Database = {
         Relationships: []
       }
       billing_items: {
-        Row: { id: string; code: string; name: string; category: BillingItemCategory; cost_cents: number; rentable: boolean; salable: boolean; sale_price_cents: number | null; taxable: boolean; tracked: boolean; is_active: boolean; created_at: string; updated_at: string }
-        Insert: { id?: string; code: string; name: string; category: BillingItemCategory; cost_cents?: number; rentable?: boolean; salable?: boolean; sale_price_cents?: number | null; taxable?: boolean; tracked?: boolean; is_active?: boolean }
-        Update: { id?: string; code?: string; name?: string; category?: BillingItemCategory; cost_cents?: number; rentable?: boolean; salable?: boolean; sale_price_cents?: number | null; taxable?: boolean; tracked?: boolean; is_active?: boolean }
+        Row: { id: string; code: string; name: string; category: BillingItemCategory; cost_cents: number; rentable: boolean; salable: boolean; sale_price_cents: number | null; taxable: boolean; tracked: boolean; is_active: boolean; owner_profile_id: string | null; own_rate_cents: number | null; created_at: string; updated_at: string }
+        Insert: { id?: string; code: string; name: string; category: BillingItemCategory; cost_cents?: number; rentable?: boolean; salable?: boolean; sale_price_cents?: number | null; taxable?: boolean; tracked?: boolean; is_active?: boolean; owner_profile_id?: string | null; own_rate_cents?: number | null }
+        Update: { id?: string; code?: string; name?: string; category?: BillingItemCategory; cost_cents?: number; rentable?: boolean; salable?: boolean; sale_price_cents?: number | null; taxable?: boolean; tracked?: boolean; is_active?: boolean; owner_profile_id?: string | null; own_rate_cents?: number | null }
         Relationships: []
       }
       billing_item_default_rates: {
@@ -355,9 +355,9 @@ export type Database = {
         Relationships: []
       }
       billing_item_variations: {
-        Row: { id: string; item_id: string; name: string; cost_adj_cents: number; sale_adj_cents: number; sort_order: number }
-        Insert: { id?: string; item_id: string; name: string; cost_adj_cents?: number; sale_adj_cents?: number; sort_order?: number }
-        Update: { id?: string; item_id?: string; name?: string; cost_adj_cents?: number; sale_adj_cents?: number; sort_order?: number }
+        Row: { id: string; item_id: string; name: string; cost_adj_cents: number; sale_adj_cents: number; sort_order: number; own_rate_cents: number | null }
+        Insert: { id?: string; item_id: string; name: string; cost_adj_cents?: number; sale_adj_cents?: number; sort_order?: number; own_rate_cents?: number | null }
+        Update: { id?: string; item_id?: string; name?: string; cost_adj_cents?: number; sale_adj_cents?: number; sort_order?: number; own_rate_cents?: number | null }
         Relationships: []
       }
       billing_price_lists: {

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
 import ProfileEntityConfigCard from '@/components/billing/ProfileEntityConfigCard'
+import ProfileCustomItemsCard from '@/components/billing/ProfileCustomItemsCard'
 import ProfileJobsTab from '@/components/billing/ProfileJobsTab'
 import ProfileInvoicesTab from '@/components/billing/ProfileInvoicesTab'
 import Tabs from '@/components/billing/Tabs'
@@ -224,6 +225,7 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
       </div>
 
       <ProfileEntityConfigCard profileId={profileId} />
+      <ProfileCustomItemsCard profileId={profileId} />
       </>)}
     </div>
   )

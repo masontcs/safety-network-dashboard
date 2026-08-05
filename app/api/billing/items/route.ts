@@ -51,6 +51,7 @@ export async function GET(): Promise<NextResponse> {
         billing_item_variations(id),
         billing_item_default_rates(billing_type)
       `)
+      .is('owner_profile_id', null) // the global catalog only — profile-scoped custom items live on their profile
       .order('code')
     if (error) throw new Error(error.message)
 
