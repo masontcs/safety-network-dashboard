@@ -98,7 +98,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     const { data: item, error: iErr } = await supabase
       .from('billing_items')
-      .insert({ code, name, category, owner_profile_id: params.id, own_rate_cents: ownRateCents, is_active: true })
+      // Charge items (Labor / Lump Sum) are never goods — billing_items_charge_flags_chk
+      // requires all four flags false, so set them explicitly (rentable defaults true).
+      .insert({ code, name, category, owner_profile_id: params.id, own_rate_cents: ownRateCents, is_active: true, rentable: false, salable: false, tracked: false, taxable: false })
       .select('id')
       .single()
     if (iErr) {
