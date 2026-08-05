@@ -61,16 +61,17 @@ export default function InvoiceDetailClient({ invoiceId }: { invoiceId: string }
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{inv.invoiceNumber}</span>
         <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: statusColor[inv.status] ?? 'var(--text-muted)' }}>{inv.status}</span>
-        {inv.isAdmin && (
-          <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <a href={`/api/billing/invoices/${invoiceId}/pdf`} download style={{ ...ghost, textDecoration: 'none', color: 'var(--text-primary)' }}>Download PDF</a>
+          {inv.isAdmin && (<>
             {inv.status === 'draft' && <button onClick={() => act('issue')} disabled={busy} className="btn-primary" style={{ padding: '7px 16px', opacity: busy ? 0.5 : 1 }}>Issue</button>}
             {inv.status !== 'void' && (confirmVoid
               ? <><span style={{ fontSize: 12, color: 'var(--text-muted)', alignSelf: 'center' }}>Void this invoice?</span>
                   <button onClick={() => act('void')} disabled={busy} style={{ ...ghost, color: 'var(--danger)', borderColor: 'var(--danger)' }}>Yes, void</button>
                   <button onClick={() => setConfirmVoid(false)} style={ghost}>No</button></>
               : <button onClick={() => setConfirmVoid(true)} disabled={busy} style={{ ...ghost, color: 'var(--danger)' }}>Void</button>)}
-          </span>
-        )}
+          </>)}
+        </span>
       </div>
 
       <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 6, marginBottom: 18 }}>
