@@ -9,6 +9,7 @@ import ProfileJobsTab from '@/components/billing/ProfileJobsTab'
 import ProfileInvoicesTab from '@/components/billing/ProfileInvoicesTab'
 import Tabs from '@/components/billing/Tabs'
 import Select from '@/components/billing/Select'
+import Combobox from '@/components/billing/Combobox'
 import Toggle from '@/components/billing/Toggle'
 
 /**
@@ -165,10 +166,9 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
             </div>
             <div>
               <label style={labelStyle}>Payment term</label>
-              <Select ariaLabel="Payment term" value={termId} onChange={(v) => { setTermId(v); setSaveSuccess(false) }} disabled={!isAdmin}>
-                <option value="">Use customer default</option>
-                {terms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </Select>
+              <Combobox ariaLabel="Payment term" value={termId} onChange={(v) => { setTermId(v); setSaveSuccess(false) }} disabled={!isAdmin}
+                placeholder="Use customer default"
+                options={[{ value: '', label: 'Use customer default' }, ...terms.map((t) => ({ value: t.id, label: t.name }))]} />
             </div>
           </div>
 

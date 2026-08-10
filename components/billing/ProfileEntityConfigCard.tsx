@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Skeleton from '@/components/ui/Skeleton'
 import Select from '@/components/billing/Select'
+import Combobox from '@/components/billing/Combobox'
 import Toggle from '@/components/billing/Toggle'
 
 /**
@@ -171,14 +172,13 @@ export default function ProfileEntityConfigCard({ profileId }: { profileId: stri
                   <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <div style={{ maxWidth: 340 }}>
                       <label style={labelStyle}>Price list</label>
-                      <Select
+                      <Combobox
                         ariaLabel="Price list"
                         value={e.priceListId ?? ''}
                         onChange={(v) => changePriceList(e.entityId, v)}
-                      >
-                        <option value="">Select a price list…</option>
-                        {lists.map((pl) => <option key={pl.id} value={pl.id}>{pl.name}</option>)}
-                      </Select>
+                        placeholder="Search price lists…"
+                        options={lists.map((pl) => ({ value: pl.id, label: pl.name }))}
+                      />
                       {lists.length === 0 && (
                         <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 6 }}>
                           No price lists exist for {e.code} yet.

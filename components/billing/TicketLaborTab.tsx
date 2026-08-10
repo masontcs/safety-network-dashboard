@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Skeleton from '@/components/ui/Skeleton'
 import Select from '@/components/billing/Select'
+import Combobox from '@/components/billing/Combobox'
 import { rowOpen } from '@/components/billing/rowOpen'
 
 /**
@@ -200,16 +201,15 @@ export default function TicketLaborTab({ ticketId, canEdit }: { ticketId: string
 
       {canEdit && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid var(--border-subtle, var(--border-emphasis))', paddingTop: 14 }}>
-          <div style={{ minWidth: 160 }}><label style={labelStyle}>Technician</label>
-            <Select ariaLabel="Technician" value={nTech} onChange={setNTech} style={inputStyle}>
-              {techs.length === 0 && <option value="">No crew assigned</option>}
-              {techs.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </Select>
+          <div style={{ minWidth: 180 }}><label style={labelStyle}>Technician</label>
+            <Combobox ariaLabel="Technician" value={nTech} onChange={setNTech} style={inputStyle}
+              placeholder={techs.length ? 'Search crew…' : 'No crew assigned'}
+              options={techs.map((t) => ({ value: t.id, label: t.name }))} />
           </div>
-          <div style={{ minWidth: 140 }}><label style={labelStyle}>Activity</label>
-            <Select ariaLabel="Activity" value={nAct} onChange={setNAct} style={inputStyle}>
-              {acts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </Select>
+          <div style={{ minWidth: 160 }}><label style={labelStyle}>Activity</label>
+            <Combobox ariaLabel="Activity" value={nAct} onChange={setNAct} style={inputStyle}
+              placeholder="Search activity…"
+              options={acts.map((a) => ({ value: a.id, label: a.name }))} />
           </div>
           <div style={{ width: 120 }}><label style={labelStyle}>Start</label><input type="time" step={900} value={nStart} onChange={(e) => setNStart(e.target.value)} style={inputStyle} /></div>
           <div style={{ width: 120 }}><label style={labelStyle}>End</label><input type="time" step={900} value={nEnd} onChange={(e) => setNEnd(e.target.value)} style={inputStyle} /></div>

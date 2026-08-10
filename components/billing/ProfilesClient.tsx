@@ -229,10 +229,8 @@ export default function ProfilesClient() {
             </div>
             <div>
               <label style={labelStyle}>Branch</label>
-              <Select ariaLabel="Branch" value={pBranchId} onChange={setPBranchId}>
-                <option value="">Select…</option>
-                {ref.branches.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.code})</option>)}
-              </Select>
+              <Combobox ariaLabel="Branch" value={pBranchId} onChange={setPBranchId} placeholder="Search branches…"
+                options={ref.branches.map((b) => ({ value: b.id, label: b.name, hint: b.code }))} />
             </div>
             <div>
               <label style={labelStyle}>Profile code</label>
@@ -244,10 +242,8 @@ export default function ProfilesClient() {
             </div>
             <div>
               <label style={labelStyle}>Payment term</label>
-              <Select ariaLabel="Payment term" value={pTermId} onChange={setPTermId}>
-                <option value="">Use customer default</option>
-                {ref.paymentTerms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </Select>
+              <Combobox ariaLabel="Payment term" value={pTermId} onChange={setPTermId} placeholder="Use customer default"
+                options={[{ value: '', label: 'Use customer default' }, ...ref.paymentTerms.map((t) => ({ value: t.id, label: t.name }))]} />
             </div>
             <div>
               <label style={labelStyle}>Rental minimum (per invoice)</label>

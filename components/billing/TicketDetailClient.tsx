@@ -309,10 +309,8 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
             )}
             {!isTyped && chargeVariations.length > 0 && (
               <div style={{ minWidth: 150 }}><label style={labelStyle}>Variation</label>
-                <Select ariaLabel="Variation" value={cVar} onChange={setCVar} style={inputStyle}>
-                  <option value="">Select…</option>
-                  {chargeVariations.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                </Select>
+                <Combobox ariaLabel="Variation" value={cVar} onChange={setCVar} style={inputStyle}
+                  options={chargeVariations.map((v) => ({ value: v.id, label: v.name }))} />
               </div>
             )}
             {isTyped && (
@@ -546,8 +544,8 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
               {/* In return mode the variation is part of what you picked off the on-rent
                   list, so there's nothing left to choose. */}
               {!returnMode && pickItem && pickItem.variations.length > 0 && (
-                <div style={{ minWidth: 130 }}><label style={labelStyle}>Variation</label>
-                  <Select ariaLabel="Variation" value={lVar} onChange={setLVar} style={inputStyle}><option value="">—</option>{pickItem.variations.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</Select>
+                <div style={{ minWidth: 150 }}><label style={labelStyle}>Variation</label>
+                  <Combobox ariaLabel="Variation" value={lVar} onChange={setLVar} style={inputStyle} options={pickItem.variations.map((v) => ({ value: v.id, label: v.name }))} />
                 </div>
               )}
               {/* Switching event type changes what the picker lists (catalog vs on-rent), so
