@@ -165,9 +165,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!pe) return bad('That entity is not enabled for this billing profile. Configure it on the profile first.', 'CONFLICT', 409)
     if (!pe.price_list_id) return bad('That entity has no price list on this profile yet.', 'CONFLICT', 409)
 
-    // Generate the per-entity job number (service-role only RPC). Validation is
-    // done above so a burned number on failure is unlikely.
-    const jobNumber = await nextNumber(supabase, 'job', body.entityId)
+    // Generate the per-(entity, branch) job number (service-role only RPC). Format:
+    // [entity][seq][branch]J e.g. S0000004BKJ. Validation is done above so a burned
+    // number on failure is unlikely.
+    const jobNumber = await nextNumber(supabase, 'job', body.entityId, profile.branch_id)
 
     const { data: created, error } = await supabase
       .from('billing_jobs')

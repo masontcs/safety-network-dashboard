@@ -122,7 +122,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       return bad('You do not have access to this job’s branch.', 'FORBIDDEN', 403)
     }
 
-    const ticketNumber = await nextNumber(supabase, 'ticket', job.entity_id)
+    // [entity][seq][branch]T e.g. S0000005BKT — per-(entity, branch), inherits the job's branch.
+    const ticketNumber = await nextNumber(supabase, 'ticket', job.entity_id, job.branch_id)
 
     const { data: created, error } = await supabase
       .from('billing_tickets')
