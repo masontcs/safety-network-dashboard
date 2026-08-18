@@ -250,6 +250,11 @@ export async function PATCH(
       patch.feature_add = add; patch.feature_return = ret; patch.feature_dtc = dtc
     }
 
+    // Leaving DTC: its rows were auto-billed daily as one-day charges. Now that they become
+    // an ongoing rental, the cadence must be chosen deliberately — clear it so the office is
+    // prompted to (re)assign a billing type per item (final-edit already blocks on nulls).
+    const leavingDtc = ex.feature_dtc && !dtc
+
 
     if (body.status !== undefined) {
       if (!STATUSES.includes(body.status as Status)) return bad('Unknown status')
@@ -275,6 +280,15 @@ export async function PATCH(
 
     const { error } = await supabase.from('billing_tickets').update(patch).eq('id', params.id)
     if (error) throw new Error(error.message)
+
+    if (leavingDtc) {
+      const { error: ledErr } = await supabase
+        .from('billing_ticket_ledger')
+        .update({ billing_type: null })
+        .eq('ticket_id', params.id)
+        .eq('event_type', 'pickup')
+      if (ledErr) throw new Error(ledErr.message)
+    }
 
     return NextResponse.json({ success: true })
   } catch (err) {

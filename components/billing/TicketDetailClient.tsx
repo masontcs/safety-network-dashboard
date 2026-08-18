@@ -146,9 +146,10 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
     const payload = {
       itemId: out ? out.itemId : lItem,
       variationId: out ? out.variationId : (lVar || null),
-      eventType: lType, eventDate: lDate, qty,
+      // DTC rows are always a daily pickup — the engine bills the day at the daily rate.
+      eventType: isDtc ? 'pickup' : lType, eventDate: lDate, qty,
       equipmentId: lEquip || null,
-      billingType: lType === 'pickup' ? (lBt || null) : null,
+      billingType: isDtc ? 'daily' : (lType === 'pickup' ? (lBt || null) : null),
     }
     if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'POST', payload)) { setLQty('1'); setLEquip(''); setLBt(''); setLItem(''); load() }
   }
@@ -221,6 +222,10 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
    * something that never went out.
    */
   const returnMode = lType === 'return' || lType === 'lost'
+  // DTC (day-charge) tickets never start an ongoing rental: every equipment row is just a
+  // one-day charge billed at the daily rate. So we don't ask for an event (it's always a
+  // pickup) or a cadence (it's always daily) — those choices only exist for Add/Return.
+  const isDtc = t?.featureDtc ?? false
   const onRentKeyOf = (itemId: string, variationId: string | null) => `${itemId}|${variationId ?? ''}`
   const pickedOut = returnMode ? t?.onRent.find((r) => onRentKeyOf(r.itemId, r.variationId) === lItem) ?? null : null
   const pickItem = items.find((i) => i.id === (returnMode ? pickedOut?.itemId : lItem))
@@ -477,28 +482,29 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
           {t.ledger.length > 0 && (
             <div style={{ overflowX: 'auto', marginBottom: 14 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-                <thead><tr>{['Date', 'Event', 'Item', 'Variation', 'Qty', 'Billing', 'Equip ID', ''].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
+                <thead><tr>{['Date', 'Event', 'Item', 'Variation', 'Qty', 'Billing', 'Equip ID', ''].filter((h) => !isDtc || (h !== 'Event' && h !== 'Billing')).map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
                 <tbody>
                   {t.ledger.map((e) => editEv === e.id ? (
                     <tr key={e.id}>
                       <td style={td}><input type="date" value={evDate} onChange={(ev) => setEvDate(ev.target.value)} style={{ ...inputStyle, width: 140 }} /></td>
-                      <td style={{ ...td, textTransform: 'capitalize' }}>{e.eventType}</td>
+                      {!isDtc && <td style={{ ...td, textTransform: 'capitalize' }}>{e.eventType}</td>}
                       <td style={td}>{e.item?.code ?? '—'}</td>
                       <td style={{ ...td, color: 'var(--text-muted)' }}>{e.variation?.name ?? '—'}</td>
                       <td style={td}><input value={evQty} onChange={(ev) => setEvQty(ev.target.value)} style={{ ...inputStyle, width: 60 }} /></td>
-                      <td style={{ ...td, color: 'var(--text-muted)' }}>{e.eventType === 'pickup' ? (e.billingType ? BILLING_TYPE_LABELS[e.billingType as BillingType] : '—') : '—'}</td>
+                      {!isDtc && <td style={{ ...td, color: 'var(--text-muted)' }}>{e.eventType === 'pickup' ? (e.billingType ? BILLING_TYPE_LABELS[e.billingType as BillingType] : '—') : '—'}</td>}
                       <td style={td}>{e.item?.tracked ? <input value={evEquip} onChange={(ev) => setEvEquip(ev.target.value)} style={{ ...inputStyle, width: 110 }} /> : '—'}</td>
                       <td style={td}><div style={{ display: 'flex', gap: 4 }}><button onClick={saveEv} disabled={busy} style={{ ...ghost, borderColor: 'var(--accent)', color: 'var(--accent)', padding: '4px 8px' }}>Save</button><button onClick={() => setEditEv(null)} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div></td>
                     </tr>
                   ) : (
                     <tr key={e.id} {...rowOpen(!locked ? () => startEditEv(e) : undefined)} style={{ cursor: locked ? 'default' : 'pointer' }}>
                       <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{e.date}</td>
-                      <td style={{ ...td, textTransform: 'capitalize', color: e.eventType === 'pickup' ? 'var(--pill-paid-fg)' : e.eventType === 'lost' ? 'var(--pill-overdue-fg)' : 'var(--text-secondary)' }}>{e.eventType}</td>
+                      {!isDtc && <td style={{ ...td, textTransform: 'capitalize', color: e.eventType === 'pickup' ? 'var(--pill-paid-fg)' : e.eventType === 'lost' ? 'var(--pill-overdue-fg)' : 'var(--text-secondary)' }}>{e.eventType}</td>}
                       <td style={td}>{e.item?.code ?? '—'}</td>
                       <td style={{ ...td, color: 'var(--text-muted)' }}>{e.variation?.name ?? '—'}</td>
                       <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{e.qty}</td>
                       {/* The cadence lives per equipment item. Set it right here on the pickup;
-                          return/lost rows don't bill a cadence. */}
+                          return/lost rows don't bill a cadence. DTC has no cadence column at all. */}
+                      {!isDtc && (
                       <td style={td} onClick={(ev) => ev.stopPropagation()}>
                         {e.eventType === 'pickup' ? (
                           <Select
@@ -513,6 +519,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
                           </Select>
                         ) : <span style={{ color: 'var(--text-dim)' }}>—</span>}
                       </td>
+                      )}
                       <td style={{ ...td, color: 'var(--text-muted)' }}>{e.equipmentId ?? '—'}</td>
                       <td style={td}>{!locked && <div style={{ display: 'flex', gap: 4 }}><button onClick={(ev) => { ev.stopPropagation(); startEditEv(e) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>Edit</button><button onClick={(ev) => { ev.stopPropagation(); removeLedger(e.id) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>✕</button></div>}</td>
                     </tr>
@@ -549,9 +556,12 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
                 </div>
               )}
               {/* Switching event type changes what the picker lists (catalog vs on-rent), so
-                  the previous selection is meaningless — clear it. */}
-              <div style={{ width: 120 }}><label style={labelStyle}>Event</label><Select ariaLabel="Event" value={lType} onChange={(v) => { setLType(v); setLItem(''); setLVar('') }} style={inputStyle}><option value="pickup">Pickup</option><option value="return">Return</option><option value="lost">Lost</option></Select></div>
-              {lType === 'pickup' && (
+                  the previous selection is meaningless — clear it. DTC is always a daily
+                  pickup, so neither event nor cadence is asked. */}
+              {!isDtc && (
+                <div style={{ width: 120 }}><label style={labelStyle}>Event</label><Select ariaLabel="Event" value={lType} onChange={(v) => { setLType(v); setLItem(''); setLVar('') }} style={inputStyle}><option value="pickup">Pickup</option><option value="return">Return</option><option value="lost">Lost</option></Select></div>
+              )}
+              {!isDtc && lType === 'pickup' && (
                 <div style={{ width: 120 }}><label style={labelStyle}>Billing</label>
                   <Select ariaLabel="Billing type" value={lBt} onChange={setLBt} style={inputStyle}>
                     <option value="">Set later</option>
