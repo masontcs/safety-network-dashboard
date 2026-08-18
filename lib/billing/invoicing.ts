@@ -164,11 +164,16 @@ export async function buildJobInvoice(
   // silently picking one.
   const cadenceFor = new Map<string, BillingType>()
   for (const row of ledger) {
-    if (row.event_type !== 'pickup' || !row.billing_type) continue
+    if (row.event_type !== 'pickup') continue
+    // A DTC ticket is always a daily day-charge: the cadence is forced to 'daily' no matter
+    // what (if anything) is stored on the row. That's why DTC never asks for a billing type,
+    // and why legacy DTC rows with a null cadence still bill.
+    const bt: BillingType | null = isDtc.get(row.ticket_id) ? 'daily' : row.billing_type
+    if (!bt) continue
     const k = `${row.ticket_id}|${keyOf(row.item_id, row.variation_id)}`
     const existing = cadenceFor.get(k)
-    if (!existing) cadenceFor.set(k, row.billing_type)
-    else if (existing !== row.billing_type) {
+    if (!existing) cadenceFor.set(k, bt)
+    else if (existing !== bt) {
       const code = itemById.get(row.item_id)?.code ?? 'item'
       warnings.push(`Ticket ${ticketNumber.get(row.ticket_id)}: ${code} has pickups with different billing types — billed as ${existing}.`)
     }

@@ -130,6 +130,22 @@ describe('buildJobInvoice — orchestration', () => {
     expect(rental.amountCents).toBe(800)
   })
 
+  it('a DTC bills daily even when the row carries no billing type', async () => {
+    // DTC never asks for a cadence, so its rows can have a null billing_type. The engine
+    // must still bill them at the daily rate for the one day — not warn/skip.
+    const client = base({
+      billing_tickets: [{ id: 't1', ticket_number: 'T-1', status: 'final_edit', feature_dtc: true }],
+      billing_ticket_ledger: [
+        { ticket_id: 't1', item_id: 'cone', variation_id: null, event_type: 'pickup', event_date: '2026-01-01', qty: 4, billing_type: null },
+      ],
+    })
+    const d = await buildJobInvoice(client, { jobId: 'job1', throughDate: '2026-01-03', taxRatePct: 0 })
+    const rental = d.lines.find((l) => l.kind === 'rental')!
+    expect(rental.qty).toBe(4)          // one day only, forced daily
+    expect(rental.amountCents).toBe(800)
+    expect(d.warnings).toEqual([])      // NOT "no billing type set — not billed"
+  })
+
   it('bills a lost unit at cost, untaxed', async () => {
     const client = base({
       billing_tickets: [{ id: 't1', ticket_number: 'T-1', status: 'final_edit', feature_dtc: false }],
