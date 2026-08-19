@@ -146,6 +146,17 @@ describe('buildJobInvoice — orchestration', () => {
     expect(d.warnings).toEqual([])      // NOT "no billing type set — not billed"
   })
 
+  it('never bills a voided ticket', async () => {
+    // Even final-edited with real equipment, a voided ticket drops out before pricing.
+    const client = base({
+      billing_tickets: [{ id: 't1', ticket_number: 'T-1', status: 'final_edit', feature_dtc: false, is_voided: true }],
+      billing_ticket_ledger: [
+        { ticket_id: 't1', item_id: 'cone', variation_id: null, event_type: 'pickup', event_date: '2026-01-01', qty: 10, billing_type: 'daily' },
+      ],
+    })
+    await expect(buildJobInvoice(client, { jobId: 'job1', throughDate: '2026-01-03' })).rejects.toThrow(/final-edited/)
+  })
+
   it('bills a lost unit at cost, untaxed', async () => {
     const client = base({
       billing_tickets: [{ id: 't1', ticket_number: 'T-1', status: 'final_edit', feature_dtc: false }],

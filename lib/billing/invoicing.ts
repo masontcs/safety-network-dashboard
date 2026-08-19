@@ -110,14 +110,15 @@ export async function buildJobInvoice(
   // ── the job's tickets and their ledgers ───────────────────────────────────
   const { data: ticketRows } = await supabase
     .from('billing_tickets')
-    .select('id, ticket_number, status, feature_dtc')
+    .select('id, ticket_number, status, feature_dtc, is_voided')
     .eq('job_id', jobId)
-  const tickets = (ticketRows ?? []) as { id: string; ticket_number: string; status: string; feature_dtc: boolean }[]
+  const tickets = (ticketRows ?? []) as { id: string; ticket_number: string; status: string; feature_dtc: boolean; is_voided: boolean }[]
   if (tickets.length === 0) throw new InvoiceBuildError('This job has no tickets to bill.')
 
   // Only settled tickets bill. An active/in-review ticket is still being edited by the
   // crew — billing it would invoice numbers nobody has signed off on.
-  const billable = tickets.filter((t) => t.status === 'final_edit' || t.status === 'invoiced')
+  // A voided ticket is billed by nothing, ever — it drops out before the status check.
+  const billable = tickets.filter((t) => !t.is_voided && (t.status === 'final_edit' || t.status === 'invoiced'))
   if (billable.length === 0) throw new InvoiceBuildError('No tickets on this job are final-edited yet, so there is nothing to bill.')
   const billableIds = billable.map((t) => t.id)
   const ticketNumber = new Map(billable.map((t) => [t.id, t.ticket_number]))

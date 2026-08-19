@@ -40,6 +40,8 @@ interface TicketRow {
   recurring: boolean
   notes: string | null
   entity_id: string
+  is_voided: boolean
+  voided_at: string | null
   billing_jobs: { id: string; job_number: string; name: string | null; branch_id: string; profile_id: string; entities: { code: string } | null; billing_profiles: { name: string; billing_customers: { name: string } | null } | null } | null
 }
 interface LedgerRow {
@@ -66,7 +68,7 @@ export async function GET(
       .from('billing_tickets')
       .select(`
         id, ticket_number, ticket_date, status, feature_add, feature_return, feature_dtc,
-        billing_type, recurring, notes, entity_id,
+        billing_type, recurring, notes, entity_id, is_voided, voided_at,
         billing_jobs(id, job_number, name, branch_id, profile_id, entities(code), billing_profiles(name, billing_customers(name)))
       `)
       .eq('id', params.id)
@@ -149,7 +151,10 @@ export async function GET(
         ticketNumber: t.ticket_number,
         date: t.ticket_date,
         status: t.status,
-        locked: isLocked(t.status),
+        // A voided ticket is fully read-only (restore it to edit) — same as a locked one.
+        locked: isLocked(t.status) || t.is_voided,
+        voided: t.is_voided,
+        voidedAt: t.voided_at,
         featureAdd: t.feature_add,
         featureReturn: t.feature_return,
         featureDtc: t.feature_dtc,
@@ -207,12 +212,12 @@ export async function PATCH(
     const supabase = createServiceClient()
     const { data: existing, error: exErr } = await supabase
       .from('billing_tickets')
-      .select('id, status, billing_type, feature_add, feature_return, feature_dtc, billing_jobs(branch_id)')
+      .select('id, status, billing_type, feature_add, feature_return, feature_dtc, is_voided, billing_jobs(branch_id)')
       .eq('id', params.id)
       .maybeSingle()
     if (exErr) throw new Error(exErr.message)
     if (!existing) return bad('Ticket not found', 'NOT_FOUND', 404)
-    const ex = existing as unknown as { status: Status; billing_type: BillingType | null; feature_add: boolean; feature_return: boolean; feature_dtc: boolean; billing_jobs: { branch_id: string } | null }
+    const ex = existing as unknown as { status: Status; billing_type: BillingType | null; feature_add: boolean; feature_return: boolean; feature_dtc: boolean; is_voided: boolean; billing_jobs: { branch_id: string } | null }
 
     if (ctx.access.branchIds !== null && (!ex.billing_jobs || !ctx.access.branchIds.includes(ex.billing_jobs.branch_id))) {
       return bad('You do not have access to this ticket’s branch.', 'FORBIDDEN', 403)
@@ -226,6 +231,40 @@ export async function PATCH(
       billingType?: string | null
       notes?: string | null
       status?: string
+      action?: 'void' | 'unvoid'
+    }
+
+    // ── Void / un-void ────────────────────────────────────────────────────────
+    // Voiding removes the ticket from all billing and quantity counting. It's blocked
+    // while the ticket is billed on a live (non-void) invoice — void that invoice first,
+    // so its totals reverse before the ticket disappears. Un-void simply restores it.
+    if (body.action === 'void' || body.action === 'unvoid') {
+      const wantVoid = body.action === 'void'
+      if (wantVoid === ex.is_voided) {
+        return bad(wantVoid ? 'This ticket is already voided.' : 'This ticket is not voided.', 'CONFLICT', 409)
+      }
+      if (wantVoid) {
+        const { data: invLines } = await supabase
+          .from('billing_invoice_lines')
+          .select('billing_invoices!inner(invoice_number, status)')
+          .eq('ticket_id', params.id)
+        const live = ((invLines ?? []) as unknown as { billing_invoices: { invoice_number: string; status: string } | null }[])
+          .find((l) => l.billing_invoices && l.billing_invoices.status !== 'void')
+        if (live) {
+          return bad(`This ticket is billed on invoice ${live.billing_invoices!.invoice_number}. Void that invoice first, then void the ticket.`, 'CONFLICT', 409)
+        }
+      }
+      const { error: vErr } = await supabase
+        .from('billing_tickets')
+        .update({ is_voided: wantVoid, voided_at: wantVoid ? new Date().toISOString() : null, voided_by: wantVoid ? ctx.access.userId : null })
+        .eq('id', params.id)
+      if (vErr) throw new Error(vErr.message)
+      return NextResponse.json({ success: true })
+    }
+
+    // Every other edit is blocked while voided — restore the ticket first.
+    if (ex.is_voided) {
+      return bad('This ticket is voided. Restore it before making changes.', 'CONFLICT', 409)
     }
 
     const patch: TicketUpdate = {}

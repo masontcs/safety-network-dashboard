@@ -54,6 +54,7 @@ export async function GET(): Promise<NextResponse> {
       `)
       .eq('technician_id', ctx.tech.technicianId)
       .eq('billing_tickets.status', 'active')
+      .eq('billing_tickets.is_voided', false) // voided tickets aren't work — hide from techs
     if (error) throw new Error(error.message)
     const rows = (data ?? []) as unknown as AssignmentRow[]
 

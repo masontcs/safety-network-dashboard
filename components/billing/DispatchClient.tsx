@@ -12,7 +12,7 @@ import { useBranch } from '@/components/billing/BranchContext'
 
 interface Ticket {
   id: string; ticketNumber: string; date: string; leadTechId: string | null; crewTechIds: string[]
-  feature: 'add' | 'return' | 'dtc'; jobNumber: string; jobName: string | null; customer: string | null
+  feature: 'add' | 'return' | 'dtc'; jobNumber: string; jobName: string | null; customer: string | null; voided?: boolean
 }
 interface Board { weekStart: string; days: string[]; technicians: { id: string; name: string }[]; tickets: Ticket[]; isAdmin: boolean }
 
@@ -153,18 +153,19 @@ function DispatchRow({ tech, days, loading, cardsFor, canDrag, onDragStart, onDr
               // Only the lead's card (or an unassigned ticket) is draggable — dragging
               // reassigns the LEAD, so it must be unambiguous which instance you're moving.
               const isLead = t.leadTechId === tech.id
-              const dragThis = canDrag && (isUnassigned || isLead)
+              // A voided ticket isn't work to schedule — show it greyed and don't let it drag.
+              const dragThis = canDrag && (isUnassigned || isLead) && !t.voided
               return (
                 <div
                   key={t.id}
                   className={`tk ${featureClass(t.feature)}`}
-                  style={!isUnassigned && !isLead ? { opacity: 0.72 } : undefined}
+                  style={t.voided ? { opacity: 0.4, textDecoration: 'line-through' } : (!isUnassigned && !isLead ? { opacity: 0.72 } : undefined)}
                   draggable={dragThis}
                   onDragStart={dragThis ? () => onDragStart(t) : undefined}
                   onClick={() => onOpen(t)}
-                  title={dragThis ? `${t.ticketNumber} · drag to reassign / open` : `${t.ticketNumber} · on crew · open`}
+                  title={t.voided ? `${t.ticketNumber} · voided` : dragThis ? `${t.ticketNumber} · drag to reassign / open` : `${t.ticketNumber} · on crew · open`}
                 >
-                  <b>{(t.customer ?? t.jobName ?? t.jobNumber) + ' — ' + featureLabel(t.feature)}{!isUnassigned && isLead ? ' ·lead' : ''}</b>
+                  <b>{(t.customer ?? t.jobName ?? t.jobNumber) + ' — ' + featureLabel(t.feature)}{t.voided ? ' · VOID' : !isUnassigned && isLead ? ' ·lead' : ''}</b>
                   <small>{t.jobName && t.customer ? t.jobName : t.jobNumber}</small>
                 </div>
               )

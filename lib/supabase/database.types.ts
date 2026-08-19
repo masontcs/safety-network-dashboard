@@ -422,9 +422,9 @@ export type Database = {
         Relationships: []
       }
       billing_tickets: {
-        Row: { id: string; ticket_number: string; job_id: string; entity_id: string; ticket_date: string; status: BillingTicketStatus; feature_add: boolean; feature_return: boolean; feature_dtc: boolean; billing_type: BillingType | null; recurring: boolean; final_edited_at: string | null; notes: string | null; created_at: string; updated_at: string }
-        Insert: { id?: string; ticket_number: string; job_id: string; entity_id: string; ticket_date: string; status?: BillingTicketStatus; feature_add?: boolean; feature_return?: boolean; feature_dtc?: boolean; billing_type?: BillingType | null; recurring?: boolean; final_edited_at?: string | null; notes?: string | null }
-        Update: { id?: string; ticket_number?: string; job_id?: string; entity_id?: string; ticket_date?: string; status?: BillingTicketStatus; feature_add?: boolean; feature_return?: boolean; feature_dtc?: boolean; billing_type?: BillingType | null; recurring?: boolean; final_edited_at?: string | null; notes?: string | null }
+        Row: { id: string; ticket_number: string; job_id: string; entity_id: string; ticket_date: string; status: BillingTicketStatus; feature_add: boolean; feature_return: boolean; feature_dtc: boolean; billing_type: BillingType | null; recurring: boolean; final_edited_at: string | null; notes: string | null; is_voided: boolean; voided_at: string | null; voided_by: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; ticket_number: string; job_id: string; entity_id: string; ticket_date: string; status?: BillingTicketStatus; feature_add?: boolean; feature_return?: boolean; feature_dtc?: boolean; billing_type?: BillingType | null; recurring?: boolean; final_edited_at?: string | null; notes?: string | null; is_voided?: boolean; voided_at?: string | null; voided_by?: string | null }
+        Update: { id?: string; ticket_number?: string; job_id?: string; entity_id?: string; ticket_date?: string; status?: BillingTicketStatus; feature_add?: boolean; feature_return?: boolean; feature_dtc?: boolean; billing_type?: BillingType | null; recurring?: boolean; final_edited_at?: string | null; notes?: string | null; is_voided?: boolean; voided_at?: string | null; voided_by?: string | null }
         Relationships: []
       }
       billing_ticket_ledger: {

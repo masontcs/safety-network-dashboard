@@ -59,9 +59,22 @@ export default function ProfileCustomItemsCard({ profileId }: { profileId: strin
 
   async function save() {
     if (busy) return
+    // Validate up front so failures show a clear message right here, not a silent no-op.
+    // (The variation names/prices are what people miss most.)
+    if (!name.trim()) { setErr('A name is required.'); return }
+    if (!code.trim()) { setErr('A code is required.'); return }
+    const cleanVars = useVars ? vars.filter((v) => v.name.trim()) : []
+    if (useVars) {
+      if (cleanVars.length === 0) { setErr('Add at least one variation with a name and price — or uncheck “has variations” to use a single price.'); return }
+      const badRate = cleanVars.find((v) => !Number.isFinite(parseFloat(v.rate)) || parseFloat(v.rate) < 0)
+      if (badRate) { setErr(`Enter a price of zero or more for “${badRate.name.trim()}”.`); return }
+    } else if (!Number.isFinite(parseFloat(rate)) || parseFloat(rate) < 0) {
+      setErr('Enter a price of zero or more.'); return
+    }
+
     setBusy(true); setErr(null)
     const body = useVars
-      ? { category, name, code, variations: vars.filter((v) => v.name.trim()).map((v) => ({ id: v.id, name: v.name.trim(), ownRateCents: toCents(v.rate) })) }
+      ? { category, name, code, variations: cleanVars.map((v) => ({ id: v.id, name: v.name.trim(), ownRateCents: toCents(v.rate) })) }
       : { category, name, code, variations: [], ownRateCents: toCents(rate) }
     const url = editId ? `/api/billing/profiles/${profileId}/items/${editId}` : `/api/billing/profiles/${profileId}/items`
     try {
@@ -123,6 +136,8 @@ export default function ProfileCustomItemsCard({ profileId }: { profileId: strin
             </div>
           )}
 
+          {/* Errors also show right here — the card-top note is easy to miss below a long form. */}
+          {err && <div className="bx-note amber" style={{ margin: 0 }}>{err}</div>}
           <button className="bx-btn accent" style={{ alignSelf: 'flex-start' }} onClick={save} disabled={busy || !name.trim() || !code.trim()}>{busy ? 'Saving…' : editId ? 'Save changes' : 'Create item'}</button>
         </div>
       )}

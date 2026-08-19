@@ -39,11 +39,11 @@ type SB = ReturnType<typeof createServiceClient>
 async function loadTicket(supabase: SB, id: string) {
   const { data, error } = await supabase
     .from('billing_tickets')
-    .select('id, status, billing_jobs(branch_id, profile_id)')
+    .select('id, status, is_voided, billing_jobs(branch_id, profile_id)')
     .eq('id', id)
     .maybeSingle()
   if (error) throw new Error(error.message)
-  return data as unknown as { id: string; status: string; billing_jobs: { branch_id: string; profile_id: string } | null } | null
+  return data as unknown as { id: string; status: string; is_voided: boolean; billing_jobs: { branch_id: string; profile_id: string } | null } | null
 }
 
 export async function POST(
@@ -61,6 +61,9 @@ export async function POST(
     if (!ticket) return bad('Ticket not found', 'NOT_FOUND', 404)
     if (ctx.access.branchIds !== null && (!ticket.billing_jobs || !ctx.access.branchIds.includes(ticket.billing_jobs.branch_id))) {
       return bad('You do not have access to this ticket’s branch.', 'FORBIDDEN', 403)
+    }
+    if (ticket.is_voided) {
+      return bad('This ticket is voided. Restore it before changing charges.', 'CONFLICT', 409)
     }
     if (ticket.status === 'final_edit' || ticket.status === 'invoiced') {
       return bad('This ticket is locked. Reopen it to change charges.', 'CONFLICT', 409)
@@ -203,6 +206,9 @@ export async function PATCH(
     if (ctx.access.branchIds !== null && (!ticket.billing_jobs || !ctx.access.branchIds.includes(ticket.billing_jobs.branch_id))) {
       return bad('You do not have access to this ticket’s branch.', 'FORBIDDEN', 403)
     }
+    if (ticket.is_voided) {
+      return bad('This ticket is voided. Restore it before changing charges.', 'CONFLICT', 409)
+    }
     if (ticket.status === 'final_edit' || ticket.status === 'invoiced') {
       return bad('This ticket is locked. Reopen it to change charges.', 'CONFLICT', 409)
     }
@@ -283,6 +289,9 @@ export async function DELETE(
     if (!ticket) return bad('Ticket not found', 'NOT_FOUND', 404)
     if (ctx.access.branchIds !== null && (!ticket.billing_jobs || !ctx.access.branchIds.includes(ticket.billing_jobs.branch_id))) {
       return bad('You do not have access to this ticket’s branch.', 'FORBIDDEN', 403)
+    }
+    if (ticket.is_voided) {
+      return bad('This ticket is voided. Restore it before changing charges.', 'CONFLICT', 409)
     }
     if (ticket.status === 'final_edit' || ticket.status === 'invoiced') {
       return bad('This ticket is locked.', 'CONFLICT', 409)

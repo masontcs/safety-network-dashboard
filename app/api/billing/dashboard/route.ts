@@ -71,18 +71,19 @@ export async function GET(request: Request): Promise<NextResponse> {
     // ── ledger → on-rent per job (DTC excluded), needs-attention ─────────────
     let ledQ = supabase
       .from('billing_ticket_ledger')
-      .select('item_id, job_id, event_type, qty, billing_type, billing_tickets(feature_dtc, status)')
+      .select('item_id, job_id, event_type, qty, billing_type, billing_tickets(feature_dtc, status, is_voided)')
     if (scopedJobIds !== null) ledQ = ledQ.in('job_id', scopedJobIds)
     const { data: ledRaw } = await ledQ
     const ledger = (ledRaw ?? []) as unknown as {
       item_id: string; job_id: string; event_type: string; qty: number; billing_type: string | null
-      billing_tickets: { feature_dtc: boolean; status: string } | null
+      billing_tickets: { feature_dtc: boolean; status: string; is_voided: boolean } | null
     }[]
 
     const onRentByJob = new Map<string, number>()
     const onRentByJobItem = new Map<string, Map<string, number>>()
     let pickupsMissingBillingType = 0
     for (const l of ledger) {
+      if (l.billing_tickets?.is_voided) continue // a voided ticket counts toward nothing
       if (l.billing_tickets?.feature_dtc) continue // DTC never on rent
       const sign = l.event_type === 'pickup' ? l.qty : -l.qty
       onRentByJob.set(l.job_id, (onRentByJob.get(l.job_id) ?? 0) + sign)
@@ -95,7 +96,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const onRentJobCount = [...onRentByJob.values()].filter((q) => q > 0).length
 
     // ── tickets → in-review, ready-to-invoice (jobs with final_edit tickets) ─
-    let tkQ = supabase.from('billing_tickets').select('job_id, status')
+    let tkQ = supabase.from('billing_tickets').select('job_id, status').eq('is_voided', false)
     if (scopedJobIds !== null) tkQ = tkQ.in('job_id', scopedJobIds)
     const { data: tkRaw } = await tkQ
     const tickets = (tkRaw ?? []) as { job_id: string; status: string }[]

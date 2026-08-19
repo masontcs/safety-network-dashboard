@@ -24,11 +24,11 @@ type SB = ReturnType<typeof createServiceClient>
 async function loadTicket(supabase: SB, id: string) {
   const { data, error } = await supabase
     .from('billing_tickets')
-    .select('id, status, billing_jobs(branch_id)')
+    .select('id, status, is_voided, billing_jobs(branch_id)')
     .eq('id', id)
     .maybeSingle()
   if (error) throw new Error(error.message)
-  return data as unknown as { id: string; status: string; billing_jobs: { branch_id: string } | null } | null
+  return data as unknown as { id: string; status: string; is_voided: boolean; billing_jobs: { branch_id: string } | null } | null
 }
 
 type Ctx = Extract<Awaited<ReturnType<typeof getAccessContext>>, { ok: true }>
@@ -107,6 +107,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const ticket = await loadTicket(supabase, params.id)
     if (!ticket) return bad('Ticket not found', 'NOT_FOUND', 404)
     if (branchDenied(ctx, ticket)) return bad('You do not have access to this ticket’s branch.', 'FORBIDDEN', 403)
+    if (ticket.is_voided) return bad('This ticket is voided. Restore it before changing labor.', 'CONFLICT', 409)
     if (isLocked(ticket.status)) return bad('This ticket is locked. Reopen it to change labor.', 'CONFLICT', 409)
 
     const body = (await request.json()) as { technicianId?: string; activityTypeId?: string; startTime?: string; endTime?: string }
@@ -145,6 +146,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const ticket = await loadTicket(supabase, params.id)
     if (!ticket) return bad('Ticket not found', 'NOT_FOUND', 404)
     if (branchDenied(ctx, ticket)) return bad('You do not have access to this ticket’s branch.', 'FORBIDDEN', 403)
+    if (ticket.is_voided) return bad('This ticket is voided. Restore it before changing labor.', 'CONFLICT', 409)
     if (isLocked(ticket.status)) return bad('This ticket is locked. Reopen it to change labor.', 'CONFLICT', 409)
 
     const body = (await request.json()) as { entryId?: string; technicianId?: string; activityTypeId?: string; startTime?: string; endTime?: string }
@@ -194,6 +196,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     const ticket = await loadTicket(supabase, params.id)
     if (!ticket) return bad('Ticket not found', 'NOT_FOUND', 404)
     if (branchDenied(ctx, ticket)) return bad('You do not have access to this ticket’s branch.', 'FORBIDDEN', 403)
+    if (ticket.is_voided) return bad('This ticket is voided. Restore it before changing labor.', 'CONFLICT', 409)
     if (isLocked(ticket.status)) return bad('This ticket is locked.', 'CONFLICT', 409)
 
     const { error } = await supabase.from('billing_ticket_labor').delete().eq('id', entryId).eq('ticket_id', params.id)

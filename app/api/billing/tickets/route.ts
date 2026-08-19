@@ -28,6 +28,7 @@ interface TicketListRow {
   feature_return: boolean
   feature_dtc: boolean
   recurring: boolean
+  is_voided: boolean
   billing_jobs: { id: string; job_number: string; name: string | null; branch_id: string; billing_profiles: { billing_customers: { name: string } | null } | null } | null
 }
 
@@ -43,7 +44,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     let query = supabase
       .from('billing_tickets')
       .select(`
-        id, ticket_number, ticket_date, status, feature_add, feature_return, feature_dtc, recurring,
+        id, ticket_number, ticket_date, status, feature_add, feature_return, feature_dtc, recurring, is_voided,
         billing_jobs(id, job_number, name, branch_id, billing_profiles(billing_customers(name)))
       `)
       .order('ticket_date', { ascending: false })
@@ -71,6 +72,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         date: t.ticket_date,
         status: t.status,
         recurring: t.recurring,
+        voided: t.is_voided,
         features: [t.feature_add && 'Add', t.feature_return && 'Return', t.feature_dtc && 'DTC'].filter(Boolean) as string[],
         job: t.billing_jobs ? { id: t.billing_jobs.id, number: t.billing_jobs.job_number, name: t.billing_jobs.name } : null,
         customer: t.billing_jobs?.billing_profiles?.billing_customers?.name ?? null,

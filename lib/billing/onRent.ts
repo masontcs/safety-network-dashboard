@@ -26,6 +26,8 @@ export interface LedgerRow {
   qty: number
   /** True when the row's ticket is a DTC — a day charge, never on rent. */
   ticketIsDtc: boolean
+  /** True when the row's ticket is voided — it counts toward nothing at all. */
+  ticketVoided: boolean
 }
 
 /** Balances are per (item, variation) — a variation is a distinct thing to hand back. */
@@ -44,6 +46,7 @@ export function balanceFrom(
 ): Map<string, number> {
   const bal = new Map<string, number>()
   for (const r of rows) {
+    if (r.ticketVoided) continue // a voided ticket counts toward nothing
     if (r.ticketIsDtc) continue // DTC equipment is never on rent
     const qty = override && override.id === r.id ? override.qty : r.qty
     const key = onRentKey(r.item_id, r.variation_id)
@@ -60,14 +63,14 @@ interface RawRow {
   variation_id: string | null
   event_type: string
   qty: number
-  billing_tickets: { feature_dtc: boolean } | null
+  billing_tickets: { feature_dtc: boolean; is_voided: boolean } | null
 }
 
-/** Every ledger row on a job, each tagged with whether its ticket is a DTC. */
+/** Every ledger row on a job, each tagged with whether its ticket is a DTC or voided. */
 export async function fetchJobLedger(supabase: SB, jobId: string): Promise<LedgerRow[]> {
   const { data, error } = await supabase
     .from('billing_ticket_ledger')
-    .select('id, item_id, variation_id, event_type, qty, billing_tickets(feature_dtc)')
+    .select('id, item_id, variation_id, event_type, qty, billing_tickets(feature_dtc, is_voided)')
     .eq('job_id', jobId)
   if (error) throw new Error(error.message)
   const rows = (data ?? []) as unknown as RawRow[]
@@ -78,6 +81,7 @@ export async function fetchJobLedger(supabase: SB, jobId: string): Promise<Ledge
     event_type: r.event_type,
     qty: r.qty,
     ticketIsDtc: r.billing_tickets?.feature_dtc ?? false,
+    ticketVoided: r.billing_tickets?.is_voided ?? false,
   }))
 }
 

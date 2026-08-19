@@ -21,6 +21,7 @@ interface LedgerEvent { id: string; eventType: string; date: string; qty: number
 interface Line { id: string; kind: string; description: string; qty: number; units: number; unitRateCents: number | null; amountCents: number | null; taxable: boolean; itemCode: string | null; rateFromPriceList?: boolean }
 interface Ticket {
   id: string; ticketNumber: string; date: string; status: string; locked: boolean
+  voided: boolean; voidedAt: string | null
   featureAdd: boolean; featureReturn: boolean; featureDtc: boolean
   billingType: BillingType | null; recurring: boolean; notes: string | null
   job: { id: string; number: string; name: string | null } | null
@@ -118,6 +119,12 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
       return true
     } catch { setMsg('Network error — please try again.'); return false }
     finally { setBusy(false) }
+  }
+
+  async function toggleVoid() {
+    const wantVoid = !t?.voided
+    if (wantVoid && !window.confirm('Void this ticket? Its equipment, labor and charges will stop counting toward any invoice or quantity. You can restore it later.')) return
+    if (await call(`/api/billing/tickets/${ticketId}`, 'PATCH', { action: wantVoid ? 'void' : 'unvoid' })) { setMsg(wantVoid ? 'Ticket voided.' : 'Ticket restored.'); load() }
   }
 
   async function saveDetails() {
@@ -356,13 +363,27 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
           ← {t.job ? `Job ${t.job.number}` : 'Tickets'}
         </Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6 }}>
-          <span style={{ fontSize: 22, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{t.ticketNumber}</span>
-          <span style={{ fontSize: 11, fontWeight: 600, color: statusColors[t.status], textTransform: 'capitalize' }}>{t.status.replace('_', ' ')}</span>
-          {t.recurring && <span title="Equipment still out" style={{ fontSize: 10, fontWeight: 600, color: 'var(--pill-pending-fg)', background: 'var(--pill-pending-bg)', padding: '2px 8px', borderRadius: 999 }}>RECURRING</span>}
-          {locked && <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>🔒 locked</span>}
+          <span style={{ fontSize: 22, fontWeight: 500, fontVariantNumeric: 'tabular-nums', textDecoration: t.voided ? 'line-through' : undefined, color: t.voided ? 'var(--text-muted)' : undefined }}>{t.ticketNumber}</span>
+          {t.voided
+            ? <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--pill-overdue-fg)', background: 'var(--pill-overdue-bg)', padding: '2px 8px', borderRadius: 999, letterSpacing: '0.04em' }}>VOID</span>
+            : <span style={{ fontSize: 11, fontWeight: 600, color: statusColors[t.status], textTransform: 'capitalize' }}>{t.status.replace('_', ' ')}</span>}
+          {!t.voided && t.recurring && <span title="Equipment still out" style={{ fontSize: 10, fontWeight: 600, color: 'var(--pill-pending-fg)', background: 'var(--pill-pending-bg)', padding: '2px 8px', borderRadius: 999 }}>RECURRING</span>}
+          {!t.voided && locked && <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>🔒 locked</span>}
+          {/* Void / restore is admin-only. Voiding a locked/invoiced ticket is blocked server-side. */}
+          {t.isAdmin && (
+            <button onClick={toggleVoid} disabled={busy} style={{ ...ghost, marginLeft: 'auto', color: t.voided ? 'var(--accent)' : 'var(--pill-overdue-fg)', borderColor: t.voided ? 'var(--accent)' : 'var(--pill-overdue-fg)' }}>
+              {t.voided ? 'Restore ticket' : 'Void ticket'}
+            </button>
+          )}
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{t.customer ?? '—'} · {t.job?.name ?? t.job?.number ?? '—'} · {t.entityCode}</div>
       </div>
+
+      {t.voided && (
+        <div style={{ fontSize: 12.5, color: 'var(--alert-danger-fg)', background: 'var(--alert-danger-bg)', borderRadius: 6, padding: '10px 12px', lineHeight: 1.5 }}>
+          This ticket is <strong>voided</strong> — its equipment, labor and charges don’t count toward any invoice or on-rent quantity. Restore it to make changes.
+        </div>
+      )}
 
       {msg && <div style={{ fontSize: 12, color: msg === 'Saved.' ? 'var(--alert-success-fg)' : 'var(--alert-danger-fg)', padding: '8px 10px', background: msg === 'Saved.' ? 'var(--alert-success-bg)' : 'var(--alert-danger-bg)', borderRadius: 6 }}>{msg}</div>}
 
