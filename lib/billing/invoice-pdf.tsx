@@ -10,6 +10,7 @@ import type { Style } from '@react-pdf/types'
 
 export interface InvoicePdfLine {
   id: string; kind: string; description: string; lotDate: string | null
+  variation: string | null
   qty: number; units: number; unitRateCents: number; amountCents: number; taxable: boolean
 }
 export interface InvoicePdfData {
@@ -29,6 +30,8 @@ export interface InvoicePdfData {
   }
   lines: InvoicePdfLine[]
   companyName: string
+  /** When true, stamp a repeated PROOF watermark across every page. */
+  proof?: boolean
 }
 
 const fmt = (cents: number) => (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
@@ -37,7 +40,6 @@ const fmtDate = (s: string | null) => {
   const d = new Date(s + 'T00:00:00')
   return `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}, ${d.getFullYear()}`
 }
-const kindLabel = (k: string) => ({ rental: 'Rental', sale: 'Sale', lost: 'Lost/Stolen', labor: 'Labor', lump_sum: 'Lump Sum', misc: 'Misc', adjustment: 'Adjustment' }[k] ?? k)
 
 const GRAPHITE = '#1e1e22'
 const GOLD = '#e0a83e'
@@ -95,7 +97,20 @@ const s = StyleSheet.create({
 
   footer: { position: 'absolute', bottom: 20, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between', borderTopColor: HAIR, borderTopWidth: 1, paddingTop: 7 },
   footerText: { fontSize: 7, color: LABEL },
+
+  // PROOF watermark — a fixed, page-covering layer of large, faint, rotated text.
+  wmLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, flexDirection: 'column', justifyContent: 'space-around', alignItems: 'center' },
+  wmText: { fontSize: 82, fontFamily: 'Helvetica-Bold', color: '#d9403a', opacity: 0.1, letterSpacing: 8, transform: 'rotate(-32deg)' },
 })
+
+function ProofWatermark() {
+  // Rendered `fixed` so it repeats on every page, behind the content.
+  return (
+    <View style={s.wmLayer} fixed>
+      {[0, 1, 2, 3, 4].map((i) => <Text key={i} style={s.wmText}>PROOF</Text>)}
+    </View>
+  )
+}
 
 function TH({ style, children, right }: { style: Style; children: string; right?: boolean }) {
   return <Text style={[s.th, style, right ? { textAlign: 'right' } : {}]}>{children}</Text>
@@ -111,6 +126,8 @@ export function InvoiceDocument({ data }: { data: InvoicePdfData }) {
   return (
     <Document title={`Invoice ${data.invoiceNumber}`} author={data.companyName}>
       <Page size="LETTER" style={s.page}>
+
+        {data.proof ? <ProofWatermark /> : null}
 
         {/* Masthead */}
         <View style={s.band}>
@@ -156,7 +173,10 @@ export function InvoiceDocument({ data }: { data: InvoicePdfData }) {
             <View key={l.id} style={s.row} wrap={false}>
               <View style={s.colDesc}>
                 <Text style={s.desc}>{l.description}</Text>
-                <Text style={s.descSub}>{kindLabel(l.kind)}{l.taxable ? '  ·  taxable' : ''}</Text>
+                {/* Sub-label = the variation (blank when none); taxable stays as a trailing note. */}
+                {(l.variation || l.taxable) ? (
+                  <Text style={s.descSub}>{[l.variation, l.taxable ? 'taxable' : null].filter(Boolean).join('  ·  ')}</Text>
+                ) : null}
               </View>
               <Text style={[s.cellQty, s.colQty]}>{l.qty}{l.units > 1 ? ` × ${l.units}` : ''}</Text>
               <Text style={[s.cellRate, s.colRate]}>{fmt(l.unitRateCents)}</Text>

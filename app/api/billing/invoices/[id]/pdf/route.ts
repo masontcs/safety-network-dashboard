@@ -18,14 +18,17 @@ interface InvoiceRow {
   billing_jobs: { job_number: string; name: string | null; entities: { code: string } | null; billing_profiles: { name: string; billing_customers: { name: string } | null } | null } | null
 }
 interface LineRow {
-  id: string; kind: string; description: string; lot_date: string | null
+  id: string; kind: string; description: string; lot_date: string | null; variation_id: string | null
   qty: number; units: number; unit_rate_cents: number; amount_cents: number; taxable: boolean
 }
 
-export async function GET(_request: Request, { params }: { params: { id: string } }): Promise<Response> {
+export async function GET(request: Request, { params }: { params: { id: string } }): Promise<Response> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
+
+    // A "proof" is the same PDF stamped with a PROOF watermark, for pre-send review.
+    const isProof = new URL(request.url).searchParams.get('proof') === '1'
 
     const supabase = createServiceClient()
     const { data, error } = await supabase
@@ -48,10 +51,18 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
     const { data: lineRaw } = await supabase
       .from('billing_invoice_lines')
-      .select('id, kind, description, lot_date, qty, units, unit_rate_cents, amount_cents, taxable')
+      .select('id, kind, description, lot_date, variation_id, qty, units, unit_rate_cents, amount_cents, taxable')
       .eq('invoice_id', params.id)
       .order('created_at')
     const lines = (lineRaw ?? []) as LineRow[]
+
+    // Resolve variation names for the line sub-label (shown in place of the kind).
+    const varIds = [...new Set(lines.map((l) => l.variation_id).filter(Boolean))] as string[]
+    const varName = new Map<string, string>()
+    if (varIds.length) {
+      const { data: vs } = await supabase.from('billing_item_variations').select('id, name').in('id', varIds)
+      for (const v of (vs ?? []) as { id: string; name: string }[]) varName.set(v.id, v.name)
+    }
 
     const pdfData: InvoicePdfData = {
       invoiceNumber: inv.invoice_number,
@@ -75,9 +86,11 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       },
       lines: lines.map((l) => ({
         id: l.id, kind: l.kind, description: l.description, lotDate: l.lot_date,
+        variation: l.variation_id ? (varName.get(l.variation_id) ?? null) : null,
         qty: Number(l.qty), units: l.units, unitRateCents: l.unit_rate_cents, amountCents: l.amount_cents, taxable: l.taxable,
       })),
       companyName: 'Safety Network',
+      proof: isProof,
     }
 
     const pdfBuffer = await renderToBuffer(
@@ -88,7 +101,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     return new Response(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="Invoice_${inv.invoice_number}.pdf"`,
+        'Content-Disposition': `attachment; filename="${isProof ? 'Proof' : 'Invoice'}_${inv.invoice_number}.pdf"`,
         'Cache-Control': 'no-store',
       },
     })

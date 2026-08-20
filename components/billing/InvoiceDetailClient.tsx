@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { TotalsBlock } from '@/components/billing/JobInvoicesSection'
 
-interface Line { id: string; kind: string; description: string; lotDate: string | null; qty: number; units: number; unitRateCents: number; amountCents: number; taxable: boolean }
+interface Line { id: string; kind: string; description: string; variation: string | null; lotDate: string | null; qty: number; units: number; unitRateCents: number; amountCents: number; taxable: boolean }
 interface Totals {
   rentalSubtotalCents: number; salesSubtotalCents: number; otherSubtotalCents: number
   rentalMinimumAdjustmentCents: number; subtotalCents: number; taxableBaseCents: number; taxCents: number; totalCents: number
@@ -62,6 +62,7 @@ export default function InvoiceDetailClient({ invoiceId }: { invoiceId: string }
         <span style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>{inv.invoiceNumber}</span>
         <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: statusColor[inv.status] ?? 'var(--text-muted)' }}>{inv.status}</span>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          <a href={`/api/billing/invoices/${invoiceId}/pdf?proof=1`} download style={{ ...ghost, textDecoration: 'none', color: 'var(--text-primary)' }}>Download proof</a>
           <a href={`/api/billing/invoices/${invoiceId}/pdf`} download style={{ ...ghost, textDecoration: 'none', color: 'var(--text-primary)' }}>Download PDF</a>
           {inv.isAdmin && (<>
             {inv.status === 'draft' && <button onClick={() => act('issue')} disabled={busy} className="btn-primary" style={{ padding: '7px 16px', opacity: busy ? 0.5 : 1 }}>Issue</button>}
@@ -89,7 +90,7 @@ export default function InvoiceDetailClient({ invoiceId }: { invoiceId: string }
           <tbody>
             {inv.lines.map((l) => (
               <tr key={l.id}>
-                <td style={td}>{l.description}<span style={{ color: 'var(--text-dim)', marginLeft: 6, fontSize: 11, textTransform: 'uppercase' }}>{l.kind}</span></td>
+                <td style={td}>{l.description}{l.variation ? <span style={{ color: 'var(--text-dim)', marginLeft: 6, fontSize: 11 }}>{l.variation}</span> : null}</td>
                 <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{l.qty}{l.units > 1 ? ` × ${l.units}` : ''}</td>
                 <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(l.unitRateCents)}</td>
                 <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(l.amountCents)}</td>

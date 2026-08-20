@@ -63,6 +63,13 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       .order('created_at')
     const lines = (lineRaw ?? []) as LineRow[]
 
+    const varIds = [...new Set(lines.map((l) => l.variation_id).filter(Boolean))] as string[]
+    const varName = new Map<string, string>()
+    if (varIds.length) {
+      const { data: vs } = await supabase.from('billing_item_variations').select('id, name').in('id', varIds)
+      for (const v of (vs ?? []) as { id: string; name: string }[]) varName.set(v.id, v.name)
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -90,6 +97,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
         },
         lines: lines.map((l) => ({
           id: l.id, kind: l.kind, description: l.description, lotDate: l.lot_date,
+          variation: l.variation_id ? (varName.get(l.variation_id) ?? null) : null,
           qty: Number(l.qty), units: l.units, unitRateCents: l.unit_rate_cents, amountCents: l.amount_cents, taxable: l.taxable,
         })),
         isAdmin: ctx.access.role === 'admin',
