@@ -97,8 +97,10 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
         const r = await post('/api/billing/tickets', { jobId, ticketDate: date, featureAdd: feature === 'add', featureReturn: feature === 'return', featureDtc: feature === 'dtc' })
         if (!r.success) return setErr(r.error ?? 'Failed')
         router.push(`/billing/tickets/${(r.data as { id: string }).id}`)
-      } else { // proof | invoice → open the job's invoice generator
+      } else if (mode === 'invoice') { // open the job's invoice generator (records a real invoice)
         router.push(`/billing/jobs/${jobId}?tab=invoices&generate=1`)
+      } else { // proof → download an unsaved preview PDF; nothing is recorded
+        window.location.href = `/api/billing/invoices/proof?jobId=${jobId}&through=${date}`
       }
       onClose()
     } catch {
@@ -114,7 +116,8 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
     if (mode === 'profile') return !!customerId && !!name.trim() && !!code.trim() && !!branchId
     if (mode === 'job') return !!profileId && !!entityId && certified !== null && (!certified || (!!dir.trim() && !!contract.trim() && !!payClass.trim()))
     if (mode === 'ticket') return !!jobId && !!date
-    return !!jobId // proof/invoice
+    if (mode === 'proof') return !!jobId && !!date
+    return !!jobId // invoice
   })()
 
   const jobOptions = jobs.map((jj) => ({ value: jj.id, label: `${jj.jobNumber}${jj.name ? ` — ${jj.name}` : ''}${jj.customer ? ` · ${jj.customer}` : ''}` }))
@@ -185,12 +188,16 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
           {(mode === 'proof' || mode === 'invoice') && (
             <Field label="Job"><Combobox value={jobId} onChange={setJobId} placeholder="Pick a job to bill…" options={jobOptions} /></Field>
           )}
+          {mode === 'proof' && (
+            <Field label="Through date"><input className="bx-f" type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: '100%' }} /></Field>
+          )}
+          {mode === 'proof' && <div className="bx-sub">A proof is a preview of what this job is ready to bill. It downloads a watermarked PDF and isn’t recorded.</div>}
 
           {err && <div style={{ fontSize: 12, color: 'var(--danger)' }}>{err}</div>}
 
           <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
             <button className="bx-btn accent" type="submit" disabled={busy || !ready}>
-              {busy ? 'Working…' : mode === 'proof' || mode === 'invoice' ? 'Continue →' : 'Create'}
+              {busy ? 'Working…' : mode === 'proof' ? 'Download proof' : mode === 'invoice' ? 'Continue →' : 'Create'}
             </button>
             <button className="bx-btn ghost" type="button" onClick={onClose}>Cancel</button>
           </div>
