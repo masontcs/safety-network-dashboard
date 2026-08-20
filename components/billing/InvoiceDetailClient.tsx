@@ -64,7 +64,6 @@ export default function InvoiceDetailClient({ invoiceId }: { invoiceId: string }
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
           <a href={`/api/billing/invoices/${invoiceId}/pdf`} download style={{ ...ghost, textDecoration: 'none', color: 'var(--text-primary)' }}>Download PDF</a>
           {inv.isAdmin && (<>
-            {inv.status === 'draft' && <button onClick={() => act('issue')} disabled={busy} className="btn-primary" style={{ padding: '7px 16px', opacity: busy ? 0.5 : 1 }}>Issue</button>}
             {inv.status !== 'void' && (confirmVoid
               ? <><span style={{ fontSize: 12, color: 'var(--text-muted)', alignSelf: 'center' }}>Void this invoice?</span>
                   <button onClick={() => act('void')} disabled={busy} style={{ ...ghost, color: 'var(--danger)', borderColor: 'var(--danger)' }}>Yes, void</button>

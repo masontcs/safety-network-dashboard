@@ -140,7 +140,9 @@ export async function POST(request: Request): Promise<NextResponse> {
         branch_id: draft.job.branchId,
         through_date: draft.throughDate,
         invoice_date: invoiceDate,
-        status: 'draft',
+        // One-step: an invoice is recorded as final. Previews happen via proofs, so there's
+        // no separate draft/issue step. Void still reverses a mistake.
+        status: 'issued',
         tax_rate_pct: draft.taxRatePct,
         rental_subtotal_cents: draft.totals.rentalSubtotalCents,
         sales_subtotal_cents: draft.totals.salesSubtotalCents,
