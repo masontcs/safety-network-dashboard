@@ -193,6 +193,15 @@ export async function POST(request: Request): Promise<NextResponse> {
       if (error) throw new Error(error.message)
     }
 
+    // Mark the tickets this invoice billed as 'invoiced' (money has gone out against them).
+    // Voiding this invoice reverts them. Recurring rentals still bill next cycle — the
+    // accrual delta, not the status, is the double-bill guard.
+    const billedTicketIds = [...new Set(draft.lines.map((l) => l.ticketId).filter(Boolean))] as string[]
+    if (billedTicketIds.length > 0) {
+      const { error: tErr } = await supabase.from('billing_tickets').update({ status: 'invoiced' }).in('id', billedTicketIds)
+      if (tErr) throw new Error(tErr.message)
+    }
+
     return NextResponse.json({
       success: true,
       data: { id: created.id, invoiceNumber: created.invoice_number, warnings: draft.warnings, totals: draft.totals },

@@ -185,6 +185,28 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
       const { error } = await supabase.from('billing_invoices').update({ status: 'void' }).eq('id', params.id)
       if (error) throw new Error(error.message)
+
+      // Unlock the tickets this invoice billed: revert 'invoiced' → 'final_edit' so they can
+      // be re-billed (or reopened to edit). A ticket that still sits on ANOTHER non-void
+      // invoice — e.g. a recurring rental billed across cycles — stays 'invoiced'.
+      const { data: myLines } = await supabase
+        .from('billing_invoice_lines')
+        .select('ticket_id')
+        .eq('invoice_id', params.id)
+        .not('ticket_id', 'is', null)
+      const myTicketIds = [...new Set(((myLines ?? []) as { ticket_id: string | null }[]).map((l) => l.ticket_id).filter(Boolean))] as string[]
+      for (const tid of myTicketIds) {
+        const { data: otherLines } = await supabase
+          .from('billing_invoice_lines')
+          .select('billing_invoices!inner(status)')
+          .eq('ticket_id', tid)
+          .neq('invoice_id', params.id)
+        const stillBilled = ((otherLines ?? []) as unknown as { billing_invoices: { status: string } | null }[])
+          .some((l) => l.billing_invoices && l.billing_invoices.status !== 'void')
+        if (!stillBilled) {
+          await supabase.from('billing_tickets').update({ status: 'final_edit' }).eq('id', tid).eq('status', 'invoiced')
+        }
+      }
       return NextResponse.json({ success: true })
     }
 
