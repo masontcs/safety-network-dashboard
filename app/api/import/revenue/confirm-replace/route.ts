@@ -72,7 +72,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (importErr || !importRecord) throw new Error(`Failed to create revenue import: ${importErr?.message}`)
 
     // 9. Insert transactions
-    const { insertedCount, skippedCount, warnings: insertWarnings } = await insertRevenueData(
+    const { insertedCount, skippedCount, unmappedCount, warnings: insertWarnings } = await insertRevenueData(
       importRecord.id, periodDate, records, branchMap, entityMap, revenueCodeMap, supabase
     )
 
@@ -83,6 +83,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         periodDate,
         insertedCount,
         skippedCount,
+        unmappedCount,
         warnings: [...allWarnings, ...insertWarnings],
       },
     })

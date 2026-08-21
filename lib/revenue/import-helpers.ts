@@ -74,10 +74,14 @@ export async function insertRevenueData(
   entityMap: Map<string, string>,
   revenueCodeMap: Map<string, string>,
   supabase: SupabaseClient
-): Promise<{ insertedCount: number; skippedCount: number; warnings: string[] }> {
+): Promise<{ insertedCount: number; skippedCount: number; unmappedCount: number; warnings: string[] }> {
   let insertedCount = 0
   let skippedCount = 0
+  let unmappedCount = 0
   const warnings: string[] = []
+  // Track (branch|entity) combos that imported with no revenue code, so we warn ONCE per
+  // combo with the total — not once per row.
+  const unmappedTotals = new Map<string, number>()
 
   for (const rec of records) {
     const branchId = branchMap.get(rec.branchName)
@@ -95,6 +99,13 @@ export async function insertRevenueData(
     }
 
     const revenueCodeId = revenueCodeMap.get(`${branchId}|${entityId}`) ?? null
+    // The row still imports (so revenue is never lost), but a missing code means it won't be
+    // attributed in code-grouped reports. Flag it loudly instead of letting it slip by.
+    if (!revenueCodeId) {
+      const k = `${rec.branchName}|${rec.entityCode}`
+      unmappedTotals.set(k, (unmappedTotals.get(k) ?? 0) + rec.totalRevenue)
+      unmappedCount++
+    }
 
     const { error } = await supabase.from('revenue_transactions').insert({
       import_id: importId,
@@ -113,5 +124,12 @@ export async function insertRevenueData(
     insertedCount++
   }
 
-  return { insertedCount, skippedCount, warnings }
+  // Surface unmapped revenue prominently — one line per branch+entity with the dollar total,
+  // so a new branch earning in an entity with no code can't slip by unnoticed.
+  for (const [k, total] of unmappedTotals) {
+    const [branch, entity] = k.split('|')
+    warnings.push(`Unmapped revenue: ${branch} / ${entity} imported $${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} with no revenue code — add a code for this branch + entity so it's attributed on reports.`)
+  }
+
+  return { insertedCount, skippedCount, unmappedCount, warnings }
 }
