@@ -15,6 +15,17 @@ export type ResolvedEmployee = {
 
 type ResolvedItem = { id: string | null; isConfirmed: boolean }
 
+/**
+ * Normalize a raw payroll name for matching. QuickBooks emits the same person with
+ * inconsistent punctuation/spacing across reports — "Porter Jr., Robert J",
+ * "Porter, Jr., Robert J.", "Porter, Jr, Robert J" — which broke exact-string matching and
+ * re-flagged the person on every import. Collapsing case, periods, commas, and whitespace
+ * makes all those variants resolve to the same key.
+ */
+export function normalizeEmployeeName(raw: string): string {
+  return raw.toLowerCase().replace(/[.,]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 export async function resolveEmployees(
   parsedEmployees: ParsedEmployee[],
   entityId: string,
@@ -30,12 +41,26 @@ export async function resolveEmployees(
 
   const assignmentByName = new Map<string, NonNullable<typeof entityAssignments>[number]>()
   for (const a of entityAssignments ?? []) {
-    assignmentByName.set(a.raw_name_in_report.toLowerCase(), a)
+    // Key by normalized name so punctuation/spacing variants of the same person collapse.
+    // Last write wins if two stored spellings normalize the same — fine, same employee.
+    assignmentByName.set(normalizeEmployeeName(a.raw_name_in_report), a)
+  }
+
+  // Cross-entity: normalized name → an existing employee_id, so a person already known under
+  // ANY entity is reused instead of spawning a duplicate employee.
+  const { data: allAssign } = await supabase
+    .from('employee_entity_assignments')
+    .select('employee_id, raw_name_in_report')
+  const employeeByName = new Map<string, string>()
+  for (const a of allAssign ?? []) {
+    const k = normalizeEmployeeName(a.raw_name_in_report)
+    if (!employeeByName.has(k)) employeeByName.set(k, a.employee_id)
   }
 
   const resolved: ResolvedEmployee[] = []
   for (const emp of parsedEmployees) {
-    const existing = assignmentByName.get(emp.rawName.toLowerCase()) ?? null
+    const norm = normalizeEmployeeName(emp.rawName)
+    const existing = assignmentByName.get(norm) ?? null
     if (existing) {
       resolved.push({
         rawName: emp.rawName,
@@ -47,28 +72,13 @@ export async function resolveEmployees(
       })
       continue
     }
-    // Before creating a new employee record, check if this person exists under any other entity.
-    // QuickBooks sometimes adds/omits a trailing period after a middle initial (e.g. "A" vs "A."),
-    // so we check all name variants to avoid creating duplicate employee records.
-    const nameVariants = [...new Set([
-      emp.rawName,
-      emp.rawName.toUpperCase(),
-      emp.rawName.toLowerCase(),
-      emp.rawName.replace(/\.+\s*$/, ''),
-      emp.rawName.toUpperCase().replace(/\.+\s*$/, ''),
-      emp.rawName.trimEnd() + '.',
-      emp.rawName.toUpperCase().trimEnd() + '.',
-    ])]
-    const { data: crossEntityAssign } = await supabase
-      .from('employee_entity_assignments')
-      .select('employee_id')
-      .in('raw_name_in_report', nameVariants)
-      .limit(1)
-      .maybeSingle()
+    // Not assigned under this entity yet — but this person may already exist under another
+    // entity (normalized match), in which case reuse that employee instead of duplicating.
+    const crossEntityEmployeeId = employeeByName.get(norm) ?? null
 
     let employeeId: string
-    if (crossEntityAssign) {
-      employeeId = crossEntityAssign.employee_id
+    if (crossEntityEmployeeId) {
+      employeeId = crossEntityEmployeeId
     } else {
       const { data: newEmp, error: empErr } = await supabase
         .from('employees').insert({ first_name: emp.autoFirstName, last_name: emp.autoLastName })
@@ -82,6 +92,10 @@ export async function resolveEmployees(
       .insert({ employee_id: employeeId, entity_id: entityId, raw_name_in_report: emp.rawName, is_confirmed: false, payroll_code_id: null })
       .select('id').single()
     if (assignErr || !newAssign) throw new Error(`Failed to insert assignment for "${emp.rawName}": ${assignErr?.message}`)
+    // Register it so a second spelling of the same person later in THIS batch reuses it
+    // instead of creating another employee/assignment.
+    assignmentByName.set(norm, { id: newAssign.id, employee_id: employeeId, payroll_code_id: null, is_confirmed: false, business_tag: null, raw_name_in_report: emp.rawName })
+    employeeByName.set(norm, employeeId)
     resolved.push({ rawName: emp.rawName, employeeId, assignmentId: newAssign.id, payrollCodeId: null, businessTag: null, isNew: true })
   }
   return resolved

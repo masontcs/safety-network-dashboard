@@ -238,6 +238,7 @@ export async function PATCH(
         payrollCodeId = resolved
       }
 
+      const throwawayEmployeeId = assignment.employee_id
       if (priorAssignment) {
         // A confirmed row already exists — delete this unconfirmed staging row to avoid duplicates
         const { error } = await supabase
@@ -252,6 +253,20 @@ export async function PATCH(
           .eq('id', params.id)
         if (error) throw new Error(error.message)
       }
+
+      // The flagged row usually carried a throwaway employee created during import. Now that
+      // we've linked to the real employee, delete that throwaway if nothing else references it —
+      // otherwise it lingers as a duplicate in the "link to existing" dropdown forever.
+      if (throwawayEmployeeId && throwawayEmployeeId !== existingEmployeeId) {
+        const [{ count: aCount }, { count: tCount }] = await Promise.all([
+          supabase.from('employee_entity_assignments').select('id', { count: 'exact', head: true }).eq('employee_id', throwawayEmployeeId),
+          supabase.from('payroll_transactions').select('id', { count: 'exact', head: true }).eq('employee_id', throwawayEmployeeId),
+        ])
+        if ((aCount ?? 0) === 0 && (tCount ?? 0) === 0) {
+          await supabase.from('employees').delete().eq('id', throwawayEmployeeId)
+        }
+      }
+
       // Deploy staged transactions under the final employee_id
       await deployStaged(existingEmployeeId, assignment.entity_id, payrollCodeId)
       return NextResponse.json({ success: true })
