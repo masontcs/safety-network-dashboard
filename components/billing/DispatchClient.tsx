@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBranch } from '@/components/billing/BranchContext'
+import DispatchAssignModal from '@/components/billing/DispatchAssignModal'
 
 /**
  * Dispatch board — the concept's week grid: technicians as rows, Mon–Fri as columns,
@@ -30,6 +31,7 @@ export default function DispatchClient() {
   const [err, setErr] = useState<string | null>(null)
   const [week, setWeek] = useState<string>(() => new Date().toISOString().slice(0, 10))
   const [toast, setToast] = useState<string | null>(null)
+  const [dispatchCell, setDispatchCell] = useState<{ techId: string | null; date: string } | null>(null)
   const drag = useRef<Ticket | null>(null)
   const router = useRouter()
   const { branchId } = useBranch()
@@ -111,6 +113,7 @@ export default function DispatchClient() {
                 onDragStart={(t) => { drag.current = t }}
                 onDrop={(techId, day) => { if (drag.current) { reassign(drag.current, techId, day); drag.current = null } }}
                 onOpen={(t) => router.push(`/billing/tickets/${t.id}`)}
+                onDispatch={(techId, day) => setDispatchCell({ techId: techId === UNASSIGNED ? null : techId, date: day })}
               />
             ))}
           </div>
@@ -122,14 +125,28 @@ export default function DispatchClient() {
       )}
 
       {toast && <div className="bx-toast">{toast}</div>}
+
+      {dispatchCell && board && (
+        <DispatchAssignModal
+          date={dispatchCell.date}
+          technicianId={dispatchCell.techId}
+          technicians={board.technicians}
+          ticketsForDay={board.tickets
+            .filter((t) => t.date === dispatchCell.date)
+            .map((t) => ({ id: t.id, ticketNumber: t.ticketNumber, jobNumber: t.jobNumber, jobName: t.jobName, customer: t.customer, feature: t.feature, voided: t.voided }))}
+          onClose={() => setDispatchCell(null)}
+          onDone={(msg) => { setDispatchCell(null); flash(msg); load(week) }}
+        />
+      )}
     </div>
   )
 }
 
-function DispatchRow({ tech, days, loading, cardsFor, canDrag, onDragStart, onDrop, onOpen }: {
+function DispatchRow({ tech, days, loading, cardsFor, canDrag, onDragStart, onDrop, onOpen, onDispatch }: {
   tech: { id: string; name: string }; days: string[]; loading: boolean; canDrag: boolean
   cardsFor: (techId: string, day: string) => Ticket[]
   onDragStart: (t: Ticket) => void; onDrop: (techId: string, day: string) => void; onOpen: (t: Ticket) => void
+  onDispatch: (techId: string, day: string) => void
 }) {
   const [over, setOver] = useState<string | null>(null)
   const isUnassigned = tech.id === UNASSIGNED
@@ -170,6 +187,15 @@ function DispatchRow({ tech, days, loading, cardsFor, canDrag, onDragStart, onDr
                 </div>
               )
             })}
+            {canDrag && (
+              <button
+                type="button"
+                className="dcell-add"
+                onClick={() => onDispatch(tech.id, day)}
+                title="Dispatch a tech to this day"
+                style={{ width: '100%', marginTop: cards.length ? 4 : 0, background: 'transparent', border: '1px dashed var(--border, #d8d5cc)', borderRadius: 6, color: 'var(--dim, #999)', fontSize: 11, padding: '3px 0', cursor: 'pointer' }}
+              >+ dispatch</button>
+            )}
           </div>
         )
       })}
