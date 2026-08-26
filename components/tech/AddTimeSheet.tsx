@@ -6,18 +6,28 @@ import { techApi, TechApiError, type ActivityType } from '@/lib/tech/client'
 import { minutesToTime, segmentMinutes, minutesToHours } from '@/lib/billing/labor'
 
 /**
- * "Add time" — activity + a start/end time stepped in 15-minute increments, with the
- * derived hours shown live so the tech sees the math before saving. Cross-midnight is
- * marked +1d. Times are the product; the server re-rounds and re-derives to be safe.
+ * "Add time" — pick WHERE it goes (a ticket the tech is on today, or their yard shift),
+ * an activity, and a start/end stepped in 15-minute increments, with the derived hours
+ * shown live. A note can be added (it rides through to the TSheets export). When there's
+ * only one destination the picker is hidden. Times are the product; the server re-rounds.
  */
 const STEP = 15
 const DAY = 1440
 
-export default function AddTimeSheet({ ticketId, onClose, onSaved }: { ticketId: string; onClose: () => void; onSaved: () => void }) {
+export interface TimeDestination { id: string; kind: 'ticket' | 'yard'; label: string }
+
+export default function AddTimeSheet({ destinations, preselectId, onClose, onSaved }: {
+  destinations: TimeDestination[]
+  preselectId?: string
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [destId, setDestId] = useState(preselectId ?? destinations[0]?.id ?? '')
   const [activities, setActivities] = useState<ActivityType[]>([])
   const [activityId, setActivityId] = useState('')
   const [start, setStart] = useState(7 * 60)   // 07:00
   const [end, setEnd] = useState(15 * 60)       // 15:00
+  const [notes, setNotes] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -35,10 +45,14 @@ export default function AddTimeSheet({ ticketId, onClose, onSaved }: { ticketId:
 
   async function save() {
     if (busy) return
+    const dest = destinations.find((d) => d.id === destId)
+    if (!dest) { setErr('Pick where this time goes.'); return }
     if (!activityId) { setErr('Pick an activity.'); return }
     setBusy(true); setErr(null)
+    const body = { activityTypeId: activityId, startTime: minutesToTime(start), endTime: minutesToTime(end), notes: notes.trim() || undefined }
     try {
-      await techApi.addLabor(ticketId, { activityTypeId: activityId, startTime: minutesToTime(start), endTime: minutesToTime(end) })
+      if (dest.kind === 'ticket') await techApi.addLabor(dest.id, body)
+      else await techApi.addYardTime(dest.id, body)
       onSaved()
       onClose()
     } catch (e) {
@@ -50,6 +64,17 @@ export default function AddTimeSheet({ ticketId, onClose, onSaved }: { ticketId:
   return (
     <Sheet title="Add time" onClose={onClose}>
       {err && <div className="tech-note err" role="alert">{err}</div>}
+
+      {destinations.length > 1 && (
+        <div className="tech-field">
+          <span className="tech-lbl">Goes to</span>
+          <div className="tech-chips">
+            {destinations.map((d) => (
+              <button key={d.id} type="button" className={`tech-chip ${destId === d.id ? 'on' : ''}`} onClick={() => setDestId(d.id)}>{d.label}</button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="tech-field">
         <span className="tech-lbl">Activity</span>
@@ -73,7 +98,13 @@ export default function AddTimeSheet({ ticketId, onClose, onSaved }: { ticketId:
 
       <div className="tech-hoursreadout">= <b>{hours.toFixed(2)}</b> h{crosses ? ' (overnight)' : ''}</div>
 
-      <button className="tech-btn block" onClick={save} disabled={busy || !activityId}>{busy ? 'Saving…' : 'Save time'}</button>
+      <div className="tech-field">
+        <span className="tech-lbl">Note (optional)</span>
+        <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Transit to Barstow"
+          style={{ width: '100%', resize: 'vertical', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--tech-line, #d8d5cc)', fontSize: 16, fontFamily: 'inherit', background: 'var(--tech-surface, #fff)', color: 'inherit' }} />
+      </div>
+
+      <button className="tech-btn block" onClick={save} disabled={busy || !activityId || !destId}>{busy ? 'Saving…' : 'Save time'}</button>
     </Sheet>
   )
 }

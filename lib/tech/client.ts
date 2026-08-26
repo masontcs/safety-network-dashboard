@@ -70,6 +70,7 @@ export interface TicketDetail {
   onRent: OnRentItem[]
 }
 
+export interface YardShift { id: string; date: string; myHours: number }
 export interface ActivityType { id: string; name: string }
 export interface TechItem { id: string; code: string; name: string; tracked: boolean; variations: { id: string; name: string }[] }
 
@@ -113,14 +114,20 @@ const jsonBody = (body: unknown): RequestInit => ({
 export const techApi = {
   listTickets: () => call<TicketListItem[]>('/api/tech/tickets'),
   getTicket: (id: string) => call<TicketDetail>(`/api/tech/tickets/${id}`),
+  listYard: () => call<YardShift[]>('/api/tech/yard'),
 
   listActivityTypes: () => call<ActivityType[]>('/api/tech/activity-types'),
   listItems: () => call<TechItem[]>('/api/tech/items'),
 
-  addLabor: (id: string, body: { activityTypeId: string; startTime: string; endTime: string; technicianId?: string }) =>
+  addLabor: (id: string, body: { activityTypeId: string; startTime: string; endTime: string; technicianId?: string; notes?: string }) =>
     call<void>(`/api/tech/tickets/${id}/labor`, jsonBody(body)),
   deleteLabor: (id: string, entryId: string) =>
     call<void>(`/api/tech/tickets/${id}/labor?entryId=${encodeURIComponent(entryId)}`, { method: 'DELETE' }),
+
+  addYardTime: (yardShiftId: string, body: { activityTypeId: string; startTime: string; endTime: string; notes?: string }) =>
+    call<void>(`/api/tech/yard/${yardShiftId}/time`, jsonBody(body)),
+  deleteYardTime: (yardShiftId: string, entryId: string) =>
+    call<void>(`/api/tech/yard/${yardShiftId}/time?entryId=${encodeURIComponent(entryId)}`, { method: 'DELETE' }),
 
   addEquipment: (id: string, body: { itemId: string; variationId?: string | null; qty: number; eventType?: string; equipmentId?: string | null }) =>
     call<void>(`/api/tech/tickets/${id}/equipment`, jsonBody(body)),

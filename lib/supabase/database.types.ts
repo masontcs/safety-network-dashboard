@@ -458,9 +458,9 @@ export type Database = {
         Relationships: []
       }
       billing_ticket_labor: {
-        Row: { id: string; ticket_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; entered_by: string | null; created_at: string }
-        Insert: { id?: string; ticket_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; entered_by?: string | null }
-        Update: { id?: string; ticket_id?: string; technician_id?: string; activity_type_id?: string; start_time?: string; end_time?: string; entered_by?: string | null }
+        Row: { id: string; ticket_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; notes: string | null; entered_by: string | null; created_at: string }
+        Insert: { id?: string; ticket_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; notes?: string | null; entered_by?: string | null }
+        Update: { id?: string; ticket_id?: string; technician_id?: string; activity_type_id?: string; start_time?: string; end_time?: string; notes?: string | null; entered_by?: string | null }
         Relationships: []
       }
       /** A tech dispatched to the yard (no ticket). Yard time logs against it, excluded from billing. */
@@ -471,9 +471,9 @@ export type Database = {
         Relationships: []
       }
       billing_yard_time: {
-        Row: { id: string; yard_shift_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; entered_by: string | null; created_at: string }
-        Insert: { id?: string; yard_shift_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; entered_by?: string | null }
-        Update: { id?: string; yard_shift_id?: string; technician_id?: string; activity_type_id?: string; start_time?: string; end_time?: string; entered_by?: string | null }
+        Row: { id: string; yard_shift_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; notes: string | null; entered_by: string | null; created_at: string }
+        Insert: { id?: string; yard_shift_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; notes?: string | null; entered_by?: string | null }
+        Update: { id?: string; yard_shift_id?: string; technician_id?: string; activity_type_id?: string; start_time?: string; end_time?: string; notes?: string | null; entered_by?: string | null }
         Relationships: []
       }
       /** Ongoing-rental accruals, keyed by PICKUP LOT (lot_date). Cumulative qty-units billed. */

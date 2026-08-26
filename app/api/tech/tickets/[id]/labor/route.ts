@@ -37,7 +37,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (!ticket) return techBad('Ticket not found', 'NOT_FOUND', 404)
     if (!isEditable(ticket.status)) return techBad('This ticket has been submitted. Ask the office to reopen it.', 'CONFLICT', 409)
 
-    const body = (await request.json()) as { activityTypeId?: string; startTime?: string; endTime?: string; technicianId?: string }
+    const body = (await request.json()) as { activityTypeId?: string; startTime?: string; endTime?: string; technicianId?: string; notes?: string }
     if (!body.activityTypeId) return techBad('An activity is required')
 
     // Whose time is this? Only the lead may record for someone else.
@@ -62,6 +62,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       activity_type_id: body.activityTypeId,
       start_time: norm.start,
       end_time: norm.end,
+      notes: body.notes?.trim() || null,
       // The hours belong to forTech; this only records who typed them.
       entered_by: ctx.tech.userId,
     })

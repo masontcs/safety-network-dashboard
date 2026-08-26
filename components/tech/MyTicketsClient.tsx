@@ -2,25 +2,38 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { techApi, TechApiError, type TicketListItem } from '@/lib/tech/client'
+import { techApi, TechApiError, type TicketListItem, type YardShift } from '@/lib/tech/client'
 import SignOutButton from '@/components/tech/SignOutButton'
 import FeatureTags from '@/components/tech/FeatureTags'
+import AddTimeSheet, { type TimeDestination } from '@/components/tech/AddTimeSheet'
 
-/** Screen 1 — every ticket assigned to me that is active. Tap one to open it. */
+const shortDate = (d: string) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+
+/** Screen 1 — my active tickets + yard shifts. Tap a ticket to open it, or add time to any. */
 export default function MyTicketsClient() {
   const [tickets, setTickets] = useState<TicketListItem[] | null>(null)
+  const [yard, setYard] = useState<YardShift[]>([])
   const [err, setErr] = useState<string | null>(null)
+  const [addTime, setAddTime] = useState(false)
 
   const load = useCallback(async () => {
     try {
       setErr(null)
-      setTickets(await techApi.listTickets())
+      const [tk, yd] = await Promise.all([techApi.listTickets(), techApi.listYard().catch(() => [])])
+      setTickets(tk)
+      setYard(yd)
     } catch (e) {
       setErr(e instanceof TechApiError ? e.message : 'Could not load your tickets.')
     }
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // Every place a time entry can go today: each of my tickets, plus any yard shift.
+  const destinations: TimeDestination[] = [
+    ...(tickets ?? []).map((t) => ({ id: t.id, kind: 'ticket' as const, label: `${t.ticketNumber}${t.customer ? ` · ${t.customer}` : ''}` })),
+    ...yard.map((y) => ({ id: y.id, kind: 'yard' as const, label: `Yard · ${shortDate(y.date)}` })),
+  ]
 
   return (
     <>
@@ -55,6 +68,10 @@ export default function MyTicketsClient() {
           </div>
         )}
 
+        {tickets !== null && destinations.length > 0 && (
+          <button className="tech-btn block" style={{ marginBottom: 12 }} onClick={() => setAddTime(true)}>+ Add time</button>
+        )}
+
         {tickets?.map((t) => (
           <Link key={t.id} href={`/tech/tickets/${t.id}`} className="tech-card tech-ticketcard">
             <div className="tech-row">
@@ -72,7 +89,23 @@ export default function MyTicketsClient() {
             </div>
           </Link>
         ))}
+
+        {yard.map((y) => (
+          <div key={y.id} className="tech-card">
+            <div className="tech-row">
+              <span className="tech-num">Yard</span>
+              <div className="tech-hours" style={{ marginLeft: 'auto' }}>
+                <b>{y.myHours.toFixed(2)}</b><span>my hrs</span>
+              </div>
+            </div>
+            <div className="tech-meta">{shortDate(y.date)} · yard shift (no ticket)</div>
+          </div>
+        ))}
       </div>
+
+      {addTime && (
+        <AddTimeSheet destinations={destinations} onClose={() => setAddTime(false)} onSaved={load} />
+      )}
     </>
   )
 }
