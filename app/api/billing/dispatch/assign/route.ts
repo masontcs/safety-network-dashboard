@@ -49,7 +49,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       const { error } = await supabase
         .from('billing_yard_shifts')
         .upsert(
-          techIds.map((id) => ({ technician_id: id, shift_date: body.date as string, branch_id: body.branchId ?? null })),
+          techIds.map((id) => ({ technician_id: id, shift_date: body.date as string, branch_id: body.branchId || null })),
           { onConflict: 'technician_id,shift_date' }
         )
       if (error) throw new Error(error.message)
