@@ -29,17 +29,32 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (guard) return guard
 
     const body = (await request.json()) as {
-      mode?: 'ticket' | 'job'
+      mode?: 'ticket' | 'job' | 'yard'
       date?: string
       technicianIds?: string[]
       ticketId?: string
       jobId?: string
+      branchId?: string | null
     }
     const techIds = [...new Set((body.technicianIds ?? []).filter(Boolean))]
-    if (body.mode !== 'ticket' && body.mode !== 'job') return bad('mode must be ticket or job')
+    if (body.mode !== 'ticket' && body.mode !== 'job' && body.mode !== 'yard') return bad('mode must be ticket, job, or yard')
     if (techIds.length === 0) return bad('At least one technician is required')
 
     const supabase = createServiceClient()
+
+    // ── Yard: no ticket. One yard shift per tech per day; time logs there (excluded from
+    // billing). Re-dispatching to yard is idempotent.
+    if (body.mode === 'yard') {
+      if (!body.date) return bad('A date is required')
+      const { error } = await supabase
+        .from('billing_yard_shifts')
+        .upsert(
+          techIds.map((id) => ({ technician_id: id, shift_date: body.date as string, branch_id: body.branchId ?? null })),
+          { onConflict: 'technician_id,shift_date' }
+        )
+      if (error) throw new Error(error.message)
+      return NextResponse.json({ success: true, data: { yard: true, count: techIds.length } })
+    }
 
     let ticketId: string
     let ticketNumber: string | null = null
@@ -110,6 +125,32 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     return NextResponse.json({ success: true, data: { ticketId, ticketNumber, added: toAdd.length } })
+  } catch (err) {
+    return billingApiError(err)
+  }
+}
+
+/** Remove a yard shift (only if it has no logged time). */
+export async function DELETE(request: Request): Promise<NextResponse> {
+  try {
+    const ctx = await getAccessContext()
+    if (!ctx.ok) return ctx.response
+    const guard = guardAdminOnly(ctx.access.role)
+    if (guard) return guard
+
+    const id = new URL(request.url).searchParams.get('yardShiftId')
+    if (!id) return bad('yardShiftId is required')
+
+    const supabase = createServiceClient()
+    const { count } = await supabase
+      .from('billing_yard_time')
+      .select('id', { count: 'exact', head: true })
+      .eq('yard_shift_id', id)
+    if ((count ?? 0) > 0) return bad('This yard shift has time logged. Remove the time first.', 'CONFLICT', 409)
+
+    const { error } = await supabase.from('billing_yard_shifts').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+    return NextResponse.json({ success: true })
   } catch (err) {
     return billingApiError(err)
   }

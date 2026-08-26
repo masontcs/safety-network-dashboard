@@ -15,7 +15,8 @@ interface Ticket {
   id: string; ticketNumber: string; date: string; leadTechId: string | null; crewTechIds: string[]
   feature: 'add' | 'return' | 'dtc'; jobNumber: string; jobName: string | null; customer: string | null; voided?: boolean
 }
-interface Board { weekStart: string; days: string[]; technicians: { id: string; name: string }[]; tickets: Ticket[]; isAdmin: boolean }
+interface YardShift { id: string; technicianId: string; date: string }
+interface Board { weekStart: string; days: string[]; technicians: { id: string; name: string }[]; tickets: Ticket[]; yard: YardShift[]; isAdmin: boolean }
 
 const addDays = (d: string, n: number) => { const dt = new Date(d + 'T00:00:00Z'); dt.setUTCDate(dt.getUTCDate() + n); return dt.toISOString().slice(0, 10) }
 const dayLabel = (d: string) => { const dt = new Date(d + 'T00:00:00Z'); return dt.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', timeZone: 'UTC' }) }
@@ -66,6 +67,16 @@ export default function DispatchClient() {
   // fall into the Unassigned row so nothing is hidden.
   const cardsFor = (techId: string, day: string) =>
     (board?.tickets ?? []).filter((t) => t.date === day && (techId === UNASSIGNED ? t.crewTechIds.length === 0 : t.crewTechIds.includes(techId)))
+  const yardFor = (techId: string, day: string) =>
+    (board?.yard ?? []).filter((y) => y.date === day && y.technicianId === techId)
+
+  async function removeYard(id: string) {
+    setBoard((b) => b && { ...b, yard: b.yard.filter((y) => y.id !== id) })
+    const res = await fetch(`/api/billing/dispatch/assign?yardShiftId=${id}`, { method: 'DELETE' })
+      .then((r) => r.json()).catch(() => ({ success: false }))
+    if (!res.success) { flash('Could not remove yard shift — reloading.'); load(week) }
+    else flash('Yard shift removed.')
+  }
 
   const weekRangeLabel = board
     ? `${new Date(board.weekStart + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' })}`
@@ -109,6 +120,8 @@ export default function DispatchClient() {
                 days={days}
                 loading={!board}
                 cardsFor={cardsFor}
+                yardFor={yardFor}
+                onRemoveYard={removeYard}
                 canDrag={!!board?.isAdmin}
                 onDragStart={(t) => { drag.current = t }}
                 onDrop={(techId, day) => { if (drag.current) { reassign(drag.current, techId, day); drag.current = null } }}
@@ -131,6 +144,7 @@ export default function DispatchClient() {
           date={dispatchCell.date}
           technicianId={dispatchCell.techId}
           technicians={board.technicians}
+          branchId={branchId ?? null}
           ticketsForDay={board.tickets
             .filter((t) => t.date === dispatchCell.date)
             .map((t) => ({ id: t.id, ticketNumber: t.ticketNumber, jobNumber: t.jobNumber, jobName: t.jobName, customer: t.customer, feature: t.feature, voided: t.voided }))}
@@ -142,9 +156,11 @@ export default function DispatchClient() {
   )
 }
 
-function DispatchRow({ tech, days, loading, cardsFor, canDrag, onDragStart, onDrop, onOpen, onDispatch }: {
+function DispatchRow({ tech, days, loading, cardsFor, yardFor, onRemoveYard, canDrag, onDragStart, onDrop, onOpen, onDispatch }: {
   tech: { id: string; name: string }; days: string[]; loading: boolean; canDrag: boolean
   cardsFor: (techId: string, day: string) => Ticket[]
+  yardFor: (techId: string, day: string) => YardShift[]
+  onRemoveYard: (id: string) => void
   onDragStart: (t: Ticket) => void; onDrop: (techId: string, day: string) => void; onOpen: (t: Ticket) => void
   onDispatch: (techId: string, day: string) => void
 }) {
@@ -158,6 +174,7 @@ function DispatchRow({ tech, days, loading, cardsFor, canDrag, onDragStart, onDr
       </div>
       {days.map((day) => {
         const cards = loading ? [] : cardsFor(tech.id, day)
+        const yard = loading ? [] : yardFor(tech.id, day)
         return (
           <div
             key={day}
@@ -187,6 +204,13 @@ function DispatchRow({ tech, days, loading, cardsFor, canDrag, onDragStart, onDr
                 </div>
               )
             })}
+            {yard.map((y) => (
+              <div key={y.id} className="tk" style={{ background: 'var(--bg-secondary, #eee)', border: '1px solid var(--border, #ddd)', color: 'var(--text-secondary, #555)' }}
+                title="Yard shift — no ticket">
+                <b>YARD{canDrag ? '' : ''}</b>
+                {canDrag && <small onClick={(e) => { e.stopPropagation(); onRemoveYard(y.id) }} style={{ cursor: 'pointer', color: 'var(--danger, #c0392b)' }}>remove</small>}
+              </div>
+            ))}
             {canDrag && (
               <button
                 type="button"

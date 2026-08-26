@@ -63,12 +63,25 @@ export async function GET(request: Request): Promise<NextResponse> {
       }
     }
 
+    // Yard shifts this week (no ticket). Branch-scoped when a branch is in effect; yard
+    // shifts with no branch always show (they're unassigned to a branch).
+    const { data: yardRaw } = await supabase
+      .from('billing_yard_shifts')
+      .select('id, technician_id, branch_id, shift_date')
+      .gte('shift_date', weekStart).lte('shift_date', weekEnd)
+    let yardShifts = (yardRaw ?? []) as { id: string; technician_id: string; branch_id: string | null; shift_date: string }[]
+    if (effBranchIds !== null) {
+      const allow = new Set(effBranchIds)
+      yardShifts = yardShifts.filter((y) => y.branch_id === null || allow.has(y.branch_id))
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         weekStart,
         days: Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)),
         technicians: techs,
+        yard: yardShifts.map((y) => ({ id: y.id, technicianId: y.technician_id, date: y.shift_date })),
         tickets: tickets.map((t) => ({
           id: t.id, ticketNumber: t.ticket_number, date: t.ticket_date,
           leadTechId: leadByTicket.get(t.id) ?? null,

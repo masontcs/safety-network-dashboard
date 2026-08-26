@@ -19,14 +19,15 @@ interface ProfileOpt { id: string; name: string; code: string; branch: { name: s
 interface EntityOpt { entityId: string; code: string; name: string }
 interface JobOpt { id: string; jobNumber: string; name: string | null; customer: string | null }
 
-type Mode = 'ticket' | 'job' | 'newjob'
+type Mode = 'ticket' | 'job' | 'newjob' | 'yard'
 
 export default function DispatchAssignModal({
-  date, technicianId, technicians, ticketsForDay, onClose, onDone,
+  date, technicianId, technicians, branchId, ticketsForDay, onClose, onDone,
 }: {
   date: string
   technicianId: string | null
   technicians: TechOpt[]
+  branchId: string | null
   ticketsForDay: TicketOpt[]
   onClose: () => void
   onDone: (msg: string) => void
@@ -80,7 +81,11 @@ export default function DispatchAssignModal({
     if (techIds.length === 0) { setErr('Pick at least one technician.'); return }
     setBusy(true); setErr(null)
     try {
-      if (mode === 'ticket') {
+      if (mode === 'yard') {
+        const r = await post('/api/billing/dispatch/assign', { mode: 'yard', technicianIds: techIds, date, branchId })
+        if (!r.success) return setErr(r.error ?? 'Failed')
+        onDone('Dispatched to yard.')
+      } else if (mode === 'ticket') {
         if (!ticketId) { setErr('Pick a ticket.'); return }
         const r = await post('/api/billing/dispatch/assign', { mode: 'ticket', ticketId, technicianIds: techIds, date })
         if (!r.success) return setErr(r.error ?? 'Failed')
@@ -148,8 +153,13 @@ export default function DispatchAssignModal({
               {tab('ticket', 'Existing ticket')}
               {tab('job', 'Job → new ticket')}
               {tab('newjob', 'New job → ticket')}
+              {tab('yard', 'Yard')}
             </div>
           </div>
+
+          {mode === 'yard' && (
+            <div className="bx-sub">Yard shift — no ticket. The tech(s) log yard time for the day; it stays out of billing.</div>
+          )}
 
           {mode === 'ticket' && (
             <div>
