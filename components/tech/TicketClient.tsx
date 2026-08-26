@@ -32,8 +32,9 @@ export default function TicketClient({ ticketId }: { ticketId: string }) {
   }, [ticketId])
 
   useEffect(() => { load() }, [load])
-  // Live: crew/assignment changes from the office reflect without a refresh.
-  useBroadcast('dispatch', 'changed', load)
+  // Live: crew/assignment/void changes from the office reflect without a refresh. If the
+  // office voids this ticket, the refetch 404s and the screen shows it's no longer available.
+  useBroadcast('billing', 'changed', load)
 
   async function removeLabor(entryId: string) {
     if (!window.confirm('Remove this time entry?')) return

@@ -6,6 +6,7 @@ import { BILLING_TYPES } from '@/lib/billing/constants'
 import { resolveItemLineRates } from '@/lib/billing/livePricing'
 import { fetchJobLedger, balanceFrom } from '@/lib/billing/onRent'
 import type { BillingItemCategory, BillingType, Database } from '@/lib/supabase/database.types'
+import { broadcastBillingChanged } from '@/lib/realtime/broadcast'
 
 /**
  * A single ticket: its details, its quantity ledger (Equipment), and its
@@ -259,6 +260,9 @@ export async function PATCH(
         .update({ is_voided: wantVoid, voided_at: wantVoid ? new Date().toISOString() : null, voided_by: wantVoid ? ctx.access.userId : null })
         .eq('id', params.id)
       if (vErr) throw new Error(vErr.message)
+      // Void/restore reflects everywhere live: dispatch board (greyed/removed), tickets
+      // list, and the tech app (a voided ticket drops off the tech's list).
+      await broadcastBillingChanged()
       return NextResponse.json({ success: true })
     }
 
@@ -329,6 +333,7 @@ export async function PATCH(
       if (ledErr) throw new Error(ledErr.message)
     }
 
+    await broadcastBillingChanged()
     return NextResponse.json({ success: true })
   } catch (err) {
     return billingApiError(err)

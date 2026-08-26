@@ -3,6 +3,7 @@ import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { nextNumber } from '@/lib/billing/rpc'
+import { broadcastBillingChanged } from '@/lib/realtime/broadcast'
 
 /**
  * Tickets. Feature-based, not type-based: each ticket toggles
@@ -143,6 +144,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       .single()
     if (error || !created) throw new Error(error?.message ?? 'Failed to create ticket')
 
+    await broadcastBillingChanged()
     return NextResponse.json({ success: true, data: { id: created.id, ticketNumber: created.ticket_number } })
   } catch (err) {
     return billingApiError(err)

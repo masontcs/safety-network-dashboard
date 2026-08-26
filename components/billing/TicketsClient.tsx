@@ -7,6 +7,7 @@ import Skeleton from '@/components/ui/Skeleton'
 import Select from '@/components/billing/Select'
 import { rowOpen } from '@/components/billing/rowOpen'
 import { useBranch } from '@/components/billing/BranchContext'
+import { useBroadcast } from '@/lib/realtime/useBroadcast'
 
 /**
  * Global tickets list — across all jobs. Create happens from a job (see the
@@ -41,8 +42,8 @@ export default function TicketsClient() {
   const [statusFilter, setStatusFilter] = useState('')
   const { query } = useBranch()
 
-  const load = useCallback(() => {
-    setLoading(true)
+  const load = useCallback((silent = false) => {
+    if (!silent) setLoading(true) // a background ping refreshes rows in place — no skeleton flash
     fetch('/api/billing/tickets' + query)
       .then((r) => r.json())
       .then((j) => { if (!j.success) throw new Error(j.error); setTickets(j.data); setErr(null) })
@@ -51,6 +52,8 @@ export default function TicketsClient() {
   }, [query])
 
   useEffect(() => { load() }, [load])
+  // Live: a ticket created, voided/restored, or invoiced updates this list without a refresh.
+  useBroadcast('billing', 'changed', () => load(true))
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()

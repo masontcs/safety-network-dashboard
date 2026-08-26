@@ -29,8 +29,9 @@ export default function MyTicketsClient() {
   }, [])
 
   useEffect(() => { load() }, [load])
-  // Live: the moment the office dispatches me, my list updates — no refresh.
-  useBroadcast('dispatch', 'changed', load)
+  // Live: the moment the office dispatches me — or voids a ticket I'm on — my list
+  // updates, no refresh. (load doesn't blank existing data, so it refreshes in place.)
+  useBroadcast('billing', 'changed', load)
 
   // Every place a time entry can go today: each of my tickets, plus any yard shift.
   const destinations: TimeDestination[] = [

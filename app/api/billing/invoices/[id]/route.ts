@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
+import { broadcastBillingChanged } from '@/lib/realtime/broadcast'
 
 /**
  * A single invoice: its header, its lines, and the two transitions it can make.
@@ -134,6 +135,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       if (inv.status !== 'draft') return bad('Only a draft invoice can be edited.', 'CONFLICT', 409)
       const { error } = await supabase.from('billing_invoices').update({ invoice_date: body.invoiceDate }).eq('id', params.id)
       if (error) throw new Error(error.message)
+      await broadcastBillingChanged()
       return NextResponse.json({ success: true })
     }
 
@@ -155,6 +157,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         const { error: tErr } = await supabase.from('billing_tickets').update({ status: 'invoiced' }).in('id', ticketIds)
         if (tErr) throw new Error(tErr.message)
       }
+      await broadcastBillingChanged()
       return NextResponse.json({ success: true })
     }
 
@@ -207,6 +210,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           await supabase.from('billing_tickets').update({ status: 'final_edit' }).eq('id', tid).eq('status', 'invoiced')
         }
       }
+      // Live: the invoice flips to void on the list, and its unlocked tickets revert to
+      // 'final_edit' on the tickets list.
+      await broadcastBillingChanged()
       return NextResponse.json({ success: true })
     }
 

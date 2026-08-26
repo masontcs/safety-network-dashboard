@@ -38,15 +38,16 @@ export default function DispatchClient() {
   const router = useRouter()
   const { branchId } = useBranch()
 
-  const load = useCallback((w: string) => {
-    setBoard(null)
+  const load = useCallback((w: string, silent = false) => {
+    if (!silent) setBoard(null) // a background ping refreshes in place — no blank flash
     fetch(`/api/billing/dispatch?week=${w}${branchId ? `&branchId=${branchId}` : ''}`).then((r) => r.json())
       .then((j) => { if (!j.success) throw new Error(j.error); setBoard(j.data) })
       .catch((e: Error) => setErr(e.message))
   }, [branchId])
   useEffect(() => { load(week) }, [week, load])
-  // Live: refetch the board the instant anyone dispatches / reassigns / yards.
-  useBroadcast('dispatch', 'changed', () => load(week))
+  // Live: refetch the instant anyone dispatches / reassigns / yards, or a ticket is
+  // created or voided (a void greys / drops the card here).
+  useBroadcast('billing', 'changed', () => load(week, true))
 
   function flash(msg: string) { setToast(msg); setTimeout(() => setToast(null), 2200) }
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useBranch } from '@/components/billing/BranchContext'
+import { useBroadcast } from '@/lib/realtime/useBroadcast'
 
 /** All invoices, newest first, filterable by status. Generation happens on a job. */
 
@@ -21,8 +22,8 @@ export default function InvoicesClient() {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('all')
   const { query } = useBranch()
 
-  const load = useCallback(() => {
-    setLoading(true)
+  const load = useCallback((silent = false) => {
+    if (!silent) setLoading(true) // a background ping refreshes rows in place — no flash
     fetch('/api/billing/invoices' + query)
       .then((r) => r.json())
       .then((j) => { if (!j.success) throw new Error(j.error); setRows(j.data); setErr(null) })
@@ -30,6 +31,8 @@ export default function InvoicesClient() {
       .finally(() => setLoading(false))
   }, [query])
   useEffect(() => { load() }, [load])
+  // Live: a generated or voided invoice updates this list without a refresh.
+  useBroadcast('billing', 'changed', () => load(true))
 
   const shown = useMemo(() => filter === 'all' ? rows : rows.filter((r) => r.status === filter), [rows, filter])
 

@@ -21,5 +21,13 @@ export async function broadcast(topic: string, event: string, payload: Record<st
   }
 }
 
-/** Dispatch board / tech assignments changed (dispatched, reassigned, yard, etc.). */
-export const broadcastDispatchChanged = () => broadcast('dispatch', 'changed')
+/**
+ * Something in billing changed and open views should refetch: a dispatch/assignment, a
+ * ticket create/edit/void, or an invoice generate/void. One shared channel keeps the
+ * dispatch board, tickets list, invoices list, and the tech app all live off a single ping.
+ * The ping still carries no data — every listener refetches through its own guarded API.
+ */
+export const broadcastBillingChanged = () => broadcast('billing', 'changed')
+
+/** @deprecated use broadcastBillingChanged — kept as an alias so callers don't break. */
+export const broadcastDispatchChanged = broadcastBillingChanged

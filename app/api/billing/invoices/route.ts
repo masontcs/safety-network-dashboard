@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { nextNumber } from '@/lib/billing/rpc'
 import { buildJobInvoice, InvoiceBuildError } from '@/lib/billing/invoicing'
+import { broadcastBillingChanged } from '@/lib/realtime/broadcast'
 
 /**
  * Invoices — list, and GENERATE from a job.
@@ -201,6 +202,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       const { error: tErr } = await supabase.from('billing_tickets').update({ status: 'invoiced' }).in('id', billedTicketIds)
       if (tErr) throw new Error(tErr.message)
     }
+
+    // Live: the new invoice appears on the invoices list, and the tickets it billed flip to
+    // 'invoiced' on the tickets list — no refresh.
+    await broadcastBillingChanged()
 
     return NextResponse.json({
       success: true,
