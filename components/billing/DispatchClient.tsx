@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBranch } from '@/components/billing/BranchContext'
 import DispatchAssignModal from '@/components/billing/DispatchAssignModal'
+import { useBroadcast } from '@/lib/realtime/useBroadcast'
 
 /**
  * Dispatch board — the concept's week grid: technicians as rows, Mon–Fri as columns,
@@ -44,6 +45,8 @@ export default function DispatchClient() {
       .catch((e: Error) => setErr(e.message))
   }, [branchId])
   useEffect(() => { load(week) }, [week, load])
+  // Live: refetch the board the instant anyone dispatches / reassigns / yards.
+  useBroadcast('dispatch', 'changed', () => load(week))
 
   function flash(msg: string) { setToast(msg); setTimeout(() => setToast(null), 2200) }
 

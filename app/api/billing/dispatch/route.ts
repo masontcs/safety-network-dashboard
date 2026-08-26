@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
+import { broadcastDispatchChanged } from '@/lib/realtime/broadcast'
 
 /**
  * Dispatch board — the week's tickets by lead technician × day.
@@ -136,6 +137,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
       }
     }
 
+    await broadcastDispatchChanged()
     return NextResponse.json({ success: true })
   } catch (err) {
     return billingApiError(err)

@@ -6,6 +6,7 @@ import { techApi, TechApiError, type TicketListItem, type YardShift } from '@/li
 import SignOutButton from '@/components/tech/SignOutButton'
 import FeatureTags from '@/components/tech/FeatureTags'
 import AddTimeSheet, { type TimeDestination } from '@/components/tech/AddTimeSheet'
+import { useBroadcast } from '@/lib/realtime/useBroadcast'
 
 const shortDate = (d: string) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 
@@ -28,6 +29,8 @@ export default function MyTicketsClient() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  // Live: the moment the office dispatches me, my list updates — no refresh.
+  useBroadcast('dispatch', 'changed', load)
 
   // Every place a time entry can go today: each of my tickets, plus any yard shift.
   const destinations: TimeDestination[] = [

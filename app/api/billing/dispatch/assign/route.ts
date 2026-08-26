@@ -3,6 +3,7 @@ import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { nextNumber } from '@/lib/billing/rpc'
+import { broadcastDispatchChanged } from '@/lib/realtime/broadcast'
 
 /**
  * Dispatch → ticket assignment. This is the hub of the tech workflow: dispatching a tech to
@@ -53,6 +54,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           { onConflict: 'technician_id,shift_date' }
         )
       if (error) throw new Error(error.message)
+      await broadcastDispatchChanged()
       return NextResponse.json({ success: true, data: { yard: true, count: techIds.length } })
     }
 
@@ -124,6 +126,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       if (makeLead) hasLead = true
     }
 
+    await broadcastDispatchChanged()
     return NextResponse.json({ success: true, data: { ticketId, ticketNumber, added: toAdd.length } })
   } catch (err) {
     return billingApiError(err)
@@ -150,6 +153,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
 
     const { error } = await supabase.from('billing_yard_shifts').delete().eq('id', id)
     if (error) throw new Error(error.message)
+    await broadcastDispatchChanged()
     return NextResponse.json({ success: true })
   } catch (err) {
     return billingApiError(err)

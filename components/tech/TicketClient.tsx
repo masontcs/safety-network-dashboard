@@ -7,6 +7,7 @@ import FeatureTags from '@/components/tech/FeatureTags'
 import Sheet from '@/components/tech/Sheet'
 import AddTimeSheet from '@/components/tech/AddTimeSheet'
 import AddEquipmentSheet from '@/components/tech/AddEquipmentSheet'
+import { useBroadcast } from '@/lib/realtime/useBroadcast'
 
 type SheetKind = 'time' | 'equipment' | 'submit' | null
 
@@ -31,6 +32,8 @@ export default function TicketClient({ ticketId }: { ticketId: string }) {
   }, [ticketId])
 
   useEffect(() => { load() }, [load])
+  // Live: crew/assignment changes from the office reflect without a refresh.
+  useBroadcast('dispatch', 'changed', load)
 
   async function removeLabor(entryId: string) {
     if (!window.confirm('Remove this time entry?')) return
