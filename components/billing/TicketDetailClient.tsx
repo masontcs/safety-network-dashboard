@@ -75,6 +75,8 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
   const [evQty, setEvQty] = useState(''); const [evDate, setEvDate] = useState(''); const [evEquip, setEvEquip] = useState('')
   // After a date edit, offer to match the rest of the ticket's items to it.
   const [datePrompt, setDatePrompt] = useState<{ date: string; count: number } | null>(null)
+  // Confirm voiding via an in-app modal (not a native browser dialog).
+  const [confirmVoid, setConfirmVoid] = useState(false)
 
   // line add form
   const [cItem, setCItem] = useState(''); const [cVar, setCVar] = useState(''); const [cDesc, setCDesc] = useState(''); const [cQty, setCQty] = useState('1'); const [cRate, setCRate] = useState('0.00')
@@ -121,9 +123,13 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
     finally { setBusy(false) }
   }
 
-  async function toggleVoid() {
-    const wantVoid = !t?.voided
-    if (wantVoid && !window.confirm('Void this ticket? Its equipment, labor and charges will stop counting toward any invoice or quantity. You can restore it later.')) return
+  // Voiding asks for confirmation via the in-app modal; restoring is direct (reversible).
+  function toggleVoid() {
+    if (!t?.voided) { setConfirmVoid(true); return }
+    doVoid(false)
+  }
+  async function doVoid(wantVoid: boolean) {
+    setConfirmVoid(false)
     if (await call(`/api/billing/tickets/${ticketId}`, 'PATCH', { action: wantVoid ? 'void' : 'unvoid' })) { setMsg(wantVoid ? 'Ticket voided.' : 'Ticket restored.'); load() }
   }
 
@@ -354,6 +360,23 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => setDatePrompt(null)} style={ghost}>Just this one</button>
               <button onClick={applyDateToAll} disabled={busy} className="btn-primary" style={{ padding: '8px 16px', opacity: busy ? 0.5 : 1 }}>Yes, update all</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmVoid && (
+        <div
+          onClick={() => setConfirmVoid(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}
+        >
+          <div onClick={(e) => e.stopPropagation()} className="card" style={{ maxWidth: 400, width: '100%', background: 'var(--bg-surface)' }}>
+            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8 }}>Void ticket {t.ticketNumber}?</div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 18 }}>
+              Its equipment, labor and charges will stop counting toward any invoice or on-rent quantity. You can restore it later.
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setConfirmVoid(false)} style={ghost}>Cancel</button>
+              <button onClick={() => doVoid(true)} disabled={busy} style={{ background: 'var(--pill-overdue-fg)', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', opacity: busy ? 0.5 : 1 }}>Void ticket</button>
             </div>
           </div>
         </div>
