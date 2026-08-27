@@ -23,14 +23,37 @@ export async function GET(request: Request): Promise<NextResponse> {
     const includeInactive = new URL(request.url).searchParams.get('includeInactive') === '1'
 
     const supabase = createServiceClient()
-    let q = supabase.from('billing_technicians').select('id, name, is_active').order('name')
+    let q = supabase.from('billing_technicians').select('id, name, is_active, user_id').order('name')
     if (!includeInactive) q = q.eq('is_active', true)
     const { data, error } = await q
     if (error) throw new Error(error.message)
+    const techs = (data ?? []) as { id: string; name: string; is_active: boolean; user_id: string | null }[]
+
+    // Pickers get just id+name. The management view (admins) also gets each tech's login
+    // status — username + email — so the office can see who can actually sign in.
+    if (!includeInactive) return NextResponse.json({ success: true, data: techs.map((t) => ({ id: t.id, name: t.name })) })
+
+    const isAdmin = ctx.access.role === 'admin'
+    const usernameById = new Map<string, string | null>()
+    const emailById = new Map<string, string>()
+    if (isAdmin) {
+      const linked = techs.map((t) => t.user_id).filter((v): v is string => !!v)
+      if (linked.length) {
+        const { data: profs } = await supabase.from('user_profiles').select('id, username').in('id', linked)
+        for (const p of (profs ?? []) as { id: string; username: string | null }[]) usernameById.set(p.id, p.username)
+        const { data: authList } = await supabase.auth.admin.listUsers()
+        for (const u of authList?.users ?? []) if (u.id && u.email) emailById.set(u.id, u.email)
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      data: (data ?? []).map((t) => (includeInactive ? { id: t.id, name: t.name, isActive: t.is_active } : { id: t.id, name: t.name })),
+      data: techs.map((t) => ({
+        id: t.id, name: t.name, isActive: t.is_active,
+        hasLogin: !!t.user_id,
+        username: isAdmin && t.user_id ? (usernameById.get(t.user_id) ?? null) : null,
+        email: isAdmin && t.user_id ? (emailById.get(t.user_id) ?? null) : null,
+      })),
     })
   } catch (err) {
     return billingApiError(err)

@@ -6,6 +6,9 @@ export type AuditAction =
   // User management
   | 'user.create'
   | 'user.update'
+  // Technician logins
+  | 'tech.provision_login'
+  | 'tech.reset_password'
   // Access requests
   | 'access_request.approve'
   | 'access_request.archive'
