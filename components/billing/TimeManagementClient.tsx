@@ -47,6 +47,18 @@ export default function TimeManagementClient() {
   const [returning, setReturning] = useState<string | null>(null)
   const [returnNote, setReturnNote] = useState('')
   const [edit, setEdit] = useState<{ id: string; start: string; end: string; date: string } | null>(null)
+  const [exportDate, setExportDate] = useState<string>(() => new Date().toISOString().slice(0, 10))
+
+  async function downloadExport() {
+    if (!branchId) { flash('Pick a branch in the top bar to export.'); return }
+    const code = branches.find((b) => b.id === branchId)?.code ?? 'branch'
+    const res = await fetch(`/api/billing/time-management/export?branchId=${branchId}&branchCode=${encodeURIComponent(code)}&date=${exportDate}`)
+    if (!res.ok) { const j = await res.json().catch(() => ({})); flash(j.error || 'Export failed'); return }
+    const blob = await res.blob()
+    const name = res.headers.get('Content-Disposition')?.match(/filename="(.+?)"/)?.[1] ?? `tsheets_${exportDate}.csv`
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href)
+    flash('Export downloaded.')
+  }
 
   const loadReview = useCallback(() => {
     fetch(`/api/billing/time-management?week=${week}${branchId ? `&branchId=${branchId}` : ''}`)
@@ -140,6 +152,14 @@ export default function TimeManagementClient() {
 
       {tab === 'review' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {canApprove && (
+            <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>TSheets export</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{branchId ? branches.find((b) => b.id === branchId)?.name : 'Select a branch in the top bar'}</span>
+              <input type="date" value={exportDate} onChange={(e) => setExportDate(e.target.value)} style={{ marginLeft: 'auto', padding: '6px 9px', border: '1px solid var(--border-emphasis)', borderRadius: 6, fontSize: 13 }} />
+              <button className="bx-btn accent sm" onClick={downloadExport} disabled={!branchId} title={branchId ? '' : 'Pick a branch first'}>Download day</button>
+            </div>
+          )}
           {!canApprove ? (
             <div className="card"><div className="bx-note amber">You aren&apos;t set up to approve any branch. Ask an admin to grant you approver access (Approvers tab).</div></div>
           ) : batches.length === 0 ? (
