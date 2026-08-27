@@ -534,7 +534,7 @@ export type Database = {
       /** Time-approval batch: one per (technician, branch, day). Parallel to the ticket's billing status. */
       billing_time_approvals: {
         Row: { id: string; technician_id: string; branch_id: string; work_date: string; status: 'submitted' | 'returned' | 'approved'; note: string | null; approved_by: string | null; created_at: string; updated_at: string }
-        Insert: { id?: string; technician_id: string; branch_id: string; work_date: string; status?: 'submitted' | 'returned' | 'approved'; note?: string | null; approved_by?: string | null }
+        Insert: { id?: string; technician_id: string; branch_id: string; work_date: string; status?: 'submitted' | 'returned' | 'approved'; note?: string | null; approved_by?: string | null; updated_at?: string }
         Update: { id?: string; technician_id?: string; branch_id?: string; work_date?: string; status?: 'submitted' | 'returned' | 'approved'; note?: string | null; approved_by?: string | null; updated_at?: string }
         Relationships: []
       }
