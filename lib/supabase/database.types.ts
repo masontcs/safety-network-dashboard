@@ -325,9 +325,9 @@ export type Database = {
         Relationships: []
       }
       billing_profiles: {
-        Row: { id: string; customer_id: string; branch_id: string; code: string; name: string; payment_term_id: string | null; rental_minimum_enabled: boolean; rental_minimum_cents: number; field_rules: Json; portal_enabled: boolean; is_active: boolean; created_at: string; updated_at: string }
-        Insert: { id?: string; customer_id: string; branch_id: string; code: string; name: string; payment_term_id?: string | null; rental_minimum_enabled?: boolean; rental_minimum_cents?: number; field_rules?: Json; portal_enabled?: boolean; is_active?: boolean }
-        Update: { id?: string; customer_id?: string; branch_id?: string; code?: string; name?: string; payment_term_id?: string | null; rental_minimum_enabled?: boolean; rental_minimum_cents?: number; field_rules?: Json; portal_enabled?: boolean; is_active?: boolean }
+        Row: { id: string; customer_id: string; branch_id: string; code: string; name: string; qb_name: string | null; payment_term_id: string | null; rental_minimum_enabled: boolean; rental_minimum_cents: number; field_rules: Json; portal_enabled: boolean; is_active: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; customer_id: string; branch_id: string; code: string; name: string; qb_name?: string | null; payment_term_id?: string | null; rental_minimum_enabled?: boolean; rental_minimum_cents?: number; field_rules?: Json; portal_enabled?: boolean; is_active?: boolean }
+        Update: { id?: string; customer_id?: string; branch_id?: string; code?: string; name?: string; qb_name?: string | null; payment_term_id?: string | null; rental_minimum_enabled?: boolean; rental_minimum_cents?: number; field_rules?: Json; portal_enabled?: boolean; is_active?: boolean }
         Relationships: []
       }
       billing_portal_accounts: {
@@ -416,9 +416,9 @@ export type Database = {
         Relationships: []
       }
       billing_jobs: {
-        Row: { id: string; job_number: string; profile_id: string; entity_id: string; branch_id: string; name: string | null; status: BillingJobStatus; certified: boolean; dir_number: string | null; cert_payroll_contact: string | null; contract_number: string | null; pay_classification: string | null; address: string | null; cross_streets: string | null; city: string | null; county: string | null; state: string | null; zip: string | null; tax_exempt: boolean; require_signature: boolean; enable_second_signature: boolean; ticket_labor_minimum_minutes: number | null; po_number: string | null; notes: string | null; date_opened: string; date_completed: string | null; created_at: string; updated_at: string }
-        Insert: { id?: string; job_number: string; profile_id: string; entity_id: string; branch_id: string; name?: string | null; status?: BillingJobStatus; certified: boolean; dir_number?: string | null; cert_payroll_contact?: string | null; contract_number?: string | null; pay_classification?: string | null; address?: string | null; cross_streets?: string | null; city?: string | null; county?: string | null; state?: string | null; zip?: string | null; tax_exempt?: boolean; require_signature?: boolean; enable_second_signature?: boolean; ticket_labor_minimum_minutes?: number | null; po_number?: string | null; notes?: string | null; date_opened?: string; date_completed?: string | null }
-        Update: { id?: string; job_number?: string; profile_id?: string; entity_id?: string; branch_id?: string; name?: string | null; status?: BillingJobStatus; certified?: boolean; dir_number?: string | null; cert_payroll_contact?: string | null; contract_number?: string | null; pay_classification?: string | null; address?: string | null; cross_streets?: string | null; city?: string | null; county?: string | null; state?: string | null; zip?: string | null; tax_exempt?: boolean; require_signature?: boolean; enable_second_signature?: boolean; ticket_labor_minimum_minutes?: number | null; po_number?: string | null; notes?: string | null; date_opened?: string; date_completed?: string | null }
+        Row: { id: string; job_number: string; profile_id: string; entity_id: string; branch_id: string; name: string | null; status: BillingJobStatus; certified: boolean; prevailing_wage: boolean; shift_schedule: string | null; dir_number: string | null; cert_payroll_contact: string | null; contract_number: string | null; pay_classification: string | null; address: string | null; cross_streets: string | null; city: string | null; county: string | null; state: string | null; zip: string | null; tax_exempt: boolean; require_signature: boolean; enable_second_signature: boolean; ticket_labor_minimum_minutes: number | null; po_number: string | null; notes: string | null; date_opened: string; date_completed: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; job_number: string; profile_id: string; entity_id: string; branch_id: string; name?: string | null; status?: BillingJobStatus; certified: boolean; prevailing_wage?: boolean; shift_schedule?: string | null; dir_number?: string | null; cert_payroll_contact?: string | null; contract_number?: string | null; pay_classification?: string | null; address?: string | null; cross_streets?: string | null; city?: string | null; county?: string | null; state?: string | null; zip?: string | null; tax_exempt?: boolean; require_signature?: boolean; enable_second_signature?: boolean; ticket_labor_minimum_minutes?: number | null; po_number?: string | null; notes?: string | null; date_opened?: string; date_completed?: string | null }
+        Update: { id?: string; job_number?: string; profile_id?: string; entity_id?: string; branch_id?: string; name?: string | null; status?: BillingJobStatus; certified?: boolean; prevailing_wage?: boolean; shift_schedule?: string | null; dir_number?: string | null; cert_payroll_contact?: string | null; contract_number?: string | null; pay_classification?: string | null; address?: string | null; cross_streets?: string | null; city?: string | null; county?: string | null; state?: string | null; zip?: string | null; tax_exempt?: boolean; require_signature?: boolean; enable_second_signature?: boolean; ticket_labor_minimum_minutes?: number | null; po_number?: string | null; notes?: string | null; date_opened?: string; date_completed?: string | null }
         Relationships: []
       }
       billing_tickets: {
@@ -440,9 +440,11 @@ export type Database = {
         Relationships: []
       }
       billing_activity_types: {
-        Row: { id: string; name: string; sort_order: number; is_active: boolean; created_at: string }
-        Insert: { id?: string; name: string; sort_order?: number; is_active?: boolean }
-        Update: { id?: string; name?: string; sort_order?: number; is_active?: boolean }
+        // note_keyword = lowercase token in the TSheets note; service_item = QB export string.
+        // exported/paid/billable/pw_eligible drive the export + payroll classification.
+        Row: { id: string; name: string; sort_order: number; is_active: boolean; note_keyword: string | null; service_item: string | null; exported: boolean; paid: boolean; billable: boolean; pw_eligible: boolean; created_at: string }
+        Insert: { id?: string; name: string; sort_order?: number; is_active?: boolean; note_keyword?: string | null; service_item?: string | null; exported?: boolean; paid?: boolean; billable?: boolean; pw_eligible?: boolean }
+        Update: { id?: string; name?: string; sort_order?: number; is_active?: boolean; note_keyword?: string | null; service_item?: string | null; exported?: boolean; paid?: boolean; billable?: boolean; pw_eligible?: boolean }
         Relationships: []
       }
       billing_technicians: {
@@ -458,9 +460,10 @@ export type Database = {
         Relationships: []
       }
       billing_ticket_labor: {
-        Row: { id: string; ticket_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; notes: string | null; entered_by: string | null; created_at: string }
-        Insert: { id?: string; ticket_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; notes?: string | null; entered_by?: string | null }
-        Update: { id?: string; ticket_id?: string; technician_id?: string; activity_type_id?: string; start_time?: string; end_time?: string; notes?: string | null; entered_by?: string | null }
+        // work_date: the entry's own date (overnight). Null = falls on the ticket's date.
+        Row: { id: string; ticket_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; work_date: string | null; notes: string | null; entered_by: string | null; created_at: string }
+        Insert: { id?: string; ticket_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; work_date?: string | null; notes?: string | null; entered_by?: string | null }
+        Update: { id?: string; ticket_id?: string; technician_id?: string; activity_type_id?: string; start_time?: string; end_time?: string; work_date?: string | null; notes?: string | null; entered_by?: string | null }
         Relationships: []
       }
       /** A tech dispatched to the yard (no ticket). Yard time logs against it, excluded from billing. */
@@ -471,9 +474,9 @@ export type Database = {
         Relationships: []
       }
       billing_yard_time: {
-        Row: { id: string; yard_shift_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; notes: string | null; entered_by: string | null; created_at: string }
-        Insert: { id?: string; yard_shift_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; notes?: string | null; entered_by?: string | null }
-        Update: { id?: string; yard_shift_id?: string; technician_id?: string; activity_type_id?: string; start_time?: string; end_time?: string; notes?: string | null; entered_by?: string | null }
+        Row: { id: string; yard_shift_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; work_date: string | null; notes: string | null; entered_by: string | null; created_at: string }
+        Insert: { id?: string; yard_shift_id: string; technician_id: string; activity_type_id: string; start_time: string; end_time: string; work_date?: string | null; notes?: string | null; entered_by?: string | null }
+        Update: { id?: string; yard_shift_id?: string; technician_id?: string; activity_type_id?: string; start_time?: string; end_time?: string; work_date?: string | null; notes?: string | null; entered_by?: string | null }
         Relationships: []
       }
       /** Ongoing-rental accruals, keyed by PICKUP LOT (lot_date). Cumulative qty-units billed. */
@@ -519,6 +522,61 @@ export type Database = {
         Row: { id: string; invoice_id: string; reason: string; status: BillingQueueStatus; waived: boolean; notes: string | null; created_by: string | null; created_at: string; resolved_by: string | null; resolved_at: string | null }
         Insert: { id?: string; invoice_id: string; reason: string; status?: BillingQueueStatus; waived?: boolean; notes?: string | null; created_by?: string | null }
         Update: { id?: string; invoice_id?: string; reason?: string; status?: BillingQueueStatus; waived?: boolean; notes?: string | null; resolved_by?: string | null; resolved_at?: string | null }
+        Relationships: []
+      }
+      /** Per-tech, per-day per-diem flag. Rolls into a weekly payout list; not on the export. */
+      billing_per_diem: {
+        Row: { id: string; technician_id: string; work_date: string; branch_id: string | null; status: 'pending' | 'paid'; pre_approved_by: string | null; paid_at: string | null; created_at: string }
+        Insert: { id?: string; technician_id: string; work_date: string; branch_id?: string | null; status?: 'pending' | 'paid'; pre_approved_by?: string | null; paid_at?: string | null }
+        Update: { id?: string; technician_id?: string; work_date?: string; branch_id?: string | null; status?: 'pending' | 'paid'; pre_approved_by?: string | null; paid_at?: string | null }
+        Relationships: []
+      }
+      /** Time-approval batch: one per (technician, branch, day). Parallel to the ticket's billing status. */
+      billing_time_approvals: {
+        Row: { id: string; technician_id: string; branch_id: string; work_date: string; status: 'submitted' | 'returned' | 'approved'; note: string | null; approved_by: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; technician_id: string; branch_id: string; work_date: string; status?: 'submitted' | 'returned' | 'approved'; note?: string | null; approved_by?: string | null }
+        Update: { id?: string; technician_id?: string; branch_id?: string; work_date?: string; status?: 'submitted' | 'returned' | 'approved'; note?: string | null; approved_by?: string | null; updated_at?: string }
+        Relationships: []
+      }
+      /** Who may approve times, scoped per branch. Governs ALL users, admins included. */
+      billing_time_approvers: {
+        Row: { id: string; user_id: string; branch_id: string; created_at: string }
+        Insert: { id?: string; user_id: string; branch_id: string }
+        Update: { id?: string; user_id?: string; branch_id?: string }
+        Relationships: []
+      }
+      /** The dispatch unit. Staged = draft; Published creates the ticket + crew and notifies techs. job_id null = yard. */
+      billing_shifts: {
+        Row: { id: string; job_id: string | null; branch_id: string; shift_date: string; status: 'staged' | 'published'; meal_type: 'standard' | 'odmp'; per_diem_preapproved: boolean; ticket_id: string | null; notes: string | null; created_by: string | null; published_at: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; job_id?: string | null; branch_id: string; shift_date: string; status?: 'staged' | 'published'; meal_type?: 'standard' | 'odmp'; per_diem_preapproved?: boolean; ticket_id?: string | null; notes?: string | null; created_by?: string | null; published_at?: string | null }
+        Update: { id?: string; job_id?: string | null; branch_id?: string; shift_date?: string; status?: 'staged' | 'published'; meal_type?: 'standard' | 'odmp'; per_diem_preapproved?: boolean; ticket_id?: string | null; notes?: string | null; created_by?: string | null; published_at?: string | null; updated_at?: string }
+        Relationships: []
+      }
+      billing_shift_job_types: {
+        Row: { id: string; shift_id: string; job_type: string }
+        Insert: { id?: string; shift_id: string; job_type: string }
+        Update: { id?: string; shift_id?: string; job_type?: string }
+        Relationships: []
+      }
+      /** Planned timeline (time + activity) — a plan the tech sees; NOT time entries. */
+      billing_shift_timeline: {
+        Row: { id: string; shift_id: string; sort_order: number; at_time: string; activity_type_id: string }
+        Insert: { id?: string; shift_id: string; sort_order?: number; at_time: string; activity_type_id: string }
+        Update: { id?: string; shift_id?: string; sort_order?: number; at_time?: string; activity_type_id?: string }
+        Relationships: []
+      }
+      /** Crew on a shift (before publish); acknowledged_at records the tech's shift acknowledgement. */
+      billing_shift_crew: {
+        Row: { id: string; shift_id: string; technician_id: string; is_lead: boolean; acknowledged_at: string | null }
+        Insert: { id?: string; shift_id: string; technician_id: string; is_lead?: boolean; acknowledged_at?: string | null }
+        Update: { id?: string; shift_id?: string; technician_id?: string; is_lead?: boolean; acknowledged_at?: string | null }
+        Relationships: []
+      }
+      /** Traffic-plan files on a shift (multiple), visible to techs. */
+      billing_shift_files: {
+        Row: { id: string; shift_id: string; storage_path: string; filename: string | null; uploaded_by: string | null; created_at: string }
+        Insert: { id?: string; shift_id: string; storage_path: string; filename?: string | null; uploaded_by?: string | null }
+        Update: { id?: string; shift_id?: string; storage_path?: string; filename?: string | null; uploaded_by?: string | null }
         Relationships: []
       }
     }
