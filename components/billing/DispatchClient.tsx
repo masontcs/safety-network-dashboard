@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBranch } from '@/components/billing/BranchContext'
-import DispatchAssignModal from '@/components/billing/DispatchAssignModal'
+import ShiftEditorModal from '@/components/billing/ShiftEditorModal'
 import { useBroadcast } from '@/lib/realtime/useBroadcast'
 
 /**
@@ -17,6 +17,7 @@ interface Ticket {
   feature: 'add' | 'return' | 'dtc'; jobNumber: string; jobName: string | null; customer: string | null; voided?: boolean
 }
 interface YardShift { id: string; technicianId: string; date: string }
+interface StagedShift { id: string; date: string; isYard: boolean; crewTechIds: string[]; leadTechId: string | null; jobNumber: string | null; jobName: string | null; customer: string | null; jobTypes: string[] }
 interface Board { weekStart: string; days: string[]; technicians: { id: string; name: string }[]; tickets: Ticket[]; yard: YardShift[]; isAdmin: boolean }
 
 const addDays = (d: string, n: number) => { const dt = new Date(d + 'T00:00:00Z'); dt.setUTCDate(dt.getUTCDate() + n); return dt.toISOString().slice(0, 10) }
@@ -30,19 +31,25 @@ const UNASSIGNED = '__unassigned__'
 
 export default function DispatchClient() {
   const [board, setBoard] = useState<Board | null>(null)
+  const [staged, setStaged] = useState<StagedShift[]>([])
   const [err, setErr] = useState<string | null>(null)
   const [week, setWeek] = useState<string>(() => new Date().toISOString().slice(0, 10))
   const [toast, setToast] = useState<string | null>(null)
   const [dispatchCell, setDispatchCell] = useState<{ techId: string | null; date: string } | null>(null)
+  const [editShiftId, setEditShiftId] = useState<string | null>(null)
   const drag = useRef<Ticket | null>(null)
   const router = useRouter()
   const { branchId } = useBranch()
 
   const load = useCallback((w: string, silent = false) => {
     if (!silent) setBoard(null) // a background ping refreshes in place — no blank flash
-    fetch(`/api/billing/dispatch?week=${w}${branchId ? `&branchId=${branchId}` : ''}`).then((r) => r.json())
+    const bq = branchId ? `&branchId=${branchId}` : ''
+    fetch(`/api/billing/dispatch?week=${w}${bq}`).then((r) => r.json())
       .then((j) => { if (!j.success) throw new Error(j.error); setBoard(j.data) })
       .catch((e: Error) => setErr(e.message))
+    // Staged shifts (drafts) live alongside published tickets on the board.
+    fetch(`/api/billing/shifts?week=${w}&status=staged${bq}`).then((r) => r.json())
+      .then((j) => { if (j.success) setStaged(j.data) }).catch(() => {})
   }, [branchId])
   useEffect(() => { load(week) }, [week, load])
   // Live: refetch the instant anyone dispatches / reassigns / yards, or a ticket is
@@ -73,6 +80,22 @@ export default function DispatchClient() {
     (board?.tickets ?? []).filter((t) => t.date === day && (techId === UNASSIGNED ? t.crewTechIds.length === 0 : t.crewTechIds.includes(techId)))
   const yardFor = (techId: string, day: string) =>
     (board?.yard ?? []).filter((y) => y.date === day && y.technicianId === techId)
+  // Staged shifts show under each crew member (or Unassigned if no crew yet).
+  const stagedFor = (techId: string, day: string) =>
+    staged.filter((s) => s.date === day && (techId === UNASSIGNED ? s.crewTechIds.length === 0 : s.crewTechIds.includes(techId)))
+
+  async function publishShift(id: string) {
+    const res = await fetch(`/api/billing/shifts/${id}/publish`, { method: 'POST' }).then((r) => r.json()).catch(() => ({ success: false }))
+    if (!res.success) { flash(res.error || 'Could not publish — reloading.'); load(week) }
+    else flash(res.data?.ticketNumber ? `Published — ticket ${res.data.ticketNumber}.` : 'Shift published.')
+  }
+  async function deleteShift(id: string) {
+    // Draft-only; optimistic. (Published shifts can't be deleted — void the ticket instead.)
+    setStaged((s) => s.filter((x) => x.id !== id))
+    const res = await fetch(`/api/billing/shifts/${id}`, { method: 'DELETE' }).then((r) => r.json()).catch(() => ({ success: false }))
+    if (!res.success) { flash('Could not delete — reloading.'); load(week) }
+    else flash('Staged shift deleted.')
+  }
 
   async function removeYard(id: string) {
     setBoard((b) => b && { ...b, yard: b.yard.filter((y) => y.id !== id) })
@@ -125,7 +148,11 @@ export default function DispatchClient() {
                 loading={!board}
                 cardsFor={cardsFor}
                 yardFor={yardFor}
+                stagedFor={stagedFor}
                 onRemoveYard={removeYard}
+                onPublishShift={publishShift}
+                onEditShift={(id) => setEditShiftId(id)}
+                onDeleteShift={deleteShift}
                 canDrag={!!board?.isAdmin}
                 onDragStart={(t) => { drag.current = t }}
                 onDrop={(techId, day) => { if (drag.current) { reassign(drag.current, techId, day); drag.current = null } }}
@@ -144,27 +171,42 @@ export default function DispatchClient() {
       {toast && <div className="bx-toast">{toast}</div>}
 
       {dispatchCell && board && (
-        <DispatchAssignModal
+        <ShiftEditorModal
           date={dispatchCell.date}
           technicianId={dispatchCell.techId}
           technicians={board.technicians}
           branchId={branchId ?? null}
           ticketsForDay={board.tickets
             .filter((t) => t.date === dispatchCell.date)
-            .map((t) => ({ id: t.id, ticketNumber: t.ticketNumber, jobNumber: t.jobNumber, jobName: t.jobName, customer: t.customer, feature: t.feature, voided: t.voided }))}
+            .map((t) => ({ id: t.id, ticketNumber: t.ticketNumber, jobNumber: t.jobNumber, jobName: t.jobName, customer: t.customer, voided: t.voided }))}
           onClose={() => setDispatchCell(null)}
           onDone={(msg) => { setDispatchCell(null); flash(msg); load(week) }}
+        />
+      )}
+
+      {editShiftId && board && (
+        <ShiftEditorModal
+          date={staged.find((s) => s.id === editShiftId)?.date ?? week}
+          technicianId={null}
+          technicians={board.technicians}
+          branchId={branchId ?? null}
+          editShiftId={editShiftId}
+          ticketsForDay={[]}
+          onClose={() => setEditShiftId(null)}
+          onDone={(msg) => { setEditShiftId(null); flash(msg); load(week) }}
         />
       )}
     </div>
   )
 }
 
-function DispatchRow({ tech, days, loading, cardsFor, yardFor, onRemoveYard, canDrag, onDragStart, onDrop, onOpen, onDispatch }: {
+function DispatchRow({ tech, days, loading, cardsFor, yardFor, stagedFor, onRemoveYard, onPublishShift, onEditShift, onDeleteShift, canDrag, onDragStart, onDrop, onOpen, onDispatch }: {
   tech: { id: string; name: string }; days: string[]; loading: boolean; canDrag: boolean
   cardsFor: (techId: string, day: string) => Ticket[]
   yardFor: (techId: string, day: string) => YardShift[]
+  stagedFor: (techId: string, day: string) => StagedShift[]
   onRemoveYard: (id: string) => void
+  onPublishShift: (id: string) => void; onEditShift: (id: string) => void; onDeleteShift: (id: string) => void
   onDragStart: (t: Ticket) => void; onDrop: (techId: string, day: string) => void; onOpen: (t: Ticket) => void
   onDispatch: (techId: string, day: string) => void
 }) {
@@ -179,6 +221,7 @@ function DispatchRow({ tech, days, loading, cardsFor, yardFor, onRemoveYard, can
       {days.map((day) => {
         const cards = loading ? [] : cardsFor(tech.id, day)
         const yard = loading ? [] : yardFor(tech.id, day)
+        const stagedCards = loading ? [] : stagedFor(tech.id, day)
         return (
           <div
             key={day}
@@ -215,6 +258,24 @@ function DispatchRow({ tech, days, loading, cardsFor, yardFor, onRemoveYard, can
                 {canDrag && <small onClick={(e) => { e.stopPropagation(); onRemoveYard(y.id) }} style={{ cursor: 'pointer', color: 'var(--danger, #c0392b)' }}>remove</small>}
               </div>
             ))}
+            {/* Staged shifts (drafts) — dashed, not yet published. Only the lead's cell shows actions. */}
+            {stagedCards.map((s) => {
+              const showActions = canDrag && (tech.id === UNASSIGNED || s.leadTechId === tech.id || (s.crewTechIds.length > 0 && s.crewTechIds[0] === tech.id && !s.leadTechId))
+              return (
+                <div key={s.id} className="tk" style={{ background: 'transparent', border: '1px dashed var(--accent, #b8860b)', color: 'var(--text-secondary, #555)' }}
+                  title="Staged shift — not published yet">
+                  <b>{(s.isYard ? 'YARD' : (s.customer ?? s.jobName ?? s.jobNumber ?? 'Shift'))} · STAGED</b>
+                  <small>{s.isYard ? 'yard shift (draft)' : (s.jobTypes.length ? s.jobTypes.join(', ') : (s.jobNumber ?? ''))}</small>
+                  {showActions && (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 3 }}>
+                      <small onClick={(e) => { e.stopPropagation(); onPublishShift(s.id) }} style={{ cursor: 'pointer', color: 'var(--accent, #b8860b)', fontWeight: 600 }}>publish</small>
+                      <small onClick={(e) => { e.stopPropagation(); onEditShift(s.id) }} style={{ cursor: 'pointer', color: 'var(--text-secondary, #555)' }}>edit</small>
+                      <small onClick={(e) => { e.stopPropagation(); onDeleteShift(s.id) }} style={{ cursor: 'pointer', color: 'var(--danger, #c0392b)' }}>delete</small>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
             {canDrag && (
               <button
                 type="button"
