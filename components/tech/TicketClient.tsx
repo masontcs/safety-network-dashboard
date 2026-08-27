@@ -174,7 +174,7 @@ export default function TicketClient({ ticketId }: { ticketId: string }) {
         )}
       </div>
 
-      {sheet === 'time' && <AddTimeSheet destinations={[{ id: ticketId, kind: 'ticket', label: t.ticketNumber }]} onClose={() => setSheet(null)} onSaved={load} />}
+      {sheet === 'time' && <AddTimeSheet destinations={[{ id: ticketId, kind: 'ticket', label: t.ticketNumber, date: t.date }]} onClose={() => setSheet(null)} onSaved={load} />}
       {sheet === 'equipment' && <AddEquipmentSheet ticketId={ticketId} features={t.features} onClose={() => setSheet(null)} onSaved={load} />}
       {sheet === 'submit' && (
         <Sheet title="Submit ticket" onClose={() => setSheet(null)}>

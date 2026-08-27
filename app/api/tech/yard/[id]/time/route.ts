@@ -40,8 +40,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const shift = await loadMyShift(supabase, params.id, ctx.tech.technicianId)
     if (!shift) return techBad('Yard shift not found', 'NOT_FOUND', 404)
 
-    const body = (await request.json()) as { activityTypeId?: string; startTime?: string; endTime?: string; notes?: string }
+    const body = (await request.json()) as { activityTypeId?: string; startTime?: string; endTime?: string; notes?: string; workDate?: string }
     if (!body.activityTypeId) return techBad('An activity is required')
+    if (body.workDate !== undefined && body.workDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(body.workDate)) return techBad('Date must be YYYY-MM-DD')
     const norm = normalise(body.startTime, body.endTime)
     if (typeof norm === 'string') return techBad(norm)
 
@@ -51,6 +52,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       activity_type_id: body.activityTypeId,
       start_time: norm.start,
       end_time: norm.end,
+      work_date: body.workDate || null,
       notes: body.notes?.trim() || null,
       entered_by: ctx.tech.userId,
     })

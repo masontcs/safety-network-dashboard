@@ -37,8 +37,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (!ticket) return techBad('Ticket not found', 'NOT_FOUND', 404)
     if (!isEditable(ticket.status)) return techBad('This ticket has been submitted. Ask the office to reopen it.', 'CONFLICT', 409)
 
-    const body = (await request.json()) as { activityTypeId?: string; startTime?: string; endTime?: string; technicianId?: string; notes?: string }
+    const body = (await request.json()) as { activityTypeId?: string; startTime?: string; endTime?: string; technicianId?: string; notes?: string; workDate?: string }
     if (!body.activityTypeId) return techBad('An activity is required')
+    // Overnight: an entry may carry its own date (defaults to the ticket's date when null),
+    // so a shift crossing midnight lands each entry on the right day for the TSheets export.
+    if (body.workDate !== undefined && body.workDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(body.workDate)) return techBad('Date must be YYYY-MM-DD')
 
     // Whose time is this? Only the lead may record for someone else.
     const forTech = body.technicianId ?? ctx.tech.technicianId
@@ -62,6 +65,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
       activity_type_id: body.activityTypeId,
       start_time: norm.start,
       end_time: norm.end,
+      work_date: body.workDate || null,
       notes: body.notes?.trim() || null,
       // The hours belong to forTech; this only records who typed them.
       entered_by: ctx.tech.userId,

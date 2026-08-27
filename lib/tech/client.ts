@@ -72,6 +72,25 @@ export interface TicketDetail {
 
 export interface YardShift { id: string; date: string; myHours: number }
 export interface ActivityType { id: string; name: string }
+
+/** A published shift the tech must acknowledge. Money-blind — operational detail only. */
+export interface TechShift {
+  id: string
+  date: string
+  isYard: boolean
+  isLead: boolean
+  acknowledged: boolean
+  jobNumber: string | null
+  jobName: string | null
+  customer: string | null
+  mealType: string
+  mealLabel: string
+  shiftSchedule: string | null
+  prevailingWage: boolean
+  perDiemPreapproved: boolean
+  jobTypes: string[]
+  files: { id: string; filename: string | null }[]
+}
 export interface TechItem { id: string; code: string; name: string; tracked: boolean; variations: { id: string; name: string }[] }
 
 interface ApiEnvelope<T> { success: boolean; data?: T; error?: string; code?: string }
@@ -119,12 +138,15 @@ export const techApi = {
   listActivityTypes: () => call<ActivityType[]>('/api/tech/activity-types'),
   listItems: () => call<TechItem[]>('/api/tech/items'),
 
-  addLabor: (id: string, body: { activityTypeId: string; startTime: string; endTime: string; technicianId?: string; notes?: string }) =>
+  listShifts: () => call<TechShift[]>('/api/tech/shifts'),
+  acknowledgeShift: (id: string) => call<void>(`/api/tech/shifts/${id}/ack`, { method: 'POST' }),
+
+  addLabor: (id: string, body: { activityTypeId: string; startTime: string; endTime: string; technicianId?: string; notes?: string; workDate?: string }) =>
     call<void>(`/api/tech/tickets/${id}/labor`, jsonBody(body)),
   deleteLabor: (id: string, entryId: string) =>
     call<void>(`/api/tech/tickets/${id}/labor?entryId=${encodeURIComponent(entryId)}`, { method: 'DELETE' }),
 
-  addYardTime: (yardShiftId: string, body: { activityTypeId: string; startTime: string; endTime: string; notes?: string }) =>
+  addYardTime: (yardShiftId: string, body: { activityTypeId: string; startTime: string; endTime: string; notes?: string; workDate?: string }) =>
     call<void>(`/api/tech/yard/${yardShiftId}/time`, jsonBody(body)),
   deleteYardTime: (yardShiftId: string, entryId: string) =>
     call<void>(`/api/tech/yard/${yardShiftId}/time?entryId=${encodeURIComponent(entryId)}`, { method: 'DELETE' }),

@@ -14,7 +14,7 @@ import { minutesToTime, segmentMinutes, minutesToHours } from '@/lib/billing/lab
 const STEP = 15
 const DAY = 1440
 
-export interface TimeDestination { id: string; kind: 'ticket' | 'yard'; label: string }
+export interface TimeDestination { id: string; kind: 'ticket' | 'yard'; label: string; date?: string }
 
 export default function AddTimeSheet({ destinations, preselectId, onClose, onSaved }: {
   destinations: TimeDestination[]
@@ -27,6 +27,9 @@ export default function AddTimeSheet({ destinations, preselectId, onClose, onSav
   const [activityId, setActivityId] = useState('')
   const [start, setStart] = useState(7 * 60)   // 07:00
   const [end, setEnd] = useState(15 * 60)       // 15:00
+  // The entry's date. Defaults to the destination's date; the tech changes it for the
+  // next-day portion of an overnight shift so it exports on the right day.
+  const [workDate, setWorkDate] = useState<string>(destinations.find((d) => d.id === (preselectId ?? destinations[0]?.id))?.date ?? '')
   const [notes, setNotes] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -37,6 +40,9 @@ export default function AddTimeSheet({ destinations, preselectId, onClose, onSav
       if (a.length) setActivityId((cur) => cur || a[0].id)
     }).catch(() => {})
   }, [])
+
+  // Follow the chosen destination's date (a tech can still override for overnight).
+  useEffect(() => { const d = destinations.find((x) => x.id === destId); if (d?.date) setWorkDate(d.date) }, [destId, destinations])
 
   const step = (v: number, dir: 1 | -1) => ((v + dir * STEP) % DAY + DAY) % DAY
   const mins = segmentMinutes(start, end)
@@ -49,7 +55,7 @@ export default function AddTimeSheet({ destinations, preselectId, onClose, onSav
     if (!dest) { setErr('Pick where this time goes.'); return }
     if (!activityId) { setErr('Pick an activity.'); return }
     setBusy(true); setErr(null)
-    const body = { activityTypeId: activityId, startTime: minutesToTime(start), endTime: minutesToTime(end), notes: notes.trim() || undefined }
+    const body = { activityTypeId: activityId, startTime: minutesToTime(start), endTime: minutesToTime(end), notes: notes.trim() || undefined, workDate: workDate || undefined }
     try {
       if (dest.kind === 'ticket') await techApi.addLabor(dest.id, body)
       else await techApi.addYardTime(dest.id, body)
@@ -75,6 +81,12 @@ export default function AddTimeSheet({ destinations, preselectId, onClose, onSav
           </div>
         </div>
       )}
+
+      <div className="tech-field">
+        <span className="tech-lbl">Date{crosses ? ' · overnight — set the next day for the after-midnight part' : ''}</span>
+        <input type="date" value={workDate} onChange={(e) => setWorkDate(e.target.value)}
+          style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--tech-line, #d8d5cc)', fontSize: 16, fontFamily: 'inherit', background: 'var(--tech-surface, #fff)', color: 'inherit' }} />
+      </div>
 
       <div className="tech-field">
         <span className="tech-lbl">Activity</span>

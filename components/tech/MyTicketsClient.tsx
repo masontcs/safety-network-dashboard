@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { techApi, TechApiError, type TicketListItem, type YardShift } from '@/lib/tech/client'
+import { techApi, TechApiError, type TicketListItem, type YardShift, type TechShift } from '@/lib/tech/client'
 import SignOutButton from '@/components/tech/SignOutButton'
 import FeatureTags from '@/components/tech/FeatureTags'
 import AddTimeSheet, { type TimeDestination } from '@/components/tech/AddTimeSheet'
+import ShiftAckCard from '@/components/tech/ShiftAckCard'
 import { useBroadcast } from '@/lib/realtime/useBroadcast'
 
 const shortDate = (d: string) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
@@ -14,19 +15,31 @@ const shortDate = (d: string) => new Date(d + 'T00:00:00Z').toLocaleDateString('
 export default function MyTicketsClient() {
   const [tickets, setTickets] = useState<TicketListItem[] | null>(null)
   const [yard, setYard] = useState<YardShift[]>([])
+  const [shifts, setShifts] = useState<TechShift[]>([])
   const [err, setErr] = useState<string | null>(null)
   const [addTime, setAddTime] = useState(false)
 
   const load = useCallback(async () => {
     try {
       setErr(null)
-      const [tk, yd] = await Promise.all([techApi.listTickets(), techApi.listYard().catch(() => [])])
+      const [tk, yd, sh] = await Promise.all([
+        techApi.listTickets(),
+        techApi.listYard().catch(() => []),
+        techApi.listShifts().catch(() => []),
+      ])
       setTickets(tk)
       setYard(yd)
+      setShifts(sh)
     } catch (e) {
       setErr(e instanceof TechApiError ? e.message : 'Could not load your tickets.')
     }
   }, [])
+
+  async function acknowledge(id: string) {
+    // Optimistic — mark it acknowledged locally, then confirm.
+    setShifts((s) => s.map((x) => x.id === id ? { ...x, acknowledged: true } : x))
+    try { await techApi.acknowledgeShift(id) } catch { load() }
+  }
 
   useEffect(() => { load() }, [load])
   // Live: the moment the office dispatches me — or voids a ticket I'm on — my list
@@ -35,9 +48,11 @@ export default function MyTicketsClient() {
 
   // Every place a time entry can go today: each of my tickets, plus any yard shift.
   const destinations: TimeDestination[] = [
-    ...(tickets ?? []).map((t) => ({ id: t.id, kind: 'ticket' as const, label: `${t.ticketNumber}${t.customer ? ` · ${t.customer}` : ''}` })),
-    ...yard.map((y) => ({ id: y.id, kind: 'yard' as const, label: `Yard · ${shortDate(y.date)}` })),
+    ...(tickets ?? []).map((t) => ({ id: t.id, kind: 'ticket' as const, label: `${t.ticketNumber}${t.customer ? ` · ${t.customer}` : ''}`, date: t.date })),
+    ...yard.map((y) => ({ id: y.id, kind: 'yard' as const, label: `Yard · ${shortDate(y.date)}`, date: y.date })),
   ]
+
+  const toAck = shifts.filter((s) => !s.acknowledged)
 
   return (
     <>
@@ -54,6 +69,13 @@ export default function MyTicketsClient() {
         {err && (
           <div className="tech-note err" role="alert">
             {err} <button onClick={load} className="tech-linkbtn" style={{ color: 'inherit', textDecoration: 'underline' }}>Retry</button>
+          </div>
+        )}
+
+        {toAck.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div className="tech-lbl" style={{ marginBottom: 6 }}>Shifts to acknowledge</div>
+            {toAck.map((s) => <ShiftAckCard key={s.id} shift={s} onAck={() => acknowledge(s.id)} />)}
           </div>
         )}
 
