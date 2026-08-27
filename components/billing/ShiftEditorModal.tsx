@@ -54,6 +54,8 @@ export default function ShiftEditorModal({
   const [mealType, setMealType] = useState<'standard' | 'odmp'>('standard')
   const [perDiem, setPerDiem] = useState(false)
   const [notes, setNotes] = useState('')
+  const [files, setFiles] = useState<{ id: string; filename: string | null; url: string | null }[]>([])
+  const [uploading, setUploading] = useState(false)
 
   // reference data
   const [jobs, setJobs] = useState<JobOpt[]>([])
@@ -95,6 +97,28 @@ export default function ShiftEditorModal({
       setLoaded(true)
     }).catch(() => { setErr('Could not load the shift.'); setLoaded(true) })
   }, [editShiftId])
+
+  // Traffic-plan files (only for an existing shift — they attach to a shift id).
+  useEffect(() => {
+    if (!editShiftId) return
+    fetch(`/api/billing/shifts/${editShiftId}/files`).then((r) => r.json()).then((j) => { if (j.success) setFiles(j.data) }).catch(() => {})
+  }, [editShiftId])
+
+  async function uploadFile(file: File) {
+    if (!editShiftId || uploading) return
+    setUploading(true); setErr(null)
+    const fd = new FormData(); fd.append('file', file)
+    const r = await fetch(`/api/billing/shifts/${editShiftId}/files`, { method: 'POST', body: fd }).then((res) => res.json()).catch(() => ({ success: false }))
+    setUploading(false)
+    if (!r.success) { setErr(r.error ?? 'Upload failed'); return }
+    const j = await fetch(`/api/billing/shifts/${editShiftId}/files`).then((res) => res.json()).catch(() => ({ success: false }))
+    if (j.success) setFiles(j.data)
+  }
+  async function removeFile(id: string) {
+    if (!editShiftId) return
+    setFiles((f) => f.filter((x) => x.id !== id))
+    await fetch(`/api/billing/shifts/${editShiftId}/files?fileId=${id}`, { method: 'DELETE' }).catch(() => {})
+  }
 
   const selProfile = useMemo(() => profiles.find((p) => p.id === profileId) ?? null, [profiles, profileId])
   const entityChoices = useMemo(() => entities.filter((e) => selProfile?.billableEntityIds.includes(e.entityId)), [entities, selProfile])
@@ -349,6 +373,25 @@ export default function ShiftEditorModal({
             </div>
 
             <div><label className="bx-lbl">Notes (optional)</label><textarea className="bx-f" style={{ width: '100%', minHeight: 54 }} value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+
+            <div>
+              <label className="bx-lbl">Traffic plan{editShiftId ? '' : ' (stage first, then re-open to attach)'}</label>
+              {editShiftId ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {files.map((f) => (
+                    <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {f.url ? <a href={f.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: 'var(--accent)' }}>📎 {f.filename ?? 'View'}</a> : <span style={{ fontSize: 13 }}>📎 {f.filename ?? 'File'}</span>}
+                      <button type="button" className="bx-iconbtn" title="Remove" onClick={() => removeFile(f.id)} style={{ marginLeft: 'auto' }}>✕</button>
+                    </div>
+                  ))}
+                  <label className="bx-btn ghost sm" style={{ cursor: 'pointer', display: 'inline-block' }}>
+                    {uploading ? 'Uploading…' : '+ Add file (PDF or image)'}
+                    <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }} disabled={uploading}
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(f); e.target.value = '' }} />
+                  </label>
+                </div>
+              ) : <div className="bx-sub">Stage the shift, then re-open it from the board to attach traffic plans.</div>}
+            </div>
 
             {err && <div style={{ fontSize: 12, color: 'var(--danger)' }}>{err}</div>}
 

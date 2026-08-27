@@ -325,9 +325,9 @@ export type Database = {
         Relationships: []
       }
       billing_profiles: {
-        Row: { id: string; customer_id: string; branch_id: string; code: string; name: string; qb_name: string | null; payment_term_id: string | null; rental_minimum_enabled: boolean; rental_minimum_cents: number; field_rules: Json; portal_enabled: boolean; is_active: boolean; created_at: string; updated_at: string }
-        Insert: { id?: string; customer_id: string; branch_id: string; code: string; name: string; qb_name?: string | null; payment_term_id?: string | null; rental_minimum_enabled?: boolean; rental_minimum_cents?: number; field_rules?: Json; portal_enabled?: boolean; is_active?: boolean }
-        Update: { id?: string; customer_id?: string; branch_id?: string; code?: string; name?: string; qb_name?: string | null; payment_term_id?: string | null; rental_minimum_enabled?: boolean; rental_minimum_cents?: number; field_rules?: Json; portal_enabled?: boolean; is_active?: boolean }
+        Row: { id: string; customer_id: string; branch_id: string; code: string; name: string; payment_term_id: string | null; rental_minimum_enabled: boolean; rental_minimum_cents: number; field_rules: Json; portal_enabled: boolean; is_active: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; customer_id: string; branch_id: string; code: string; name: string; payment_term_id?: string | null; rental_minimum_enabled?: boolean; rental_minimum_cents?: number; field_rules?: Json; portal_enabled?: boolean; is_active?: boolean }
+        Update: { id?: string; customer_id?: string; branch_id?: string; code?: string; name?: string; payment_term_id?: string | null; rental_minimum_enabled?: boolean; rental_minimum_cents?: number; field_rules?: Json; portal_enabled?: boolean; is_active?: boolean }
         Relationships: []
       }
       billing_portal_accounts: {

@@ -44,12 +44,15 @@ export async function GET(): Promise<NextResponse> {
 
     const shiftIds = crew.map((c) => c.shift_id)
     const typesByShift = new Map<string, string[]>()
-    const filesByShift = new Map<string, { id: string; filename: string | null }[]>()
+    const filesByShift = new Map<string, { id: string; filename: string | null; url: string | null }[]>()
     if (shiftIds.length) {
       const { data: types } = await supabase.from('billing_shift_job_types').select('shift_id, job_type').in('shift_id', shiftIds)
       for (const t of (types ?? []) as { shift_id: string; job_type: string }[]) typesByShift.set(t.shift_id, [...(typesByShift.get(t.shift_id) ?? []), t.job_type])
-      const { data: files } = await supabase.from('billing_shift_files').select('id, shift_id, filename').in('shift_id', shiftIds)
-      for (const f of (files ?? []) as { id: string; shift_id: string; filename: string | null }[]) filesByShift.set(f.shift_id, [...(filesByShift.get(f.shift_id) ?? []), { id: f.id, filename: f.filename }])
+      const { data: files } = await supabase.from('billing_shift_files').select('id, shift_id, filename, storage_path').in('shift_id', shiftIds)
+      for (const f of (files ?? []) as { id: string; shift_id: string; filename: string | null; storage_path: string }[]) {
+        const { data: signed } = await supabase.storage.from('shift-files').createSignedUrl(f.storage_path, 3600)
+        filesByShift.set(f.shift_id, [...(filesByShift.get(f.shift_id) ?? []), { id: f.id, filename: f.filename, url: signed?.signedUrl ?? null }])
+      }
     }
 
     const data = crew

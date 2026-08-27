@@ -89,7 +89,7 @@ export interface TechShift {
   prevailingWage: boolean
   perDiemPreapproved: boolean
   jobTypes: string[]
-  files: { id: string; filename: string | null }[]
+  files: { id: string; filename: string | null; url: string | null }[]
 }
 export interface TechItem { id: string; code: string; name: string; tracked: boolean; variations: { id: string; name: string }[] }
 

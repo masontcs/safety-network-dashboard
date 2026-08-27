@@ -57,12 +57,12 @@ export async function GET(request: Request): Promise<NextResponse> {
     // Ticket labor
     const { data: labRaw } = await supabase
       .from('billing_ticket_labor')
-      .select('technician_id, activity_type_id, start_time, end_time, work_date, notes, billing_tickets!inner(ticket_date, is_voided, billing_jobs!inner(branch_id, job_number, shift_schedule, prevailing_wage, billing_profiles(name, qb_name, billing_customers(name))))')
+      .select('technician_id, activity_type_id, start_time, end_time, work_date, notes, billing_tickets!inner(ticket_date, is_voided, billing_jobs!inner(branch_id, job_number, shift_schedule, prevailing_wage, billing_profiles(name, billing_customers(name))))')
       .in('technician_id', techList)
       .gte('billing_tickets.ticket_date', prevDate).lte('billing_tickets.ticket_date', date)
     for (const l of (labRaw ?? []) as unknown as {
       technician_id: string; activity_type_id: string; start_time: string; end_time: string; work_date: string | null; notes: string | null
-      billing_tickets: { ticket_date: string; is_voided: boolean; billing_jobs: { branch_id: string; job_number: string; shift_schedule: string | null; prevailing_wage: boolean; billing_profiles: { name: string; qb_name: string | null; billing_customers: { name: string } | null } | null } | null } | null
+      billing_tickets: { ticket_date: string; is_voided: boolean; billing_jobs: { branch_id: string; job_number: string; shift_schedule: string | null; prevailing_wage: boolean; billing_profiles: { name: string; billing_customers: { name: string } | null } | null } | null } | null
     }[]) {
       const tk = l.billing_tickets; if (!tk || tk.is_voided || !tk.billing_jobs) continue
       const job = tk.billing_jobs
@@ -71,7 +71,8 @@ export async function GET(request: Request): Promise<NextResponse> {
       if (eff !== date) continue
       const a = act.get(l.activity_type_id); if (!a || !a.exported) continue
       const prof = job.billing_profiles
-      const jobcode = prof?.qb_name || (prof?.billing_customers?.name && prof?.name ? `${prof.billing_customers.name} - ${prof.name}` : prof?.name || '')
+      // QB customer name = the derived "{customer} - {profile}" merge (billing_profile_qb_names).
+      const jobcode = prof ? (prof.billing_customers?.name ? `${prof.billing_customers.name} - ${prof.name}` : prof.name) : ''
       entries.push({
         username: techName.get(l.technician_id) ?? '—', date: eff, startTime: l.start_time, endTime: l.end_time,
         jobcode, activityKeyword: a.keyword ?? '', serviceItem: a.serviceItem ?? '', billable: a.billable,

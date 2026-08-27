@@ -47,8 +47,13 @@ export default function ShiftAckCard({ shift, onAck }: { shift: TechShift; onAck
       )}
 
       {shift.files.length > 0 && (
-        <div className="tech-meta" style={{ marginTop: 6 }}>
-          📎 {shift.files.length} traffic plan file{shift.files.length > 1 ? 's' : ''} attached
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span className="tech-lbl">Traffic plan</span>
+          {shift.files.map((f) => (
+            f.url
+              ? <a key={f.id} href={f.url} target="_blank" rel="noreferrer" style={{ fontSize: 14, color: 'var(--tech-accent, #b8860b)', textDecoration: 'underline' }}>📎 {f.filename ?? 'View file'}</a>
+              : <span key={f.id} className="tech-meta">📎 {f.filename ?? 'File'}</span>
+          ))}
         </div>
       )}
 
