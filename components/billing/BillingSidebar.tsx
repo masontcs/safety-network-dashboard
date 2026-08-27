@@ -28,6 +28,7 @@ const SECTIONS: NavSection[] = [
   {
     heading: 'Money',
     items: [
+      { href: '/billing/time', label: 'Time', icon: '◔' },
       { href: '/billing/invoices', label: 'Invoices', icon: '⌗' },
       { href: '/billing/customers', label: 'Customers', icon: '◍' },
     ],
