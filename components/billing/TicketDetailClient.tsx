@@ -21,6 +21,7 @@ interface LedgerEvent { id: string; eventType: string; date: string; qty: number
 interface Line { id: string; kind: string; description: string; qty: number; units: number; unitRateCents: number | null; amountCents: number | null; taxable: boolean; itemCode: string | null; rateFromPriceList?: boolean }
 interface Ticket {
   id: string; ticketNumber: string; date: string; status: string; locked: boolean
+  timeApproval: { status: 'submitted' | 'returned' | 'approved'; note: string | null } | null
   voided: boolean; voidedAt: string | null
   featureAdd: boolean; featureReturn: boolean; featureDtc: boolean
   billingType: BillingType | null; recurring: boolean; notes: string | null
@@ -391,6 +392,11 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
             ? <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--pill-overdue-fg)', background: 'var(--pill-overdue-bg)', padding: '2px 8px', borderRadius: 999, letterSpacing: '0.04em' }}>VOID</span>
             : <span style={{ fontSize: 11, fontWeight: 600, color: statusColors[t.status], textTransform: 'capitalize' }}>{t.status.replace('_', ' ')}</span>}
           {!t.voided && t.recurring && <span title="Equipment still out" style={{ fontSize: 10, fontWeight: 600, color: 'var(--pill-pending-fg)', background: 'var(--pill-pending-bg)', padding: '2px 8px', borderRadius: 999 }}>RECURRING</span>}
+          {!t.voided && t.timeApproval && (() => {
+            const ta = t.timeApproval
+            const map = { submitted: { fg: 'var(--pill-pending-fg)', bg: 'var(--pill-pending-bg)', label: 'Times: in review' }, returned: { fg: 'var(--pill-overdue-fg)', bg: 'var(--pill-overdue-bg)', label: 'Times: returned' }, approved: { fg: 'var(--pill-paid-fg)', bg: 'var(--pill-paid-bg)', label: 'Times: approved' } }[ta.status]
+            return <span title={ta.note ?? undefined} style={{ fontSize: 10, fontWeight: 600, color: map.fg, background: map.bg, padding: '2px 8px', borderRadius: 999 }}>{map.label}</span>
+          })()}
           {!t.voided && locked && <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>🔒 locked</span>}
           {/* Void / restore is admin-only. Voiding a locked/invoiced ticket is blocked server-side. */}
           {t.isAdmin && (

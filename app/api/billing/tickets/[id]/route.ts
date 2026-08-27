@@ -145,6 +145,33 @@ export async function GET(
       }
     })
 
+    // Time-approval rollup — a parallel track to the billing status. Grouped by (tech, branch,
+    // effective date), it reflects whether this ticket's logged time has been approved. A
+    // returned batch surfaces its note so the office sees what the tech must fix.
+    let timeApproval: { status: 'submitted' | 'returned' | 'approved'; note: string | null } | null = null
+    const taBranch = t.billing_jobs?.branch_id
+    if (taBranch) {
+      const { data: lab } = await supabase.from('billing_ticket_labor').select('technician_id, work_date').eq('ticket_id', params.id)
+      const labRows = (lab ?? []) as { technician_id: string; work_date: string | null }[]
+      if (labRows.length) {
+        const keys = [...new Set(labRows.map((l) => `${l.technician_id}|${l.work_date ?? t.ticket_date}`))]
+        const techIds = [...new Set(labRows.map((l) => l.technician_id))]
+        const dates = [...new Set(labRows.map((l) => l.work_date ?? t.ticket_date))]
+        const { data: appr } = await supabase.from('billing_time_approvals')
+          .select('technician_id, work_date, status, note')
+          .eq('branch_id', taBranch).in('technician_id', techIds).in('work_date', dates)
+        const map = new Map<string, { status: string; note: string | null }>()
+        for (const a of (appr ?? []) as { technician_id: string; work_date: string; status: string; note: string | null }[]) map.set(`${a.technician_id}|${a.work_date}`, { status: a.status, note: a.note })
+        let anyReturned = false, allApproved = true, returnedNote: string | null = null
+        for (const k of keys) {
+          const st = map.get(k)?.status ?? 'submitted'
+          if (st === 'returned') { anyReturned = true; returnedNote = returnedNote ?? map.get(k)?.note ?? null }
+          if (st !== 'approved') allApproved = false
+        }
+        timeApproval = anyReturned ? { status: 'returned', note: returnedNote } : allApproved ? { status: 'approved', note: null } : { status: 'submitted', note: null }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -152,6 +179,7 @@ export async function GET(
         ticketNumber: t.ticket_number,
         date: t.ticket_date,
         status: t.status,
+        timeApproval,
         // A voided ticket is fully read-only (restore it to edit) — same as a locked one.
         locked: isLocked(t.status) || t.is_voided,
         voided: t.is_voided,

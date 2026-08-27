@@ -50,6 +50,10 @@ const ghost: React.CSSProperties = {
 const hrs = (h: number) => `${h.toFixed(2)} h`
 
 export default function TicketLaborTab({ ticketId, canEdit }: { ticketId: string; canEdit: boolean }) {
+  // Times are entered by techs and adjusted by approvers in Time Management — NEVER edited
+  // here, because these hours drive payroll and must pass through approval. This tab is a
+  // read-only view of the record. (`canEdit` still gates the "adjust elsewhere" hint.)
+  const canEditTimes = false
   const [entries, setEntries] = useState<Entry[]>([])
   const [techs, setTechs] = useState<Opt[]>([])
   const [acts, setActs] = useState<Opt[]>([])
@@ -138,9 +142,15 @@ export default function TicketLaborTab({ ticketId, canEdit }: { ticketId: string
   return (
     <div className="card">
       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
-        Time is entered as start/end — hours are calculated, never typed, and round to the nearest quarter hour.
-        These entries are the record of what happened; billing sums them separately and never changes them.
+        Time is entered by techs and reviewed in Time Management. This is a read-only view — hours here
+        feed payroll, so adjustments go through the approval flow, not the ticket.
       </div>
+
+      {canEdit && (
+        <div className="bx-note" style={{ marginBottom: 14, fontSize: 12 }}>
+          To adjust these times, open <a href="/billing/time" style={{ color: 'var(--accent)' }}>Time Management</a> — edits there keep payroll and approvals in sync.
+        </div>
+      )}
 
       {msg && <div style={{ fontSize: 12, color: 'var(--alert-danger-fg)', padding: '8px 10px', background: 'var(--alert-danger-bg)', borderRadius: 6, marginBottom: 14 }}>{msg}</div>}
 
@@ -162,7 +172,7 @@ export default function TicketLaborTab({ ticketId, canEdit }: { ticketId: string
                   </div></td>
                 </tr>
               ) : (
-                <tr key={e.id} {...rowOpen(canEdit ? () => startEdit(e) : undefined)} style={{ cursor: canEdit ? 'pointer' : 'default' }}>
+                <tr key={e.id} {...rowOpen(canEditTimes ? () => startEdit(e) : undefined)} style={{ cursor: canEditTimes ? 'pointer' : 'default' }}>
                   <td style={td}>{e.technician?.name ?? '—'}</td>
                   <td style={{ ...td, color: 'var(--text-secondary)' }}>{e.activityType?.name ?? '—'}</td>
                   <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{e.startTime}</td>
@@ -171,7 +181,7 @@ export default function TicketLaborTab({ ticketId, canEdit }: { ticketId: string
                     {e.crossesMidnight && <span title="Crosses midnight" style={{ marginLeft: 6, fontSize: 10, color: 'var(--pill-pending-fg)' }}>+1d</span>}
                   </td>
                   <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{hrs(e.hours)}</td>
-                  <td style={td}>{canEdit && <div style={{ display: 'flex', gap: 4 }}>
+                  <td style={td}>{canEditTimes && <div style={{ display: 'flex', gap: 4 }}>
                     <button onClick={(ev) => { ev.stopPropagation(); startEdit(e) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>Edit</button>
                     <button onClick={(ev) => { ev.stopPropagation(); remove(e.id) }} disabled={busy} style={{ ...ghost, padding: '4px 8px' }}>✕</button>
                   </div>}</td>
@@ -199,7 +209,7 @@ export default function TicketLaborTab({ ticketId, canEdit }: { ticketId: string
         <div style={{ fontSize: 12.5, color: 'var(--text-dim)', marginBottom: 14 }}>No time logged on this ticket yet.</div>
       )}
 
-      {canEdit && (
+      {canEditTimes && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid var(--border-subtle, var(--border-emphasis))', paddingTop: 14 }}>
           <div style={{ minWidth: 180 }}><label style={labelStyle}>Technician</label>
             <Combobox ariaLabel="Technician" value={nTech} onChange={setNTech} style={inputStyle}
