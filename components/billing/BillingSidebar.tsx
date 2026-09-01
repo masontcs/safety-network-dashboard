@@ -41,6 +41,7 @@ const SECTIONS: NavSection[] = [
       { href: '/billing/items', label: 'Items', icon: '≣', area: 'items' },
       { href: '/billing/price-lists', label: 'Price Lists', icon: '≡', area: 'pricelists' },
       { href: '/billing/technicians', label: 'Technicians', icon: '☰', area: 'technicians' },
+      { href: '/billing/users', label: 'Users', icon: '◔', area: 'users' },
     ],
   },
 ]

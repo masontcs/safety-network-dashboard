@@ -37,10 +37,17 @@ export const DASHBOARD_ROLES: readonly Role[] = [
  */
 export const BILLING_ROLES: readonly Role[] = ['admin', 'billing_manager', 'dispatcher', 'biller'] as const
 
-/** Billing sub-areas — the unit of permission within the billing interface. */
-export type BillingArea = 'home' | 'dispatch' | 'jobs' | 'tickets' | 'quotes' | 'invoices' | 'customers' | 'items' | 'pricelists' | 'technicians' | 'time'
+/**
+ * Roles a billing-user manager may create/assign from inside the billing interface. Excludes
+ * 'admin' and all dashboard roles — a Billing Manager can staff billing but never mint an
+ * admin or a dashboard account (no privilege escalation out of billing).
+ */
+export const MANAGEABLE_BILLING_ROLES: readonly Role[] = ['billing_manager', 'dispatcher', 'biller'] as const
 
-const ALL_AREAS: BillingArea[] = ['home', 'dispatch', 'jobs', 'tickets', 'quotes', 'invoices', 'customers', 'items', 'pricelists', 'technicians', 'time']
+/** Billing sub-areas — the unit of permission within the billing interface. */
+export type BillingArea = 'home' | 'dispatch' | 'jobs' | 'tickets' | 'quotes' | 'invoices' | 'customers' | 'items' | 'pricelists' | 'technicians' | 'time' | 'users'
+
+const ALL_AREAS: BillingArea[] = ['home', 'dispatch', 'jobs', 'tickets', 'quotes', 'invoices', 'customers', 'items', 'pricelists', 'technicians', 'time', 'users']
 
 /** Which billing areas each role may use. Admin + Billing Manager get everything. */
 const BILLING_AREAS: Partial<Record<Role, BillingArea[]>> = {
@@ -92,6 +99,7 @@ const AREA_PATHS: Record<BillingArea, string[]> = {
   home: [], dispatch: ['/billing/dispatch'], jobs: ['/billing/jobs'], tickets: ['/billing/tickets'],
   quotes: ['/billing/quotes'], invoices: ['/billing/invoices'], customers: ['/billing/customers', '/billing/profiles'],
   items: ['/billing/items'], pricelists: ['/billing/price-lists'], technicians: ['/billing/technicians'], time: ['/billing/time'],
+  users: ['/billing/users'],
 }
 
 /**
