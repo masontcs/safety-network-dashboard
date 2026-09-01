@@ -13,6 +13,7 @@ interface User {
   branchIds: string[]
   isActive: boolean
   username: string | null
+  fieldAccess?: boolean
 }
 
 const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/
@@ -267,6 +268,14 @@ export default function UsersClient() {
     setResetUserId(null)
     setResetError(null)
     setResetSuccess(false)
+  }
+
+  // Toggle field-app access on a desktop user (makes them a hybrid, or removes it).
+  async function toggleFieldTech(user: User) {
+    const next = !user.fieldAccess
+    setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, fieldAccess: next } : u))
+    const res = await fetch(`/api/admin/users/${user.id}/field-tech`, { method: next ? 'POST' : 'DELETE' })
+    if (!res.ok) setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, fieldAccess: !next } : u))
   }
 
   function handleGenerateReset() {
@@ -574,6 +583,13 @@ export default function UsersClient() {
                               style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-dim)', fontSize: 12, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit' }}
                             >
                               Reset PW
+                            </button>
+                            <button
+                              onClick={() => toggleFieldTech(user)}
+                              title={user.fieldAccess ? 'Remove field-app access' : 'Also make this user a field technician'}
+                              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, color: user.fieldAccess ? '#1a7a33' : 'var(--text-dim)', fontSize: 12, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit' }}
+                            >
+                              {user.fieldAccess ? 'Field ✓' : '+ Field'}
                             </button>
                           </div>
                         )}

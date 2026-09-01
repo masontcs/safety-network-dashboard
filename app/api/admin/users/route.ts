@@ -17,7 +17,7 @@ export async function GET(): Promise<NextResponse> {
     const supabase = createServiceClient()
 
     const [profilesRes, assignmentsRes, branchesRes, authRes] = await Promise.all([
-      supabase.from('user_profiles').select('id, role, display_name, is_active, username'),
+      supabase.from('user_profiles').select('id, role, display_name, is_active, username, field_access'),
       supabase.from('user_branch_assignments').select('user_id, branch_id'),
       supabase.from('branches').select('id, name, is_revenue_generating').eq('is_active', true).order('name'),
       supabase.auth.admin.listUsers(),
@@ -26,7 +26,7 @@ export async function GET(): Promise<NextResponse> {
     if (profilesRes.error) throw new Error(profilesRes.error.message)
     if (assignmentsRes.error) throw new Error(assignmentsRes.error.message)
 
-    const profiles = (profilesRes.data ?? []) as { id: string; role: Role; display_name: string; is_active: boolean; username: string | null }[]
+    const profiles = (profilesRes.data ?? []) as { id: string; role: Role; display_name: string; is_active: boolean; username: string | null; field_access: boolean }[]
     const branches = (branchesRes.data ?? []) as { id: string; name: string; is_revenue_generating: boolean }[]
     const authUsers = authRes.data?.users ?? []
 
@@ -50,6 +50,7 @@ export async function GET(): Promise<NextResponse> {
         branchIds:   branchMap[p.id] ?? [],
         isActive:    p.is_active ?? true,
         username:    p.username ?? null,
+        fieldAccess: p.field_access ?? false,
       }))
       .sort((a, b) => {
         // Active users first, then alphabetical by name
