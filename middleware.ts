@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import type { Database } from '@/lib/supabase/database.types'
 import { allowedPrefixesFor, canBillingArea } from '@/lib/utils/interfaces'
+import { surfaceForHost, surfaceForPath, surfaceUrl, cookieDomainForHost, SURFACE_HOME } from '@/lib/utils/domains'
 
 type Role = Database['public']['Tables']['user_profiles']['Row']['role']
 
@@ -33,6 +34,25 @@ const ROLE_HOME: Record<Role, string> = {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  const host = request.headers.get('host')
+
+  // ── Subdomain routing (strict) ────────────────────────────────────────────────
+  // On a surface subdomain: its root → that surface's home, and a path belonging to a
+  // DIFFERENT surface → that surface's subdomain (a full cross-origin redirect). The
+  // shared cookie (below) keeps the user signed in across the hop. …vercel.app / apex have
+  // no surface, so they're untouched (fallback + local dev).
+  const surface = surfaceForHost(host)
+  if (surface) {
+    if (pathname === '/') return NextResponse.redirect(new URL(SURFACE_HOME[surface], request.url))
+    const pathSurface = surfaceForPath(pathname)
+    if (pathSurface && pathSurface !== surface) {
+      return NextResponse.redirect(surfaceUrl(pathSurface, pathname + request.nextUrl.search))
+    }
+  }
+
+  // One login across all subdomains: write auth cookies on the parent domain.
+  const cookieDomain = cookieDomainForHost(host)
+
   let res = NextResponse.next({ request: { headers: request.headers } })
 
   const supabase = createServerClient<Database>(
@@ -47,7 +67,7 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           res = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
-            res.cookies.set(name, value, options)
+            res.cookies.set(name, value, cookieDomain ? { ...options, domain: cookieDomain } : options)
           )
         },
       },

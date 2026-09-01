@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 
 /**
  * Switches between the two interfaces that share this app: Dashboards and
@@ -30,7 +29,6 @@ interface Props {
 }
 
 export default function InterfaceSwitcher({ current, available, collapsed = false }: Props) {
-  const router = useRouter()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -118,7 +116,7 @@ export default function InterfaceSwitcher({ current, available, collapsed = fals
               <button
                 key={k}
                 role="menuitem"
-                onClick={() => { setOpen(false); if (!active) router.push(m.href) }}
+                onClick={() => { setOpen(false); if (!active) window.location.assign(m.href) }}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 8,
                   padding: '8px 9px', borderRadius: 7, border: 0, cursor: 'pointer',

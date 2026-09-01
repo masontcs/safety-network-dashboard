@@ -1,11 +1,16 @@
 import { createServerClient as createSSRServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import type { Database } from './database.types'
+import { cookieDomainForHost } from '@/lib/utils/domains'
 
 // For Server Components and Route Handlers (session from cookies — anon key, RLS enforced)
 export function createServerClient() {
   const cookieStore = cookies()
+  // Share the session across subdomains: parent-domain cookie for *.safetynetworkteams.com,
+  // host-only (undefined) for …vercel.app / localhost.
+  let cookieDomain: string | undefined
+  try { cookieDomain = cookieDomainForHost(headers().get('host')) } catch { cookieDomain = undefined }
   return createSSRServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -17,7 +22,7 @@ export function createServerClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, cookieDomain ? { ...options, domain: cookieDomain } : options)
             )
           } catch {
             // Called from a Server Component — cookie writes are a no-op

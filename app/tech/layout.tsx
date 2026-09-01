@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { createServerClient } from '@/lib/supabase/server'
 import type { Role } from '@/lib/supabase/database.types'
 import { hasFieldAccess, canUseDashboards, canUseBilling } from '@/lib/utils/interfaces'
@@ -35,10 +34,11 @@ export default async function TechLayout({ children }: { children: React.ReactNo
   return (
     <div className="tech-root">
       {desktopHref && (
-        <Link href={desktopHref} title="Switch to desktop"
+        /* Plain <a> (full navigation) so the cross-subdomain redirect to billing/dashboards is followed. */
+        <a href={desktopHref} title="Switch to desktop"
           style={{ position: 'fixed', top: 8, right: 8, zIndex: 50, fontSize: 12, fontWeight: 600, color: 'var(--tech-accent, #b8860b)', background: 'var(--tech-surface, #fff)', border: '1px solid var(--tech-line, #d8d5cc)', borderRadius: 999, padding: '4px 10px', textDecoration: 'none' }}>
           Desktop ↗
-        </Link>
+        </a>
       )}
       {children}
     </div>
