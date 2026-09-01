@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
+import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import type { Database, BillingItemCategory } from '@/lib/supabase/database.types'
@@ -53,7 +53,7 @@ export async function POST(
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardAdminOnly(ctx.access.role)
+    const guard = guardBillingArea(ctx.access.role, 'tickets')
     if (guard) return guard
 
     const supabase = createServiceClient()
@@ -197,7 +197,7 @@ export async function PATCH(
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardAdminOnly(ctx.access.role)
+    const guard = guardBillingArea(ctx.access.role, 'tickets')
     if (guard) return guard
 
     const supabase = createServiceClient()
@@ -277,7 +277,7 @@ export async function DELETE(
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardAdminOnly(ctx.access.role)
+    const guard = guardBillingArea(ctx.access.role, 'tickets')
     if (guard) return guard
 
     const url = new URL(request.url)

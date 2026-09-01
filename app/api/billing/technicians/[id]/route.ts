@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
+import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 
@@ -17,7 +17,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardAdminOnly(ctx.access.role)
+    const guard = guardBillingArea(ctx.access.role, 'technicians')
     if (guard) return guard
 
     const body = (await request.json()) as { name?: string; isActive?: boolean }
@@ -43,7 +43,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardAdminOnly(ctx.access.role)
+    const guard = guardBillingArea(ctx.access.role, 'technicians')
     if (guard) return guard
 
     const supabase = createServiceClient()

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
+import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 
@@ -51,7 +51,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!ctx.ok) return ctx.response
 
     // Billing roles are not defined yet — writes are admin-only until they are.
-    const guard = guardAdminOnly(ctx.access.role)
+    const guard = guardBillingArea(ctx.access.role, 'customers')
     if (guard) return guard
 
     const body = (await request.json()) as {

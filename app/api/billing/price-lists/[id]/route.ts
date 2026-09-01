@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
+import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { BILLING_TYPES, FLAT_RATE, rateKeysFor } from '@/lib/billing/constants'
@@ -221,7 +221,7 @@ export async function PUT(
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
 
-    const guard = guardAdminOnly(ctx.access.role)
+    const guard = guardBillingArea(ctx.access.role, 'pricelists')
     if (guard) return guard
 
     const body = (await request.json()) as { name?: string; tiers?: SaveTier[]; items?: SaveItem[] }

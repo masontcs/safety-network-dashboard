@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
+import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { nextNumber } from '@/lib/billing/rpc'
@@ -71,7 +71,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardAdminOnly(ctx.access.role)
+    const guard = guardBillingArea(ctx.access.role, 'quotes')
     if (guard) return guard
 
     const body = (await request.json()) as {
@@ -143,7 +143,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardAdminOnly(ctx.access.role)
+    const guard = guardBillingArea(ctx.access.role, 'quotes')
     if (guard) return guard
     const body = (await request.json()) as { action?: string; status?: string }
     const supabase = createServiceClient()
