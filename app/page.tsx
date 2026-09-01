@@ -17,6 +17,10 @@ const DASHBOARD_ROUTES: Record<Role, string> = {
   // Field techs have no web app — they use the tech mobile app. Keep them on the
   // public landing page rather than redirecting into the dashboard.
   tech:             '/',
+  // Billing roles land in the billing interface at their area.
+  billing_manager:  '/billing',
+  dispatcher:       '/billing/dispatch',
+  biller:           '/billing/invoices',
 }
 
 export default async function RootPage() {

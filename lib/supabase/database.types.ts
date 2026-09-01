@@ -5,7 +5,7 @@
 // 'tech' is a FIELD role for the tech app only. It is deliberately NOT a dashboard role:
 // see DASHBOARD_ROLES in lib/api/auth.ts — techs are rejected by every dashboard/billing
 // API, and /api/tech/* requires it. Never add 'tech' to a dashboard role list.
-export type Role = 'admin' | 'executive' | 'district_manager' | 'branch_manager' | 'ar_manager' | 'ar_team' | 'office_team' | 'project_manager' | 'sales' | 'tech'
+export type Role = 'admin' | 'executive' | 'district_manager' | 'branch_manager' | 'ar_manager' | 'ar_team' | 'office_team' | 'project_manager' | 'sales' | 'tech' | 'billing_manager' | 'dispatcher' | 'biller'
 export type LaborType =
   | 'direct'
   | 'admin_hourly'

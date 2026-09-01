@@ -29,6 +29,9 @@ const ROLE_LABELS: Record<Role, string> = {
   project_manager:  'Project Manager',
   sales:            'Sales',
   tech:             'Field Tech',
+  billing_manager:  'Billing Manager',
+  dispatcher:       'Dispatcher',
+  biller:           'Biller',
 }
 
 const ROLE_COLORS: Record<Role, string> = {
@@ -42,6 +45,9 @@ const ROLE_COLORS: Record<Role, string> = {
   project_manager:  'var(--text-secondary)',
   sales:            'var(--text-secondary)',
   tech:             'var(--text-secondary)',
+  billing_manager:  '#b8860b',
+  dispatcher:       '#b8860b',
+  biller:           '#b8860b',
 }
 
 const selectStyle: React.CSSProperties = {
@@ -125,7 +131,8 @@ export default function UsersClient() {
 
   const branchMap = Object.fromEntries(branches.map((b) => [b.id, b.name]))
   const needsBranchScope = (role: Role) =>
-    role === 'district_manager' || role === 'branch_manager' || role === 'project_manager' || role === 'sales'
+    role === 'district_manager' || role === 'branch_manager' || role === 'project_manager' || role === 'sales' ||
+    role === 'billing_manager' || role === 'dispatcher' || role === 'biller'
 
   useEffect(() => {
     fetch('/api/admin/users')

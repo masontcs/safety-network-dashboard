@@ -4,6 +4,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createBrowserClient } from '@/lib/supabase/client'
 import InterfaceSwitcher, { type InterfaceKey } from '@/components/billing/InterfaceSwitcher'
+import { canBillingArea, type BillingArea } from '@/lib/utils/interfaces'
+import type { Role } from '@/lib/supabase/database.types'
 
 /**
  * Billing navigation — the concept's sidebar: brand mark, grouped nav (Operate /
@@ -11,41 +13,46 @@ import InterfaceSwitcher, { type InterfaceKey } from '@/components/billing/Inter
  * Styling lives in app/billing/billing.css (.bx-side / .bx-nav / .bx-brand).
  */
 
-interface NavItem { href: string; label: string; icon: string; soon?: boolean; exact?: boolean; badge?: number }
+interface NavItem { href: string; label: string; icon: string; area: BillingArea; soon?: boolean; exact?: boolean; badge?: number }
 interface NavSection { heading: string; items: NavItem[] }
 
 const SECTIONS: NavSection[] = [
   {
     heading: 'Operate',
     items: [
-      { href: '/billing', label: 'Dashboard', icon: '◧', exact: true },
-      { href: '/billing/dispatch', label: 'Dispatch', icon: '▦' },
-      { href: '/billing/jobs', label: 'Jobs', icon: '▤' },
-      { href: '/billing/tickets', label: 'Tickets', icon: '▣' },
-      { href: '/billing/quotes', label: 'Quotes', icon: '▧' },
+      { href: '/billing', label: 'Dashboard', icon: '◧', area: 'home', exact: true },
+      { href: '/billing/dispatch', label: 'Dispatch', icon: '▦', area: 'dispatch' },
+      { href: '/billing/jobs', label: 'Jobs', icon: '▤', area: 'jobs' },
+      { href: '/billing/tickets', label: 'Tickets', icon: '▣', area: 'tickets' },
+      { href: '/billing/quotes', label: 'Quotes', icon: '▧', area: 'quotes' },
     ],
   },
   {
     heading: 'Money',
     items: [
-      { href: '/billing/time', label: 'Time', icon: '◔' },
-      { href: '/billing/invoices', label: 'Invoices', icon: '⌗' },
-      { href: '/billing/customers', label: 'Customers', icon: '◍' },
+      { href: '/billing/time', label: 'Time', icon: '◔', area: 'time' },
+      { href: '/billing/invoices', label: 'Invoices', icon: '⌗', area: 'invoices' },
+      { href: '/billing/customers', label: 'Customers', icon: '◍', area: 'customers' },
     ],
   },
   {
     heading: 'Setup',
     items: [
-      { href: '/billing/items', label: 'Items', icon: '≣' },
-      { href: '/billing/price-lists', label: 'Price Lists', icon: '≡' },
-      { href: '/billing/technicians', label: 'Technicians', icon: '☰' },
+      { href: '/billing/items', label: 'Items', icon: '≣', area: 'items' },
+      { href: '/billing/price-lists', label: 'Price Lists', icon: '≡', area: 'pricelists' },
+      { href: '/billing/technicians', label: 'Technicians', icon: '☰', area: 'technicians' },
     ],
   },
 ]
 
-export default function BillingSidebar({ userName, available }: { userName: string; available: InterfaceKey[] }) {
+export default function BillingSidebar({ userName, role, available }: { userName: string; role: Role; available: InterfaceKey[] }) {
   const pathname = usePathname()
   const router = useRouter()
+
+  // Show only the sections/items this role's billing areas allow (empty sections drop out).
+  const sections = SECTIONS
+    .map((s) => ({ ...s, items: s.items.filter((i) => canBillingArea(role, i.area)) }))
+    .filter((s) => s.items.length > 0)
 
   async function signOut() {
     const supabase = createBrowserClient()
@@ -63,7 +70,7 @@ export default function BillingSidebar({ userName, available }: { userName: stri
         </span>
       </Link>
 
-      {SECTIONS.map((section) => (
+      {sections.map((section) => (
         <div key={section.heading}>
           <div className="bx-navgroup">{section.heading}</div>
           {section.items.map((item) => {

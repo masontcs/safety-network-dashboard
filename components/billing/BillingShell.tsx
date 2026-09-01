@@ -3,6 +3,7 @@ import BillingSidebar from '@/components/billing/BillingSidebar'
 import BillingTopbar from '@/components/billing/BillingTopbar'
 import { BranchProvider } from '@/components/billing/BranchContext'
 import type { InterfaceKey } from '@/components/billing/InterfaceSwitcher'
+import type { Role } from '@/lib/supabase/database.types'
 
 /**
  * The billing interface shell — the concept layout: a white sidebar, a sticky
@@ -11,16 +12,18 @@ import type { InterfaceKey } from '@/components/billing/InterfaceSwitcher'
  */
 export default function BillingShell({
   userName,
+  role,
   available,
   children,
 }: {
   userName: string
+  role: Role
   available: InterfaceKey[]
   children: ReactNode
 }) {
   return (
     <div className="billing-root" style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg)' }}>
-      <BillingSidebar userName={userName} available={available} />
+      <BillingSidebar userName={userName} role={role} available={available} />
       <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <BranchProvider>
           <BillingTopbar />

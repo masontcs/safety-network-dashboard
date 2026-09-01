@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createRouteClient, createServiceClient } from '@/lib/supabase/server'
 import type { UserAccess } from '@/lib/utils/access'
 import type { Role } from '@/lib/supabase/database.types'
-import { DASHBOARD_ROLES, isFieldRole } from '@/lib/utils/interfaces'
+import { DASHBOARD_ROLES, BILLING_ROLES, isFieldRole, canBillingArea, type BillingArea } from '@/lib/utils/interfaces'
 
 type AccessResult =
   | { ok: true; access: UserAccess }
@@ -14,7 +14,9 @@ type AccessResult =
 // Field roles ('tech') are deliberately absent: they must never reach a dashboard or
 // billing API. getAccessContext rejects them outright and /api/tech/* requires
 // role === 'tech'. Two disjoint sets.
-const VALID_ROLES: readonly Role[] = DASHBOARD_ROLES
+// Everyone who may reach a desktop (dashboard OR billing) API. Field roles ('tech') stay
+// out — they use /api/tech/* only. Billing roles are branch-scoped like dashboard users.
+const VALID_ROLES: readonly Role[] = [...new Set([...DASHBOARD_ROLES, ...BILLING_ROLES])]
 
 // ── Role sets ──────────────────────────────────────────────────────────────────
 //
@@ -39,6 +41,19 @@ export function guardAdminOnly(role: Role): NextResponse | null {
   if (role === 'admin') return null
   return NextResponse.json(
     { success: false, error: 'Admin access required.', code: 'FORBIDDEN' },
+    { status: 403 }
+  )
+}
+
+/**
+ * Billing area guard — the permission boundary for the billing interface. Admin and Billing
+ * Manager pass everything; a Dispatcher / Biller pass only their areas. Use in each billing
+ * route with the area it belongs to, e.g. guardBillingArea(role, 'invoices').
+ */
+export function guardBillingArea(role: Role, area: BillingArea): NextResponse | null {
+  if (canBillingArea(role, area)) return null
+  return NextResponse.json(
+    { success: false, error: 'You do not have access to this billing area.', code: 'FORBIDDEN' },
     { status: 403 }
   )
 }

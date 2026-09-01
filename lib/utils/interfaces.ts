@@ -30,11 +30,32 @@ export const DASHBOARD_ROLES: readonly Role[] = [
 ] as const
 
 /**
- * Roles that may reach the Billing interface.
- * Billing roles aren't defined yet, so it's admin-only. Widening this is the one
- * place to do it — the middleware, the /billing layout and the switcher all follow.
+ * Roles that may reach the Billing interface. Admin sees everything; the functional billing
+ * roles split the work: a Billing Manager does it all, a Dispatcher runs the operate side
+ * (dispatch/jobs/tickets/time), a Biller runs the money side (jobs/tickets/quotes/invoices/
+ * customers/pricing/time). All billing users are branch-scoped via their assignments.
  */
-export const BILLING_ROLES: readonly Role[] = ['admin'] as const
+export const BILLING_ROLES: readonly Role[] = ['admin', 'billing_manager', 'dispatcher', 'biller'] as const
+
+/** Billing sub-areas — the unit of permission within the billing interface. */
+export type BillingArea = 'home' | 'dispatch' | 'jobs' | 'tickets' | 'quotes' | 'invoices' | 'customers' | 'items' | 'pricelists' | 'technicians' | 'time'
+
+const ALL_AREAS: BillingArea[] = ['home', 'dispatch', 'jobs', 'tickets', 'quotes', 'invoices', 'customers', 'items', 'pricelists', 'technicians', 'time']
+
+/** Which billing areas each role may use. Admin + Billing Manager get everything. */
+const BILLING_AREAS: Partial<Record<Role, BillingArea[]>> = {
+  admin: ALL_AREAS,
+  billing_manager: ALL_AREAS,
+  dispatcher: ['dispatch', 'jobs', 'tickets', 'time'],
+  biller: ['jobs', 'tickets', 'quotes', 'invoices', 'customers', 'pricelists', 'time'],
+}
+
+export function billingAreasFor(role: Role): BillingArea[] {
+  return BILLING_AREAS[role] ?? []
+}
+export function canBillingArea(role: Role, area: BillingArea): boolean {
+  return billingAreasFor(role).includes(area)
+}
 
 /**
  * Field-only roles. They reach ONLY the mobile tech web app at /tech (a money-blind
@@ -66,11 +87,29 @@ export function interfacesFor(role: Role, fieldAccess = false): InterfaceKey[] {
   return keys
 }
 
+/** Billing sub-area → the URL prefixes it covers. */
+const AREA_PATHS: Record<BillingArea, string[]> = {
+  home: [], dispatch: ['/billing/dispatch'], jobs: ['/billing/jobs'], tickets: ['/billing/tickets'],
+  quotes: ['/billing/quotes'], invoices: ['/billing/invoices'], customers: ['/billing/customers', '/billing/profiles'],
+  items: ['/billing/items'], pricelists: ['/billing/price-lists'], technicians: ['/billing/technicians'], time: ['/billing/time'],
+}
+
+/**
+ * Billing path prefixes a role may visit. Admin + Billing Manager get the whole subtree; a
+ * Dispatcher / Biller get only the sub-paths for their areas (so a dispatcher can't open
+ * Invoices, etc.). A non-billing role gets nothing.
+ */
+export function billingPrefixesFor(role: Role): string[] {
+  if (!canUseBilling(role)) return []
+  if (role === 'admin' || role === 'billing_manager') return ['/billing']
+  return billingAreasFor(role).flatMap((a) => AREA_PATHS[a])
+}
+
 /** Path prefixes a user may visit. Empty = no web access at all. */
 export function allowedPrefixesFor(role: Role, fieldAccess = false): string[] {
   const prefixes: string[] = []
   if (canUseDashboards(role)) prefixes.push(...DASHBOARD_PREFIXES[role])
-  if (canUseBilling(role)) prefixes.push('/billing')
+  prefixes.push(...billingPrefixesFor(role))
   // The tech app is reachable by field roles AND hybrids (field_access) — the one place
   // a desktop user may also step into /tech.
   if (hasFieldAccess(role, fieldAccess)) prefixes.push('/tech')
@@ -89,4 +128,8 @@ const DASHBOARD_PREFIXES: Record<Role, string[]> = {
   project_manager:  ['/dashboard', '/ar'],
   sales:            ['/dashboard', '/ar'],
   tech:             [], // field role — dashboards none; /tech is granted via isFieldRole in allowedPrefixesFor
+  // Billing-only roles reach no dashboard prefix; their access comes from billingPrefixesFor.
+  billing_manager:  [],
+  dispatcher:       [],
+  biller:           [],
 }

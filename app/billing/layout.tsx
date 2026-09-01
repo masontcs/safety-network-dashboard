@@ -33,7 +33,7 @@ export default async function BillingLayout({ children }: { children: React.Reac
   if (!profile || !canUseBilling(profile.role)) redirect('/dashboard')
 
   return (
-    <BillingShell userName={profile.display_name} available={interfacesFor(profile.role, profile.field_access)}>
+    <BillingShell userName={profile.display_name} role={profile.role} available={interfacesFor(profile.role, profile.field_access)}>
       {children}
     </BillingShell>
   )
