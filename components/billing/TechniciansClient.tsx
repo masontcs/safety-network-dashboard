@@ -149,6 +149,7 @@ function TechLoginModal({ tech, mode, onClose }: { tech: Tech; mode: 'create' | 
   const [email, setEmail] = useState(tech.email ?? '')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState(genPassword())
+  const [hybrid, setHybrid] = useState(false) // false = field-only tech; true = also full desktop (admin)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [done, setDone] = useState<{ username?: string; email?: string; password: string } | null>(null)
@@ -168,7 +169,7 @@ function TechLoginModal({ tech, mode, onClose }: { tech: Tech; mode: 'create' | 
         method: mode === 'create' ? 'POST' : 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(mode === 'create'
-          ? { email: email.trim(), username: username.trim().toLowerCase(), temporaryPassword: password }
+          ? { email: email.trim(), username: username.trim().toLowerCase(), temporaryPassword: password, role: hybrid ? 'admin' : 'tech' }
           : { temporaryPassword: password }),
       })
       const j = await res.json()
@@ -205,6 +206,14 @@ function TechLoginModal({ tech, mode, onClose }: { tech: Tech; mode: 'create' | 
               <div><label className="bx-lbl">Username</label>
                 <input className="bx-f" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="jrocha" style={{ width: '100%' }} />
                 <div className="bx-sub" style={{ marginTop: 4 }}>Lowercase letters, numbers, underscore (3–20). They can sign in with this or their email.</div></div>
+              <div>
+                <label className="bx-lbl">Access</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" className={`bx-btn ${!hybrid ? 'accent' : 'ghost'} sm`} onClick={() => setHybrid(false)}>Field only</button>
+                  <button type="button" className={`bx-btn ${hybrid ? 'accent' : 'ghost'} sm`} onClick={() => setHybrid(true)}>Field + desktop (admin)</button>
+                </div>
+                <div className="bx-sub" style={{ marginTop: 4 }}>{hybrid ? 'Also gets full desktop access (dashboard + billing/dispatch) and lands there, with a switch to the field app.' : 'Field app only (mobile time capture).'}</div>
+              </div>
             </>)}
             <div>
               <label className="bx-lbl">Temporary password</label>

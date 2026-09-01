@@ -107,9 +107,9 @@ export type Database = {
         Relationships: []
       }
       user_profiles: {
-        Row: { id: string; role: Role; display_name: string; must_change_password: boolean; is_active: boolean; username: string | null }
-        Insert: { id: string; role: Role; display_name?: string; must_change_password?: boolean; is_active?: boolean; username?: string | null }
-        Update: { id?: string; role?: Role; display_name?: string; must_change_password?: boolean; is_active?: boolean; username?: string | null }
+        Row: { id: string; role: Role; display_name: string; must_change_password: boolean; is_active: boolean; username: string | null; field_access: boolean }
+        Insert: { id: string; role: Role; display_name?: string; must_change_password?: boolean; is_active?: boolean; username?: string | null; field_access?: boolean }
+        Update: { id?: string; role?: Role; display_name?: string; must_change_password?: boolean; is_active?: boolean; username?: string | null; field_access?: boolean }
         Relationships: []
       }
       user_branch_assignments: {

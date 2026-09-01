@@ -3,6 +3,11 @@ import { getAccessContext, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { logAudit, getClientIp } from '@/lib/audit/log'
+import { DASHBOARD_ROLES } from '@/lib/utils/interfaces'
+import type { Role } from '@/lib/supabase/database.types'
+
+// A technician login may be field-only ('tech') or a hybrid (a real desktop role + field access).
+const ALLOWED_LOGIN_ROLES: Role[] = ['tech', ...DASHBOARD_ROLES]
 
 /**
  * Give a technician a real login (POST) or reset their password (PATCH). Admin-only.
@@ -36,13 +41,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (!tech) return bad('Technician not found', 'NOT_FOUND', 404)
     if (tech.user_id) return bad('This technician already has a login. Use reset password instead.', 'CONFLICT', 409)
 
-    const body = (await request.json()) as { email?: string; username?: string; temporaryPassword?: string }
+    const body = (await request.json()) as { email?: string; username?: string; temporaryPassword?: string; role?: Role; branchIds?: string[] }
     const email = body.email?.trim()
     const uname = body.username?.trim().toLowerCase() || null
     const password = body.temporaryPassword
+    const role: Role = body.role ?? 'tech'
+    const branchIds = [...new Set((body.branchIds ?? []).filter(Boolean))]
     if (!email) return bad('An email is required')
     if (!uname || !/^[a-z0-9_]{3,20}$/.test(uname)) return bad('Username must be 3–20 chars: lowercase letters, numbers, underscore')
     if (!password || password.length < 8) return bad('A temporary password of at least 8 characters is required')
+    if (!ALLOWED_LOGIN_ROLES.includes(role)) return bad('Invalid role')
 
     // Username uniqueness before creating anything.
     const { data: taken } = await supabase.from('user_profiles').select('id').eq('username', uname).maybeSingle()
@@ -59,12 +67,22 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const userId = created.user?.id
     if (!userId) throw new Error('Failed to create the auth user')
 
+    // field_access is always true — they're a technician. role is 'tech' (field-only) or a
+    // desktop role (hybrid: field + desktop).
     const { error: pErr } = await supabase.from('user_profiles')
-      .insert({ id: userId, role: 'tech', display_name: tech.name, username: uname, must_change_password: true })
+      .insert({ id: userId, role, display_name: tech.name, username: uname, must_change_password: true, field_access: true })
     if (pErr) { await supabase.auth.admin.deleteUser(userId); throw new Error(pErr.message) }
 
+    const rollback = async () => { await supabase.from('user_profiles').delete().eq('id', userId); await supabase.auth.admin.deleteUser(userId) }
+
+    // Hybrids with a scoped desktop role get their branch assignments (admin = all branches).
+    if (branchIds.length && role !== 'tech' && role !== 'admin') {
+      const { error: bErr } = await supabase.from('user_branch_assignments').insert(branchIds.map((branch_id) => ({ user_id: userId, branch_id })))
+      if (bErr) { await rollback(); throw new Error(bErr.message) }
+    }
+
     const { error: linkErr } = await supabase.from('billing_technicians').update({ user_id: userId, is_active: true }).eq('id', params.id)
-    if (linkErr) { await supabase.from('user_profiles').delete().eq('id', userId); await supabase.auth.admin.deleteUser(userId); throw new Error(linkErr.message) }
+    if (linkErr) { await rollback(); throw new Error(linkErr.message) }
 
     await logAudit({
       userId: ctx.access.userId, userDisplayName: ctx.access.displayName, userRole: ctx.access.role,

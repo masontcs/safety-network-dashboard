@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createRouteClient, createServiceClient } from '@/lib/supabase/server'
-import { isFieldRole } from '@/lib/utils/interfaces'
+import { hasFieldAccess } from '@/lib/utils/interfaces'
 import type { Role } from '@/lib/supabase/database.types'
 
 /**
@@ -48,13 +48,14 @@ export async function getTechContext(): Promise<TechResult> {
   const supabase = createServiceClient()
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('id, role')
+    .select('id, role, field_access')
     .eq('id', userId)
     .single()
   if (!profile) return fail('User profile not found.', 'NOT_FOUND', 404)
 
-  // Positive check: ONLY a field role may use this API. An admin is not a tech.
-  if (!isFieldRole(profile.role as Role)) {
+  // Field roles AND hybrids (desktop users with field_access) may use the tech app. The
+  // linked-technician check below is the real gate; this is the fast reject for non-field users.
+  if (!hasFieldAccess(profile.role as Role, (profile as { field_access?: boolean }).field_access ?? false)) {
     return fail('This API is for the tech app.', 'FORBIDDEN', 403)
   }
 

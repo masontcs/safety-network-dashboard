@@ -21,7 +21,7 @@ import type { Role } from '@/lib/supabase/database.types'
  * the middleware, and client components can all share it.
  */
 
-export type InterfaceKey = 'dashboards' | 'billing'
+export type InterfaceKey = 'dashboards' | 'billing' | 'field'
 
 /** Roles that may reach the Dashboards interface. */
 export const DASHBOARD_ROLES: readonly Role[] = [
@@ -48,23 +48,32 @@ export const canUseBilling = (role: Role): boolean => BILLING_ROLES.includes(rol
 export const isFieldRole = (role: Role): boolean => FIELD_ROLES.includes(role)
 
 /**
- * Which interfaces this role may switch between — drives the sidebar switcher.
- * A role with one interface sees a plain brand block; a role with none sees nothing.
+ * Field-app access is a CAPABILITY, not a role: a pure tech has it via their role, and a
+ * hybrid (a desktop user who also works in the field) has it via the `field_access` flag on
+ * their profile (set when they're linked to a technician record). Either grants /tech.
  */
-export function interfacesFor(role: Role): InterfaceKey[] {
+export const hasFieldAccess = (role: Role, fieldAccess = false): boolean => isFieldRole(role) || fieldAccess
+
+/**
+ * Which interfaces this user may switch between — drives the sidebar switcher.
+ * A user with one interface sees a plain brand block; with none, nothing.
+ */
+export function interfacesFor(role: Role, fieldAccess = false): InterfaceKey[] {
   const keys: InterfaceKey[] = []
   if (canUseDashboards(role)) keys.push('dashboards')
   if (canUseBilling(role)) keys.push('billing')
+  if (hasFieldAccess(role, fieldAccess)) keys.push('field')
   return keys
 }
 
-/** Path prefixes a role may visit. Empty = no web access at all. */
-export function allowedPrefixesFor(role: Role): string[] {
+/** Path prefixes a user may visit. Empty = no web access at all. */
+export function allowedPrefixesFor(role: Role, fieldAccess = false): string[] {
   const prefixes: string[] = []
   if (canUseDashboards(role)) prefixes.push(...DASHBOARD_PREFIXES[role])
   if (canUseBilling(role)) prefixes.push('/billing')
-  // Field roles reach ONLY the tech app — never a dashboard or billing prefix.
-  if (isFieldRole(role)) prefixes.push('/tech')
+  // The tech app is reachable by field roles AND hybrids (field_access) — the one place
+  // a desktop user may also step into /tech.
+  if (hasFieldAccess(role, fieldAccess)) prefixes.push('/tech')
   return prefixes
 }
 

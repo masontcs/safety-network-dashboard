@@ -25,15 +25,15 @@ export default async function BillingLayout({ children }: { children: React.Reac
 
   const { data: profileRaw } = await supabase
     .from('user_profiles')
-    .select('role, display_name')
+    .select('role, display_name, field_access')
     .eq('id', userId)
     .single()
 
-  const profile = profileRaw as { role: Role; display_name: string } | null
+  const profile = profileRaw as { role: Role; display_name: string; field_access: boolean } | null
   if (!profile || !canUseBilling(profile.role)) redirect('/dashboard')
 
   return (
-    <BillingShell userName={profile.display_name} available={interfacesFor(profile.role)}>
+    <BillingShell userName={profile.display_name} available={interfacesFor(profile.role, profile.field_access)}>
       {children}
     </BillingShell>
   )

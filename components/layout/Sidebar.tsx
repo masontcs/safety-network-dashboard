@@ -201,12 +201,13 @@ const NAV_ITEMS: NavItem[] = [
 
 interface SidebarProps {
   role: Role
+  fieldAccess?: boolean
 }
 
 const COLLAPSED_W = 48
 const EXPANDED_W = 220
 
-export default function Sidebar({ role }: SidebarProps) {
+export default function Sidebar({ role, fieldAccess = false }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { theme, toggle: toggleTheme } = useTheme()
@@ -307,7 +308,7 @@ export default function Sidebar({ role }: SidebarProps) {
         <div style={{ padding: '0 6px 6px' }}>
           <InterfaceSwitcher
             current="dashboards"
-            available={interfacesFor(role)}
+            available={interfacesFor(role, fieldAccess)}
           />
         </div>
       )}
