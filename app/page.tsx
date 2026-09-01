@@ -20,7 +20,7 @@ const DASHBOARD_ROUTES: Record<Role, string> = {
   // Billing roles land in the billing interface at their area.
   billing_manager:  '/billing',
   dispatcher:       '/billing/dispatch',
-  biller:           '/billing/invoices',
+  biller:           '/billing',
 }
 
 export default async function RootPage() {

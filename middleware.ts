@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import type { Database } from '@/lib/supabase/database.types'
-import { allowedPrefixesFor } from '@/lib/utils/interfaces'
+import { allowedPrefixesFor, canBillingArea } from '@/lib/utils/interfaces'
 
 type Role = Database['public']['Tables']['user_profiles']['Row']['role']
 
@@ -25,7 +25,7 @@ const ROLE_HOME: Record<Role, string> = {
   // Billing roles land in the billing interface, at the area that matches their job.
   billing_manager:  '/billing',
   dispatcher:       '/billing/dispatch',
-  biller:           '/billing/invoices',
+  biller:           '/billing',
 }
 
 // Path prefixes each role is allowed to visit come from the single source of truth in
@@ -97,7 +97,10 @@ export async function middleware(request: NextRequest) {
   // grant reaches nothing, and is bounced to its home rather than shown a 403 (a 403
   // would confirm the page exists).
   const allowed = allowedPrefixesFor(profile.role, profile.field_access)
-  if (!allowed.some((prefix) => pathname.startsWith(prefix))) {
+  // The billing home ('/billing') is granted by the 'home' area as an EXACT match — a prefix
+  // would over-grant the whole /billing subtree to a role that only has the dashboard.
+  const homeOk = pathname === '/billing' && canBillingArea(profile.role, 'home')
+  if (!homeOk && !allowed.some((prefix) => pathname.startsWith(prefix))) {
     return NextResponse.redirect(new URL(ROLE_HOME[profile.role], request.url))
   }
 

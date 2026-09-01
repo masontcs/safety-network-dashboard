@@ -54,7 +54,7 @@ const BILLING_AREAS: Partial<Record<Role, BillingArea[]>> = {
   admin: ALL_AREAS,
   billing_manager: ALL_AREAS,
   dispatcher: ['dispatch', 'jobs', 'tickets', 'time'],
-  biller: ['jobs', 'tickets', 'quotes', 'invoices', 'customers', 'pricelists', 'time'],
+  biller: ['home', 'jobs', 'tickets', 'quotes', 'invoices', 'customers', 'pricelists', 'time'],
 }
 
 export function billingAreasFor(role: Role): BillingArea[] {
