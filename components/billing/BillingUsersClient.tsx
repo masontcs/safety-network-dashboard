@@ -23,13 +23,13 @@ interface BUser {
 interface Candidate { id: string; displayName: string; username: string | null; email: string; baseRole: string; isField: boolean; branchIds: string[] }
 interface Branch { id: string; name: string }
 
-const ROLE_LABEL: Record<string, string> = { billing_manager: 'Billing Manager', dispatcher: 'Dispatcher', biller: 'Biller' }
+const ROLE_LABEL: Record<string, string> = { billing_branch_manager: 'Branch Manager', dispatcher: 'Dispatcher', biller: 'Biller' }
 const BASE_ROLE_LABEL: Record<string, string> = {
   admin: 'Admin', executive: 'Executive', district_manager: 'District Manager', branch_manager: 'Branch Manager',
   ar_manager: 'AR Manager', ar_team: 'AR Team', office_team: 'Office', project_manager: 'Project Manager',
-  sales: 'Sales', tech: 'Technician', billing_manager: 'Billing Manager', dispatcher: 'Dispatcher', biller: 'Biller',
+  sales: 'Sales', tech: 'Technician', billing_branch_manager: 'Branch Manager', dispatcher: 'Dispatcher', biller: 'Biller',
 }
-const ROLES = ['billing_manager', 'dispatcher', 'biller'] as const
+const ROLES = ['biller', 'dispatcher', 'billing_branch_manager'] as const
 const genPassword = () => 'Bill-' + Math.random().toString(36).slice(2, 8) + Math.floor(10 + Math.random() * 89) + '!'
 
 const th: React.CSSProperties = { textAlign: 'left', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', padding: '8px 12px', borderBottom: '1px solid var(--border-emphasis)' }

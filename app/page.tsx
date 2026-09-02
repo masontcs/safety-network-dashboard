@@ -18,7 +18,7 @@ const DASHBOARD_ROUTES: Record<Role, string> = {
   // public landing page rather than redirecting into the dashboard.
   tech:             '/',
   // Billing roles land in the billing interface at their area.
-  billing_manager:  '/billing',
+  billing_branch_manager: '/billing',
   dispatcher:       '/billing/dispatch',
   biller:           '/billing',
 }

@@ -8,7 +8,7 @@ import type { Role } from '@/lib/supabase/database.types'
 
 /**
  * Manage BILLING users from inside the billing interface (admin + Billing Manager only, via
- * the 'users' area). Deliberately narrow: only billing roles (billing_manager/dispatcher/
+ * the 'users' area). Deliberately narrow: only billing roles (billing_branch_manager/dispatcher/
  * biller) are listed and creatable — never an admin or a dashboard account — and a
  * branch-scoped manager can only touch users in, and assign, their own branches.
  */
@@ -32,7 +32,7 @@ export async function GET(): Promise<NextResponse> {
       // Billing users are (a) NATIVE — role is itself a billing role — or (b) GRANTED — any
       // dashboard/tech user who was given a layered billing_role. List both.
       supabase.from('user_profiles').select('id, role, billing_role, display_name, username, is_active')
-        .or('role.in.(billing_manager,dispatcher,biller),billing_role.not.is.null'),
+        .or('role.in.(billing_branch_manager,dispatcher,biller),billing_role.not.is.null'),
       supabase.from('user_branch_assignments').select('user_id, branch_id'),
       supabase.from('branches').select('id, name').eq('is_active', true).order('name'),
       supabase.auth.admin.listUsers(),

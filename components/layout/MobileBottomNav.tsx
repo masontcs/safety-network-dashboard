@@ -174,7 +174,7 @@ const NAV_CONFIG: Record<Role, NavConfig> = {
   // Field techs have no dashboard pages at all — nothing to navigate to.
   tech: { primary: [], more: [] },
   // Billing roles use the billing interface's own nav, not the dashboard mobile bar.
-  billing_manager: { primary: [], more: [] },
+  billing_branch_manager: { primary: [], more: [] },
   dispatcher: { primary: [], more: [] },
   biller: { primary: [], more: [] },
 }

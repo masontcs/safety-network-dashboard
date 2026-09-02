@@ -24,7 +24,7 @@ const ROLE_HOME: Record<Role, string> = {
   // Field techs land in the mobile tech web app — the only interface they can reach.
   tech:             '/tech',
   // Billing roles land in the billing interface, at the area that matches their job.
-  billing_manager:  '/billing',
+  billing_branch_manager: '/billing',
   dispatcher:       '/billing/dispatch',
   biller:           '/billing',
 }

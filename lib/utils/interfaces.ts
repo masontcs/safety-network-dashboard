@@ -31,28 +31,34 @@ export const DASHBOARD_ROLES: readonly Role[] = [
 
 /**
  * Roles that may reach the Billing interface. Admin sees everything; the functional billing
- * roles split the work: a Billing Manager does it all, a Dispatcher runs the operate side
- * (dispatch/jobs/tickets/time), a Biller runs the money side (jobs/tickets/quotes/invoices/
- * customers/pricing/time). All billing users are branch-scoped via their assignments.
+ * roles split the work: a Branch Manager runs the whole branch — money AND dispatch (every
+ * billing screen except user management); a Dispatcher runs the operate side (dispatch/jobs/
+ * tickets/time); a Biller runs the money side (jobs/tickets/quotes/invoices/customers/pricing/
+ * time). All billing users are branch-scoped via their assignments. Managing billing users is
+ * admin-only. NOTE: billing_branch_manager is the BILLING role; the dashboard 'branch_manager'
+ * is a separate role in a separate column — distinct strings on purpose.
  */
-export const BILLING_ROLES: readonly Role[] = ['admin', 'billing_manager', 'dispatcher', 'biller'] as const
+export const BILLING_ROLES: readonly Role[] = ['admin', 'billing_branch_manager', 'dispatcher', 'biller'] as const
 
 /**
- * Roles a billing-user manager may create/assign from inside the billing interface. Excludes
- * 'admin' and all dashboard roles — a Billing Manager can staff billing but never mint an
- * admin or a dashboard account (no privilege escalation out of billing).
+ * Roles that can be assigned to a billing user (native account or layered grant). Excludes
+ * 'admin' and all dashboard roles — no privilege escalation out of billing.
  */
-export const MANAGEABLE_BILLING_ROLES: readonly Role[] = ['billing_manager', 'dispatcher', 'biller'] as const
+export const MANAGEABLE_BILLING_ROLES: readonly Role[] = ['billing_branch_manager', 'dispatcher', 'biller'] as const
 
 /** Billing sub-areas — the unit of permission within the billing interface. */
 export type BillingArea = 'home' | 'dispatch' | 'jobs' | 'tickets' | 'quotes' | 'invoices' | 'customers' | 'items' | 'pricelists' | 'technicians' | 'time' | 'users'
 
 const ALL_AREAS: BillingArea[] = ['home', 'dispatch', 'jobs', 'tickets', 'quotes', 'invoices', 'customers', 'items', 'pricelists', 'technicians', 'time', 'users']
 
-/** Which billing areas each role may use. Admin + Billing Manager get everything. */
+/**
+ * Which billing areas each role may use. Only Admin gets 'users' (managing billing users is
+ * admin-only). Branch Manager gets everything else — money + dispatch + setup. Dispatcher runs
+ * the operate side; Biller runs the money side.
+ */
 const BILLING_AREAS: Partial<Record<Role, BillingArea[]>> = {
   admin: ALL_AREAS,
-  billing_manager: ALL_AREAS,
+  billing_branch_manager: ['home', 'dispatch', 'jobs', 'tickets', 'quotes', 'invoices', 'customers', 'items', 'pricelists', 'technicians', 'time'],
   dispatcher: ['dispatch', 'jobs', 'tickets', 'time'],
   biller: ['home', 'jobs', 'tickets', 'quotes', 'invoices', 'customers', 'pricelists', 'time'],
 }
@@ -128,7 +134,10 @@ const AREA_PATHS: Record<BillingArea, string[]> = {
 export function billingPrefixesFor(role: Role, billingRole?: Role | null): string[] {
   const eff = effectiveBillingRole(role, billingRole)
   if (!eff) return []
-  if (eff === 'admin' || eff === 'billing_manager') return ['/billing']
+  // Only admin gets the whole /billing subtree (they alone have the 'users' area). Everyone
+  // else — including Branch Manager — is granted exactly their areas' paths, so a role without
+  // the 'users' area can't reach /billing/users.
+  if (eff === 'admin') return ['/billing']
   return billingAreasFor(role, billingRole).flatMap((a) => AREA_PATHS[a])
 }
 
@@ -156,7 +165,7 @@ const DASHBOARD_PREFIXES: Record<Role, string[]> = {
   sales:            ['/dashboard', '/ar'],
   tech:             [], // field role — dashboards none; /tech is granted via isFieldRole in allowedPrefixesFor
   // Billing-only roles reach no dashboard prefix; their access comes from billingPrefixesFor.
-  billing_manager:  [],
+  billing_branch_manager: [],
   dispatcher:       [],
   biller:           [],
 }

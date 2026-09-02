@@ -5,7 +5,7 @@ import { apiError } from '@/lib/utils/errors'
 import type { Role } from '@/lib/supabase/database.types'
 import { logAudit, getClientIp } from '@/lib/audit/log'
 
-const VALID_ROLES: Role[] = ['admin', 'executive', 'district_manager', 'branch_manager', 'ar_manager', 'ar_team', 'office_team', 'project_manager', 'sales', 'billing_manager', 'dispatcher', 'biller']
+const VALID_ROLES: Role[] = ['admin', 'executive', 'district_manager', 'branch_manager', 'ar_manager', 'ar_team', 'office_team', 'project_manager', 'sales', 'billing_branch_manager', 'dispatcher', 'biller']
 const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/
 
 export async function PATCH(
