@@ -71,7 +71,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'quotes')
+    const guard = guardBillingArea(ctx.access, 'quotes')
     if (guard) return guard
 
     const body = (await request.json()) as {
@@ -143,7 +143,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'quotes')
+    const guard = guardBillingArea(ctx.access, 'quotes')
     if (guard) return guard
     const body = (await request.json()) as { action?: string; status?: string }
     const supabase = createServiceClient()

@@ -21,15 +21,16 @@ export default async function TechLayout({ children }: { children: React.ReactNo
 
   const { data: profileRaw } = await supabase
     .from('user_profiles')
-    .select('role, field_access')
+    .select('role, field_access, billing_role')
     .eq('id', userId)
     .single()
 
-  const profile = profileRaw as { role: Role; field_access: boolean } | null
+  const profile = profileRaw as { role: Role; field_access: boolean; billing_role: Role | null } | null
   if (!profile || !hasFieldAccess(profile.role, profile.field_access)) redirect('/login')
 
-  // Hybrids also have a desktop interface — offer a way back to it.
-  const desktopHref = canUseBilling(profile.role) ? '/billing' : canUseDashboards(profile.role) ? '/dashboard' : null
+  // Hybrids also have a desktop interface — offer a way back to it. Billing here includes a
+  // layered grant (billing_role) on top of a tech's role.
+  const desktopHref = canUseBilling(profile.role, profile.billing_role) ? '/billing' : canUseDashboards(profile.role) ? '/dashboard' : null
 
   return (
     <div className="tech-root">

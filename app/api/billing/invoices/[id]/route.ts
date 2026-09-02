@@ -113,7 +113,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'invoices')
+    const guard = guardBillingArea(ctx.access, 'invoices')
     if (guard) return guard
 
     const body = (await request.json()) as { action?: string; invoiceDate?: string }

@@ -26,7 +26,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'customers')
+    const guard = guardBillingArea(ctx.access, 'customers')
     if (guard) return guard
 
     const supabase = createServiceClient()
@@ -55,7 +55,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'customers')
+    const guard = guardBillingArea(ctx.access, 'customers')
     if (guard) return guard
 
     const body = (await request.json()) as {

@@ -17,7 +17,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'technicians')
+    const guard = guardBillingArea(ctx.access, 'technicians')
     if (guard) return guard
 
     const body = (await request.json()) as { name?: string; isActive?: boolean }
@@ -43,7 +43,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'technicians')
+    const guard = guardBillingArea(ctx.access, 'technicians')
     if (guard) return guard
 
     const supabase = createServiceClient()

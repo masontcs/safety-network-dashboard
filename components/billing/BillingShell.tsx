@@ -13,17 +13,19 @@ import type { Role } from '@/lib/supabase/database.types'
 export default function BillingShell({
   userName,
   role,
+  billingRole = null,
   available,
   children,
 }: {
   userName: string
   role: Role
+  billingRole?: Role | null
   available: InterfaceKey[]
   children: ReactNode
 }) {
   return (
     <div className="billing-root" style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg)' }}>
-      <BillingSidebar userName={userName} role={role} available={available} />
+      <BillingSidebar userName={userName} role={role} billingRole={billingRole} available={available} />
       <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <BranchProvider>
           <BillingTopbar />

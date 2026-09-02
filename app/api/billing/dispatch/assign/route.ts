@@ -26,7 +26,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'dispatch')
+    const guard = guardBillingArea(ctx.access, 'dispatch')
     if (guard) return guard
 
     const body = (await request.json()) as {
@@ -138,7 +138,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'dispatch')
+    const guard = guardBillingArea(ctx.access, 'dispatch')
     if (guard) return guard
 
     const id = new URL(request.url).searchParams.get('yardShiftId')

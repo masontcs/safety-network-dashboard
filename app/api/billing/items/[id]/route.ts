@@ -138,7 +138,7 @@ export async function PATCH(
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
 
-    const guard = guardBillingArea(ctx.access.role, 'items')
+    const guard = guardBillingArea(ctx.access, 'items')
     if (guard) return guard
 
     const body = (await request.json()) as {
@@ -351,7 +351,7 @@ export async function DELETE(
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
 
-    const guard = guardBillingArea(ctx.access.role, 'items')
+    const guard = guardBillingArea(ctx.access, 'items')
     if (guard) return guard
 
     const supabase = createServiceClient()

@@ -18,7 +18,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'customers')
+    const guard = guardBillingArea(ctx.access, 'customers')
     if (guard) return guard
 
     const customerId = new URL(request.url).searchParams.get('customerId')
@@ -48,7 +48,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'customers')
+    const guard = guardBillingArea(ctx.access, 'customers')
     if (guard) return guard
 
     const body = (await request.json()) as { customerId?: string; email?: string; name?: string }

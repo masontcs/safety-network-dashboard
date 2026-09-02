@@ -46,13 +46,14 @@ const SECTIONS: NavSection[] = [
   },
 ]
 
-export default function BillingSidebar({ userName, role, available }: { userName: string; role: Role; available: InterfaceKey[] }) {
+export default function BillingSidebar({ userName, role, billingRole = null, available }: { userName: string; role: Role; billingRole?: Role | null; available: InterfaceKey[] }) {
   const pathname = usePathname()
   const router = useRouter()
 
-  // Show only the sections/items this role's billing areas allow (empty sections drop out).
+  // Show only the sections/items this user's billing areas allow (empty sections drop out).
+  // Honours a layered billing grant (billingRole) on top of a dashboard/tech primary role.
   const sections = SECTIONS
-    .map((s) => ({ ...s, items: s.items.filter((i) => canBillingArea(role, i.area)) }))
+    .map((s) => ({ ...s, items: s.items.filter((i) => canBillingArea(role, i.area, billingRole)) }))
     .filter((s) => s.items.length > 0)
 
   async function signOut() {

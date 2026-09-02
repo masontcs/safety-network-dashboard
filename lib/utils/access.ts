@@ -5,6 +5,10 @@ export type UserAccess = {
   role: Role
   displayName: string
   branchIds: string[] | null  // null = all access (admin / executive)
+  // Billing capability layered on top of `role` (mirrors field_access). null/undefined = no
+  // layered grant; a legacy pure-billing account instead carries the billing role in `role`.
+  // getAccessContext always populates this; optional only so terse test fixtures may omit it.
+  billingRole?: Role | null
 }
 
 export function canAccessBranch(access: UserAccess, branchId: string): boolean {

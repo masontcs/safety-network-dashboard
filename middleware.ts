@@ -85,10 +85,10 @@ export async function middleware(request: NextRequest) {
 
   const { data } = await supabase
     .from('user_profiles')
-    .select('role, must_change_password, field_access')
+    .select('role, must_change_password, field_access, billing_role')
     .eq('id', user.id)
     .single()
-  const profile = data as { role: Role; must_change_password: boolean; field_access: boolean } | null
+  const profile = data as { role: Role; must_change_password: boolean; field_access: boolean; billing_role: Role | null } | null
 
   // Authenticated user on a public path → redirect to their home page
   if (PUBLIC_PATHS.includes(pathname)) {
@@ -116,10 +116,10 @@ export async function middleware(request: NextRequest) {
   // Block cross-role path access. allowedPrefixesFor is an allow-list: a role with no
   // grant reaches nothing, and is bounced to its home rather than shown a 403 (a 403
   // would confirm the page exists).
-  const allowed = allowedPrefixesFor(profile.role, profile.field_access)
+  const allowed = allowedPrefixesFor(profile.role, profile.field_access, profile.billing_role)
   // The billing home ('/billing') is granted by the 'home' area as an EXACT match — a prefix
   // would over-grant the whole /billing subtree to a role that only has the dashboard.
-  const homeOk = pathname === '/billing' && canBillingArea(profile.role, 'home')
+  const homeOk = pathname === '/billing' && canBillingArea(profile.role, 'home', profile.billing_role)
   if (!homeOk && !allowed.some((prefix) => pathname.startsWith(prefix))) {
     return NextResponse.redirect(new URL(ROLE_HOME[profile.role], request.url))
   }

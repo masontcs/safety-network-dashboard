@@ -51,7 +51,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!ctx.ok) return ctx.response
 
     // Billing roles are not defined yet — writes are admin-only until they are.
-    const guard = guardBillingArea(ctx.access.role, 'customers')
+    const guard = guardBillingArea(ctx.access, 'customers')
     if (guard) return guard
 
     const body = (await request.json()) as {

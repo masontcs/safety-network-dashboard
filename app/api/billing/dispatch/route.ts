@@ -105,7 +105,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'dispatch')
+    const guard = guardBillingArea(ctx.access, 'dispatch')
     if (guard) return guard
 
     const body = (await request.json()) as { ticketId?: string; technicianId?: string | null; ticketDate?: string }

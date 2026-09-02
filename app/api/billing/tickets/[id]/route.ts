@@ -235,7 +235,7 @@ export async function PATCH(
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'tickets')
+    const guard = guardBillingArea(ctx.access, 'tickets')
     if (guard) return guard
 
     const supabase = createServiceClient()

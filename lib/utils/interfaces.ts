@@ -57,11 +57,28 @@ const BILLING_AREAS: Partial<Record<Role, BillingArea[]>> = {
   biller: ['home', 'jobs', 'tickets', 'quotes', 'invoices', 'customers', 'pricelists', 'time'],
 }
 
-export function billingAreasFor(role: Role): BillingArea[] {
-  return BILLING_AREAS[role] ?? []
+/**
+ * The billing role a user effectively acts as. Billing access is a CAPABILITY layered on top
+ * of the primary `role` (mirrors field_access):
+ *   - an admin is always full billing;
+ *   - a `billing_role` grant (on any dashboard/tech user) takes effect on top of their role;
+ *   - a legacy pure-billing account carries the billing role in `role` itself (billing_role null);
+ *   - everyone else has no billing access (null).
+ * Every billing gate resolves through here, so a grant is honoured everywhere at once.
+ */
+export function effectiveBillingRole(role: Role, billingRole?: Role | null): Role | null {
+  if (role === 'admin') return 'admin'
+  if (billingRole) return billingRole
+  if (BILLING_ROLES.includes(role)) return role
+  return null
 }
-export function canBillingArea(role: Role, area: BillingArea): boolean {
-  return billingAreasFor(role).includes(area)
+
+export function billingAreasFor(role: Role, billingRole?: Role | null): BillingArea[] {
+  const eff = effectiveBillingRole(role, billingRole)
+  return eff ? BILLING_AREAS[eff] ?? [] : []
+}
+export function canBillingArea(role: Role, area: BillingArea, billingRole?: Role | null): boolean {
+  return billingAreasFor(role, billingRole).includes(area)
 }
 
 /**
@@ -72,7 +89,8 @@ export function canBillingArea(role: Role, area: BillingArea): boolean {
 export const FIELD_ROLES: readonly Role[] = ['tech'] as const
 
 export const canUseDashboards = (role: Role): boolean => DASHBOARD_ROLES.includes(role)
-export const canUseBilling = (role: Role): boolean => BILLING_ROLES.includes(role)
+export const canUseBilling = (role: Role, billingRole?: Role | null): boolean =>
+  effectiveBillingRole(role, billingRole) !== null
 export const isFieldRole = (role: Role): boolean => FIELD_ROLES.includes(role)
 
 /**
@@ -86,10 +104,10 @@ export const hasFieldAccess = (role: Role, fieldAccess = false): boolean => isFi
  * Which interfaces this user may switch between — drives the sidebar switcher.
  * A user with one interface sees a plain brand block; with none, nothing.
  */
-export function interfacesFor(role: Role, fieldAccess = false): InterfaceKey[] {
+export function interfacesFor(role: Role, fieldAccess = false, billingRole?: Role | null): InterfaceKey[] {
   const keys: InterfaceKey[] = []
   if (canUseDashboards(role)) keys.push('dashboards')
-  if (canUseBilling(role)) keys.push('billing')
+  if (canUseBilling(role, billingRole)) keys.push('billing')
   if (hasFieldAccess(role, fieldAccess)) keys.push('field')
   return keys
 }
@@ -107,17 +125,18 @@ const AREA_PATHS: Record<BillingArea, string[]> = {
  * Dispatcher / Biller get only the sub-paths for their areas (so a dispatcher can't open
  * Invoices, etc.). A non-billing role gets nothing.
  */
-export function billingPrefixesFor(role: Role): string[] {
-  if (!canUseBilling(role)) return []
-  if (role === 'admin' || role === 'billing_manager') return ['/billing']
-  return billingAreasFor(role).flatMap((a) => AREA_PATHS[a])
+export function billingPrefixesFor(role: Role, billingRole?: Role | null): string[] {
+  const eff = effectiveBillingRole(role, billingRole)
+  if (!eff) return []
+  if (eff === 'admin' || eff === 'billing_manager') return ['/billing']
+  return billingAreasFor(role, billingRole).flatMap((a) => AREA_PATHS[a])
 }
 
 /** Path prefixes a user may visit. Empty = no web access at all. */
-export function allowedPrefixesFor(role: Role, fieldAccess = false): string[] {
+export function allowedPrefixesFor(role: Role, fieldAccess = false, billingRole?: Role | null): string[] {
   const prefixes: string[] = []
   if (canUseDashboards(role)) prefixes.push(...DASHBOARD_PREFIXES[role])
-  prefixes.push(...billingPrefixesFor(role))
+  prefixes.push(...billingPrefixesFor(role, billingRole))
   // The tech app is reachable by field roles AND hybrids (field_access) — the one place
   // a desktop user may also step into /tech.
   if (hasFieldAccess(role, fieldAccess)) prefixes.push('/tech')

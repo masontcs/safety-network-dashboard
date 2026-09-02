@@ -68,7 +68,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'tickets')
+    const guard = guardBillingArea(ctx.access, 'tickets')
     if (guard) return guard
 
     const supabase = createServiceClient()
@@ -114,7 +114,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'tickets')
+    const guard = guardBillingArea(ctx.access, 'tickets')
     if (guard) return guard
 
     const url = new URL(request.url)

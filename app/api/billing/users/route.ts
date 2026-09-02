@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
-import { MANAGEABLE_BILLING_ROLES } from '@/lib/utils/interfaces'
+import { MANAGEABLE_BILLING_ROLES, effectiveBillingRole } from '@/lib/utils/interfaces'
 import { logAudit, getClientIp } from '@/lib/audit/log'
 import type { Role } from '@/lib/supabase/database.types'
 
@@ -22,18 +22,22 @@ export async function GET(): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'users')
+    const guard = guardBillingArea(ctx.access, 'users')
     if (guard) return guard
     const supabase = createServiceClient()
 
     const scope = ctx.access.branchIds // null = all branches
+    const isAdmin = ctx.access.role === 'admin'
     const [{ data: profs }, { data: asg }, { data: branchRows }, authList] = await Promise.all([
-      supabase.from('user_profiles').select('id, role, display_name, username, is_active').in('role', [...MANAGEABLE_BILLING_ROLES]),
+      // Billing users are (a) NATIVE — role is itself a billing role — or (b) GRANTED — any
+      // dashboard/tech user who was given a layered billing_role. List both.
+      supabase.from('user_profiles').select('id, role, billing_role, display_name, username, is_active')
+        .or('role.in.(billing_manager,dispatcher,biller),billing_role.not.is.null'),
       supabase.from('user_branch_assignments').select('user_id, branch_id'),
       supabase.from('branches').select('id, name').eq('is_active', true).order('name'),
       supabase.auth.admin.listUsers(),
     ])
-    const profiles = (profs ?? []) as { id: string; role: Role; display_name: string; username: string | null; is_active: boolean }[]
+    const profiles = (profs ?? []) as { id: string; role: Role; billing_role: Role | null; display_name: string; username: string | null; is_active: boolean }[]
     const assignments = (asg ?? []) as { user_id: string; branch_id: string }[]
     const branchByUser = new Map<string, string[]>()
     for (const a of assignments) branchByUser.set(a.user_id, [...(branchByUser.get(a.user_id) ?? []), a.branch_id])
@@ -43,15 +47,22 @@ export async function GET(): Promise<NextResponse> {
     let branches = (branchRows ?? []) as { id: string; name: string }[]
     if (scope !== null) { const allow = new Set(scope); branches = branches.filter((b) => allow.has(b.id)) }
 
-    let users = profiles.map((p) => ({
-      id: p.id, displayName: p.display_name, username: p.username, email: emailById.get(p.id) ?? '',
-      role: p.role, isActive: p.is_active, branchIds: branchByUser.get(p.id) ?? [],
-    }))
+    let users = profiles.map((p) => {
+      const granted = p.billing_role != null                         // layered grant vs native billing account
+      const billingRole = effectiveBillingRole(p.role, p.billing_role) // the role they act as in billing
+      return {
+        id: p.id, displayName: p.display_name, username: p.username, email: emailById.get(p.id) ?? '',
+        baseRole: p.role,            // their primary (dashboard/tech) role — informational for granted users
+        billingRole,                 // effective billing role (what drives areas)
+        source: granted ? 'granted' as const : 'native' as const,
+        isActive: p.is_active, branchIds: branchByUser.get(p.id) ?? [],
+      }
+    })
     // A scoped manager only sees billing users who share one of their branches.
     if (scope !== null) { const allow = new Set(scope); users = users.filter((u) => u.branchIds.some((b) => allow.has(b))) }
     users.sort((a, b) => (a.isActive === b.isActive ? a.displayName.localeCompare(b.displayName) : a.isActive ? -1 : 1))
 
-    return NextResponse.json({ success: true, data: { users, branches, canManageAll: scope === null } })
+    return NextResponse.json({ success: true, data: { users, branches, canManageAll: scope === null, isAdmin } })
   } catch (err) {
     return billingApiError(err)
   }
@@ -61,7 +72,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'users')
+    const guard = guardBillingArea(ctx.access, 'users')
     if (guard) return guard
     const supabase = createServiceClient()
 

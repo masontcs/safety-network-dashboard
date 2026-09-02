@@ -87,7 +87,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access.role, 'invoices')
+    const guard = guardBillingArea(ctx.access, 'invoices')
     if (guard) return guard
 
     const body = (await request.json()) as {

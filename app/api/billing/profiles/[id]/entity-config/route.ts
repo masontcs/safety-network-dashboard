@@ -140,7 +140,7 @@ export async function PUT(
     if (!ctx.ok) return ctx.response
 
     // Billing roles are not defined yet — writes are admin-only until they are.
-    const guard = guardBillingArea(ctx.access.role, 'pricelists')
+    const guard = guardBillingArea(ctx.access, 'pricelists')
     if (guard) return guard
 
     const supabase = createServiceClient()

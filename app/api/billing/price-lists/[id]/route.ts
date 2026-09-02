@@ -221,7 +221,7 @@ export async function PUT(
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
 
-    const guard = guardBillingArea(ctx.access.role, 'pricelists')
+    const guard = guardBillingArea(ctx.access, 'pricelists')
     if (guard) return guard
 
     const body = (await request.json()) as { name?: string; tiers?: SaveTier[]; items?: SaveItem[] }
