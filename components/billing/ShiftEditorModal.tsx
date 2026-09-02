@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Combobox from '@/components/billing/Combobox'
+import TechMultiSelect from '@/components/billing/TechMultiSelect'
 import { JOB_TYPES, MEAL_TYPES } from '@/lib/billing/shiftConstants'
 
 /**
@@ -27,7 +28,7 @@ interface TimelineRow { atTime: string; activityTypeId: string }
 type Mode = 'ticket' | 'job' | 'newjob' | 'yard'
 
 export default function ShiftEditorModal({
-  date, technicianId, technicians, branchId, editShiftId = null, ticketsForDay, onClose, onDone,
+  date, technicianId, technicians, branchId, editShiftId = null, ticketsForDay, pickDate = false, onClose, onDone,
 }: {
   date: string
   technicianId: string | null
@@ -35,11 +36,16 @@ export default function ShiftEditorModal({
   branchId: string | null
   editShiftId?: string | null
   ticketsForDay: TicketOpt[]
+  /** General-purpose dispatch: let the user choose the date here, and load that day's tickets. */
+  pickDate?: boolean
   onClose: () => void
   onDone: (msg: string) => void
 }) {
   const editing = !!editShiftId
-  const [mode, setMode] = useState<Mode>(ticketsForDay.length > 0 ? 'ticket' : 'job')
+  // In general (pickDate) mode the date is chosen inside the modal; otherwise it's fixed by the cell.
+  const [dateState, setDateState] = useState(date)
+  const [dayTickets, setDayTickets] = useState<TicketOpt[]>(ticketsForDay)
+  const [mode, setMode] = useState<Mode>(!pickDate && ticketsForDay.length > 0 ? 'ticket' : 'job')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(!editing)
@@ -79,6 +85,20 @@ export default function ShiftEditorModal({
     Promise.all([fetch('/api/billing/profiles').then(j), fetch('/api/billing/entities').then(j)])
       .then(([p, e]) => { if (p.success) setProfiles(p.data); if (e.success) setEntities(e.data) }).catch(() => {})
   }, [])
+
+  // General dispatch: load the chosen day's open tickets (the parent didn't pre-pass them).
+  useEffect(() => {
+    if (!pickDate) return
+    const bq = branchId ? `&branchId=${branchId}` : ''
+    fetch(`/api/billing/dispatch?week=${dateState}${bq}`).then((r) => r.json())
+      .then((j) => {
+        if (!j.success) return
+        const day = (j.data.tickets as { id: string; ticketNumber: string; date: string; jobNumber: string; jobName: string | null; customer: string | null; voided?: boolean }[])
+          .filter((t) => t.date === dateState)
+          .map((t) => ({ id: t.id, ticketNumber: t.ticketNumber, jobNumber: t.jobNumber, jobName: t.jobName, customer: t.customer, voided: t.voided }))
+        setDayTickets(day)
+      }).catch(() => {})
+  }, [pickDate, dateState, branchId])
 
   // Editing a staged shift — prefill everything.
   useEffect(() => {
@@ -167,7 +187,7 @@ export default function ShiftEditorModal({
   // Create or update the shift; returns its id.
   async function saveShift(): Promise<string | null> {
     const payload = {
-      shiftDate: date, mealType, perDiemPreapproved: perDiem, notes: notes.trim() || null,
+      shiftDate: dateState, mealType, perDiemPreapproved: perDiem, notes: notes.trim() || null,
       jobTypes, timeline: timeline.filter((t) => t.atTime && t.activityTypeId), crew,
     }
     if (editShiftId) {
@@ -215,20 +235,20 @@ export default function ShiftEditorModal({
     if (!ticketId) { setErr('Pick a ticket.'); return }
     setBusy(true); setErr(null)
     try {
-      const r = await post('/api/billing/dispatch/assign', { mode: 'ticket', ticketId, technicianIds: crew.map((c) => c.technicianId), date })
+      const r = await post('/api/billing/dispatch/assign', { mode: 'ticket', ticketId, technicianIds: crew.map((c) => c.technicianId), date: dateState })
       if (!r.success) return setErr(r.error ?? 'Failed')
       onDone('Dispatched to ticket.')
     } catch { setErr('Network error — please try again.') } finally { setBusy(false) }
   }
 
-  const openTickets = ticketsForDay.filter((t) => !t.voided)
+  const openTickets = dayTickets.filter((t) => !t.voided)
   if (typeof document === 'undefined') return null
   const host = document.querySelector('.billing-root') ?? document.body
   const tab = (m: Mode, label: string) => (
     <button type="button" className={`bx-btn ${mode === m ? 'accent' : 'ghost'} sm`} onClick={() => setMode(m)}>{label}</button>
   )
   const isShiftMode = mode === 'job' || mode === 'newjob' || mode === 'yard'
-  const dateLabel = new Date(date + 'T00:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' })
+  const dateLabel = new Date(dateState + 'T00:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' })
 
   return createPortal((
     <div onMouseDown={onClose} style={overlay}>
@@ -240,23 +260,18 @@ export default function ShiftEditorModal({
 
         {!loaded ? <div className="bx-sub" style={{ padding: 12 }}>Loading…</div> : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
-          {/* Technicians + lead */}
-          <div>
-            <label className="bx-lbl">Technician(s){crew.length > 1 ? ' · tap ★ to set the lead' : ''}</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {technicians.map((t) => {
-                const on = crew.find((c) => c.technicianId === t.id)
-                return (
-                  <span key={t.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                    <button type="button" className={`bx-btn ${on ? 'accent' : 'ghost'} sm`} onClick={() => toggleTech(t.id)}>{t.name}</button>
-                    {on && crew.length > 1 && (
-                      <button type="button" title={on.isLead ? 'Lead' : 'Make lead'} onClick={() => setLead(t.id)}
-                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, color: on.isLead ? 'var(--accent)' : 'var(--dim,#bbb)' }}>★</button>
-                    )}
-                  </span>
-                )
-              })}
+          {/* Date — only in general dispatch; cell-based dispatch fixes the date. */}
+          {pickDate && (
+            <div>
+              <label className="bx-lbl">Date</label>
+              <input type="date" className="bx-f" style={{ width: '100%' }} value={dateState} onChange={(e) => { if (e.target.value) setDateState(e.target.value) }} />
             </div>
+          )}
+
+          {/* Technicians + lead — searchable multi-select */}
+          <div>
+            <label className="bx-lbl">Technician(s){crew.length > 1 ? ' · ★ sets the lead' : ''}</label>
+            <TechMultiSelect technicians={technicians} crew={crew} onToggle={toggleTech} onSetLead={setLead} />
           </div>
 
           {!editing && (
@@ -274,7 +289,7 @@ export default function ShiftEditorModal({
           {mode === 'ticket' && !editing && (
             <form onSubmit={onAssignExisting} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <label className="bx-lbl">Ticket ({date})</label>
+                <label className="bx-lbl">Ticket ({dateState})</label>
                 {openTickets.length === 0
                   ? <div className="bx-note amber">No tickets on this day — pick a job or create one instead.</div>
                   : <Combobox value={ticketId} onChange={setTicketId} placeholder="Pick a ticket…"

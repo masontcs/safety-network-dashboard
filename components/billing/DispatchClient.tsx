@@ -36,6 +36,7 @@ export default function DispatchClient() {
   const [week, setWeek] = useState<string>(() => new Date().toISOString().slice(0, 10))
   const [toast, setToast] = useState<string | null>(null)
   const [dispatchCell, setDispatchCell] = useState<{ techId: string | null; date: string } | null>(null)
+  const [generalDispatch, setGeneralDispatch] = useState(false)
   const [editShiftId, setEditShiftId] = useState<string | null>(null)
   const drag = useRef<Ticket | null>(null)
   const router = useRouter()
@@ -131,6 +132,9 @@ export default function DispatchClient() {
           <button className="bx-btn ghost" onClick={() => setWeek(addDays(week, -7))}>‹ Prev</button>
           <button className="bx-btn ghost" onClick={() => setWeek(new Date().toISOString().slice(0, 10))}>This week</button>
           <button className="bx-btn ghost" onClick={() => setWeek(addDays(week, 7))}>Next ›</button>
+          {board?.isAdmin && (
+            <button className="bx-btn accent" style={{ marginLeft: 6 }} onClick={() => setGeneralDispatch(true)}>+ Dispatch</button>
+          )}
         </div>
       </div>
 
@@ -181,6 +185,19 @@ export default function DispatchClient() {
             .map((t) => ({ id: t.id, ticketNumber: t.ticketNumber, jobNumber: t.jobNumber, jobName: t.jobName, customer: t.customer, voided: t.voided }))}
           onClose={() => setDispatchCell(null)}
           onDone={(msg) => { setDispatchCell(null); flash(msg); load(week) }}
+        />
+      )}
+
+      {generalDispatch && board && (
+        <ShiftEditorModal
+          date={new Date().toISOString().slice(0, 10)}
+          technicianId={null}
+          technicians={board.technicians}
+          branchId={branchId ?? null}
+          pickDate
+          ticketsForDay={[]}
+          onClose={() => setGeneralDispatch(false)}
+          onDone={(msg) => { setGeneralDispatch(false); flash(msg); load(week) }}
         />
       )}
 
