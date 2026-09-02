@@ -38,9 +38,11 @@ export default function TechMultiSelect({
 
   useEffect(() => {
     if (!open) return
+    // Capture phase: the modal card stops mousedown propagation, so a bubble-phase listener
+    // never sees clicks made elsewhere inside the modal. Capture runs top-down, before that.
     const onDoc = (e: MouseEvent) => { if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false) }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
+    document.addEventListener('mousedown', onDoc, true)
+    return () => document.removeEventListener('mousedown', onDoc, true)
   }, [open])
 
   useEffect(() => {

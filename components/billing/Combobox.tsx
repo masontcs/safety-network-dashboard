@@ -56,14 +56,15 @@ export default function Combobox({
     return options.filter((o) => `${o.label} ${o.hint ?? ''}`.toLowerCase().includes(q))
   }, [query, options, selected])
 
-  // Close on outside click.
+  // Close on outside click. Capture phase, so it still fires inside a modal whose card stops
+  // mousedown propagation (a bubble-phase listener would never see the click).
   useEffect(() => {
     if (!open) return
     const onDoc = (e: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
     }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
+    document.addEventListener('mousedown', onDoc, true)
+    return () => document.removeEventListener('mousedown', onDoc, true)
   }, [open])
 
   // Keep the highlighted row scrolled into view.
