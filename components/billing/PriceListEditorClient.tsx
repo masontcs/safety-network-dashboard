@@ -249,7 +249,9 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
             {keys.map((bt) => (
               <tr key={bt}>
                 <td style={{ ...tdStyle, paddingLeft: 2, whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
-                  {keys.length === 1 ? 'Rate' : BILLING_TYPE_LABELS[bt as keyof typeof BILLING_TYPE_LABELS]}
+                  {keys.length === 1
+                    ? (it.category === 'Equipment' ? 'Rate / day' : 'Rate')
+                    : `${BILLING_TYPE_LABELS[bt as keyof typeof BILLING_TYPE_LABELS]} / day`}
                 </td>
                 {tiers.map((t, i) => {
                   const computed = preview[`${it.key}|${gridKey}`]?.[t.key]?.[bt]
@@ -517,8 +519,10 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
       <div className="card">
         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 4 }}>Equipment rates</div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-          Open an item to set its rates. Turn on <strong>single rate</strong> for a cone or barricade — one rate instead of
-          the six billing types (tiers still apply). Items with variations are priced per variation.
+          Rates are <strong>per day</strong>. Daily / Weekly / Monthly are duration discounts — the rate you enter in each is
+          the per-day price when an item is tagged that way on a ticket (weekly/monthly are cheaper per day). Rentals always
+          bill by the number of days. Turn on <strong>single rate</strong> for a cone or barricade — one per-day rate instead
+          of the three (tiers still apply). Items with variations are priced per variation.
         </div>
       </div>
       {equipmentItems.length === 0 ? (

@@ -13,7 +13,11 @@ export interface InvoicePdfLine {
   id: string; kind: string; description: string; lotDate: string | null
   variation: string | null
   qty: number; units: number; unitRateCents: number; amountCents: number; taxable: boolean
+  rentalItemQty?: number | null; rentalDays?: number | null; periodEnd?: string | null
 }
+
+const pdfShortDate = (d: string | null | undefined) =>
+  d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit', timeZone: 'UTC' }) : ''
 export interface InvoicePdfData {
   invoiceNumber: string
   invoiceDate: string
@@ -78,7 +82,7 @@ const s = StyleSheet.create({
   thRow: { flexDirection: 'row', backgroundColor: CHAR, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 3 },
   th: { fontSize: 7.5, color: WHITE, letterSpacing: 0.8, textTransform: 'uppercase' },
   row: { flexDirection: 'row', paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center' },
-  cDesc: { flex: 1 }, cQty: { width: 46, textAlign: 'center' }, cPrice: { width: 82, textAlign: 'right' }, cTot: { width: 82, textAlign: 'right' },
+  cDesc: { flex: 1 }, cQty: { width: 34, textAlign: 'center' }, cPeriod: { width: 96, textAlign: 'left' }, cDays: { width: 36, textAlign: 'center' }, cPrice: { width: 72, textAlign: 'right' }, cTot: { width: 78, textAlign: 'right' },
   itemName: { fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: INK },
   itemSub: { fontSize: 8, color: MUT, marginTop: 2 },
   cell: { fontSize: 9, color: INK },
@@ -158,20 +162,27 @@ export function InvoiceDocument({ data }: { data: InvoicePdfData }) {
           <View style={s.thRow} fixed>
             <TH style={s.cDesc}>Item Description</TH>
             <TH style={s.cQty} center>Qty</TH>
-            <TH style={s.cPrice} right>Price</TH>
+            <TH style={s.cPeriod}>Rental Period</TH>
+            <TH style={s.cDays} center>Days</TH>
+            <TH style={s.cPrice} right>Rate</TH>
             <TH style={s.cTot} right>Total</TH>
           </View>
-          {data.lines.map((l, i) => (
-            <View key={l.id} style={[s.row, { backgroundColor: i % 2 ? WHITE : STRIPE }]} wrap={false}>
-              <View style={s.cDesc}>
-                <Text style={s.itemName}>{l.description}</Text>
-                {l.variation ? <Text style={s.itemSub}>{l.variation}</Text> : null}
+          {data.lines.map((l, i) => {
+            const rental = l.kind === 'rental' && l.rentalDays != null
+            return (
+              <View key={l.id} style={[s.row, { backgroundColor: i % 2 ? WHITE : STRIPE }]} wrap={false}>
+                <View style={s.cDesc}>
+                  <Text style={s.itemName}>{l.description}</Text>
+                  {l.variation ? <Text style={s.itemSub}>{l.variation}</Text> : null}
+                </View>
+                <Text style={[s.cell, s.cQty]}>{rental ? l.rentalItemQty : `${l.qty}${l.units > 1 ? ` × ${l.units}` : ''}`}</Text>
+                <Text style={[s.cell, s.cPeriod, { color: MUT }]}>{rental ? `${pdfShortDate(l.lotDate)} – ${pdfShortDate(l.periodEnd)}` : ''}</Text>
+                <Text style={[s.cell, s.cDays]}>{rental ? l.rentalDays : ''}</Text>
+                <Text style={[s.cell, s.cPrice, { color: MUT }]}>{fmt(l.unitRateCents)}</Text>
+                <Text style={[s.cell, s.cTot, { fontFamily: 'Helvetica-Bold' }]}>{fmt(l.amountCents)}</Text>
               </View>
-              <Text style={[s.cell, s.cQty]}>{l.qty}{l.units > 1 ? ` × ${l.units}` : ''}</Text>
-              <Text style={[s.cell, s.cPrice, { color: MUT }]}>{fmt(l.unitRateCents)}</Text>
-              <Text style={[s.cell, s.cTot, { fontFamily: 'Helvetica-Bold' }]}>{fmt(l.amountCents)}</Text>
-            </View>
-          ))}
+            )
+          })}
 
           {/* Payment info / terms + totals */}
           <View style={s.lower}>

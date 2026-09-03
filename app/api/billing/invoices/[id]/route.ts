@@ -31,6 +31,7 @@ interface InvoiceRow {
 interface LineRow {
   id: string; kind: string; description: string; item_id: string | null; variation_id: string | null
   lot_date: string | null; qty: number; units: number; unit_rate_cents: number; amount_cents: number; taxable: boolean
+  rental_item_qty: number | null; rental_days: number | null; period_end: string | null
 }
 
 export async function GET(_request: Request, { params }: { params: { id: string } }): Promise<NextResponse> {
@@ -59,7 +60,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
     const { data: lineRaw } = await supabase
       .from('billing_invoice_lines')
-      .select('id, kind, description, item_id, variation_id, lot_date, qty, units, unit_rate_cents, amount_cents, taxable')
+      .select('id, kind, description, item_id, variation_id, lot_date, qty, units, unit_rate_cents, amount_cents, taxable, rental_item_qty, rental_days, period_end')
       .eq('invoice_id', params.id)
       .order('created_at')
     const lines = (lineRaw ?? []) as LineRow[]
@@ -100,6 +101,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
           id: l.id, kind: l.kind, description: l.description, lotDate: l.lot_date,
           variation: l.variation_id ? (varName.get(l.variation_id) ?? null) : null,
           qty: Number(l.qty), units: l.units, unitRateCents: l.unit_rate_cents, amountCents: l.amount_cents, taxable: l.taxable,
+          rentalItemQty: l.rental_item_qty, rentalDays: l.rental_days, periodEnd: l.period_end,
         })),
         isAdmin: ctx.access.role === 'admin',
       },

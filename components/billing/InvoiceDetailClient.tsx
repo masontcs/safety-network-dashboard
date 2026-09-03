@@ -4,7 +4,12 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { TotalsBlock } from '@/components/billing/JobInvoicesSection'
 
-interface Line { id: string; kind: string; description: string; variation: string | null; lotDate: string | null; qty: number; units: number; unitRateCents: number; amountCents: number; taxable: boolean }
+interface Line { id: string; kind: string; description: string; variation: string | null; lotDate: string | null; qty: number; units: number; unitRateCents: number; amountCents: number; taxable: boolean; rentalItemQty: number | null; rentalDays: number | null; periodEnd: string | null }
+
+// A rental line with the new day columns present. Older invoices lack them and fall back to
+// their description text.
+const isDayRental = (l: Line) => l.kind === 'rental' && l.rentalDays != null
+const shortDate = (d: string | null) => d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit', timeZone: 'UTC' }) : ''
 interface Totals {
   rentalSubtotalCents: number; salesSubtotalCents: number; otherSubtotalCents: number
   rentalMinimumAdjustmentCents: number; subtotalCents: number; taxableBaseCents: number; taxCents: number; totalCents: number
@@ -84,16 +89,21 @@ export default function InvoiceDetailClient({ invoiceId }: { invoiceId: string }
 
       <div className="card">
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr>{['Description', 'Qty', 'Rate', 'Amount'].map((h) => <th key={h} style={{ ...th, textAlign: ['Qty', 'Rate', 'Amount'].includes(h) ? 'right' : 'left' }}>{h}</th>)}</tr></thead>
+          <thead><tr>{['Description', 'Qty', 'Rental period', 'Days', 'Rate', 'Amount'].map((h) => <th key={h} style={{ ...th, textAlign: ['Qty', 'Days', 'Rate', 'Amount'].includes(h) ? 'right' : 'left' }}>{h}</th>)}</tr></thead>
           <tbody>
-            {inv.lines.map((l) => (
-              <tr key={l.id}>
-                <td style={td}>{l.description}{l.variation ? <span style={{ color: 'var(--text-dim)', marginLeft: 6, fontSize: 11 }}>{l.variation}</span> : null}</td>
-                <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{l.qty}{l.units > 1 ? ` × ${l.units}` : ''}</td>
-                <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(l.unitRateCents)}</td>
-                <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(l.amountCents)}</td>
-              </tr>
-            ))}
+            {inv.lines.map((l) => {
+              const rental = isDayRental(l)
+              return (
+                <tr key={l.id}>
+                  <td style={td}>{l.description}{l.variation ? <span style={{ color: 'var(--text-dim)', marginLeft: 6, fontSize: 11 }}>{l.variation}</span> : null}</td>
+                  <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{rental ? l.rentalItemQty : `${l.qty}${l.units > 1 ? ` × ${l.units}` : ''}`}</td>
+                  <td style={{ ...td, textAlign: 'left', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{rental ? `${shortDate(l.lotDate)} – ${shortDate(l.periodEnd)}` : ''}</td>
+                  <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{rental ? l.rentalDays : ''}</td>
+                  <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(l.unitRateCents)}</td>
+                  <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(l.amountCents)}</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
         <TotalsBlock t={inv.totals} />

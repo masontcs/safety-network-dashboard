@@ -525,9 +525,9 @@ export type Database = {
         Relationships: []
       }
       billing_invoice_lines: {
-        Row: { id: string; invoice_id: string; ticket_id: string | null; kind: BillingInvoiceLineKind; item_id: string | null; variation_id: string | null; description: string; lot_date: string | null; qty: number; units: number; unit_rate_cents: number; amount_cents: number; taxable: boolean; created_at: string }
-        Insert: { id?: string; invoice_id: string; ticket_id?: string | null; kind: BillingInvoiceLineKind; item_id?: string | null; variation_id?: string | null; description: string; lot_date?: string | null; qty?: number; units?: number; unit_rate_cents: number; amount_cents: number; taxable?: boolean }
-        Update: { id?: string; invoice_id?: string; ticket_id?: string | null; kind?: BillingInvoiceLineKind; item_id?: string | null; variation_id?: string | null; description?: string; lot_date?: string | null; qty?: number; units?: number; unit_rate_cents?: number; amount_cents?: number; taxable?: boolean }
+        Row: { id: string; invoice_id: string; ticket_id: string | null; kind: BillingInvoiceLineKind; item_id: string | null; variation_id: string | null; description: string; lot_date: string | null; qty: number; units: number; unit_rate_cents: number; amount_cents: number; taxable: boolean; rental_item_qty: number | null; rental_days: number | null; period_end: string | null; created_at: string }
+        Insert: { id?: string; invoice_id: string; ticket_id?: string | null; kind: BillingInvoiceLineKind; item_id?: string | null; variation_id?: string | null; description: string; lot_date?: string | null; qty?: number; units?: number; unit_rate_cents: number; amount_cents: number; taxable?: boolean; rental_item_qty?: number | null; rental_days?: number | null; period_end?: string | null }
+        Update: { id?: string; invoice_id?: string; ticket_id?: string | null; kind?: BillingInvoiceLineKind; item_id?: string | null; variation_id?: string | null; description?: string; lot_date?: string | null; qty?: number; units?: number; unit_rate_cents?: number; amount_cents?: number; taxable?: boolean; rental_item_qty?: number | null; rental_days?: number | null; period_end?: string | null }
         Relationships: []
       }
       billing_quotes: {

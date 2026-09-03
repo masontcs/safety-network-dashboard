@@ -173,6 +173,9 @@ export async function POST(request: Request): Promise<NextResponse> {
         unit_rate_cents: l.unitRateCents,
         amount_cents: l.amountCents,
         taxable: l.kind === 'sale',
+        rental_item_qty: l.rentalItemQty ?? null,
+        rental_days: l.rentalDays ?? null,
+        period_end: l.periodEnd ?? null,
       }))
     )
     if (lErr) throw new Error(lErr.message)

@@ -34,8 +34,13 @@ export interface DraftLine extends InvoiceLine {
   ticketId: string | null
   itemId: string | null
   variationId: string | null
-  /** The pickup lot a rental line came from — its billing anchor. */
+  /** The pickup lot a rental line came from — its billing anchor (= the period start). */
   lotDate: string | null
+  // Display-only splits for the invoice columns (rentals). The billing truth stays in qty x
+  // units x unitRate; these just let the invoice show Qty · Start–End · Days without re-deriving.
+  rentalItemQty?: number
+  rentalDays?: number
+  periodEnd?: string | null
 }
 
 /** What to add to billing_rental_accruals once the invoice is actually issued. */
@@ -263,21 +268,30 @@ export async function buildJobInvoice(
     const plan = accrualPlan({ batches, asOf: throughDate, billingType: cadence, alreadyBilled })
 
     for (const row of plan.chargeable) {
-      const qtyUnits = isDtc.get(ticketId)
+      const dtc = isDtc.get(ticketId)
+      const qtyUnits = dtc
         ? rows.filter((r) => r.event_type === 'pickup' && r.event_date === row.start).reduce((s, r) => s + r.qty, 0)
         : row.qtyUnitsToBill
       if (qtyUnits <= 0) continue
 
+      // Display split (rentals meter in DAYS now): item quantity is the lot's pickup qty; days is
+      // this invoice's unit-days ÷ that quantity. The billed amount stays qtyUnits × per-day rate.
+      const itemQty = dtc ? qtyUnits : Math.max(1, ...row.detail.map((d) => d.qty))
+      const rentalDays = dtc ? 1 : (itemQty > 0 ? Math.round(qtyUnits / itemQty) : qtyUnits)
+      const closedEnds = row.detail.map((d) => d.end).filter((e): e is string => !!e)
+      const periodEnd = dtc ? row.start : (row.fullyClosed && closedEnds.length ? closedEnds.slice().sort().slice(-1)[0] : throughDate)
+
       lines.push({
         ...rentalLine({
-          description: `${label} — ${cadence} rental from ${row.start}`,
+          description: label, // the columns carry the dates + days now, not the description text
           itemCode: item?.code ?? '',
           variation: variation?.name ?? null,
           qty: qtyUnits,
-          units: 1, // qty-units are already qty x periods
+          units: 1, // qty-units are already qty x days — keep the billing truth here
           unitRateCents,
         }),
         ticketId, itemId, variationId, lotDate: row.start,
+        rentalItemQty: itemQty, rentalDays, periodEnd,
       })
       accruals.push({
         ticketId, itemId, variationId, lotDate: row.start,

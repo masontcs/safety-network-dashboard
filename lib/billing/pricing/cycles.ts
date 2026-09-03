@@ -44,8 +44,8 @@
  * (identical dollars either way).
  */
 import { cmpDate } from './dates';
-import { billableSpan, unitsForSpan, DEFAULT_RENTAL_OPTIONS, type Batch, type RentalDayOptions } from './rental';
-import { BILLING_TYPES, type BillingType, type ISODate } from './types';
+import { billableSpan, DEFAULT_RENTAL_OPTIONS, type Batch, type RentalDayOptions } from './rental';
+import { type BillingType, type ISODate } from './types';
 
 /** Display identity for one sub-batch. NOT used for the ledger — see LotKey. */
 export type BatchKey = string;
@@ -112,10 +112,14 @@ export function accrualPlan(params: {
   alreadyBilled?: AccrualLedger;
   options?: RentalDayOptions;
 }): AccrualPlan {
-  const { batches, asOf, billingType } = params;
+  const { batches, asOf } = params;
   const alreadyBilled = params.alreadyBilled ?? {};
   const opts = params.options ?? DEFAULT_RENTAL_OPTIONS;
-  const { rateUnit } = BILLING_TYPES[billingType];
+  // Rentals ALWAYS meter in days. The billing_type (daily/weekly/monthly) is not a period — it
+  // only selects which per-day rate applies (a longer-duration discount), and that selection
+  // happens where the rate is looked up (invoicing). So a "weekly" item out 10 days bills 10
+  // days at the weekly per-day rate, not 2 weeks. `billingType` stays on the params for callers
+  // but no longer changes the metering here.
 
   const merged = mergeBatches(batches);
 
@@ -137,8 +141,8 @@ export function accrualPlan(params: {
       // count from the pickup, not from the billing-run window.
       const span = billableSpan(b, { start: b.start, end: asOf }, opts);
       if (!span) return { qty: b.qty, days: 0, units: 0, closed: false, end: b.end, endReason: b.endReason };
-      const units = unitsForSpan(span.start, span.end, rateUnit, span.closedInWindow);
-      return { qty: b.qty, days: span.days, units, closed: span.closedInWindow, end: b.end, endReason: b.endReason };
+      // units == days: every rental is metered per day now.
+      return { qty: b.qty, days: span.days, units: span.days, closed: span.closedInWindow, end: b.end, endReason: b.endReason };
     });
 
     const cumulativeQtyUnits = detail.reduce((s, d) => s + d.qty * d.units, 0);
