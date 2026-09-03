@@ -318,8 +318,8 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
           }}
         >
           <span aria-hidden style={{ fontSize: 11, color: 'var(--text-muted)', width: 12 }}>{open ? '▾' : '▸'}</span>
-          <span style={{ fontWeight: 500, fontSize: 13.5 }}>{it.code}</span>
-          <span style={{ color: 'var(--text-muted)', fontSize: 12.5 }}>{it.name}</span>
+          <span style={{ fontWeight: 500, fontSize: 13.5 }}>{it.name}</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: 12.5 }}>{it.code}</span>
           <span style={{ ...pill, marginLeft: 'auto' }}>{summaryOf(it)}</span>
         </button>
 
