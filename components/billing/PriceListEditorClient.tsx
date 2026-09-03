@@ -197,6 +197,22 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
   const hasOverride = (grid: Grid, tierId: string | undefined, rateKey: RateKey) =>
     !!tierId && grid.overrides.some((o) => o.tierId === tierId && o.billingType === rateKey)
 
+  /** Copy one variation's whole grid (bases + locked cells) onto EVERY variation of the item,
+   *  overwriting them. For the common case where most variations share a price: price one, click
+   *  Apply to all, then tweak the few exceptions. */
+  function applyToAllVariations(key: string, sourceGridKey: string) {
+    setItems((rows) => rows.map((r) => {
+      if (r.key !== key || r.variations.length < 2) return r
+      const src = r.grids[sourceGridKey] ?? EMPTY_GRID
+      const grids = { ...r.grids }
+      for (const v of r.variations) {
+        grids[v.id] = { bases: { ...src.bases }, overrides: src.overrides.map((o) => ({ ...o })) }
+      }
+      return { ...r, grids }
+    }))
+    setSaveMsg(null)
+  }
+
   const toggleExpand = (key: string) =>
     setExpanded((s) => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n })
 
@@ -348,12 +364,22 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
             {hasVars ? (
               <>
                 <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 10 }}>
-                  This item has variations, so each variation is priced on its own.
+                  This item has variations, so each is priced on its own. Price one, then{' '}
+                  <b>Apply to all</b> to copy it to every variation — tweak the exceptions after.
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {it.variations.map((v) => (
                     <div key={v.id}>
-                      <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>{v.name}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-secondary)' }}>{v.name}</div>
+                        {it.variations.length > 1 && (
+                          <button
+                            style={{ ...ghostBtn, padding: '3px 8px', fontSize: 11 }}
+                            title="Copy this variation's rates to every variation (overwrites the others)"
+                            onClick={() => { if (confirm(`Copy ${v.name}'s rates to all ${it.variations.length} variations? This overwrites the others.`)) applyToAllVariations(it.key, v.id) }}
+                          >Apply to all →</button>
+                        )}
+                      </div>
                       {renderRateGrid(it, v.id)}
                     </div>
                   ))}
