@@ -24,6 +24,27 @@ function mondayOf(d: string): string {
   return dt.toISOString().slice(0, 10)
 }
 const addDays = (d: string, n: number) => { const dt = new Date(d + 'T00:00:00Z'); dt.setUTCDate(dt.getUTCDate() + n); return dt.toISOString().slice(0, 10) }
+const iso = (dt: Date) => dt.toISOString().slice(0, 10)
+
+type Range = 'day' | 'week' | 'month'
+
+// The [start,end] date span and the day columns to render for a given range + anchor date.
+// Week stays Mon–Fri (the work week). Day is one column. Month spans the calendar month, and
+// its `days` is every date in the month (the client lays them out as a calendar grid).
+function spanFor(range: Range, anchor: string): { start: string; end: string; days: string[] } {
+  if (range === 'day') return { start: anchor, end: anchor, days: [anchor] }
+  if (range === 'month') {
+    const dt = new Date(anchor + 'T00:00:00Z')
+    const start = iso(new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), 1)))
+    const endDt = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0))
+    const end = iso(endDt)
+    const days: string[] = []
+    for (let d = 1; d <= endDt.getUTCDate(); d++) days.push(iso(new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), d))))
+    return { start, end, days }
+  }
+  const start = mondayOf(anchor)
+  return { start, end: addDays(start, 4), days: Array.from({ length: 5 }, (_, i) => addDays(start, i)) }
+}
 
 export async function GET(request: Request): Promise<NextResponse> {
   try {
@@ -32,16 +53,19 @@ export async function GET(request: Request): Promise<NextResponse> {
     const supabase = createServiceClient()
 
     const url = new URL(request.url)
-    const weekStart = mondayOf(url.searchParams.get('week') || new Date().toISOString().slice(0, 10))
-    const weekEnd = addDays(weekStart, 4) // Mon–Fri
+    // Anchor date: prefer `date`, fall back to the legacy `week` param, else today.
+    const anchor = url.searchParams.get('date') || url.searchParams.get('week') || new Date().toISOString().slice(0, 10)
+    const rangeParam = (url.searchParams.get('range') || 'week') as Range
+    const range: Range = rangeParam === 'day' || rangeParam === 'month' ? rangeParam : 'week'
+    const { start: rangeStart, end: rangeEnd, days } = spanFor(range, anchor)
 
     const { data: techRaw } = await supabase.from('billing_technicians').select('id, name').eq('is_active', true).order('name')
     const techs = (techRaw ?? []) as { id: string; name: string }[]
 
-    let tq = supabase
+    const tq = supabase
       .from('billing_tickets')
       .select('id, ticket_number, ticket_date, feature_add, feature_return, feature_dtc, is_voided, billing_jobs(job_number, name, branch_id, billing_profiles(billing_customers(name)))')
-      .gte('ticket_date', weekStart).lte('ticket_date', weekEnd)
+      .gte('ticket_date', rangeStart).lte('ticket_date', rangeEnd)
     const { data: tkRaw } = await tq
     let tickets = (tkRaw ?? []) as unknown as {
       id: string; ticket_number: string; ticket_date: string; feature_add: boolean; feature_return: boolean; feature_dtc: boolean; is_voided: boolean
@@ -64,12 +88,29 @@ export async function GET(request: Request): Promise<NextResponse> {
       }
     }
 
-    // Yard shifts this week (no ticket). Branch-scoped when a branch is in effect; yard
+    // Per-ticket job types — carried from the shift that published the ticket (billing_shifts
+    // links back via ticket_id → billing_shift_job_types). Tickets not created from a shift have
+    // none. Powers the "group by job type" view.
+    const jobTypesByTicket = new Map<string, string[]>()
+    if (tickets.length) {
+      const { data: pubShifts } = await supabase.from('billing_shifts').select('id, ticket_id').in('ticket_id', tickets.map((t) => t.id))
+      const shiftToTicket = new Map<string, string>()
+      for (const s of (pubShifts ?? []) as { id: string; ticket_id: string | null }[]) if (s.ticket_id) shiftToTicket.set(s.id, s.ticket_id)
+      if (shiftToTicket.size) {
+        const { data: sjt } = await supabase.from('billing_shift_job_types').select('shift_id, job_type').in('shift_id', [...shiftToTicket.keys()])
+        for (const r of (sjt ?? []) as { shift_id: string; job_type: string }[]) {
+          const tid = shiftToTicket.get(r.shift_id); if (!tid) continue
+          jobTypesByTicket.set(tid, [...(jobTypesByTicket.get(tid) ?? []), r.job_type])
+        }
+      }
+    }
+
+    // Yard shifts in range (no ticket). Branch-scoped when a branch is in effect; yard
     // shifts with no branch always show (they're unassigned to a branch).
     const { data: yardRaw } = await supabase
       .from('billing_yard_shifts')
       .select('id, technician_id, branch_id, shift_date')
-      .gte('shift_date', weekStart).lte('shift_date', weekEnd)
+      .gte('shift_date', rangeStart).lte('shift_date', rangeEnd)
     let yardShifts = (yardRaw ?? []) as { id: string; technician_id: string; branch_id: string | null; shift_date: string }[]
     if (effBranchIds !== null) {
       const allow = new Set(effBranchIds)
@@ -79,8 +120,12 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json({
       success: true,
       data: {
-        weekStart,
-        days: Array.from({ length: 5 }, (_, i) => addDays(weekStart, i)),
+        range,
+        rangeStart,
+        rangeEnd,
+        // `weekStart` kept for any caller still reading it; equals rangeStart.
+        weekStart: rangeStart,
+        days,
         technicians: techs,
         yard: yardShifts.map((y) => ({ id: y.id, technicianId: y.technician_id, date: y.shift_date })),
         tickets: tickets.map((t) => ({
@@ -92,6 +137,7 @@ export async function GET(request: Request): Promise<NextResponse> {
           jobNumber: t.billing_jobs?.job_number ?? '',
           jobName: t.billing_jobs?.name ?? null,
           customer: t.billing_jobs?.billing_profiles?.billing_customers?.name ?? null,
+          jobTypes: jobTypesByTicket.get(t.id) ?? [],
         })),
         isAdmin: ctx.access.role === 'admin',
       },

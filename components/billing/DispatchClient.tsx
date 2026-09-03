@@ -1,175 +1,225 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBranch } from '@/components/billing/BranchContext'
 import ShiftEditorModal from '@/components/billing/ShiftEditorModal'
 import { useBroadcast } from '@/lib/realtime/useBroadcast'
 
 /**
- * Dispatch board — the concept's week grid: technicians as rows, Mon–Fri as columns,
- * ticket cards in the cell for (lead tech × ticket_date). Drag a card to another
- * driver row or day column to reassign the lead / move the date. Admin-only writes.
+ * Dispatch board with multiple views:
+ *   • Time range — Day / Week / Month (Month renders a calendar).
+ *   • Group by  — Technician / Customer / Job type (regroups the rows on the Day & Week grids).
+ *
+ * Rows are the group; columns are the days in the range. Drag-to-reassign and per-cell "+ dispatch"
+ * are technician-view only (they change a ticket's lead) — the other groupings are read/click views;
+ * use the header "+ Dispatch" there. Admin-only writes.
  */
 
 interface Ticket {
   id: string; ticketNumber: string; date: string; leadTechId: string | null; crewTechIds: string[]
-  feature: 'add' | 'return' | 'dtc'; jobNumber: string; jobName: string | null; customer: string | null; voided?: boolean
+  feature: 'add' | 'return' | 'dtc'; jobNumber: string; jobName: string | null; customer: string | null; jobTypes: string[]; voided?: boolean
 }
 interface YardShift { id: string; technicianId: string; date: string }
 interface StagedShift { id: string; date: string; isYard: boolean; crewTechIds: string[]; leadTechId: string | null; jobNumber: string | null; jobName: string | null; customer: string | null; jobTypes: string[] }
-interface Board { weekStart: string; days: string[]; technicians: { id: string; name: string }[]; tickets: Ticket[]; yard: YardShift[]; isAdmin: boolean }
+type Range = 'day' | 'week' | 'month'
+type GroupBy = 'tech' | 'customer' | 'jobtype'
+interface Board { range: Range; rangeStart: string; rangeEnd: string; days: string[]; technicians: { id: string; name: string }[]; tickets: Ticket[]; yard: YardShift[]; isAdmin: boolean }
 
 const addDays = (d: string, n: number) => { const dt = new Date(d + 'T00:00:00Z'); dt.setUTCDate(dt.getUTCDate() + n); return dt.toISOString().slice(0, 10) }
-const dayLabel = (d: string) => { const dt = new Date(d + 'T00:00:00Z'); return dt.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', timeZone: 'UTC' }) }
+const addMonths = (d: string, n: number) => { const dt = new Date(d + 'T00:00:00Z'); dt.setUTCMonth(dt.getUTCMonth() + n); return dt.toISOString().slice(0, 10) }
+const today = () => new Date().toISOString().slice(0, 10)
+const dayCol = (d: string) => { const dt = new Date(d + 'T00:00:00Z'); return dt.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', timeZone: 'UTC' }) }
+const dayLong = (d: string) => { const dt = new Date(d + 'T00:00:00Z'); return dt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' }) }
+const monthLabel = (d: string) => { const dt = new Date(d + 'T00:00:00Z'); return dt.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }) }
 const initials = (name: string) => name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 const featureClass = (f: Ticket['feature']) => (f === 'return' ? 'blue' : f === 'dtc' ? 'amber' : '')
 const featureLabel = (f: Ticket['feature']) => (f === 'return' ? 'pickup' : f === 'dtc' ? 'DTC' : 'set up')
 
-// Cards for the "no lead assigned" row live in a synthetic technician id.
 const UNASSIGNED = '__unassigned__'
+const NO_CUSTOMER = '__nocustomer__'
+const NO_JOBTYPE = '__nojobtype__'
 
 export default function DispatchClient() {
   const [board, setBoard] = useState<Board | null>(null)
   const [staged, setStaged] = useState<StagedShift[]>([])
   const [err, setErr] = useState<string | null>(null)
-  const [week, setWeek] = useState<string>(() => new Date().toISOString().slice(0, 10))
+  const [range, setRange] = useState<Range>('week')
+  const [groupBy, setGroupBy] = useState<GroupBy>('tech')
+  const [anchor, setAnchor] = useState<string>(today())
   const [toast, setToast] = useState<string | null>(null)
   const [dispatchCell, setDispatchCell] = useState<{ techId: string | null; date: string } | null>(null)
-  const [generalDispatch, setGeneralDispatch] = useState(false)
+  const [generalDispatch, setGeneralDispatch] = useState<{ date: string } | null>(null)
   const [editShiftId, setEditShiftId] = useState<string | null>(null)
   const drag = useRef<Ticket | null>(null)
   const router = useRouter()
   const { branchId } = useBranch()
 
-  const load = useCallback((w: string, silent = false) => {
-    if (!silent) setBoard(null) // a background ping refreshes in place — no blank flash
+  const load = useCallback((r: Range, a: string, silent = false) => {
+    if (!silent) setBoard(null)
     const bq = branchId ? `&branchId=${branchId}` : ''
-    fetch(`/api/billing/dispatch?week=${w}${bq}`).then((r) => r.json())
+    fetch(`/api/billing/dispatch?range=${r}&date=${a}${bq}`).then((res) => res.json())
       .then((j) => { if (!j.success) throw new Error(j.error); setBoard(j.data) })
       .catch((e: Error) => setErr(e.message))
-    // Staged shifts (drafts) live alongside published tickets on the board.
-    fetch(`/api/billing/shifts?week=${w}&status=staged${bq}`).then((r) => r.json())
+    // Staged drafts for the anchor's week (they're near-term); shown on the grid where dates match.
+    fetch(`/api/billing/shifts?week=${a}&status=staged${bq}`).then((res) => res.json())
       .then((j) => { if (j.success) setStaged(j.data) }).catch(() => {})
   }, [branchId])
-  useEffect(() => { load(week) }, [week, load])
-  // Live: refetch the instant anyone dispatches / reassigns / yards, or a ticket is
-  // created or voided (a void greys / drops the card here).
-  useBroadcast('billing', 'changed', () => load(week, true))
+  useEffect(() => { load(range, anchor) }, [range, anchor, load])
+  useBroadcast('billing', 'changed', () => load(range, anchor, true))
 
   function flash(msg: string) { setToast(msg); setTimeout(() => setToast(null), 2200) }
 
   async function reassign(t: Ticket, techId: string | null, date: string) {
     const technicianId = techId === UNASSIGNED ? null : techId
     if (t.leadTechId === (technicianId ?? null) && t.date === date) return
-    // Optimistic: move the card locally, roll back on failure. The old lead stays on the
-    // crew (demoted, not removed); the new lead joins the crew if not already on it.
     setBoard((b) => b && { ...b, tickets: b.tickets.map((x) => (x.id === t.id
       ? { ...x, leadTechId: technicianId, date, crewTechIds: technicianId && !x.crewTechIds.includes(technicianId) ? [...x.crewTechIds, technicianId] : x.crewTechIds }
       : x)) })
     const res = await fetch('/api/billing/dispatch', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticketId: t.id, technicianId, ticketDate: date }),
-    }).then((r) => r.json()).catch(() => ({ success: false, error: 'network' }))
-    if (!res.success) { flash('Could not reassign — reloading.'); load(week) }
+    }).then((r) => r.json()).catch(() => ({ success: false }))
+    if (!res.success) { flash('Could not reassign — reloading.'); load(range, anchor) }
     else flash('Reassigned — driver notified.')
   }
 
-  // A ticket appears under EVERY crew member assigned to it. Tickets with no crew at all
-  // fall into the Unassigned row so nothing is hidden.
-  const cardsFor = (techId: string, day: string) =>
-    (board?.tickets ?? []).filter((t) => t.date === day && (techId === UNASSIGNED ? t.crewTechIds.length === 0 : t.crewTechIds.includes(techId)))
-  const yardFor = (techId: string, day: string) =>
-    (board?.yard ?? []).filter((y) => y.date === day && y.technicianId === techId)
-  // Staged shifts show under each crew member (or Unassigned if no crew yet).
-  const stagedFor = (techId: string, day: string) =>
-    staged.filter((s) => s.date === day && (techId === UNASSIGNED ? s.crewTechIds.length === 0 : s.crewTechIds.includes(techId)))
-
   async function publishShift(id: string) {
     const res = await fetch(`/api/billing/shifts/${id}/publish`, { method: 'POST' }).then((r) => r.json()).catch(() => ({ success: false }))
-    if (!res.success) { flash(res.error || 'Could not publish — reloading.'); load(week) }
+    if (!res.success) { flash(res.error || 'Could not publish — reloading.'); load(range, anchor) }
     else flash(res.data?.ticketNumber ? `Published — ticket ${res.data.ticketNumber}.` : 'Shift published.')
   }
   async function deleteShift(id: string) {
-    // Draft-only; optimistic. (Published shifts can't be deleted — void the ticket instead.)
     setStaged((s) => s.filter((x) => x.id !== id))
     const res = await fetch(`/api/billing/shifts/${id}`, { method: 'DELETE' }).then((r) => r.json()).catch(() => ({ success: false }))
-    if (!res.success) { flash('Could not delete — reloading.'); load(week) }
+    if (!res.success) { flash('Could not delete — reloading.'); load(range, anchor) }
     else flash('Staged shift deleted.')
   }
-
   async function removeYard(id: string) {
     setBoard((b) => b && { ...b, yard: b.yard.filter((y) => y.id !== id) })
-    const res = await fetch(`/api/billing/dispatch/assign?yardShiftId=${id}`, { method: 'DELETE' })
-      .then((r) => r.json()).catch(() => ({ success: false }))
-    if (!res.success) { flash('Could not remove yard shift — reloading.'); load(week) }
+    const res = await fetch(`/api/billing/dispatch/assign?yardShiftId=${id}`, { method: 'DELETE' }).then((r) => r.json()).catch(() => ({ success: false }))
+    if (!res.success) { flash('Could not remove yard shift — reloading.'); load(range, anchor) }
     else flash('Yard shift removed.')
   }
 
-  const weekRangeLabel = board
-    ? `${new Date(board.weekStart + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' })}`
-    : ''
+  // Prev/next step by the active range.
+  const step = (dir: -1 | 1) => setAnchor((a) => range === 'month' ? addMonths(a, dir) : range === 'day' ? addDays(a, dir) : addDays(a, dir * 7))
+  const days = board?.days ?? []
+  const isTech = groupBy === 'tech'
+
+  // Rows for the current grouping. Tech: technicians + Unassigned. Customer/Job type: the distinct
+  // values present in this range (published + staged), plus a catch-all row so nothing hides.
+  const rows = useMemo<{ key: string; label: string; sub?: string }[]>(() => {
+    if (!board) return []
+    if (groupBy === 'tech') return [...board.technicians.map((t) => ({ key: t.id, label: t.name })), { key: UNASSIGNED, label: 'Unassigned' }]
+    if (groupBy === 'customer') {
+      const set = new Map<string, string>()
+      board.tickets.forEach((t) => { if (t.customer) set.set(t.customer, t.customer) })
+      staged.forEach((s) => { if (s.customer) set.set(s.customer, s.customer) })
+      const list = [...set.values()].sort((a, b) => a.localeCompare(b)).map((c) => ({ key: c, label: c }))
+      return [...list, { key: NO_CUSTOMER, label: 'No customer' }]
+    }
+    const set = new Set<string>()
+    board.tickets.forEach((t) => t.jobTypes.forEach((j) => set.add(j)))
+    staged.forEach((s) => s.jobTypes.forEach((j) => set.add(j)))
+    const list = [...set].sort((a, b) => a.localeCompare(b)).map((j) => ({ key: j, label: j }))
+    return [...list, { key: NO_JOBTYPE, label: 'No job type' }]
+  }, [board, staged, groupBy])
+
+  // Membership tests for a row × day.
+  const ticketIn = (t: Ticket, key: string) =>
+    groupBy === 'tech' ? (key === UNASSIGNED ? t.crewTechIds.length === 0 : t.crewTechIds.includes(key))
+    : groupBy === 'customer' ? (t.customer ?? NO_CUSTOMER) === key
+    : (t.jobTypes.length ? t.jobTypes.includes(key) : key === NO_JOBTYPE)
+  const stagedIn = (s: StagedShift, key: string) =>
+    groupBy === 'tech' ? (key === UNASSIGNED ? s.crewTechIds.length === 0 : s.crewTechIds.includes(key))
+    : groupBy === 'customer' ? (s.customer ?? NO_CUSTOMER) === key
+    : (s.jobTypes.length ? s.jobTypes.includes(key) : key === NO_JOBTYPE)
+
+  const cardsFor = (key: string, day: string) => (board?.tickets ?? []).filter((t) => t.date === day && ticketIn(t, key))
+  const yardFor = (key: string, day: string) => (groupBy === 'tech' ? (board?.yard ?? []).filter((y) => y.date === day && y.technicianId === key) : [])
+  const stagedFor = (key: string, day: string) => staged.filter((s) => s.date === day && stagedIn(s, key))
 
   if (err) return <div style={{ color: 'var(--danger)', fontSize: 13 }}>Failed to load dispatch: {err}</div>
 
-  // Technician rows plus an Unassigned row so nothing is hidden.
-  const rows: { id: string; name: string }[] = [
-    ...(board?.technicians ?? []),
-    { id: UNASSIGNED, name: 'Unassigned' },
-  ]
-  const days = board?.days ?? Array.from({ length: 5 }, (_, i) => addDays(week, i))
+  const rangeTitle = !board ? '…'
+    : range === 'day' ? dayLong(anchor)
+    : range === 'month' ? monthLabel(anchor)
+    : `Week of ${new Date(board.rangeStart + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' })}`
+
+  const seg = (r: Range, label: string) => (
+    <button type="button" className={`bx-btn ${range === r ? 'accent' : 'ghost'} sm`} onClick={() => setRange(r)}>{label}</button>
+  )
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 220 }}>
           <h1 className="bx-h1">Dispatch</h1>
           <div className="bx-sub">
-            Week of {weekRangeLabel || '…'}{board?.isAdmin ? ' · drag a ticket to another driver or day.' : ' · read-only.'}
+            {rangeTitle}{board?.isAdmin && isTech && range !== 'month' ? ' · drag a ticket to another driver or day.' : ''}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button className="bx-btn ghost" onClick={() => setWeek(addDays(week, -7))}>‹ Prev</button>
-          <button className="bx-btn ghost" onClick={() => setWeek(new Date().toISOString().slice(0, 10))}>This week</button>
-          <button className="bx-btn ghost" onClick={() => setWeek(addDays(week, 7))}>Next ›</button>
-          {board?.isAdmin && (
-            <button className="bx-btn accent" style={{ marginLeft: 6 }} onClick={() => setGeneralDispatch(true)}>+ Dispatch</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 4 }}>{seg('day', 'Day')}{seg('week', 'Week')}{seg('month', 'Month')}</div>
+          {range !== 'month' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted)' }}>
+              Group by
+              <select className="bx-f bx-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupBy)} style={{ padding: '5px 8px', fontSize: 12.5 }}>
+                <option value="tech">Technician</option>
+                <option value="customer">Customer</option>
+                <option value="jobtype">Job type</option>
+              </select>
+            </label>
           )}
-        </div>
-      </div>
-
-      <div className="card" style={{ marginTop: 14, padding: 0 }}>
-        <div className="bx-board">
-          <div className="bx-week">
-            <div className="hcell">Driver</div>
-            {days.map((d) => <div className="hcell" key={d}>{dayLabel(d)}</div>)}
-
-            {rows.map((tech) => (
-              <DispatchRow
-                key={tech.id}
-                tech={tech}
-                days={days}
-                loading={!board}
-                cardsFor={cardsFor}
-                yardFor={yardFor}
-                stagedFor={stagedFor}
-                onRemoveYard={removeYard}
-                onPublishShift={publishShift}
-                onEditShift={(id) => setEditShiftId(id)}
-                onDeleteShift={deleteShift}
-                canDrag={!!board?.isAdmin}
-                onDragStart={(t) => { drag.current = t }}
-                onDrop={(techId, day) => { if (drag.current) { reassign(drag.current, techId, day); drag.current = null } }}
-                onOpen={(t) => router.push(`/billing/tickets/${t.id}`)}
-                onDispatch={(techId, day) => setDispatchCell({ techId: techId === UNASSIGNED ? null : techId, date: day })}
-              />
-            ))}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <button className="bx-btn ghost" onClick={() => step(-1)}>‹</button>
+            <button className="bx-btn ghost" onClick={() => setAnchor(today())}>Today</button>
+            <button className="bx-btn ghost" onClick={() => step(1)}>›</button>
+            {board?.isAdmin && <button className="bx-btn accent" onClick={() => setGeneralDispatch({ date: range === 'month' ? today() : anchor })}>+ Dispatch</button>}
           </div>
         </div>
       </div>
 
-      {board && board.tickets.length === 0 && (
-        <div className="bx-empty" style={{ marginTop: 10 }}>No tickets scheduled this week.</div>
+      {range === 'month'
+        ? <MonthCalendar days={days} anchor={anchor} board={board} staged={staged}
+            onPickDay={(d) => { setAnchor(d); setRange('day') }} />
+        : (
+          <div className="card" style={{ marginTop: 14, padding: 0 }}>
+            <div className="bx-board">
+              <div className="bx-week" style={{ gridTemplateColumns: `170px repeat(${days.length}, minmax(150px,1fr))`, minWidth: 170 + days.length * 150 }}>
+                <div className="hcell">{groupBy === 'tech' ? 'Driver' : groupBy === 'customer' ? 'Customer' : 'Job type'}</div>
+                {days.map((d) => <div className="hcell" key={d}>{dayCol(d)}</div>)}
+
+                {rows.map((row) => (
+                  <GridRow
+                    key={row.key}
+                    row={row}
+                    days={days}
+                    loading={!board}
+                    groupBy={groupBy}
+                    cardsFor={cardsFor}
+                    yardFor={yardFor}
+                    stagedFor={stagedFor}
+                    onRemoveYard={removeYard}
+                    onPublishShift={publishShift}
+                    onEditShift={(id) => setEditShiftId(id)}
+                    onDeleteShift={deleteShift}
+                    canDrag={!!board?.isAdmin && isTech}
+                    canDispatch={!!board?.isAdmin && isTech}
+                    onDragStart={(t) => { drag.current = t }}
+                    onDrop={(key, day) => { if (drag.current) { reassign(drag.current, key, day); drag.current = null } }}
+                    onOpen={(t) => router.push(`/billing/tickets/${t.id}`)}
+                    onDispatch={(key, day) => setDispatchCell({ techId: key === UNASSIGNED ? null : key, date: day })}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+      {board && board.tickets.length === 0 && staged.length === 0 && range !== 'month' && (
+        <div className="bx-empty" style={{ marginTop: 10 }}>Nothing scheduled in this {range}.</div>
       )}
 
       {toast && <div className="bx-toast">{toast}</div>}
@@ -184,103 +234,99 @@ export default function DispatchClient() {
             .filter((t) => t.date === dispatchCell.date)
             .map((t) => ({ id: t.id, ticketNumber: t.ticketNumber, jobNumber: t.jobNumber, jobName: t.jobName, customer: t.customer, voided: t.voided }))}
           onClose={() => setDispatchCell(null)}
-          onDone={(msg) => { setDispatchCell(null); flash(msg); load(week) }}
+          onDone={(msg) => { setDispatchCell(null); flash(msg); load(range, anchor) }}
         />
       )}
 
       {generalDispatch && board && (
         <ShiftEditorModal
-          date={new Date().toISOString().slice(0, 10)}
+          date={generalDispatch.date}
           technicianId={null}
           technicians={board.technicians}
           branchId={branchId ?? null}
           pickDate
           ticketsForDay={[]}
-          onClose={() => setGeneralDispatch(false)}
-          onDone={(msg) => { setGeneralDispatch(false); flash(msg); load(week) }}
+          onClose={() => setGeneralDispatch(null)}
+          onDone={(msg) => { setGeneralDispatch(null); flash(msg); load(range, anchor) }}
         />
       )}
 
       {editShiftId && board && (
         <ShiftEditorModal
-          date={staged.find((s) => s.id === editShiftId)?.date ?? week}
+          date={staged.find((s) => s.id === editShiftId)?.date ?? anchor}
           technicianId={null}
           technicians={board.technicians}
           branchId={branchId ?? null}
           editShiftId={editShiftId}
           ticketsForDay={[]}
           onClose={() => setEditShiftId(null)}
-          onDone={(msg) => { setEditShiftId(null); flash(msg); load(week) }}
+          onDone={(msg) => { setEditShiftId(null); flash(msg); load(range, anchor) }}
         />
       )}
     </div>
   )
 }
 
-function DispatchRow({ tech, days, loading, cardsFor, yardFor, stagedFor, onRemoveYard, onPublishShift, onEditShift, onDeleteShift, canDrag, onDragStart, onDrop, onOpen, onDispatch }: {
-  tech: { id: string; name: string }; days: string[]; loading: boolean; canDrag: boolean
-  cardsFor: (techId: string, day: string) => Ticket[]
-  yardFor: (techId: string, day: string) => YardShift[]
-  stagedFor: (techId: string, day: string) => StagedShift[]
+/* ─── One grouped row (tech / customer / job type) across the day columns ───────────── */
+function GridRow({ row, days, loading, groupBy, cardsFor, yardFor, stagedFor, onRemoveYard, onPublishShift, onEditShift, onDeleteShift, canDrag, canDispatch, onDragStart, onDrop, onOpen, onDispatch }: {
+  row: { key: string; label: string }; days: string[]; loading: boolean; groupBy: GroupBy; canDrag: boolean; canDispatch: boolean
+  cardsFor: (key: string, day: string) => Ticket[]
+  yardFor: (key: string, day: string) => YardShift[]
+  stagedFor: (key: string, day: string) => StagedShift[]
   onRemoveYard: (id: string) => void
   onPublishShift: (id: string) => void; onEditShift: (id: string) => void; onDeleteShift: (id: string) => void
-  onDragStart: (t: Ticket) => void; onDrop: (techId: string, day: string) => void; onOpen: (t: Ticket) => void
-  onDispatch: (techId: string, day: string) => void
+  onDragStart: (t: Ticket) => void; onDrop: (key: string, day: string) => void; onOpen: (t: Ticket) => void
+  onDispatch: (key: string, day: string) => void
 }) {
   const [over, setOver] = useState<string | null>(null)
-  const isUnassigned = tech.id === UNASSIGNED
+  const muted = row.key === UNASSIGNED || row.key === NO_CUSTOMER || row.key === NO_JOBTYPE
   return (
     <>
       <div className="drv">
-        {!isUnassigned && <span className="avatar" style={{ width: 26, height: 26, fontSize: 11 }}>{initials(tech.name)}</span>}
-        <span style={{ color: isUnassigned ? 'var(--dim)' : 'inherit' }}>{tech.name}</span>
+        {groupBy === 'tech' && !muted && <span className="avatar" style={{ width: 26, height: 26, fontSize: 11 }}>{initials(row.label)}</span>}
+        <span style={{ color: muted ? 'var(--dim)' : 'inherit' }}>{row.label}</span>
       </div>
       {days.map((day) => {
-        const cards = loading ? [] : cardsFor(tech.id, day)
-        const yard = loading ? [] : yardFor(tech.id, day)
-        const stagedCards = loading ? [] : stagedFor(tech.id, day)
+        const cards = loading ? [] : cardsFor(row.key, day)
+        const yard = loading ? [] : yardFor(row.key, day)
+        const stagedCards = loading ? [] : stagedFor(row.key, day)
+        const hasContent = cards.length + yard.length + stagedCards.length > 0
         return (
           <div
             key={day}
             className={`dcell${over === day ? ' over' : ''}`}
             onDragOver={canDrag ? (e) => { e.preventDefault(); setOver(day) } : undefined}
             onDragLeave={canDrag ? () => setOver(null) : undefined}
-            onDrop={canDrag ? (e) => { e.preventDefault(); setOver(null); onDrop(tech.id, day) } : undefined}
+            onDrop={canDrag ? (e) => { e.preventDefault(); setOver(null); onDrop(row.key, day) } : undefined}
           >
             {cards.map((t) => {
-              // Only the lead's card (or an unassigned ticket) is draggable — dragging
-              // reassigns the LEAD, so it must be unambiguous which instance you're moving.
-              const isLead = t.leadTechId === tech.id
-              // A voided ticket isn't work to schedule — show it greyed and don't let it drag.
-              const dragThis = canDrag && (isUnassigned || isLead) && !t.voided
+              const isLead = t.leadTechId === row.key
+              const dragThis = canDrag && (row.key === UNASSIGNED || isLead) && !t.voided
               return (
                 <div
                   key={t.id}
                   className={`tk ${featureClass(t.feature)}`}
-                  style={t.voided ? { opacity: 0.4, textDecoration: 'line-through' } : (!isUnassigned && !isLead ? { opacity: 0.72 } : undefined)}
+                  style={t.voided ? { opacity: 0.4, textDecoration: 'line-through' } : (groupBy === 'tech' && row.key !== UNASSIGNED && !isLead ? { opacity: 0.72 } : undefined)}
                   draggable={dragThis}
                   onDragStart={dragThis ? () => onDragStart(t) : undefined}
                   onClick={() => onOpen(t)}
-                  title={t.voided ? `${t.ticketNumber} · voided` : dragThis ? `${t.ticketNumber} · drag to reassign / open` : `${t.ticketNumber} · on crew · open`}
+                  title={t.voided ? `${t.ticketNumber} · voided` : `${t.ticketNumber} · open`}
                 >
-                  <b>{(t.customer ?? t.jobName ?? t.jobNumber) + ' — ' + featureLabel(t.feature)}{t.voided ? ' · VOID' : !isUnassigned && isLead ? ' ·lead' : ''}</b>
-                  <small>{t.jobName && t.customer ? t.jobName : t.jobNumber}</small>
+                  <b>{(t.customer ?? t.jobName ?? t.jobNumber) + ' — ' + featureLabel(t.feature)}{t.voided ? ' · VOID' : (groupBy === 'tech' && row.key !== UNASSIGNED && isLead ? ' ·lead' : '')}</b>
+                  <small>{groupBy === 'customer' ? (t.jobName ?? t.jobNumber) : groupBy === 'jobtype' ? (t.customer ?? t.jobNumber) : (t.jobName && t.customer ? t.jobName : t.jobNumber)}</small>
                 </div>
               )
             })}
             {yard.map((y) => (
-              <div key={y.id} className="tk" style={{ background: 'var(--bg-secondary, #eee)', border: '1px solid var(--border, #ddd)', color: 'var(--text-secondary, #555)' }}
-                title="Yard shift — no ticket">
-                <b>YARD{canDrag ? '' : ''}</b>
+              <div key={y.id} className="tk" style={{ background: 'var(--bg-secondary, #eee)', border: '1px solid var(--border, #ddd)', color: 'var(--text-secondary, #555)' }} title="Yard shift — no ticket">
+                <b>YARD</b>
                 {canDrag && <small onClick={(e) => { e.stopPropagation(); onRemoveYard(y.id) }} style={{ cursor: 'pointer', color: 'var(--danger, #c0392b)' }}>remove</small>}
               </div>
             ))}
-            {/* Staged shifts (drafts) — dashed, not yet published. Only the lead's cell shows actions. */}
             {stagedCards.map((s) => {
-              const showActions = canDrag && (tech.id === UNASSIGNED || s.leadTechId === tech.id || (s.crewTechIds.length > 0 && s.crewTechIds[0] === tech.id && !s.leadTechId))
+              const showActions = canDispatch && (row.key === UNASSIGNED || s.leadTechId === row.key || (s.crewTechIds.length > 0 && s.crewTechIds[0] === row.key && !s.leadTechId) || groupBy !== 'tech')
               return (
-                <div key={s.id} className="tk" style={{ background: 'transparent', border: '1px dashed var(--accent, #b8860b)', color: 'var(--text-secondary, #555)' }}
-                  title="Staged shift — not published yet">
+                <div key={s.id} className="tk" style={{ background: 'transparent', border: '1px dashed var(--accent, #b8860b)', color: 'var(--text-secondary, #555)' }} title="Staged shift — not published yet">
                   <b>{(s.isYard ? 'YARD' : (s.customer ?? s.jobName ?? s.jobNumber ?? 'Shift'))} · STAGED</b>
                   <small>{s.isYard ? 'yard shift (draft)' : (s.jobTypes.length ? s.jobTypes.join(', ') : (s.jobNumber ?? ''))}</small>
                   {showActions && (
@@ -293,23 +339,63 @@ function DispatchRow({ tech, days, loading, cardsFor, yardFor, stagedFor, onRemo
                 </div>
               )
             })}
-            {canDrag && (() => {
-              const hasContent = cards.length + yard.length + stagedCards.length > 0
-              return (
-                <button
-                  type="button"
-                  className="dcell-add"
-                  onClick={() => onDispatch(tech.id, day)}
-                  title="Dispatch a tech to this day"
-                  // Centered in the cell: horizontally always, and vertically too when the cell is
-                  // empty (margin:auto in a flex column). With cards above, it sits centered below them.
-                  style={{ alignSelf: 'center', margin: hasContent ? '4px auto 0' : 'auto', background: 'transparent', border: '1px dashed var(--border, #d8d5cc)', borderRadius: 6, color: 'var(--dim, #999)', fontSize: 11, padding: '3px 12px', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                >+ dispatch</button>
-              )
-            })()}
+            {canDispatch && (
+              <button type="button" className="dcell-add" onClick={() => onDispatch(row.key, day)} title="Dispatch a tech to this day"
+                style={{ alignSelf: 'center', margin: hasContent ? '4px auto 0' : 'auto', background: 'transparent', border: '1px dashed var(--border, #d8d5cc)', borderRadius: 6, color: 'var(--dim, #999)', fontSize: 11, padding: '3px 12px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >+ dispatch</button>
+            )}
           </div>
         )
       })}
     </>
+  )
+}
+
+/* ─── Month calendar: a cell per day with a shift count + a few chips; click to open the day ── */
+function MonthCalendar({ days, anchor, board, staged, onPickDay }: {
+  days: string[]; anchor: string; board: Board | null; staged: StagedShift[]
+  onPickDay: (d: string) => void
+}) {
+  // Pad the month to whole Mon–Sun weeks.
+  const dow = (d: string) => (new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7 // 0 = Mon
+  const cells: (string | null)[] = []
+  if (days.length) { for (let i = 0; i < dow(days[0]); i++) cells.push(null) }
+  days.forEach((d) => cells.push(d))
+  while (cells.length % 7 !== 0) cells.push(null)
+  const t0 = today()
+
+  const countFor = (d: string) => (board?.tickets.filter((t) => t.date === d && !t.voided).length ?? 0) + staged.filter((s) => s.date === d).length + (board?.yard.filter((y) => y.date === d).length ?? 0)
+  const chipsFor = (d: string) => (board?.tickets.filter((t) => t.date === d && !t.voided) ?? []).slice(0, 3)
+
+  return (
+    <div className="card" style={{ marginTop: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0,1fr))', gap: 1, background: 'var(--line)', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
+        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((w) => (
+          <div key={w} style={{ background: 'var(--surface)', padding: '8px 10px', fontSize: 11, fontWeight: 600, color: 'var(--muted)' }}>{w}</div>
+        ))}
+        {cells.map((d, i) => {
+          if (!d) return <div key={i} style={{ background: 'var(--bg, #faf9f7)', minHeight: 96 }} />
+          const n = countFor(d)
+          const chips = chipsFor(d)
+          const isToday = d === t0
+          return (
+            <button key={d} type="button" onClick={() => onPickDay(d)}
+              style={{ textAlign: 'left', background: 'var(--surface)', minHeight: 96, padding: 8, border: 'none', borderTop: isToday ? '2px solid var(--accent)' : '2px solid transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}
+              title={`${dayLong(d)} — ${n} shift${n === 1 ? '' : 's'}`}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12.5, fontWeight: isToday ? 700 : 500, color: isToday ? 'var(--accent)' : 'var(--ink)' }}>{new Date(d + 'T00:00:00Z').getUTCDate()}</span>
+                {n > 0 && <span style={{ fontSize: 10.5, fontWeight: 700, color: '#fff', background: 'var(--accent)', borderRadius: 999, padding: '0 6px', lineHeight: '16px' }}>{n}</span>}
+              </div>
+              {chips.map((t) => (
+                <span key={t.id} className={`tk ${featureClass(t.feature)}`} style={{ margin: 0, fontSize: 10.5, padding: '2px 5px', cursor: 'pointer' }}>
+                  <b style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.customer ?? t.jobName ?? t.jobNumber}</b>
+                </span>
+              ))}
+              {n > chips.length && <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>+{n - chips.length} more</span>}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
