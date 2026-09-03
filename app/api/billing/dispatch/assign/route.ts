@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { nextNumber } from '@/lib/billing/rpc'
 import { broadcastDispatchChanged } from '@/lib/realtime/broadcast'
+import { sendPushToTechnicians } from '@/lib/push/send'
 
 /**
  * Dispatch → ticket assignment. This is the hub of the tech workflow: dispatching a tech to
@@ -55,6 +56,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         )
       if (error) throw new Error(error.message)
       await broadcastDispatchChanged()
+      const yLabel = new Date(body.date + 'T00:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
+      await sendPushToTechnicians(techIds, { title: 'Yard shift scheduled', body: `You’re scheduled for the yard on ${yLabel}.`, url: '/tech', tag: `yard-${body.date}` })
       return NextResponse.json({ success: true, data: { yard: true, count: techIds.length } })
     }
 
@@ -127,6 +130,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     await broadcastDispatchChanged()
+
+    // Notify only the techs newly added to this ticket that they've been scheduled.
+    if (toAdd.length) {
+      const dLabel = body.date ? new Date(body.date + 'T00:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }) : null
+      await sendPushToTechnicians(toAdd, {
+        title: 'You’re scheduled',
+        body: dLabel ? `New shift on ${dLabel}. Tap to view.` : 'You’ve been added to a shift. Tap to view.',
+        url: '/tech',
+        tag: `ticket-${ticketId}`,
+      })
+    }
+
     return NextResponse.json({ success: true, data: { ticketId, ticketNumber, added: toAdd.length } })
   } catch (err) {
     return billingApiError(err)

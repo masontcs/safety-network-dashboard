@@ -3,6 +3,7 @@ import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { broadcastDispatchChanged } from '@/lib/realtime/broadcast'
+import { sendPushToTechnicians } from '@/lib/push/send'
 
 /**
  * Dispatch board — the week's tickets by lead technician × day.
@@ -164,10 +165,14 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     if (!t) return bad('Ticket not found', 'NOT_FOUND', 404)
     if (ctx.access.branchIds !== null && (!t.billing_jobs || !ctx.access.branchIds.includes(t.billing_jobs.branch_id))) return bad('No access to this branch.', 'FORBIDDEN', 403)
 
-    // Move the date (dropping on another day column).
+    // Move the date (dropping on another day column). Notify the crew their shift moved.
     if (body.ticketDate) {
       const { error } = await supabase.from('billing_tickets').update({ ticket_date: body.ticketDate }).eq('id', body.ticketId)
       if (error) throw new Error(error.message)
+      const { data: crewRows } = await supabase.from('billing_ticket_assignments').select('technician_id').eq('ticket_id', body.ticketId)
+      const crewIds = ((crewRows ?? []) as { technician_id: string }[]).map((c) => c.technician_id)
+      const moved = new Date(body.ticketDate + 'T00:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
+      await sendPushToTechnicians(crewIds, { title: 'Shift moved', body: `Your shift was moved to ${moved}.`, url: '/tech', tag: `ticket-${body.ticketId}` })
     }
 
     // Reassign the lead technician. Demote whoever is currently lead, then make the target

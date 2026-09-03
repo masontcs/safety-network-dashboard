@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { nextNumber } from '@/lib/billing/rpc'
 import { broadcastBillingChanged } from '@/lib/realtime/broadcast'
+import { sendPushToTechnicians } from '@/lib/push/send'
 
 /**
  * Publish a staged shift. This is what turns a draft into live work:
@@ -97,6 +98,16 @@ export async function POST(_request: Request, { params }: { params: { id: string
     if (uErr) throw new Error(uErr.message)
 
     await broadcastBillingChanged()
+
+    // Notify the crew they've been scheduled (best-effort; never blocks the publish).
+    const dateLabel = new Date(shift.shift_date + 'T00:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
+    await sendPushToTechnicians(crew.map((c) => c.technician_id), {
+      title: shift.job_id ? 'New shift scheduled' : 'Yard shift scheduled',
+      body: `You’re scheduled for ${dateLabel}. Tap to view and acknowledge.`,
+      url: '/tech',
+      tag: `shift-${shift.id}`,
+    })
+
     return NextResponse.json({ success: true, data: { ticketId, ticketNumber } })
   } catch (err) {
     return billingApiError(err)

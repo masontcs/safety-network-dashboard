@@ -1,8 +1,18 @@
 import { redirect } from 'next/navigation'
+import type { Metadata, Viewport } from 'next'
 import { createServerClient } from '@/lib/supabase/server'
 import type { Role } from '@/lib/supabase/database.types'
 import { hasFieldAccess, canUseDashboards, canUseBilling } from '@/lib/utils/interfaces'
+import PwaBoot from '@/components/tech/PwaBoot'
 import './tech.css'
+
+// The tech app is an installable PWA (manifest + service worker) so it can receive web-push
+// notifications. Scoped to /tech; the manifest link only appears on these pages.
+export const metadata: Metadata = {
+  manifest: '/manifest.json',
+  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'SN Field' },
+}
+export const viewport: Viewport = { themeColor: '#14181f' }
 
 /**
  * Gate the whole /tech subtree once, here — the second of two independent gates
@@ -34,6 +44,7 @@ export default async function TechLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="tech-root">
+      <PwaBoot />
       {desktopHref && (
         /* Plain <a> (full navigation) so the cross-subdomain redirect to billing/dashboards is followed. */
         <a href={desktopHref} title="Switch to desktop"

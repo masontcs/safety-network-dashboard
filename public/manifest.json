@@ -1,0 +1,16 @@
+{
+  "name": "Safety Network Field",
+  "short_name": "SN Field",
+  "description": "Field technician time capture and dispatch for Safety Network.",
+  "start_url": "/tech",
+  "scope": "/tech",
+  "display": "standalone",
+  "background_color": "#14181f",
+  "theme_color": "#14181f",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -439,6 +439,18 @@ export type Database = {
         Update: { id?: string; ticket_id?: string; storage_path?: string; file_name?: string; content_type?: string | null; size_bytes?: number | null; uploaded_by?: string | null }
         Relationships: []
       }
+      push_config: {
+        Row: { id: boolean; public_key: string; private_key: string; subject: string; updated_at: string }
+        Insert: { id?: boolean; public_key: string; private_key: string; subject: string }
+        Update: { public_key?: string; private_key?: string; subject?: string }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: { id: string; user_id: string; endpoint: string; p256dh: string; auth: string; user_agent: string | null; created_at: string }
+        Insert: { id?: string; user_id: string; endpoint: string; p256dh: string; auth: string; user_agent?: string | null }
+        Update: { endpoint?: string; p256dh?: string; auth?: string; user_agent?: string | null }
+        Relationships: []
+      }
       billing_job_types: {
         Row: { id: string; name: string; sort_order: number; is_active: boolean; created_at: string }
         Insert: { id?: string; name: string; sort_order?: number; is_active?: boolean }

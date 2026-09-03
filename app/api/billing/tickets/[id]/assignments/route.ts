@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
+import { sendPushToTechnicians } from '@/lib/push/send'
 
 /**
  * Crew on a ticket — who worked it, and which of them is the LEAD.
@@ -104,6 +105,11 @@ export async function POST(request: Request, { params }: { params: { id: string 
     })
     if (error) throw new Error(error.message)
 
+    // Notify the tech they've been added to this shift (best-effort).
+    await sendPushToTechnicians([body.technicianId], {
+      title: 'You’re scheduled', body: 'You’ve been added to a shift. Tap to view.', url: '/tech', tag: `ticket-${params.id}`,
+    })
+
     return NextResponse.json({ success: true })
   } catch (err) {
     return billingApiError(err)
@@ -191,6 +197,13 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 
     const { error } = await supabase.from('billing_ticket_assignments').delete().eq('id', assignmentId).eq('ticket_id', params.id)
     if (error) throw new Error(error.message)
+
+    // Let the removed tech know their assignment changed (best-effort).
+    if (assignment?.technician_id) {
+      await sendPushToTechnicians([assignment.technician_id], {
+        title: 'Shift updated', body: 'You were removed from a shift. Tap to see your schedule.', url: '/tech', tag: `ticket-${params.id}`,
+      })
+    }
 
     return NextResponse.json({ success: true })
   } catch (err) {

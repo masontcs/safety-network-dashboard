@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { techApi, TechApiError, type TicketListItem, type YardShift, type TechShift } from '@/lib/tech/client'
 import SignOutButton from '@/components/tech/SignOutButton'
+import NotificationsToggle from '@/components/tech/NotificationsToggle'
 import FeatureTags from '@/components/tech/FeatureTags'
 import AddTimeSheet, { type TimeDestination } from '@/components/tech/AddTimeSheet'
 import ShiftAckCard from '@/components/tech/ShiftAckCard'
@@ -66,6 +67,7 @@ export default function MyTicketsClient() {
       </div>
 
       <div className="tech-page">
+        <NotificationsToggle />
         {err && (
           <div className="tech-note err" role="alert">
             {err} <button onClick={load} className="tech-linkbtn" style={{ color: 'inherit', textDecoration: 'underline' }}>Retry</button>
