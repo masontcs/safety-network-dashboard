@@ -175,7 +175,7 @@
 .bx-week{display:grid;grid-template-columns:150px repeat(5,1fr);min-width:880px}
 .bx-week .hcell{padding:11px 12px;font-size:11.5px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--line);background:var(--surface)}
 .bx-week .drv{padding:12px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:9px;font-weight:500;font-size:13px}
-.bx-week .dcell{border-bottom:1px solid var(--line);border-left:1px solid var(--line);min-height:84px;padding:7px;transition:background .1s}
+.bx-week .dcell{border-bottom:1px solid var(--line);border-left:1px solid var(--line);min-height:84px;padding:7px;transition:background .1s;display:flex;flex-direction:column}
 .bx-week .dcell.over{background:var(--accent-soft)}
 .bx-week .tk{background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);border-left:3px solid var(--accent);border-radius:7px;padding:6px 8px;font-size:11.5px;margin-bottom:6px;cursor:grab}
 .bx-week .tk:active{cursor:grabbing;opacity:.6}

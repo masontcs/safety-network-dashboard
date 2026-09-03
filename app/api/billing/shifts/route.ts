@@ -3,7 +3,7 @@ import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { broadcastBillingChanged } from '@/lib/realtime/broadcast'
-import { JOB_TYPES } from '@/lib/billing/shiftConstants'
+import { existingJobTypeNames } from '@/lib/billing/jobTypes'
 import { writeShiftChildren } from '@/lib/billing/shifts'
 
 /**
@@ -128,9 +128,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     const body = (await request.json()) as CreateBody
     if (!body.shiftDate) return bad('A shift date is required')
     if (body.mealType && body.mealType !== 'standard' && body.mealType !== 'odmp') return bad('Invalid meal type')
-    const jobTypes = [...new Set((body.jobTypes ?? []).filter((t) => (JOB_TYPES as readonly string[]).includes(t)))]
 
     const supabase = createServiceClient()
+    const validTypes = await existingJobTypeNames(supabase)
+    const jobTypes = [...new Set((body.jobTypes ?? []).filter((t) => validTypes.has(t)))]
 
     // Resolve branch: from the job for a job shift, else from the request for yard.
     let branchId: string | null

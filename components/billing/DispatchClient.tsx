@@ -293,15 +293,20 @@ function DispatchRow({ tech, days, loading, cardsFor, yardFor, stagedFor, onRemo
                 </div>
               )
             })}
-            {canDrag && (
-              <button
-                type="button"
-                className="dcell-add"
-                onClick={() => onDispatch(tech.id, day)}
-                title="Dispatch a tech to this day"
-                style={{ width: '100%', marginTop: cards.length ? 4 : 0, background: 'transparent', border: '1px dashed var(--border, #d8d5cc)', borderRadius: 6, color: 'var(--dim, #999)', fontSize: 11, padding: '3px 0', cursor: 'pointer' }}
-              >+ dispatch</button>
-            )}
+            {canDrag && (() => {
+              const hasContent = cards.length + yard.length + stagedCards.length > 0
+              return (
+                <button
+                  type="button"
+                  className="dcell-add"
+                  onClick={() => onDispatch(tech.id, day)}
+                  title="Dispatch a tech to this day"
+                  // Centered in the cell: horizontally always, and vertically too when the cell is
+                  // empty (margin:auto in a flex column). With cards above, it sits centered below them.
+                  style={{ alignSelf: 'center', margin: hasContent ? '4px auto 0' : 'auto', background: 'transparent', border: '1px dashed var(--border, #d8d5cc)', borderRadius: 6, color: 'var(--dim, #999)', fontSize: 11, padding: '3px 12px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                >+ dispatch</button>
+              )
+            })()}
           </div>
         )
       })}

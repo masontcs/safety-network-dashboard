@@ -3,7 +3,7 @@ import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { broadcastBillingChanged } from '@/lib/realtime/broadcast'
-import { JOB_TYPES } from '@/lib/billing/shiftConstants'
+import { existingJobTypeNames } from '@/lib/billing/jobTypes'
 import { writeShiftChildren } from '@/lib/billing/shifts'
 import type { Database } from '@/lib/supabase/database.types'
 
@@ -113,7 +113,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       if (error) throw new Error(error.message)
     }
 
-    const jobTypes = body.jobTypes ? [...new Set(body.jobTypes.filter((t) => (JOB_TYPES as readonly string[]).includes(t)))] : undefined
+    let jobTypes: string[] | undefined
+    if (body.jobTypes) {
+      const validTypes = await existingJobTypeNames(supabase)
+      jobTypes = [...new Set(body.jobTypes.filter((t) => validTypes.has(t)))]
+    }
     await writeShiftChildren(supabase, params.id, jobTypes, body.timeline, body.crew)
 
     await broadcastBillingChanged()

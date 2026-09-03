@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Combobox from '@/components/billing/Combobox'
 import TechMultiSelect from '@/components/billing/TechMultiSelect'
-import { JOB_TYPES, MEAL_TYPES } from '@/lib/billing/shiftConstants'
+import { MEAL_TYPES } from '@/lib/billing/shiftConstants'
 
 /**
  * Stage or publish a SHIFT — the dispatch unit. A staged shift is a draft (no ticket, no
@@ -68,6 +68,7 @@ export default function ShiftEditorModal({
   const [profiles, setProfiles] = useState<ProfileOpt[]>([])
   const [entities, setEntities] = useState<EntityOpt[]>([])
   const [activities, setActivities] = useState<ActivityOpt[]>([])
+  const [jobTypeOptions, setJobTypeOptions] = useState<string[]>([])
 
   // new-job fields
   const [profileId, setProfileId] = useState('')
@@ -82,6 +83,7 @@ export default function ShiftEditorModal({
     const j = (r: Response) => r.json()
     fetch('/api/billing/jobs').then(j).then((r) => { if (r.success) setJobs(r.data) }).catch(() => {})
     fetch('/api/billing/activity-types').then(j).then((r) => { if (r.success) setActivities(r.data) }).catch(() => {})
+    fetch('/api/billing/job-types').then(j).then((r) => { if (r.success) setJobTypeOptions((r.data as { name: string }[]).map((d) => d.name)) }).catch(() => {})
     Promise.all([fetch('/api/billing/profiles').then(j), fetch('/api/billing/entities').then(j)])
       .then(([p, e]) => { if (p.success) setProfiles(p.data); if (e.success) setEntities(e.data) }).catch(() => {})
   }, [])
@@ -352,9 +354,10 @@ export default function ShiftEditorModal({
             <div>
               <label className="bx-lbl">Job type(s)</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {JOB_TYPES.map((t) => (
+                {jobTypeOptions.map((t) => (
                   <button key={t} type="button" className={`bx-btn ${jobTypes.includes(t) ? 'accent' : 'ghost'} sm`} onClick={() => toggleJobType(t)}>{t}</button>
                 ))}
+                {jobTypeOptions.length === 0 && <div className="bx-sub">No job types configured — add them under Setup → Job Types.</div>}
               </div>
             </div>
 

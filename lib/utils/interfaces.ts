@@ -47,9 +47,9 @@ export const BILLING_ROLES: readonly Role[] = ['admin', 'billing_branch_manager'
 export const MANAGEABLE_BILLING_ROLES: readonly Role[] = ['billing_branch_manager', 'dispatcher', 'biller'] as const
 
 /** Billing sub-areas — the unit of permission within the billing interface. */
-export type BillingArea = 'home' | 'dispatch' | 'jobs' | 'tickets' | 'quotes' | 'invoices' | 'customers' | 'items' | 'pricelists' | 'technicians' | 'time' | 'users'
+export type BillingArea = 'home' | 'dispatch' | 'jobs' | 'tickets' | 'quotes' | 'invoices' | 'customers' | 'items' | 'pricelists' | 'technicians' | 'jobtypes' | 'time' | 'users'
 
-const ALL_AREAS: BillingArea[] = ['home', 'dispatch', 'jobs', 'tickets', 'quotes', 'invoices', 'customers', 'items', 'pricelists', 'technicians', 'time', 'users']
+const ALL_AREAS: BillingArea[] = ['home', 'dispatch', 'jobs', 'tickets', 'quotes', 'invoices', 'customers', 'items', 'pricelists', 'technicians', 'jobtypes', 'time', 'users']
 
 /**
  * Which billing areas each role may use. Only Admin gets 'users' (managing billing users is
@@ -58,7 +58,7 @@ const ALL_AREAS: BillingArea[] = ['home', 'dispatch', 'jobs', 'tickets', 'quotes
  */
 const BILLING_AREAS: Partial<Record<Role, BillingArea[]>> = {
   admin: ALL_AREAS,
-  billing_branch_manager: ['home', 'dispatch', 'jobs', 'tickets', 'quotes', 'invoices', 'customers', 'items', 'pricelists', 'technicians', 'time'],
+  billing_branch_manager: ['home', 'dispatch', 'jobs', 'tickets', 'quotes', 'invoices', 'customers', 'items', 'pricelists', 'technicians', 'jobtypes', 'time'],
   dispatcher: ['dispatch', 'jobs', 'tickets', 'time'],
   biller: ['home', 'jobs', 'tickets', 'quotes', 'invoices', 'customers', 'pricelists', 'time'],
 }
@@ -122,7 +122,8 @@ export function interfacesFor(role: Role, fieldAccess = false, billingRole?: Rol
 const AREA_PATHS: Record<BillingArea, string[]> = {
   home: [], dispatch: ['/billing/dispatch'], jobs: ['/billing/jobs'], tickets: ['/billing/tickets'],
   quotes: ['/billing/quotes'], invoices: ['/billing/invoices'], customers: ['/billing/customers', '/billing/profiles'],
-  items: ['/billing/items'], pricelists: ['/billing/price-lists'], technicians: ['/billing/technicians'], time: ['/billing/time'],
+  items: ['/billing/items'], pricelists: ['/billing/price-lists'], technicians: ['/billing/technicians'],
+  jobtypes: ['/billing/job-types'], time: ['/billing/time'],
   users: ['/billing/users'],
 }
 

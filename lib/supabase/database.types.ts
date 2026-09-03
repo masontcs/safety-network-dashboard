@@ -439,6 +439,12 @@ export type Database = {
         Update: { id?: string; ticket_id?: string; storage_path?: string; file_name?: string; content_type?: string | null; size_bytes?: number | null; uploaded_by?: string | null }
         Relationships: []
       }
+      billing_job_types: {
+        Row: { id: string; name: string; sort_order: number; is_active: boolean; created_at: string }
+        Insert: { id?: string; name: string; sort_order?: number; is_active?: boolean }
+        Update: { id?: string; name?: string; sort_order?: number; is_active?: boolean }
+        Relationships: []
+      }
       billing_activity_types: {
         // note_keyword = lowercase token in the TSheets note; service_item = QB export string.
         // exported/paid/billable/pw_eligible drive the export + payroll classification.
