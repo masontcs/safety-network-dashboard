@@ -29,7 +29,10 @@ export default function BillingShell({
       <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <BranchProvider>
           <BillingTopbar />
-          <div style={{ padding: '24px 26px 70px', maxWidth: 1200, width: '100%' }}>{children}</div>
+          {/* Fluid content: fills the viewport on normal monitors, capped only so text pages
+              don't sprawl on ultrawide displays. Table/list pages fill this width; form and
+              detail pages keep their own narrower, readable caps. */}
+          <div style={{ padding: '24px 26px 70px', maxWidth: 1800, width: '100%' }}>{children}</div>
         </BranchProvider>
       </main>
     </div>

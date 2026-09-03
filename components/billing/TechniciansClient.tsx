@@ -64,7 +64,7 @@ export default function TechniciansClient() {
   const inactive = (techs ?? []).filter((t) => !t.isActive)
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div>
       <h1 className="bx-h1">Technicians</h1>
       <div className="bx-sub">The crew assigned to tickets and dispatched. Deactivate someone to hide them from the pickers without losing their history.</div>
 
@@ -109,18 +109,18 @@ export default function TechniciansClient() {
                         ? <span style={{ fontSize: 12 }}>{t.username ? <b>{t.username}</b> : 'linked'}{t.email ? <span style={{ color: 'var(--dim)' }}> · {t.email}</span> : null}</span>
                         : <span style={{ fontSize: 12, color: 'var(--dim)' }}>no login</span>}
                     </td>
-                    <td style={{ ...tdR, whiteSpace: 'nowrap' }}>
+                    <td style={tdR}>
                       {editId !== t.id && (
-                        <>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                           {t.hasLogin
-                            ? <button className="bx-btn ghost sm" onClick={() => setLoginFor({ tech: t, mode: 'reset' })} disabled={busy} style={{ marginRight: 6 }}>Reset password</button>
-                            : <button className="bx-btn accent sm" onClick={() => setLoginFor({ tech: t, mode: 'create' })} disabled={busy} style={{ marginRight: 6 }}>Create login</button>}
-                          <button className="bx-btn ghost sm" onClick={() => { setEditId(t.id); setEditName(t.name) }} style={{ marginRight: 6 }}>Rename</button>
+                            ? <button className="bx-btn ghost sm" onClick={() => setLoginFor({ tech: t, mode: 'reset' })} disabled={busy}>Reset password</button>
+                            : <button className="bx-btn accent sm" onClick={() => setLoginFor({ tech: t, mode: 'create' })} disabled={busy}>Create login</button>}
+                          <button className="bx-btn ghost sm" onClick={() => { setEditId(t.id); setEditName(t.name) }}>Rename</button>
                           {t.isActive
-                            ? <button className="bx-btn ghost sm" onClick={() => setActive(t, false)} disabled={busy} style={{ marginRight: 6 }}>Deactivate</button>
-                            : <button className="bx-btn ghost sm" onClick={() => setActive(t, true)} disabled={busy} style={{ marginRight: 6 }}>Activate</button>}
+                            ? <button className="bx-btn ghost sm" onClick={() => setActive(t, false)} disabled={busy}>Deactivate</button>
+                            : <button className="bx-btn ghost sm" onClick={() => setActive(t, true)} disabled={busy}>Activate</button>}
                           <button className="bx-btn danger sm" onClick={() => remove(t)} disabled={busy}>Delete</button>
-                        </>
+                        </div>
                       )}
                     </td>
                   </tr>

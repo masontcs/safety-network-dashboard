@@ -37,7 +37,7 @@ export default function InvoicesClient() {
   const shown = useMemo(() => filter === 'all' ? rows : rows.filter((r) => r.status === filter), [rows, filter])
 
   return (
-    <div style={{ maxWidth: 900 }}>
+    <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
         <span style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Invoices</span>
         <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>

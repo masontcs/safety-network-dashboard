@@ -51,7 +51,7 @@ export default function QuotesClient() {
   }
 
   return (
-    <div style={{ maxWidth: 900 }}>
+    <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
         <h1 className="bx-h1">Quotes</h1>
         <button className="bx-btn ghost sm" style={{ marginLeft: 'auto' }} onClick={() => { setShowNew((v) => !v); setErr(null) }}>{showNew ? 'Cancel' : '+ New quote'}</button>

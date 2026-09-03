@@ -62,7 +62,7 @@ export default function BillingUsersClient() {
   useEffect(() => { load() }, [load])
 
   return (
-    <div style={{ maxWidth: 900 }}>
+    <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{ flex: 1 }}>
           <h1 className="bx-h1">Billing Users</h1>

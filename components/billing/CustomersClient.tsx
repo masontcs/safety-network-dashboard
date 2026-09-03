@@ -54,7 +54,7 @@ export default function CustomersClient() {
   }
 
   return (
-    <div style={{ maxWidth: 900 }}>
+    <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         <div style={{ flex: 1 }}>
           <h1 className="bx-h1">Customers</h1>
