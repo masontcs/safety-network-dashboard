@@ -55,6 +55,19 @@ export default function DispatchClient() {
   const router = useRouter()
   const { branchId } = useBranch()
 
+  // Remember the user's chosen view (range + grouping) across visits. Read after mount to avoid a
+  // hydration mismatch; the date is intentionally NOT persisted (it resets to today each visit).
+  useEffect(() => {
+    try {
+      const r = localStorage.getItem('sn.dispatch.range')
+      if (r === 'day' || r === 'week' || r === 'month') setRange(r)
+      const g = localStorage.getItem('sn.dispatch.groupBy')
+      if (g === 'tech' || g === 'customer' || g === 'jobtype') setGroupBy(g)
+    } catch { /* storage unavailable — just use defaults */ }
+  }, [])
+  useEffect(() => { try { localStorage.setItem('sn.dispatch.range', range) } catch { /* ignore */ } }, [range])
+  useEffect(() => { try { localStorage.setItem('sn.dispatch.groupBy', groupBy) } catch { /* ignore */ } }, [groupBy])
+
   const load = useCallback((r: Range, a: string, silent = false) => {
     if (!silent) setBoard(null)
     const bq = branchId ? `&branchId=${branchId}` : ''
