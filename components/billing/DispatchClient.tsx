@@ -182,8 +182,11 @@ export default function DispatchClient() {
       </div>
 
       {range === 'month'
-        ? <MonthCalendar days={days} anchor={anchor} board={board} staged={staged}
-            onPickDay={(d) => { setAnchor(d); setRange('day') }} />
+        ? <MonthCalendar
+            days={days} anchor={anchor} board={board} staged={staged} isAdmin={!!board?.isAdmin}
+            onOpenTicket={(t) => router.push(`/billing/tickets/${t.id}`)}
+            onDispatchDay={(d) => setGeneralDispatch({ date: d })}
+            onPublishShift={publishShift} onEditShift={(id) => setEditShiftId(id)} onDeleteShift={deleteShift} />
         : (
           <div className="card" style={{ marginTop: 14, padding: 0 }}>
             <div className="bx-board">
@@ -351,11 +354,19 @@ function GridRow({ row, days, loading, groupBy, cardsFor, yardFor, stagedFor, on
   )
 }
 
-/* ─── Month calendar: a cell per day with a shift count + a few chips; click to open the day ── */
-function MonthCalendar({ days, anchor, board, staged, onPickDay }: {
-  days: string[]; anchor: string; board: Board | null; staged: StagedShift[]
-  onPickDay: (d: string) => void
+/* ─── Month calendar with a horizontal slide to a day agenda ─────────────────────────────
+   Two panels ride a track: the calendar (left) and the clicked day's agenda (right). Clicking a
+   day slides the track left so the month exits and the day enters from the right; "‹ Month" slides
+   back. Selecting a day is local to this view (range stays 'month'). */
+function MonthCalendar({ days, anchor, board, staged, isAdmin, onOpenTicket, onDispatchDay, onPublishShift, onEditShift, onDeleteShift }: {
+  days: string[]; anchor: string; board: Board | null; staged: StagedShift[]; isAdmin: boolean
+  onOpenTicket: (t: Ticket) => void; onDispatchDay: (d: string) => void
+  onPublishShift: (id: string) => void; onEditShift: (id: string) => void; onDeleteShift: (id: string) => void
 }) {
+  const [selected, setSelected] = useState<string | null>(null)
+  // Reset the slide whenever the month changes.
+  useEffect(() => { setSelected(null) }, [anchor])
+
   // Pad the month to whole Mon–Sun weeks.
   const dow = (d: string) => (new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7 // 0 = Mon
   const cells: (string | null)[] = []
@@ -367,34 +378,84 @@ function MonthCalendar({ days, anchor, board, staged, onPickDay }: {
   const countFor = (d: string) => (board?.tickets.filter((t) => t.date === d && !t.voided).length ?? 0) + staged.filter((s) => s.date === d).length + (board?.yard.filter((y) => y.date === d).length ?? 0)
   const chipsFor = (d: string) => (board?.tickets.filter((t) => t.date === d && !t.voided) ?? []).slice(0, 3)
 
+  const dayTickets = selected ? (board?.tickets.filter((t) => t.date === selected) ?? []) : []
+  const dayStaged = selected ? staged.filter((s) => s.date === selected) : []
+  const dayYard = selected ? (board?.yard.filter((y) => y.date === selected) ?? []) : []
+
   return (
-    <div className="card" style={{ marginTop: 14 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0,1fr))', gap: 1, background: 'var(--line)', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
-        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((w) => (
-          <div key={w} style={{ background: 'var(--surface)', padding: '8px 10px', fontSize: 11, fontWeight: 600, color: 'var(--muted)' }}>{w}</div>
-        ))}
-        {cells.map((d, i) => {
-          if (!d) return <div key={i} style={{ background: 'var(--bg, #faf9f7)', minHeight: 96 }} />
-          const n = countFor(d)
-          const chips = chipsFor(d)
-          const isToday = d === t0
-          return (
-            <button key={d} type="button" onClick={() => onPickDay(d)}
-              style={{ textAlign: 'left', background: 'var(--surface)', minHeight: 96, padding: 8, border: 'none', borderTop: isToday ? '2px solid var(--accent)' : '2px solid transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}
-              title={`${dayLong(d)} — ${n} shift${n === 1 ? '' : 's'}`}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 12.5, fontWeight: isToday ? 700 : 500, color: isToday ? 'var(--accent)' : 'var(--ink)' }}>{new Date(d + 'T00:00:00Z').getUTCDate()}</span>
-                {n > 0 && <span style={{ fontSize: 10.5, fontWeight: 700, color: '#fff', background: 'var(--accent)', borderRadius: 999, padding: '0 6px', lineHeight: '16px' }}>{n}</span>}
-              </div>
-              {chips.map((t) => (
-                <span key={t.id} className={`tk ${featureClass(t.feature)}`} style={{ margin: 0, fontSize: 10.5, padding: '2px 5px', cursor: 'pointer' }}>
-                  <b style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.customer ?? t.jobName ?? t.jobNumber}</b>
-                </span>
+    <div className="card" style={{ marginTop: 14, padding: 0, overflow: 'hidden' }}>
+      {/* Viewport clips the track; the track holds both panels side by side and translates. */}
+      <div style={{ overflow: 'hidden' }}>
+        <div style={{ display: 'flex', width: '200%', transform: selected ? 'translateX(-50%)' : 'translateX(0)', transition: 'transform 320ms cubic-bezier(.4,0,.2,1)' }}>
+          {/* Panel 1 — the month */}
+          <div style={{ width: '50%', padding: 18, boxSizing: 'border-box' }} aria-hidden={!!selected}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0,1fr))', gap: 1, background: 'var(--line)', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((w) => (
+                <div key={w} style={{ background: 'var(--surface)', padding: '8px 10px', fontSize: 11, fontWeight: 600, color: 'var(--muted)' }}>{w}</div>
               ))}
-              {n > chips.length && <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>+{n - chips.length} more</span>}
-            </button>
-          )
-        })}
+              {cells.map((d, i) => {
+                if (!d) return <div key={i} style={{ background: 'var(--bg, #faf9f7)', minHeight: 96 }} />
+                const n = countFor(d)
+                const chips = chipsFor(d)
+                const isToday = d === t0
+                return (
+                  <button key={d} type="button" onClick={() => setSelected(d)}
+                    style={{ textAlign: 'left', background: 'var(--surface)', minHeight: 96, padding: 8, border: 'none', borderTop: isToday ? '2px solid var(--accent)' : '2px solid transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}
+                    title={`${dayLong(d)} — ${n} shift${n === 1 ? '' : 's'}`}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: isToday ? 700 : 500, color: isToday ? 'var(--accent)' : 'var(--ink)' }}>{new Date(d + 'T00:00:00Z').getUTCDate()}</span>
+                      {n > 0 && <span style={{ fontSize: 10.5, fontWeight: 700, color: '#fff', background: 'var(--accent)', borderRadius: 999, padding: '0 6px', lineHeight: '16px' }}>{n}</span>}
+                    </div>
+                    {chips.map((t) => (
+                      <span key={t.id} className={`tk ${featureClass(t.feature)}`} style={{ margin: 0, fontSize: 10.5, padding: '2px 5px', cursor: 'pointer' }}>
+                        <b style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.customer ?? t.jobName ?? t.jobNumber}</b>
+                      </span>
+                    ))}
+                    {n > chips.length && <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>+{n - chips.length} more</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Panel 2 — the selected day's agenda */}
+          <div style={{ width: '50%', padding: 18, boxSizing: 'border-box' }} aria-hidden={!selected}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+              <button className="bx-btn ghost sm" onClick={() => setSelected(null)}>‹ Month</button>
+              <h3 style={{ margin: 0, fontSize: 15 }}>{selected ? dayLong(selected) : ''}</h3>
+              {isAdmin && selected && <button className="bx-btn accent sm" style={{ marginLeft: 'auto' }} onClick={() => onDispatchDay(selected)}>+ Dispatch</button>}
+            </div>
+
+            {selected && dayTickets.length === 0 && dayStaged.length === 0 && dayYard.length === 0 ? (
+              <div className="bx-empty">Nothing scheduled this day.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 560 }}>
+                {dayTickets.map((t) => (
+                  <div key={t.id} className={`tk ${featureClass(t.feature)}`} style={{ margin: 0, cursor: 'pointer', ...(t.voided ? { opacity: 0.4, textDecoration: 'line-through' } : {}) }} onClick={() => onOpenTicket(t)} title={`${t.ticketNumber} · open`}>
+                    <b>{(t.customer ?? t.jobName ?? t.jobNumber) + ' — ' + featureLabel(t.feature)}{t.voided ? ' · VOID' : ''}</b>
+                    <small>{t.ticketNumber}{t.jobName && t.customer ? ` · ${t.jobName}` : ''}{t.jobTypes.length ? ` · ${t.jobTypes.join(', ')}` : ''}</small>
+                  </div>
+                ))}
+                {dayYard.map((y) => (
+                  <div key={y.id} className="tk" style={{ margin: 0, background: 'var(--bg-secondary, #eee)', border: '1px solid var(--border, #ddd)', color: 'var(--text-secondary, #555)' }} title="Yard shift — no ticket"><b>YARD</b></div>
+                ))}
+                {dayStaged.map((s) => (
+                  <div key={s.id} className="tk" style={{ margin: 0, background: 'transparent', border: '1px dashed var(--accent, #b8860b)', color: 'var(--text-secondary, #555)' }} title="Staged shift — not published yet">
+                    <b>{(s.isYard ? 'YARD' : (s.customer ?? s.jobName ?? s.jobNumber ?? 'Shift'))} · STAGED</b>
+                    <small>{s.isYard ? 'yard shift (draft)' : (s.jobTypes.length ? s.jobTypes.join(', ') : (s.jobNumber ?? ''))}</small>
+                    {isAdmin && (
+                      <div style={{ display: 'flex', gap: 8, marginTop: 3 }}>
+                        <small onClick={(e) => { e.stopPropagation(); onPublishShift(s.id) }} style={{ cursor: 'pointer', color: 'var(--accent, #b8860b)', fontWeight: 600 }}>publish</small>
+                        <small onClick={(e) => { e.stopPropagation(); onEditShift(s.id) }} style={{ cursor: 'pointer', color: 'var(--text-secondary, #555)' }}>edit</small>
+                        <small onClick={(e) => { e.stopPropagation(); onDeleteShift(s.id) }} style={{ cursor: 'pointer', color: 'var(--danger, #c0392b)' }}>delete</small>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
