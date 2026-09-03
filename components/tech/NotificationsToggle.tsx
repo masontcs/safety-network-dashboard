@@ -67,61 +67,42 @@ export default function NotificationsToggle() {
     } catch { /* ignore */ } finally { setBusy(false) }
   }
 
-  if (state === 'loading') return null
+  // Once notifications are on, the prompt disappears entirely — nothing to show.
+  if (state === 'loading' || state === 'on') return null
 
-  const box: React.CSSProperties = {
-    display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', borderRadius: 12,
-    border: '1px solid var(--tech-line, #2a2f38)', background: 'var(--tech-surface, #1a1f27)', marginBottom: 12,
+  // Slim single-line bar shared by every remaining state.
+  const bar: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px 6px 10px', borderRadius: 9,
+    border: '1px solid var(--tech-line, #2a2f38)', background: 'var(--tech-surface, #1a1f27)',
+    marginBottom: 10, fontSize: 12.5,
   }
-  const sub: React.CSSProperties = { fontSize: 12, color: 'var(--tech-dim, #93a0b4)', marginTop: 1 }
+  const text: React.CSSProperties = { flex: 1, minWidth: 0, color: 'var(--tech-dim, #93a0b4)', overflow: 'hidden', textOverflow: 'ellipsis' }
 
   if (state === 'unsupported') {
     const iOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
     return (
-      <div style={box}>
-        <span aria-hidden style={{ fontSize: 18 }}>🔔</span>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>Get shift alerts</div>
-          <div style={sub}>{iOS ? 'Tap Share → Add to Home Screen, then open the app from there to turn on notifications.' : 'This device can’t receive notifications in the browser.'}</div>
-        </div>
+      <div style={bar}>
+        <span aria-hidden>🔔</span>
+        <span style={text}>{iOS ? 'Add to Home Screen to get shift alerts' : 'Notifications aren’t supported on this browser'}</span>
       </div>
     )
   }
 
   if (state === 'denied') {
     return (
-      <div style={box}>
-        <span aria-hidden style={{ fontSize: 18 }}>🔕</span>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>Notifications are blocked</div>
-          <div style={sub}>Enable them for this app in your device settings to get shift alerts.</div>
-        </div>
-      </div>
-    )
-  }
-
-  if (state === 'on') {
-    return (
-      <div style={box}>
-        <span aria-hidden style={{ fontSize: 18 }}>🔔</span>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>Notifications on</div>
-          <div style={sub}>You’ll be alerted when you’re scheduled or your shift changes.</div>
-        </div>
-        <button onClick={disable} disabled={busy} className="tech-btn ghost" style={{ fontSize: 13 }}>{busy ? '…' : 'Turn off'}</button>
+      <div style={bar}>
+        <span aria-hidden>🔕</span>
+        <span style={text}>Notifications blocked — enable them in your device settings</span>
       </div>
     )
   }
 
   // off
   return (
-    <div style={box}>
-      <span aria-hidden style={{ fontSize: 18 }}>🔔</span>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 14, fontWeight: 600 }}>Turn on notifications</div>
-        <div style={sub}>{hint ?? 'Get alerted the moment you’re scheduled for a shift.'}</div>
-      </div>
-      <button onClick={enable} disabled={busy} className="tech-btn accent" style={{ fontSize: 13 }}>{busy ? '…' : 'Enable'}</button>
+    <div style={bar}>
+      <span aria-hidden>🔔</span>
+      <span style={text}>{hint ?? 'Get alerted when you’re scheduled'}</span>
+      <button onClick={enable} disabled={busy} className="tech-btn accent sm" style={{ fontSize: 12.5, padding: '4px 12px' }}>{busy ? '…' : 'Enable'}</button>
     </div>
   )
 }

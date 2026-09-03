@@ -440,9 +440,15 @@ export type Database = {
         Relationships: []
       }
       push_config: {
-        Row: { id: boolean; public_key: string; private_key: string; subject: string; updated_at: string }
-        Insert: { id?: boolean; public_key: string; private_key: string; subject: string }
-        Update: { public_key?: string; private_key?: string; subject?: string }
+        Row: { id: boolean; public_key: string; private_key: string; subject: string; cron_secret: string | null; updated_at: string }
+        Insert: { id?: boolean; public_key: string; private_key: string; subject: string; cron_secret?: string | null }
+        Update: { public_key?: string; private_key?: string; subject?: string; cron_secret?: string | null }
+        Relationships: []
+      }
+      push_reminder_runs: {
+        Row: { run_date: string; created_at: string }
+        Insert: { run_date: string }
+        Update: { run_date?: string }
         Relationships: []
       }
       push_subscriptions: {
