@@ -192,6 +192,7 @@ export async function GET(
         notes: t.notes,
         job: t.billing_jobs ? { id: t.billing_jobs.id, number: t.billing_jobs.job_number, name: t.billing_jobs.name } : null,
         profileId: t.billing_jobs?.profile_id ?? null, // scopes the Lump-sum/Labor picker to this profile's custom items
+        entityId: t.entity_id,                          // + the entity, to scope the picker to this job's price list
         entityCode: t.billing_jobs?.entities?.code ?? '',
         customer: t.billing_jobs?.billing_profiles?.billing_customers?.name ?? null,
         statuses: STATUSES,

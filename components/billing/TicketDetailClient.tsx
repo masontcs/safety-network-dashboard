@@ -13,7 +13,7 @@ import { rowOpen } from '@/components/billing/rowOpen'
 import { BILLING_TYPE_LABELS } from '@/lib/billing/constants'
 import type { BillingType } from '@/lib/supabase/database.types'
 
-interface PickerItem { id: string; code: string; name: string; category: string; tracked: boolean; rentable: boolean; salable: boolean; salePriceCents: number | null; ownerProfileId: string | null; variations: { id: string; name: string }[] }
+interface PickerItem { id: string; code: string; name: string; category: string; tracked: boolean; rentable: boolean; salable: boolean; salePriceCents: number | null; ownerProfileId: string | null; onPriceList: boolean; variations: { id: string; name: string }[] }
 interface LedgerEvent { id: string; eventType: string; date: string; qty: number; equipmentId: string | null; billingType: string | null; item: { id: string; code: string; name: string; tracked: boolean } | null; variation: { id: string; name: string } | null }
 // Item-priced kinds (labor, lump sum) store no rate; the API resolves it live from the
 // price list and sets rateFromPriceList so we can show the number while marking it as
@@ -27,6 +27,7 @@ interface Ticket {
   billingType: BillingType | null; recurring: boolean; notes: string | null
   job: { id: string; number: string; name: string | null } | null
   profileId: string | null
+  entityId: string | null
   entityCode: string; customer: string | null
   statuses: string[]; billingTypes: BillingType[]
   pickupsMissingBillingType: number
@@ -106,10 +107,14 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
     }).catch((e: Error) => setErr(e.message)).finally(() => { if (!silent) setLoading(false) })
   }, [ticketId])
 
-  // Catalog is fetched once — it doesn't change while editing a ticket.
+  // Catalog for the pickers. Scoped to THIS job's price list (profile + entity) so the
+  // list-priced pickers only offer items the profile is actually set up for. Refetched if the
+  // ticket's profile/entity resolves after mount.
   useEffect(() => {
-    fetch('/api/billing/items/picker').then((r) => r.json()).then((it) => { if (it.success) setItems(it.data) }).catch(() => {})
-  }, [])
+    const p = t?.profileId, e = t?.entityId
+    const qs = p && e ? `?profileId=${p}&entityId=${e}` : ''
+    fetch(`/api/billing/items/picker${qs}`).then((r) => r.json()).then((it) => { if (it.success) setItems(it.data) }).catch(() => {})
+  }, [t?.profileId, t?.entityId])
 
   useEffect(() => { load(false) }, [load])
 
@@ -243,8 +248,12 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
   const onRentKeyOf = (itemId: string, variationId: string | null) => `${itemId}|${variationId ?? ''}`
   const pickedOut = returnMode ? t?.onRent.find((r) => onRentKeyOf(r.itemId, r.variationId) === lItem) ?? null : null
   const pickItem = items.find((i) => i.id === (returnMode ? pickedOut?.itemId : lItem))
-  const rentItems = items.filter((i) => i.rentable) // equipment ledger = rentals only
-  const saleItems = items.filter((i) => i.salable)
+  // A list-priced item is offerable here only if it's on THIS job's price list — or it's one of
+  // the profile's own custom items (which carry their own rate). Global items with no rate for
+  // this profile are excluded so you can't add an unpriceable line.
+  const onListForJob = (i: PickerItem) => (t != null && i.ownerProfileId === t.profileId) || (i.ownerProfileId == null && i.onPriceList)
+  const rentItems = items.filter((i) => i.rentable && onListForJob(i)) // equipment ledger = rentals on this list
+  const saleItems = items.filter((i) => i.salable)                     // sale items carry their own price, not a list
   const statusColors: Record<string, string> = { active: 'var(--pill-neutral-fg)', in_review: 'var(--pill-pending-fg)', final_edit: 'var(--pill-paid-fg)', invoiced: 'var(--accent)' }
 
   const chargeBlurb: Record<'sale' | 'labor' | 'lump_sum' | 'misc', string> = {
@@ -265,7 +274,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
     const itemCategory = ITEM_PRICED_CATEGORY[kind]
     // Global items (no owner) plus THIS ticket's profile's custom items — never another profile's.
     const chargeItems = itemCategory
-      ? items.filter((i) => i.category === itemCategory && (i.ownerProfileId == null || i.ownerProfileId === t.profileId))
+      ? items.filter((i) => i.category === itemCategory && onListForJob(i))
       : []
     // Only misc is typed by hand.
     const isTyped = kind === 'misc'
