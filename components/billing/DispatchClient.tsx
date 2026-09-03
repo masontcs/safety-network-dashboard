@@ -18,7 +18,7 @@ import { useBroadcast } from '@/lib/realtime/useBroadcast'
 
 interface Ticket {
   id: string; ticketNumber: string; date: string; leadTechId: string | null; crewTechIds: string[]
-  feature: 'add' | 'return' | 'dtc'; jobNumber: string; jobName: string | null; customer: string | null; jobTypes: string[]; voided?: boolean
+  feature: 'add' | 'return' | 'dtc'; jobNumber: string; jobName: string | null; customer: string | null; profile: string | null; jobTypes: string[]; voided?: boolean
 }
 interface YardShift { id: string; technicianId: string; date: string }
 interface StagedShift { id: string; date: string; isYard: boolean; crewTechIds: string[]; leadTechId: string | null; jobNumber: string | null; jobName: string | null; customer: string | null; jobTypes: string[] }
@@ -382,27 +382,29 @@ function MonthCalendar({ days, anchor, board, staged, isAdmin, onOpenTicket, onD
   const dayTickets = selected ? (board?.tickets.filter((t) => t.date === selected) ?? []) : []
   const dayStaged = selected ? staged.filter((s) => s.date === selected) : []
   const dayYard = selected ? (board?.yard.filter((y) => y.date === selected) ?? []) : []
+  const techName = useMemo(() => new Map((board?.technicians ?? []).map((t) => [t.id, t.name])), [board])
 
-  const PANEL_W = 380
+  const PANEL_W = 400
+  const weeks = cells.length / 7
 
   return (
-    <div className="card" style={{ marginTop: 14, padding: 0, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'stretch' }}>
-        {/* Month — flexes down as the panel opens, stays clickable. */}
-        <div style={{ flex: 1, minWidth: 0, padding: 18, boxSizing: 'border-box' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0,1fr))', gap: 1, background: 'var(--line)', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
+    <div className="card" style={{ marginTop: 14, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 'calc(100dvh - 200px)' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'stretch' }}>
+        {/* Month — flexes down as the panel opens, stays clickable, fills the card height. */}
+        <div style={{ flex: 1, minWidth: 0, padding: 18, boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0,1fr))', gridTemplateRows: `auto repeat(${weeks}, minmax(64px, 1fr))`, gap: 1, background: 'var(--line)', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((w) => (
               <div key={w} style={{ background: 'var(--surface)', padding: '8px 10px', fontSize: 11, fontWeight: 600, color: 'var(--muted)' }}>{w}</div>
             ))}
             {cells.map((d, i) => {
-              if (!d) return <div key={i} style={{ background: 'var(--bg, #faf9f7)', minHeight: selected ? 76 : 96 }} />
+              if (!d) return <div key={i} style={{ background: 'var(--bg, #faf9f7)' }} />
               const n = countFor(d)
               const chips = chipsFor(d)
               const isToday = d === t0
               const isSel = d === selected
               return (
                 <button key={d} type="button" onClick={() => setSelected(d)}
-                  style={{ textAlign: 'left', background: isSel ? 'var(--accent-soft)' : 'var(--surface)', minHeight: selected ? 76 : 96, padding: 8, border: 'none', borderTop: isToday ? '2px solid var(--accent)' : '2px solid transparent', boxShadow: isSel ? 'inset 0 0 0 2px var(--accent)' : 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4, transition: 'min-height 300ms cubic-bezier(.4,0,.2,1)' }}
+                  style={{ textAlign: 'left', background: isSel ? 'var(--accent-soft)' : 'var(--surface)', padding: 8, border: 'none', borderTop: isToday ? '2px solid var(--accent)' : '2px solid transparent', boxShadow: isSel ? 'inset 0 0 0 2px var(--accent)' : 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4, overflow: 'hidden' }}
                   title={`${dayLong(d)} — ${n} shift${n === 1 ? '' : 's'}`}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: 12.5, fontWeight: isToday || isSel ? 700 : 500, color: isToday ? 'var(--accent)' : 'var(--ink)' }}>{new Date(d + 'T00:00:00Z').getUTCDate()}</span>
@@ -420,10 +422,11 @@ function MonthCalendar({ days, anchor, board, staged, isAdmin, onOpenTicket, onD
           </div>
         </div>
 
-        {/* Day agenda — width eases from 0; inner fixed width keeps text from reflowing mid-anim. */}
-        <div style={{ flexShrink: 0, width: selected ? PANEL_W : 0, opacity: selected ? 1 : 0, borderLeft: selected ? '1px solid var(--line)' : 'none', transition: 'width 300ms cubic-bezier(.4,0,.2,1), opacity 220ms ease', overflow: 'hidden' }}>
-          <div style={{ width: PANEL_W, padding: 18, boxSizing: 'border-box' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        {/* Day agenda — width eases from 0; inner fixed width keeps text from reflowing mid-anim.
+            Fills the card height and scrolls internally when the day is busy. */}
+        <div style={{ flexShrink: 0, width: selected ? PANEL_W : 0, opacity: selected ? 1 : 0, borderLeft: selected ? '1px solid var(--line)' : 'none', transition: 'width 300ms cubic-bezier(.4,0,.2,1), opacity 220ms ease', overflow: 'hidden', display: 'flex' }}>
+          <div style={{ width: PANEL_W, padding: 18, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexShrink: 0 }}>
               <h3 style={{ margin: 0, fontSize: 14.5 }}>{selected ? dayLong(selected) : ''}</h3>
               {isAdmin && selected && <button className="bx-btn accent sm" style={{ marginLeft: 'auto' }} onClick={() => onDispatchDay(selected)}>+ Dispatch</button>}
               <button className="bx-iconbtn" onClick={() => setSelected(null)} title="Close" style={{ marginLeft: isAdmin ? 0 : 'auto' }}>✕</button>
@@ -432,27 +435,13 @@ function MonthCalendar({ days, anchor, board, staged, isAdmin, onOpenTicket, onD
             {selected && dayTickets.length === 0 && dayStaged.length === 0 && dayYard.length === 0 ? (
               <div className="bx-empty">Nothing scheduled this day.</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {dayTickets.map((t) => (
-                  <div key={t.id} className={`tk ${featureClass(t.feature)}`} style={{ margin: 0, cursor: 'pointer', ...(t.voided ? { opacity: 0.4, textDecoration: 'line-through' } : {}) }} onClick={() => onOpenTicket(t)} title={`${t.ticketNumber} · open`}>
-                    <b>{(t.customer ?? t.jobName ?? t.jobNumber) + ' — ' + featureLabel(t.feature)}{t.voided ? ' · VOID' : ''}</b>
-                    <small>{t.ticketNumber}{t.jobName && t.customer ? ` · ${t.jobName}` : ''}{t.jobTypes.length ? ` · ${t.jobTypes.join(', ')}` : ''}</small>
-                  </div>
-                ))}
+              <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 2 }}>
+                {dayTickets.map((t) => <AgendaTicketBox key={t.id} t={t} techName={techName} onOpen={() => onOpenTicket(t)} />)}
+                {dayStaged.map((s) => <AgendaStagedBox key={s.id} s={s} techName={techName} isAdmin={isAdmin} onPublish={() => onPublishShift(s.id)} onEdit={() => onEditShift(s.id)} onDelete={() => onDeleteShift(s.id)} />)}
                 {dayYard.map((y) => (
-                  <div key={y.id} className="tk" style={{ margin: 0, background: 'var(--bg-secondary, #eee)', border: '1px solid var(--border, #ddd)', color: 'var(--text-secondary, #555)' }} title="Yard shift — no ticket"><b>YARD</b></div>
-                ))}
-                {dayStaged.map((s) => (
-                  <div key={s.id} className="tk" style={{ margin: 0, background: 'transparent', border: '1px dashed var(--accent, #b8860b)', color: 'var(--text-secondary, #555)' }} title="Staged shift — not published yet">
-                    <b>{(s.isYard ? 'YARD' : (s.customer ?? s.jobName ?? s.jobNumber ?? 'Shift'))} · STAGED</b>
-                    <small>{s.isYard ? 'yard shift (draft)' : (s.jobTypes.length ? s.jobTypes.join(', ') : (s.jobNumber ?? ''))}</small>
-                    {isAdmin && (
-                      <div style={{ display: 'flex', gap: 8, marginTop: 3 }}>
-                        <small onClick={(e) => { e.stopPropagation(); onPublishShift(s.id) }} style={{ cursor: 'pointer', color: 'var(--accent, #b8860b)', fontWeight: 600 }}>publish</small>
-                        <small onClick={(e) => { e.stopPropagation(); onEditShift(s.id) }} style={{ cursor: 'pointer', color: 'var(--text-secondary, #555)' }}>edit</small>
-                        <small onClick={(e) => { e.stopPropagation(); onDeleteShift(s.id) }} style={{ cursor: 'pointer', color: 'var(--danger, #c0392b)' }}>delete</small>
-                      </div>
-                    )}
+                  <div key={y.id} style={{ ...agendaBox, borderStyle: 'solid', color: 'var(--muted)' }} title="Yard shift — no ticket">
+                    <div style={agendaTitle}><span>Yard shift</span><Feature label="yard" /></div>
+                    <Field label="Tech" value={techName.get(y.technicianId) ?? '—'} />
                   </div>
                 ))}
               </div>
@@ -460,6 +449,87 @@ function MonthCalendar({ days, anchor, board, staged, isAdmin, onOpenTicket, onD
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/* ─── Box-style shift widgets for the day agenda ─────────────────────────────────────────── */
+const agendaBox: React.CSSProperties = { border: '1px solid var(--line)', borderRadius: 8, background: 'var(--surface)', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 5 }
+const agendaTitle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', fontSize: 13, fontWeight: 600, color: 'var(--ink)' }
+
+function Feature({ label }: { label: string }) {
+  const map: Record<string, { bg: string; fg: string }> = {
+    'set up': { bg: 'var(--accent-soft)', fg: 'var(--accent)' },
+    pickup: { bg: 'color-mix(in srgb, var(--blue) 14%, transparent)', fg: 'var(--blue)' },
+    DTC: { bg: 'var(--warn-soft)', fg: 'var(--brand)' },
+    yard: { bg: 'var(--bg-secondary, #eee)', fg: 'var(--muted)' },
+    STAGED: { bg: 'transparent', fg: 'var(--accent)' },
+  }
+  const c = map[label] ?? { bg: 'var(--bg-secondary,#eee)', fg: 'var(--muted)' }
+  return <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: c.fg, background: c.bg, border: label === 'STAGED' ? '1px dashed var(--accent)' : 'none', borderRadius: 5, padding: '2px 6px', whiteSpace: 'nowrap' }}>{label}</span>
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, fontSize: 12, lineHeight: 1.35 }}>
+      <span style={{ color: 'var(--muted)', minWidth: 48, flexShrink: 0 }}>{label}</span>
+      <span style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>{value}</span>
+    </div>
+  )
+}
+
+function TechChips({ crewTechIds, leadTechId, techName }: { crewTechIds: string[]; leadTechId: string | null; techName: Map<string, string> }) {
+  if (crewTechIds.length === 0) return <span style={{ fontSize: 12, color: 'var(--muted)' }}>No techs assigned</span>
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+      {crewTechIds.map((id) => {
+        const lead = id === leadTechId
+        return (
+          <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, padding: '2px 8px', borderRadius: 999, background: lead ? 'var(--accent-soft)' : 'var(--bg-secondary, #f0efec)', color: lead ? 'var(--accent)' : 'var(--text-primary)', border: lead ? '1px solid var(--accent)' : '1px solid var(--line)' }}>
+            {lead && <span aria-hidden>★</span>}{techName.get(id) ?? '—'}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+function AgendaTicketBox({ t, techName, onOpen }: { t: Ticket; techName: Map<string, string>; onOpen: () => void }) {
+  return (
+    <div onClick={onOpen} title={`${t.ticketNumber} · open`}
+      style={{ ...agendaBox, cursor: 'pointer', borderLeft: '3px solid var(--accent)', ...(t.voided ? { opacity: 0.5 } : {}) }}>
+      <div style={agendaTitle}>
+        <span style={t.voided ? { textDecoration: 'line-through' } : undefined}>{t.customer ?? t.profile ?? t.jobName ?? t.jobNumber}</span>
+        <Feature label={t.voided ? 'yard' : featureLabel(t.feature)} />
+      </div>
+      {t.profile && <Field label="Profile" value={t.profile} />}
+      <Field label="Job" value={`${t.jobNumber}${t.jobName ? ` · ${t.jobName}` : ''}`} />
+      <Field label="Ticket" value={t.ticketNumber} />
+      {t.jobTypes.length > 0 && <Field label="Type" value={t.jobTypes.join(', ')} />}
+      <div style={{ borderTop: '1px solid var(--line)', margin: '2px 0 1px' }} />
+      <TechChips crewTechIds={t.crewTechIds} leadTechId={t.leadTechId} techName={techName} />
+    </div>
+  )
+}
+
+function AgendaStagedBox({ s, techName, isAdmin, onPublish, onEdit, onDelete }: { s: StagedShift; techName: Map<string, string>; isAdmin: boolean; onPublish: () => void; onEdit: () => void; onDelete: () => void }) {
+  return (
+    <div style={{ ...agendaBox, border: '1px dashed var(--accent)' }} title="Staged shift — not published yet">
+      <div style={agendaTitle}>
+        <span>{s.isYard ? 'Yard shift' : (s.customer ?? s.jobName ?? s.jobNumber ?? 'Shift')}</span>
+        <Feature label="STAGED" />
+      </div>
+      {!s.isYard && s.jobNumber && <Field label="Job" value={`${s.jobNumber}${s.jobName ? ` · ${s.jobName}` : ''}`} />}
+      {s.jobTypes.length > 0 && <Field label="Type" value={s.jobTypes.join(', ')} />}
+      <div style={{ borderTop: '1px solid var(--line)', margin: '2px 0 1px' }} />
+      <TechChips crewTechIds={s.crewTechIds} leadTechId={s.leadTechId} techName={techName} />
+      {isAdmin && (
+        <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
+          <button className="bx-btn accent sm" onClick={onPublish}>Publish</button>
+          <button className="bx-btn ghost sm" onClick={onEdit}>Edit</button>
+          <button className="bx-btn ghost sm" onClick={onDelete} style={{ color: 'var(--danger)' }}>Delete</button>
+        </div>
+      )}
     </div>
   )
 }

@@ -64,12 +64,12 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     const tq = supabase
       .from('billing_tickets')
-      .select('id, ticket_number, ticket_date, feature_add, feature_return, feature_dtc, is_voided, billing_jobs(job_number, name, branch_id, billing_profiles(billing_customers(name)))')
+      .select('id, ticket_number, ticket_date, feature_add, feature_return, feature_dtc, is_voided, billing_jobs(job_number, name, branch_id, billing_profiles(name, billing_customers(name)))')
       .gte('ticket_date', rangeStart).lte('ticket_date', rangeEnd)
     const { data: tkRaw } = await tq
     let tickets = (tkRaw ?? []) as unknown as {
       id: string; ticket_number: string; ticket_date: string; feature_add: boolean; feature_return: boolean; feature_dtc: boolean; is_voided: boolean
-      billing_jobs: { job_number: string; name: string | null; branch_id: string; billing_profiles: { billing_customers: { name: string } | null } | null } | null
+      billing_jobs: { job_number: string; name: string | null; branch_id: string; billing_profiles: { name: string | null; billing_customers: { name: string } | null } | null } | null
     }[]
     const reqBranch = url.searchParams.get('branchId') || ''
     let effBranchIds = ctx.access.branchIds
@@ -137,6 +137,7 @@ export async function GET(request: Request): Promise<NextResponse> {
           jobNumber: t.billing_jobs?.job_number ?? '',
           jobName: t.billing_jobs?.name ?? null,
           customer: t.billing_jobs?.billing_profiles?.billing_customers?.name ?? null,
+          profile: t.billing_jobs?.billing_profiles?.name ?? null,
           jobTypes: jobTypesByTicket.get(t.id) ?? [],
         })),
         isAdmin: ctx.access.role === 'admin',
