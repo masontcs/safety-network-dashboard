@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBranch } from '@/components/billing/BranchContext'
 import ShiftEditorModal from '@/components/billing/ShiftEditorModal'
+import ShiftDetailDrawer from '@/components/billing/ShiftDetailDrawer'
 import { useBroadcast } from '@/lib/realtime/useBroadcast'
 
 /**
@@ -51,6 +52,7 @@ export default function DispatchClient() {
   const [dispatchCell, setDispatchCell] = useState<{ techId: string | null; date: string } | null>(null)
   const [generalDispatch, setGeneralDispatch] = useState<{ date: string } | null>(null)
   const [editShiftId, setEditShiftId] = useState<string | null>(null)
+  const [detailTicket, setDetailTicket] = useState<Ticket | null>(null)
   const drag = useRef<Ticket | null>(null)
   const router = useRouter()
   const { branchId } = useBranch()
@@ -197,7 +199,7 @@ export default function DispatchClient() {
       {range === 'month'
         ? <MonthCalendar
             days={days} anchor={anchor} board={board} staged={staged} isAdmin={!!board?.isAdmin}
-            onOpenTicket={(t) => router.push(`/billing/tickets/${t.id}`)}
+            onOpenTicket={(t) => setDetailTicket(t)}
             onDispatchDay={(d) => setGeneralDispatch({ date: d })}
             onPublishShift={publishShift} onEditShift={(id) => setEditShiftId(id)} onDeleteShift={deleteShift} />
         : (
@@ -225,7 +227,7 @@ export default function DispatchClient() {
                     canDispatch={!!board?.isAdmin && isTech}
                     onDragStart={(t) => { drag.current = t }}
                     onDrop={(key, day) => { if (drag.current) { reassign(drag.current, key, day); drag.current = null } }}
-                    onOpen={(t) => router.push(`/billing/tickets/${t.id}`)}
+                    onOpen={(t) => setDetailTicket(t)}
                     onDispatch={(key, day) => setDispatchCell({ techId: key === UNASSIGNED ? null : key, date: day })}
                   />
                 ))}
@@ -264,6 +266,17 @@ export default function DispatchClient() {
           ticketsForDay={[]}
           onClose={() => setGeneralDispatch(null)}
           onDone={(msg) => { setGeneralDispatch(null); flash(msg); load(range, anchor) }}
+        />
+      )}
+
+      {detailTicket && board && (
+        <ShiftDetailDrawer
+          ticket={detailTicket}
+          technicians={board.technicians}
+          isAdmin={board.isAdmin}
+          onOpenFull={() => router.push(`/billing/tickets/${detailTicket.id}`)}
+          onClose={() => setDetailTicket(null)}
+          onChanged={() => load(range, anchor, true)}
         />
       )}
 
