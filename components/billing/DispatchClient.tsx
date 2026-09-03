@@ -354,17 +354,18 @@ function GridRow({ row, days, loading, groupBy, cardsFor, yardFor, stagedFor, on
   )
 }
 
-/* ─── Month calendar with a horizontal slide to a day agenda ─────────────────────────────
-   Two panels ride a track: the calendar (left) and the clicked day's agenda (right). Clicking a
-   day slides the track left so the month exits and the day enters from the right; "‹ Month" slides
-   back. Selecting a day is local to this view (range stays 'month'). */
+/* ─── Month calendar with a master–detail day agenda ─────────────────────────────────────
+   Clicking a day opens an agenda panel that eases in on the RIGHT while the calendar shrinks to
+   the left and STAYS interactive — so you can keep picking other days without closing the panel.
+   The selected day is highlighted; ✕ collapses the panel. Selecting a day is local (range stays
+   'month'). */
 function MonthCalendar({ days, anchor, board, staged, isAdmin, onOpenTicket, onDispatchDay, onPublishShift, onEditShift, onDeleteShift }: {
   days: string[]; anchor: string; board: Board | null; staged: StagedShift[]; isAdmin: boolean
   onOpenTicket: (t: Ticket) => void; onDispatchDay: (d: string) => void
   onPublishShift: (id: string) => void; onEditShift: (id: string) => void; onDeleteShift: (id: string) => void
 }) {
   const [selected, setSelected] = useState<string | null>(null)
-  // Reset the slide whenever the month changes.
+  // Collapse the panel whenever the month changes.
   useEffect(() => { setSelected(null) }, [anchor])
 
   // Pad the month to whole Mon–Sun weeks.
@@ -376,60 +377,62 @@ function MonthCalendar({ days, anchor, board, staged, isAdmin, onOpenTicket, onD
   const t0 = today()
 
   const countFor = (d: string) => (board?.tickets.filter((t) => t.date === d && !t.voided).length ?? 0) + staged.filter((s) => s.date === d).length + (board?.yard.filter((y) => y.date === d).length ?? 0)
-  const chipsFor = (d: string) => (board?.tickets.filter((t) => t.date === d && !t.voided) ?? []).slice(0, 3)
+  const chipsFor = (d: string) => (board?.tickets.filter((t) => t.date === d && !t.voided) ?? []).slice(0, selected ? 2 : 3)
 
   const dayTickets = selected ? (board?.tickets.filter((t) => t.date === selected) ?? []) : []
   const dayStaged = selected ? staged.filter((s) => s.date === selected) : []
   const dayYard = selected ? (board?.yard.filter((y) => y.date === selected) ?? []) : []
 
+  const PANEL_W = 380
+
   return (
     <div className="card" style={{ marginTop: 14, padding: 0, overflow: 'hidden' }}>
-      {/* Viewport clips the track; the track holds both panels side by side and translates. */}
-      <div style={{ overflow: 'hidden' }}>
-        <div style={{ display: 'flex', width: '200%', transform: selected ? 'translateX(-50%)' : 'translateX(0)', transition: 'transform 320ms cubic-bezier(.4,0,.2,1)' }}>
-          {/* Panel 1 — the month */}
-          <div style={{ width: '50%', padding: 18, boxSizing: 'border-box' }} aria-hidden={!!selected}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0,1fr))', gap: 1, background: 'var(--line)', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((w) => (
-                <div key={w} style={{ background: 'var(--surface)', padding: '8px 10px', fontSize: 11, fontWeight: 600, color: 'var(--muted)' }}>{w}</div>
-              ))}
-              {cells.map((d, i) => {
-                if (!d) return <div key={i} style={{ background: 'var(--bg, #faf9f7)', minHeight: 96 }} />
-                const n = countFor(d)
-                const chips = chipsFor(d)
-                const isToday = d === t0
-                return (
-                  <button key={d} type="button" onClick={() => setSelected(d)}
-                    style={{ textAlign: 'left', background: 'var(--surface)', minHeight: 96, padding: 8, border: 'none', borderTop: isToday ? '2px solid var(--accent)' : '2px solid transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4 }}
-                    title={`${dayLong(d)} — ${n} shift${n === 1 ? '' : 's'}`}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 12.5, fontWeight: isToday ? 700 : 500, color: isToday ? 'var(--accent)' : 'var(--ink)' }}>{new Date(d + 'T00:00:00Z').getUTCDate()}</span>
-                      {n > 0 && <span style={{ fontSize: 10.5, fontWeight: 700, color: '#fff', background: 'var(--accent)', borderRadius: 999, padding: '0 6px', lineHeight: '16px' }}>{n}</span>}
-                    </div>
-                    {chips.map((t) => (
-                      <span key={t.id} className={`tk ${featureClass(t.feature)}`} style={{ margin: 0, fontSize: 10.5, padding: '2px 5px', cursor: 'pointer' }}>
-                        <b style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.customer ?? t.jobName ?? t.jobNumber}</b>
-                      </span>
-                    ))}
-                    {n > chips.length && <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>+{n - chips.length} more</span>}
-                  </button>
-                )
-              })}
-            </div>
+      <div style={{ display: 'flex', alignItems: 'stretch' }}>
+        {/* Month — flexes down as the panel opens, stays clickable. */}
+        <div style={{ flex: 1, minWidth: 0, padding: 18, boxSizing: 'border-box' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0,1fr))', gap: 1, background: 'var(--line)', border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((w) => (
+              <div key={w} style={{ background: 'var(--surface)', padding: '8px 10px', fontSize: 11, fontWeight: 600, color: 'var(--muted)' }}>{w}</div>
+            ))}
+            {cells.map((d, i) => {
+              if (!d) return <div key={i} style={{ background: 'var(--bg, #faf9f7)', minHeight: selected ? 76 : 96 }} />
+              const n = countFor(d)
+              const chips = chipsFor(d)
+              const isToday = d === t0
+              const isSel = d === selected
+              return (
+                <button key={d} type="button" onClick={() => setSelected(d)}
+                  style={{ textAlign: 'left', background: isSel ? 'var(--accent-soft)' : 'var(--surface)', minHeight: selected ? 76 : 96, padding: 8, border: 'none', borderTop: isToday ? '2px solid var(--accent)' : '2px solid transparent', boxShadow: isSel ? 'inset 0 0 0 2px var(--accent)' : 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 4, transition: 'min-height 300ms cubic-bezier(.4,0,.2,1)' }}
+                  title={`${dayLong(d)} — ${n} shift${n === 1 ? '' : 's'}`}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 12.5, fontWeight: isToday || isSel ? 700 : 500, color: isToday ? 'var(--accent)' : 'var(--ink)' }}>{new Date(d + 'T00:00:00Z').getUTCDate()}</span>
+                    {n > 0 && <span style={{ fontSize: 10.5, fontWeight: 700, color: '#fff', background: 'var(--accent)', borderRadius: 999, padding: '0 6px', lineHeight: '16px' }}>{n}</span>}
+                  </div>
+                  {chips.map((t) => (
+                    <span key={t.id} className={`tk ${featureClass(t.feature)}`} style={{ margin: 0, fontSize: 10.5, padding: '2px 5px', cursor: 'pointer' }}>
+                      <b style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.customer ?? t.jobName ?? t.jobNumber}</b>
+                    </span>
+                  ))}
+                  {n > chips.length && <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>+{n - chips.length} more</span>}
+                </button>
+              )
+            })}
           </div>
+        </div>
 
-          {/* Panel 2 — the selected day's agenda */}
-          <div style={{ width: '50%', padding: 18, boxSizing: 'border-box' }} aria-hidden={!selected}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-              <button className="bx-btn ghost sm" onClick={() => setSelected(null)}>‹ Month</button>
-              <h3 style={{ margin: 0, fontSize: 15 }}>{selected ? dayLong(selected) : ''}</h3>
+        {/* Day agenda — width eases from 0; inner fixed width keeps text from reflowing mid-anim. */}
+        <div style={{ flexShrink: 0, width: selected ? PANEL_W : 0, opacity: selected ? 1 : 0, borderLeft: selected ? '1px solid var(--line)' : 'none', transition: 'width 300ms cubic-bezier(.4,0,.2,1), opacity 220ms ease', overflow: 'hidden' }}>
+          <div style={{ width: PANEL_W, padding: 18, boxSizing: 'border-box' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <h3 style={{ margin: 0, fontSize: 14.5 }}>{selected ? dayLong(selected) : ''}</h3>
               {isAdmin && selected && <button className="bx-btn accent sm" style={{ marginLeft: 'auto' }} onClick={() => onDispatchDay(selected)}>+ Dispatch</button>}
+              <button className="bx-iconbtn" onClick={() => setSelected(null)} title="Close" style={{ marginLeft: isAdmin ? 0 : 'auto' }}>✕</button>
             </div>
 
             {selected && dayTickets.length === 0 && dayStaged.length === 0 && dayYard.length === 0 ? (
               <div className="bx-empty">Nothing scheduled this day.</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 560 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {dayTickets.map((t) => (
                   <div key={t.id} className={`tk ${featureClass(t.feature)}`} style={{ margin: 0, cursor: 'pointer', ...(t.voided ? { opacity: 0.4, textDecoration: 'line-through' } : {}) }} onClick={() => onOpenTicket(t)} title={`${t.ticketNumber} · open`}>
                     <b>{(t.customer ?? t.jobName ?? t.jobNumber) + ' — ' + featureLabel(t.feature)}{t.voided ? ' · VOID' : ''}</b>
