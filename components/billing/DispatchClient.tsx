@@ -57,8 +57,10 @@ export default function DispatchClient() {
   const router = useRouter()
   const { branchId } = useBranch()
 
-  // Remember the user's chosen view (range + grouping) across visits. Read after mount to avoid a
-  // hydration mismatch; the date is intentionally NOT persisted (it resets to today each visit).
+  // Remember the user's chosen view (range + grouping) across visits. We RESTORE once on mount and
+  // WRITE only on an explicit pick (below) — never from an effect, which would fire on the first
+  // render with the default value and clobber the stored one before the restore lands. The date is
+  // intentionally NOT persisted (it resets to today each visit).
   useEffect(() => {
     try {
       const r = localStorage.getItem('sn.dispatch.range')
@@ -67,8 +69,8 @@ export default function DispatchClient() {
       if (g === 'tech' || g === 'customer' || g === 'jobtype') setGroupBy(g)
     } catch { /* storage unavailable — just use defaults */ }
   }, [])
-  useEffect(() => { try { localStorage.setItem('sn.dispatch.range', range) } catch { /* ignore */ } }, [range])
-  useEffect(() => { try { localStorage.setItem('sn.dispatch.groupBy', groupBy) } catch { /* ignore */ } }, [groupBy])
+  const pickRange = (r: Range) => { setRange(r); try { localStorage.setItem('sn.dispatch.range', r) } catch { /* ignore */ } }
+  const pickGroupBy = (g: GroupBy) => { setGroupBy(g); try { localStorage.setItem('sn.dispatch.groupBy', g) } catch { /* ignore */ } }
 
   const load = useCallback((r: Range, a: string, silent = false) => {
     if (!silent) setBoard(null)
@@ -163,7 +165,7 @@ export default function DispatchClient() {
     : `Week of ${new Date(board.rangeStart + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' })}`
 
   const seg = (r: Range, label: string) => (
-    <button type="button" className={`bx-btn ${range === r ? 'accent' : 'ghost'} sm`} onClick={() => setRange(r)}>{label}</button>
+    <button type="button" className={`bx-btn ${range === r ? 'accent' : 'ghost'} sm`} onClick={() => pickRange(r)}>{label}</button>
   )
 
   return (
@@ -180,7 +182,7 @@ export default function DispatchClient() {
           {range !== 'month' && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted)' }}>
               Group by
-              <select className="bx-f bx-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupBy)} style={{ padding: '5px 8px', fontSize: 12.5 }}>
+              <select className="bx-f bx-select" value={groupBy} onChange={(e) => pickGroupBy(e.target.value as GroupBy)} style={{ padding: '5px 8px', fontSize: 12.5 }}>
                 <option value="tech">Technician</option>
                 <option value="customer">Customer</option>
                 <option value="jobtype">Job type</option>
