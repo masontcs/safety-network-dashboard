@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import type { Database } from '@/lib/supabase/database.types'
 import { allowedPrefixesFor, canBillingArea } from '@/lib/utils/interfaces'
-import { surfaceForHost, surfaceForPath, surfaceUrl, cookieDomainForHost, SURFACE_HOME } from '@/lib/utils/domains'
+import { surfaceForHost, surfaceForPath, surfaceUrl, cookieDomainForHost, SURFACE_HOME, isPortalHost, isPortalPath, PORTAL_URL } from '@/lib/utils/domains'
 
 type Role = Database['public']['Tables']['user_profiles']['Row']['role']
 
@@ -35,6 +35,26 @@ const ROLE_HOME: Record<Role, string> = {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const host = request.headers.get('host')
+
+  // ── Customer portal (its own world) ────────────────────────────────────────────
+  // The portal has separate auth (portal accounts, no user_profiles), so the staff gating
+  // below must never run on it. It lives ONLY on portal.<root>:
+  //   • on the portal host, everything routes to /portal (its own layout gate handles auth);
+  //   • on a staff subdomain, a /portal path is pushed to the portal host;
+  //   • on …vercel.app / localhost (no custom domains) /portal is served in place for dev.
+  const onPortalHost = isPortalHost(host)
+  const portalPath = isPortalPath(pathname)
+  if (onPortalHost) {
+    if (!portalPath) return NextResponse.redirect(new URL('/portal', request.url))
+    return NextResponse.next() // portal owns its auth in app/portal/(secure)/layout
+  }
+  if (portalPath) {
+    // A staff subdomain must not serve the portal — push it to its own domain. On
+    // …vercel.app / localhost / apex (no custom domains) serve it in place for dev, still
+    // skipping the staff auth below (the portal's own layout gate handles auth).
+    if (surfaceForHost(host)) return NextResponse.redirect(new URL(`${PORTAL_URL}${pathname}${request.nextUrl.search}`))
+    return NextResponse.next()
+  }
 
   // ── Subdomain routing (strict) ────────────────────────────────────────────────
   // On a surface subdomain: its root → that surface's home, and a path belonging to a
@@ -147,5 +167,10 @@ export const config = {
     // The tech app — gated here (allow-list bounces non-tech roles) and again in the
     // /tech layout, two independent gates like /billing.
     '/tech/:path*',
+    // The customer portal — matched so the host router can keep it on portal.<root>
+    // (and redirect the root there). Its own layout gate handles auth; the early branch
+    // in the middleware body returns before any staff-auth logic runs.
+    '/portal',
+    '/portal/:path*',
   ],
 }

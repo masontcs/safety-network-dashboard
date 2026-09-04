@@ -331,9 +331,9 @@ export type Database = {
         Relationships: []
       }
       billing_portal_accounts: {
-        Row: { id: string; customer_id: string; auth_user_id: string | null; email: string; name: string | null; role: 'owner' | 'member'; is_active: boolean; invited_by: string | null; last_login_at: string | null; created_at: string; updated_at: string }
-        Insert: { id?: string; customer_id: string; auth_user_id?: string | null; email: string; name?: string | null; role?: 'owner' | 'member'; is_active?: boolean; invited_by?: string | null; last_login_at?: string | null }
-        Update: { id?: string; customer_id?: string; auth_user_id?: string | null; email?: string; name?: string | null; role?: 'owner' | 'member'; is_active?: boolean; invited_by?: string | null; last_login_at?: string | null; updated_at?: string }
+        Row: { id: string; customer_id: string; auth_user_id: string | null; email: string; username: string | null; name: string | null; role: 'owner' | 'member'; is_active: boolean; invited_by: string | null; last_login_at: string | null; created_at: string; updated_at: string }
+        Insert: { id?: string; customer_id: string; auth_user_id?: string | null; email: string; username?: string | null; name?: string | null; role?: 'owner' | 'member'; is_active?: boolean; invited_by?: string | null; last_login_at?: string | null }
+        Update: { id?: string; customer_id?: string; auth_user_id?: string | null; email?: string; username?: string | null; name?: string | null; role?: 'owner' | 'member'; is_active?: boolean; invited_by?: string | null; last_login_at?: string | null; updated_at?: string }
         Relationships: []
       }
       billing_profile_contacts: {

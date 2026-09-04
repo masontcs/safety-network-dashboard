@@ -150,14 +150,17 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
   )
 }
 
-interface PortalAccount { id: string; email: string; name: string | null; role: string; isActive: boolean; activated: boolean; lastLoginAt: string | null }
+interface PortalAccount { id: string; email: string; username: string | null; name: string | null; role: string; isActive: boolean; activated: boolean; lastLoginAt: string | null }
 
 function PortalAccessCard({ customerId }: { customerId: string }) {
   const [accounts, setAccounts] = useState<PortalAccount[] | null>(null)
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
+  const [username, setUsername] = useState('')
   const [busy, setBusy] = useState(false)
+  const [resending, setResending] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [note, setNote] = useState<string | null>(null)
 
   const load = useCallback(() => {
     fetch(`/api/billing/portal-accounts?customerId=${customerId}`).then((r) => r.json())
@@ -169,16 +172,27 @@ function PortalAccessCard({ customerId }: { customerId: string }) {
   async function add(e: React.FormEvent) {
     e.preventDefault()
     if (busy) return
-    setBusy(true); setError(null)
+    setBusy(true); setError(null); setNote(null)
     try {
       const res = await fetch('/api/billing/portal-accounts', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerId, email: email.trim(), name: name.trim() }),
+        body: JSON.stringify({ customerId, email: email.trim(), name: name.trim(), username: username.trim() || undefined }),
       })
       const j = await res.json()
       if (!j.success) { setError(j.error); return }
-      setEmail(''); setName(''); load()
+      setNote(j.invited ? `Invite emailed to ${email.trim()}.` : `Login added, but the invite email couldn’t be sent — use Resend once email is configured.`)
+      setEmail(''); setName(''); setUsername(''); load()
     } finally { setBusy(false) }
+  }
+
+  async function resend(id: string, addr: string) {
+    setResending(id); setError(null); setNote(null)
+    try {
+      const res = await fetch(`/api/billing/portal-accounts/${id}`, { method: 'POST' })
+      const j = await res.json()
+      if (!j.success) { setError(j.error); return }
+      setNote(`Invite re-sent to ${addr}.`)
+    } finally { setResending(null) }
   }
 
   return (
@@ -186,21 +200,24 @@ function PortalAccessCard({ customerId }: { customerId: string }) {
       <div className="bx-cardhead"><h3>Portal access</h3></div>
       <div className="bx-sub" style={{ margin: '-6px 0 12px' }}>
         People here can sign in at the customer portal to see this customer&apos;s open jobs and issued invoices —
-        but only for profiles you&apos;ve switched on (toggle lives on each profile). They sign in with a magic link; no passwords.
+        but only for profiles you&apos;ve switched on (toggle lives on each profile). Adding a login emails them an
+        invite to set their own password; they then sign in with their email (or username) and password.
       </div>
 
       {accounts === null ? <div className="bx-empty">Loading…</div>
         : accounts.length === 0 ? <div className="bx-empty">No portal logins yet.</div>
         : (
           <table>
-            <thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Status</th></tr></thead>
+            <thead><tr><th>Email</th><th>Username</th><th>Name</th><th>Role</th><th>Status</th><th></th></tr></thead>
             <tbody>
               {accounts.map((a) => (
                 <tr key={a.id}>
                   <td>{a.email}</td>
+                  <td>{a.username ?? '—'}</td>
                   <td>{a.name ?? '—'}</td>
                   <td><span className="tag t-gray">{a.role}</span></td>
                   <td>{!a.isActive ? <span className="tag t-red">disabled</span> : a.activated ? <span className="tag t-green">active</span> : <span className="tag t-amber">invited</span>}</td>
+                  <td className="num">{a.isActive && <button className="bx-btn ghost sm" disabled={resending === a.id} onClick={() => resend(a.id, a.email)}>{resending === a.id ? 'Sending…' : a.activated ? 'Send reset' : 'Resend invite'}</button>}</td>
                 </tr>
               ))}
             </tbody>
@@ -209,9 +226,11 @@ function PortalAccessCard({ customerId }: { customerId: string }) {
 
       <form onSubmit={add} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 14, flexWrap: 'wrap' }}>
         <div><label className="bx-lbl">Email</label><input className="bx-f" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="contact@customer.com" style={{ width: 220 }} /></div>
-        <div><label className="bx-lbl">Name (optional)</label><input className="bx-f" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe" style={{ width: 180 }} /></div>
+        <div><label className="bx-lbl">Username (optional)</label><input className="bx-f" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="acme-jobs" style={{ width: 150 }} /></div>
+        <div><label className="bx-lbl">Name (optional)</label><input className="bx-f" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe" style={{ width: 160 }} /></div>
         <button className="bx-btn accent" type="submit" disabled={busy || !email.trim()}>{busy ? 'Adding…' : 'Add login'}</button>
       </form>
+      {note && <div style={{ fontSize: 12, color: 'var(--pill-paid-fg)', marginTop: 8 }}>{note}</div>}
       {error && <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 8 }}>{error}</div>}
     </div>
   )

@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 
 /**
- * Magic-link landing. Exchanges the one-time code for a session (cookies set by the SSR
- * client), then hands off to /portal — where the layout gate resolves the portal account
- * and links auth_user_id on this first visit.
+ * Auth landing for the portal. Exchanges the one-time code for a session (cookies set by
+ * the SSR client), then hands off:
+ *   • invite / password-reset links (?next=set-password) → the set-password page
+ *   • anything else → /portal, where the layout gate resolves the account and links
+ *     auth_user_id on first visit.
  */
 export async function GET(request: Request): Promise<NextResponse> {
   const url = new URL(request.url)
@@ -13,5 +15,6 @@ export async function GET(request: Request): Promise<NextResponse> {
     const supabase = createServerClient()
     await supabase.auth.exchangeCodeForSession(code)
   }
-  return NextResponse.redirect(new URL('/portal', url.origin))
+  const dest = url.searchParams.get('next') === 'set-password' ? '/portal/auth/set-password' : '/portal'
+  return NextResponse.redirect(new URL(dest, url.origin))
 }

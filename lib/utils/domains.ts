@@ -13,6 +13,20 @@
 
 export const ROOT_DOMAIN = 'safetynetworkteams.com'
 
+/**
+ * The customer portal is a fourth surface, but it is NOT a staff Surface: it has its own
+ * auth (external portal accounts, no user_profiles) and must stay isolated from the staff
+ * subdomains. So it's handled separately from the Surface machinery below — the portal
+ * lives only on portal.<root> and serves only /portal.
+ */
+export const PORTAL_HOST = `portal.${ROOT_DOMAIN}`
+export const PORTAL_URL = `https://${PORTAL_HOST}`
+/** Where an invite / password-reset link should land (the portal set-password flow). */
+export const portalSetPasswordRedirect = (): string =>
+  (process.env.NEXT_PUBLIC_PORTAL_URL || PORTAL_URL) + '/portal/auth/callback?next=set-password'
+export const isPortalHost = (host?: string | null): boolean => (host ?? '').split(':')[0].toLowerCase() === PORTAL_HOST
+export const isPortalPath = (pathname: string): boolean => pathname === '/portal' || pathname.startsWith('/portal/')
+
 export type Surface = 'billing' | 'dashboards' | 'field'
 
 export const SUBDOMAIN_HOST: Record<Surface, string> = {
@@ -62,5 +76,8 @@ export function surfaceUrl(surface: Surface, path = ''): string {
  */
 export function cookieDomainForHost(host?: string | null): string | undefined {
   const h = bareHost(host)
+  // The portal is a separate audience with its own auth — keep its session cookie HOST-ONLY
+  // so it never joins (or clobbers) the staff single-sign-on cookie on the parent domain.
+  if (h === PORTAL_HOST) return undefined
   return h === ROOT_DOMAIN || h.endsWith('.' + ROOT_DOMAIN) ? '.' + ROOT_DOMAIN : undefined
 }
