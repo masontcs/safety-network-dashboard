@@ -68,10 +68,10 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
   const [date, setDate] = useState(''); const [notes, setNotes] = useState('')
 
   // ledger add form (billing type is the per-item cadence, only for pickups)
-  const [lItem, setLItem] = useState(''); const [lVar, setLVar] = useState(''); const [lType, setLType] = useState('pickup')
-  const [lDate, setLDate] = useState(''); const [lQty, setLQty] = useState('1'); const [lEquip, setLEquip] = useState(''); const [lBt, setLBt] = useState('')
-  // return grid: qty typed per on-rent row, keyed `${itemId}|${variationId ?? ''}`
-  const [retQty, setRetQty] = useState<Record<string, string>>({}); const [retDate, setRetDate] = useState('')
+  const [lItem, setLItem] = useState(''); const [lVar, setLVar] = useState(''); const [lType] = useState('pickup') // add-form only ever creates pickups now
+  const [lDate, setLDate] = useState(''); const [lQty, setLQty] = useState('1'); const [lEquip, setLEquip] = useState(''); const [lBt, setLBt] = useState('daily')
+  // settle grid: returned + lost qty typed per on-rent row, keyed `${itemId}|${variationId ?? ''}`
+  const [retQty, setRetQty] = useState<Record<string, string>>({}); const [lostQty, setLostQty] = useState<Record<string, string>>({}); const [retDate, setRetDate] = useState('')
   // ledger inline edit
   const [editEv, setEditEv] = useState<string | null>(null)
   const [evQty, setEvQty] = useState(''); const [evDate, setEvDate] = useState(''); const [evEquip, setEvEquip] = useState('')
@@ -170,27 +170,35 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
       equipmentId: lEquip || null,
       billingType: isDtc ? 'daily' : (lType === 'pickup' ? (lBt || null) : null),
     }
-    if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'POST', payload)) { setLQty('1'); setLEquip(''); setLBt(''); setLItem(''); load() }
+    if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'POST', payload)) { setLQty('1'); setLEquip(''); setLBt('daily'); setLItem(''); load() }
   }
 
-  /** Fill every return field with the full quantity that's out — "they brought it all back". */
+  /** Fill every returned field with the full quantity that's out — "they brought it all back". */
   function fillAllReturns() {
     const next: Record<string, string> = {}
     for (const r of t?.onRent ?? []) next[`${r.itemId}|${r.variationId ?? ''}`] = String(r.qty)
     setRetQty(next)
   }
 
-  /** Post the whole return grid in one request. */
+  /** Post the whole settle grid (returned + lost) in one request. */
   async function submitReturns() {
-    const rows = (t?.onRent ?? [])
-      .map((r) => ({ r, qty: parseInt(retQty[`${r.itemId}|${r.variationId ?? ''}`] ?? '', 10) }))
-      .filter(({ qty }) => Number.isFinite(qty) && qty > 0)
-    if (rows.length === 0) { setMsg('Enter a quantity to return.'); return }
-    const over = rows.find(({ r, qty }) => qty > r.qty)
-    if (over) { setMsg(`Only ${over.r.qty} of ${over.r.code} on rent — you can’t return ${over.qty}.`); return }
+    const returns: { itemId: string; variationId: string | null; qty: number }[] = []
+    const losses: { itemId: string; variationId: string | null; qty: number }[] = []
+    for (const r of t?.onRent ?? []) {
+      const key = `${r.itemId}|${r.variationId ?? ''}`
+      const ret = parseInt(retQty[key] ?? '', 10)
+      const lost = parseInt(lostQty[key] ?? '', 10)
+      const retN = Number.isFinite(ret) && ret > 0 ? ret : 0
+      const lostN = Number.isFinite(lost) && lost > 0 ? lost : 0
+      if (retN + lostN === 0) continue
+      if (retN + lostN > r.qty) { setMsg(`Only ${r.qty} of ${r.code} on rent — returned + lost can’t exceed that.`); return }
+      if (retN > 0) returns.push({ itemId: r.itemId, variationId: r.variationId, qty: retN })
+      if (lostN > 0) losses.push({ itemId: r.itemId, variationId: r.variationId, qty: lostN })
+    }
+    if (returns.length === 0 && losses.length === 0) { setMsg('Enter a returned or lost quantity.'); return }
 
-    const payload = { eventDate: retDate || lDate, returns: rows.map(({ r, qty }) => ({ itemId: r.itemId, variationId: r.variationId, qty })) }
-    if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'POST', payload)) { setRetQty({}); load() }
+    const payload = { eventDate: retDate || lDate, returns, losses }
+    if (await call(`/api/billing/tickets/${ticketId}/ledger`, 'POST', payload)) { setRetQty({}); setLostQty({}); load() }
   }
   async function removeLedger(id: string) { if (await call(`/api/billing/tickets/${ticketId}/ledger?eventId=${id}`, 'DELETE')) load() }
   function startEditEv(e: LedgerEvent) { setEditEv(e.id); setEvQty(String(e.qty)); setEvDate(e.date); setEvEquip(e.equipmentId ?? '') }
@@ -490,26 +498,30 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
             <div style={{ border: '1px solid var(--border-subtle, var(--border-emphasis))', borderRadius: 8, padding: 14, marginBottom: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 13, fontWeight: 500 }}>On rent for this job</span>
-                <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Enter what came back</span>
+                <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Enter what came back or was lost — zero out Remaining to close the job</span>
                 {!locked && (
                   <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     <label style={{ fontSize: 11.5, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
                       Date
                       <input type="date" value={retDate} onChange={(e) => setRetDate(e.target.value)} style={{ ...inputStyle, width: 140 }} />
                     </label>
-                    <button onClick={fillAllReturns} disabled={busy} title="Fill every row with the full quantity out" style={ghost}>Returned all</button>
-                    <button onClick={submitReturns} disabled={busy} className="btn-primary" style={{ padding: '6px 14px', opacity: busy ? 0.5 : 1 }}>Record returns</button>
+                    <button onClick={fillAllReturns} disabled={busy} title="Fill every row's Returned with the full quantity out" style={ghost}>Returned all</button>
+                    <button onClick={submitReturns} disabled={busy} className="btn-primary" style={{ padding: '6px 14px', opacity: busy ? 0.5 : 1 }}>Record</button>
                   </span>
                 )}
               </div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-                  <thead><tr>{['Item', 'Variation', 'Out', 'Returning'].map((h) => <th key={h} style={{ ...th, textAlign: h === 'Out' || h === 'Returning' ? 'right' : 'left' }}>{h}</th>)}</tr></thead>
+                  <thead><tr>{['Item', 'Variation', 'Out', 'Returning', 'Lost', 'Remaining'].map((h) => <th key={h} style={{ ...th, textAlign: h === 'Item' || h === 'Variation' ? 'left' : 'right' }}>{h}</th>)}</tr></thead>
                   <tbody>
                     {t.onRent.map((r) => {
                       const key = `${r.itemId}|${r.variationId ?? ''}`
-                      const typed = parseInt(retQty[key] ?? '', 10)
-                      const tooMany = Number.isFinite(typed) && typed > r.qty
+                      const retN = parseInt(retQty[key] ?? '', 10)
+                      const lostN = parseInt(lostQty[key] ?? '', 10)
+                      const ret = Number.isFinite(retN) && retN > 0 ? retN : 0
+                      const lost = Number.isFinite(lostN) && lostN > 0 ? lostN : 0
+                      const remaining = r.qty - ret - lost
+                      const tooMany = remaining < 0
                       return (
                         <tr key={key}>
                           <td style={td}><span style={{ fontWeight: 500 }}>{r.code}</span><span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>{r.name}</span></td>
@@ -523,12 +535,27 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
                               aria-label={`Quantity of ${r.code} returned`}
                               onChange={(e) => setRetQty((q) => ({ ...q, [key]: e.target.value }))}
                               style={{
-                                ...inputStyle, width: 80, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+                                ...inputStyle, width: 74, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
                                 borderColor: tooMany ? 'var(--danger)' : undefined,
                                 color: tooMany ? 'var(--danger)' : undefined,
                               }}
                             />
                           </td>
+                          <td style={{ ...td, textAlign: 'right' }}>
+                            <input
+                              value={lostQty[key] ?? ''}
+                              disabled={locked || busy}
+                              placeholder="0"
+                              aria-label={`Quantity of ${r.code} lost`}
+                              onChange={(e) => setLostQty((q) => ({ ...q, [key]: e.target.value }))}
+                              style={{
+                                ...inputStyle, width: 74, textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+                                borderColor: tooMany ? 'var(--danger)' : undefined,
+                                color: tooMany ? 'var(--danger)' : undefined,
+                              }}
+                            />
+                          </td>
+                          <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 500, color: tooMany ? 'var(--danger)' : remaining === 0 ? 'var(--pill-paid-fg)' : 'var(--text-secondary)' }}>{remaining}</td>
                         </tr>
                       )
                     })}
@@ -614,13 +641,10 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
                   <Combobox ariaLabel="Variation" value={lVar} onChange={setLVar} style={inputStyle} options={pickItem.variations.map((v) => ({ value: v.id, label: v.name }))} />
                 </div>
               )}
-              {/* Switching event type changes what the picker lists (catalog vs on-rent), so
-                  the previous selection is meaningless — clear it. DTC is always a daily
-                  pickup, so neither event nor cadence is asked. */}
+              {/* This form only ever adds pickups. Returns and losses are settled through the
+                  "On rent for this job" grid above (Returned + Lost columns). DTC is always a
+                  daily pickup, so it doesn't ask for a cadence either. */}
               {!isDtc && (
-                <div style={{ width: 120 }}><label style={labelStyle}>Event</label><Select ariaLabel="Event" value={lType} onChange={(v) => { setLType(v); setLItem(''); setLVar('') }} style={inputStyle}><option value="pickup">Pickup</option><option value="return">Return</option><option value="lost">Lost</option></Select></div>
-              )}
-              {!isDtc && lType === 'pickup' && (
                 <div style={{ width: 120 }}><label style={labelStyle}>Billing</label>
                   <Select ariaLabel="Billing type" value={lBt} onChange={setLBt} style={inputStyle}>
                     <option value="">Set later</option>

@@ -15,6 +15,8 @@ interface Job {
   name: string | null
   status: string
   certified: boolean
+  prevailingWage: boolean
+  customerJobNumber: string | null
   dirNumber: string | null
   certPayrollContact: string | null
   contractNumber: string | null
@@ -74,6 +76,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
   const [name, setName] = useState('')
   const [status, setStatus] = useState('new')
   const [po, setPo] = useState('')
+  const [custJobNo, setCustJobNo] = useState('')
+  const [prevailingWage, setPrevailingWage] = useState(false)
   const [address, setAddress] = useState('')
   const [city, setCity] = useState('')
   const [stateF, setStateF] = useState('')
@@ -92,6 +96,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
         const j = json.data as Job
         setJob(j)
         setName(j.name ?? ''); setStatus(j.status); setPo(j.poNumber ?? '')
+        setCustJobNo(j.customerJobNumber ?? ''); setPrevailingWage(j.prevailingWage)
         setAddress(j.address ?? ''); setCity(j.city ?? ''); setStateF(j.state ?? ''); setZip(j.zip ?? '')
         setNotes(j.notes ?? ''); setReqSig(j.requireSignature); setSecondSig(j.enableSecondSignature); setTaxExempt(j.taxExempt)
         setFetchError(null)
@@ -110,7 +115,8 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name, status, poNumber: po, address, city, state: stateF, zip, notes,
+          name, status, poNumber: po, customerJobNumber: custJobNo, prevailingWage,
+          address, city, state: stateF, zip, notes,
           requireSignature: reqSig, enableSecondSignature: secondSig, taxExempt,
         }),
       })
@@ -159,6 +165,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
             </Select>
           </div>
           <div><label style={labelStyle}>PO number</label><input value={po} onChange={(e) => { setPo(e.target.value); setSaveOk(false) }} disabled={!isAdmin} style={inputStyle} /></div>
+          <div><label style={labelStyle}>Customer job #</label><input value={custJobNo} onChange={(e) => { setCustJobNo(e.target.value); setSaveOk(false) }} disabled={!isAdmin} style={inputStyle} placeholder="Their reference" /></div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginTop: 14 }}>
@@ -177,6 +184,7 @@ export default function JobDetailClient({ jobId }: { jobId: string }) {
         )}
 
         <div style={{ display: 'flex', gap: '14px 32px', marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--border-subtle, var(--border-emphasis))', flexWrap: 'wrap' }}>
+          <Toggle label="Prevailing wage" disabled={!isAdmin} checked={prevailingWage} onChange={(v) => { setPrevailingWage(v); setSaveOk(false) }} />
           <Toggle label="Require signature" disabled={!isAdmin} checked={reqSig} onChange={(v) => { setReqSig(v); setSaveOk(false) }} />
           <Toggle label="Second signature" disabled={!isAdmin} checked={secondSig} onChange={(v) => { setSecondSig(v); setSaveOk(false) }} />
           <Toggle label="Tax exempt" disabled={!isAdmin} checked={taxExempt} onChange={(v) => { setTaxExempt(v); setSaveOk(false) }} />

@@ -101,6 +101,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       entityId?: string
       name?: string | null
       certified?: boolean
+      prevailingWage?: boolean
+      customerJobNumber?: string | null
       dirNumber?: string | null
       certPayrollContact?: string | null
       contractNumber?: string | null
@@ -179,6 +181,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         branch_id: profile.branch_id,
         name: body.name?.trim() || null,
         certified: body.certified,
+        prevailing_wage: body.prevailingWage ?? false,
+        customer_job_number: body.customerJobNumber?.trim() || null,
         dir_number: body.certified ? body.dirNumber?.trim() ?? null : null,
         cert_payroll_contact: body.certified ? body.certPayrollContact?.trim() || null : null,
         contract_number: body.certified ? body.contractNumber?.trim() ?? null : null,

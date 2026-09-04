@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 /**
  * The tickets list + "New ticket" form shown on a job's detail page. Tickets
@@ -15,6 +16,7 @@ interface TicketRow {
   status: string
   recurring: boolean
   features: string[]
+  voided: boolean
 }
 
 const inputStyle: React.CSSProperties = {
@@ -25,6 +27,7 @@ const labelStyle: React.CSSProperties = { display: 'block', fontSize: 11, color:
 const ghost: React.CSSProperties = { background: 'transparent', border: '1px solid var(--border-emphasis)', borderRadius: 6, padding: '6px 12px', fontSize: 12, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit' }
 
 export default function JobTicketsSection({ jobId, isAdmin }: { jobId: string; isAdmin: boolean }) {
+  const router = useRouter()
   const [tickets, setTickets] = useState<TicketRow[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -57,6 +60,9 @@ export default function JobTicketsSection({ jobId, isAdmin }: { jobId: string; i
       })
       const json = await res.json()
       if (!json.success) { setErr(json.error); return }
+      // Land the user on the ticket they just created.
+      const newId = (json.data as { id?: string })?.id
+      if (newId) { router.push(`/billing/tickets/${newId}`); return }
       setShowNew(false); setDate(today); setAdd(true); setRet(false); setDtc(false); load()
     } catch { setErr('Network error — please try again.') }
     finally { setBusy(false) }
@@ -95,12 +101,14 @@ export default function JobTicketsSection({ jobId, isAdmin }: { jobId: string; i
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {tickets.map((t) => (
-            <Link key={t.id} href={`/billing/tickets/${t.id}`} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 10px', borderRadius: 8, textDecoration: 'none', color: 'var(--text-primary)' }}>
-              <span style={{ fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: 'var(--accent)' }}>{t.ticketNumber}</span>
+            <Link key={t.id} href={`/billing/tickets/${t.id}`} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 10px', borderRadius: 8, textDecoration: 'none', color: 'var(--text-primary)', opacity: t.voided ? 0.55 : 1 }}>
+              <span style={{ fontWeight: 500, fontVariantNumeric: 'tabular-nums', color: t.voided ? 'var(--text-muted)' : 'var(--accent)', textDecoration: t.voided ? 'line-through' : 'none' }}>{t.ticketNumber}</span>
               <span style={{ fontSize: 12, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{t.date}</span>
               <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t.features.join(' + ') || '—'}</span>
-              {t.recurring && <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--pill-pending-fg)' }}>RECURRING</span>}
-              <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, color: statusColors[t.status], textTransform: 'capitalize' }}>{t.status.replace('_', ' ')}</span>
+              {t.recurring && !t.voided && <span style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--pill-pending-fg)' }}>RECURRING</span>}
+              {t.voided
+                ? <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, color: 'var(--pill-overdue-fg)' }}>VOID</span>
+                : <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, color: statusColors[t.status], textTransform: 'capitalize' }}>{t.status.replace('_', ' ')}</span>}
             </Link>
           ))}
         </div>

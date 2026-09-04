@@ -26,6 +26,8 @@ interface JobDetailRow {
   name: string | null
   status: JobStatus
   certified: boolean
+  prevailing_wage: boolean
+  customer_job_number: string | null
   dir_number: string | null
   cert_payroll_contact: string | null
   contract_number: string | null
@@ -63,7 +65,8 @@ export async function GET(
     const { data, error } = await supabase
       .from('billing_jobs')
       .select(`
-        id, job_number, name, status, certified, dir_number, cert_payroll_contact,
+        id, job_number, name, status, certified, prevailing_wage, customer_job_number,
+        dir_number, cert_payroll_contact,
         contract_number, pay_classification, entity_id, branch_id, po_number,
         address, cross_streets, city, county, state, zip, tax_exempt,
         require_signature, enable_second_signature, ticket_labor_minimum_minutes,
@@ -91,6 +94,8 @@ export async function GET(
         name: j.name,
         status: j.status,
         certified: j.certified,
+        prevailingWage: j.prevailing_wage,
+        customerJobNumber: j.customer_job_number,
         dirNumber: j.dir_number,
         certPayrollContact: j.cert_payroll_contact,
         contractNumber: j.contract_number,
@@ -151,6 +156,8 @@ export async function PATCH(
     const body = (await request.json()) as {
       name?: string | null
       status?: string
+      prevailingWage?: boolean
+      customerJobNumber?: string | null
       poNumber?: string | null
       address?: string | null
       crossStreets?: string | null
@@ -177,6 +184,8 @@ export async function PATCH(
       if (!JOB_STATUSES.includes(body.status as JobStatus)) return bad('Unknown status')
       patch.status = body.status as JobStatus
     }
+    if (body.prevailingWage !== undefined) patch.prevailing_wage = body.prevailingWage
+    if (body.customerJobNumber !== undefined) patch.customer_job_number = body.customerJobNumber?.trim() || null
     if (body.poNumber !== undefined) patch.po_number = body.poNumber?.trim() || null
     if (body.address !== undefined) patch.address = body.address?.trim() || null
     if (body.crossStreets !== undefined) patch.cross_streets = body.crossStreets?.trim() || null

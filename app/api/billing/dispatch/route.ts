@@ -63,9 +63,12 @@ export async function GET(request: Request): Promise<NextResponse> {
     const { data: techRaw } = await supabase.from('billing_technicians').select('id, name').eq('is_active', true).order('name')
     const techs = (techRaw ?? []) as { id: string; name: string }[]
 
+    // Only DTC tickets belong on the dispatch board — Add/Return tickets are back-office
+    // billing artifacts, not field dispatches.
     const tq = supabase
       .from('billing_tickets')
       .select('id, ticket_number, ticket_date, feature_add, feature_return, feature_dtc, is_voided, billing_jobs(job_number, name, branch_id, billing_profiles(name, billing_customers(name)))')
+      .eq('feature_dtc', true)
       .gte('ticket_date', rangeStart).lte('ticket_date', rangeEnd)
     const { data: tkRaw } = await tq
     let tickets = (tkRaw ?? []) as unknown as {

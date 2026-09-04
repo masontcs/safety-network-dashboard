@@ -45,6 +45,8 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
   const [profileId, setProfileId] = useState('')
   const [entityId, setEntityId] = useState('')
   const [certified, setCertified] = useState<boolean | null>(null)
+  const [prevailingWage, setPrevailingWage] = useState(false)
+  const [customerJobNumber, setCustomerJobNumber] = useState('')
   const [dir, setDir] = useState(''); const [contract, setContract] = useState(''); const [payClass, setPayClass] = useState('')
   const [jobId, setJobId] = useState('')
   const [feature, setFeature] = useState<'add' | 'return' | 'dtc'>('add')
@@ -88,7 +90,8 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
         router.push(`/billing/profiles/${(r.data as { id: string }).id}`)
       } else if (mode === 'job') {
         const r = await post('/api/billing/jobs', {
-          profileId, entityId, name: name.trim() || null, certified,
+          profileId, entityId, name: name.trim() || null, certified, prevailingWage,
+          customerJobNumber: customerJobNumber.trim() || null,
           dirNumber: certified ? dir.trim() : undefined, contractNumber: certified ? contract.trim() : undefined, payClassification: certified ? payClass.trim() : undefined,
         })
         if (!r.success) return setErr(r.error ?? 'Failed')
@@ -160,7 +163,14 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
               ? <div className="bx-note amber">This profile has no billable entities yet — configure a price list on it first.</div>
               : <Field label="Entity"><select className="bx-f bx-select" value={entityId} onChange={(e) => setEntityId(e.target.value)} style={{ width: '100%' }}><option value="">Select…</option>{entityChoices.map((en) => <option key={en.entityId} value={en.entityId}>{en.code} — {en.name}</option>)}</select></Field>)}
             <Field label="Job name (optional)"><input className="bx-f" value={name} onChange={(e) => setName(e.target.value)} placeholder="Northside Tower" style={{ width: '100%' }} /></Field>
-            <Field label="Certified / prevailing wage?">
+            <Field label="Customer job # (optional)"><input className="bx-f" value={customerJobNumber} onChange={(e) => setCustomerJobNumber(e.target.value)} placeholder="Their PO / job reference" style={{ width: '100%' }} /></Field>
+            <Field label="Prevailing wage?">
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className={`bx-btn ${prevailingWage === false ? 'accent' : 'ghost'} sm`} onClick={() => setPrevailingWage(false)}>No</button>
+                <button type="button" className={`bx-btn ${prevailingWage === true ? 'accent' : 'ghost'} sm`} onClick={() => setPrevailingWage(true)}>Yes</button>
+              </div>
+            </Field>
+            <Field label="Certified payroll?">
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="button" className={`bx-btn ${certified === false ? 'accent' : 'ghost'} sm`} onClick={() => setCertified(false)}>No</button>
                 <button type="button" className={`bx-btn ${certified === true ? 'accent' : 'ghost'} sm`} onClick={() => setCertified(true)}>Yes</button>

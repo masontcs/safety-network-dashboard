@@ -52,6 +52,8 @@ export default function DispatchAssignModal({
   const [entityId, setEntityId] = useState('')
   const [jobName, setJobName] = useState('')
   const [certified, setCertified] = useState<boolean | null>(null)
+  const [prevailingWage, setPrevailingWage] = useState(false)
+  const [customerJobNumber, setCustomerJobNumber] = useState('')
   const [dir, setDir] = useState(''); const [contract, setContract] = useState(''); const [payClass, setPayClass] = useState('')
   const [poNumber, setPoNumber] = useState('')
   const [address, setAddress] = useState(''); const [city, setCity] = useState('')
@@ -101,7 +103,8 @@ export default function DispatchAssignModal({
         if (certified === null) { setErr('Answer whether this is a certified job.'); return }
         if (certified && (!dir.trim() || !contract.trim() || !payClass.trim())) { setErr('Certified jobs need DIR #, contract #, and pay classification.'); return }
         const jr = await post('/api/billing/jobs', {
-          profileId, entityId, name: jobName.trim() || null, certified,
+          profileId, entityId, name: jobName.trim() || null, certified, prevailingWage,
+          customerJobNumber: customerJobNumber.trim() || null,
           dirNumber: certified ? dir.trim() : undefined, contractNumber: certified ? contract.trim() : undefined, payClassification: certified ? payClass.trim() : undefined,
           poNumber: poNumber.trim() || null, address: address.trim() || null, city: city.trim() || null,
         })
@@ -192,8 +195,16 @@ export default function DispatchAssignModal({
                     <option value="">Select…</option>{entityChoices.map((en) => <option key={en.entityId} value={en.entityId}>{en.code} — {en.name}</option>)}
                   </select></div>)}
             <div><label className="bx-lbl">Job name (optional)</label><input className="bx-f" style={{ width: '100%' }} value={jobName} onChange={(e) => setJobName(e.target.value)} placeholder="Northside Tower" /></div>
+            <div><label className="bx-lbl">Customer job # (optional)</label><input className="bx-f" style={{ width: '100%' }} value={customerJobNumber} onChange={(e) => setCustomerJobNumber(e.target.value)} placeholder="Their PO / job reference" /></div>
             <div>
-              <label className="bx-lbl">Certified / prevailing wage?</label>
+              <label className="bx-lbl">Prevailing wage?</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className={`bx-btn ${prevailingWage === false ? 'accent' : 'ghost'} sm`} onClick={() => setPrevailingWage(false)}>No</button>
+                <button type="button" className={`bx-btn ${prevailingWage === true ? 'accent' : 'ghost'} sm`} onClick={() => setPrevailingWage(true)}>Yes</button>
+              </div>
+            </div>
+            <div>
+              <label className="bx-lbl">Certified payroll?</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="button" className={`bx-btn ${certified === false ? 'accent' : 'ghost'} sm`} onClick={() => setCertified(false)}>No</button>
                 <button type="button" className={`bx-btn ${certified === true ? 'accent' : 'ghost'} sm`} onClick={() => setCertified(true)}>Yes</button>

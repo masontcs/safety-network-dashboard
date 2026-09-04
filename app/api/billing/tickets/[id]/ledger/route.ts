@@ -103,55 +103,66 @@ export async function POST(
       equipmentId?: string | null
       billingType?: string | null
       returns?: { itemId?: string; variationId?: string | null; qty?: number }[]
+      losses?: { itemId?: string; variationId?: string | null; qty?: number }[]
     }
 
     /**
-     * BULK RETURN — the return grid posts every row at once instead of one request per
-     * item. Each quantity is checked against the LIVE job balance here, so a stale page
-     * can never hand back more than went out. All-or-nothing: one bad row rejects the
-     * batch rather than half-recording a return.
+     * BULK SETTLE — the on-rent grid posts every row at once (returned + lost) instead of
+     * one request per item. Returned and lost DRAW FROM THE SAME on-rent pool, so their
+     * combined quantity for an (item, variation) is checked against the LIVE job balance
+     * here — a stale page can never hand back or write off more than went out. All-or-
+     * nothing: one bad row rejects the whole batch.
      */
-    if (Array.isArray(body.returns)) {
+    if (Array.isArray(body.returns) || Array.isArray(body.losses)) {
       if (!body.eventDate) return bad('A date is required')
-      const wanted = body.returns.filter((r) => r.itemId && Number.isInteger(r.qty) && (r.qty as number) > 0)
-      if (wanted.length === 0) return bad('Enter a quantity to return.')
+      const clean = (arr?: { itemId?: string; variationId?: string | null; qty?: number }[]) =>
+        (arr ?? []).filter((r) => r.itemId && Number.isInteger(r.qty) && (r.qty as number) > 0)
+      const wantReturns = clean(body.returns)
+      const wantLosses = clean(body.losses)
+      if (wantReturns.length === 0 && wantLosses.length === 0) return bad('Enter a returned or lost quantity.')
 
       const balances = balanceFrom(await fetchJobLedger(supabase, ticket.job_id))
 
       // Codes only so a rejection can name the item instead of an opaque id.
-      const { data: itemRows } = await supabase
-        .from('billing_items')
-        .select('id, code')
-        .in('id', [...new Set(wanted.map((r) => r.itemId as string))])
+      const allItemIds = [...new Set([...wantReturns, ...wantLosses].map((r) => r.itemId as string))]
+      const { data: itemRows } = await supabase.from('billing_items').select('id, code').in('id', allItemIds)
       const codeById = new Map((itemRows ?? []).map((i) => [i.id, i.code]))
 
-      const rows = []
-      for (const r of wanted) {
+      // Sum returned + lost per key and check the COMBINED total against what's on rent.
+      const combined = new Map<string, { itemId: string; variationId: string | null; total: number }>()
+      for (const r of [...wantReturns, ...wantLosses]) {
         const itemId = r.itemId as string
         const variationId = r.variationId ?? null
-        const qty = r.qty as number
-        const avail = balances.get(onRentKey(itemId, variationId)) ?? 0
-        if (qty > avail) {
-          return bad(`Only ${avail} of ${codeById.get(itemId) ?? 'that item'} on rent — can't return ${qty}.`, 'CONFLICT', 409)
-        }
-        rows.push({
-          ticket_id: params.id,
-          job_id: ticket.job_id,
-          item_id: itemId,
-          variation_id: variationId,
-          event_type: 'return' as const,
-          event_date: body.eventDate as string,
-          qty,
-          equipment_id: null,
-          billing_type: null, // a return never carries a cadence
-        })
+        const key = onRentKey(itemId, variationId)
+        const cur = combined.get(key) ?? { itemId, variationId, total: 0 }
+        cur.total += r.qty as number
+        combined.set(key, cur)
       }
+      for (const { itemId, variationId, total } of combined.values()) {
+        const avail = balances.get(onRentKey(itemId, variationId)) ?? 0
+        if (total > avail) {
+          return bad(`Only ${avail} of ${codeById.get(itemId) ?? 'that item'} on rent — returned + lost can't exceed that.`, 'CONFLICT', 409)
+        }
+      }
+
+      const mkRow = (r: { itemId?: string; variationId?: string | null; qty?: number }, event: 'return' | 'lost') => ({
+        ticket_id: params.id,
+        job_id: ticket.job_id,
+        item_id: r.itemId as string,
+        variation_id: r.variationId ?? null,
+        event_type: event,
+        event_date: body.eventDate as string,
+        qty: r.qty as number,
+        equipment_id: null,
+        billing_type: null, // return/lost never carry a cadence
+      })
+      const rows = [...wantReturns.map((r) => mkRow(r, 'return')), ...wantLosses.map((r) => mkRow(r, 'lost'))]
 
       const { error } = await supabase.from('billing_ticket_ledger').insert(rows)
       if (error) throw new Error(error.message)
 
       await refreshRecurring(supabase, params.id, ticket.job_id)
-      return NextResponse.json({ success: true, data: { returned: rows.length } })
+      return NextResponse.json({ success: true, data: { returned: wantReturns.length, lost: wantLosses.length } })
     }
 
     if (!body.itemId) return bad('An item is required')
