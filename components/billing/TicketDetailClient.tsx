@@ -253,6 +253,11 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
   // one-day charge billed at the daily rate. So we don't ask for an event (it's always a
   // pickup) or a cadence (it's always daily) — those choices only exist for Add/Return.
   const isDtc = t?.featureDtc ?? false
+  // The ticket's feature drives what the equipment tab does. An Add ticket sends equipment
+  // OUT (pickups); a Return ticket brings it BACK (the Returned + Lost grid); a ticket with
+  // both does both. DTC is a standalone daily pickup.
+  const canPickup = isDtc || (t?.featureAdd ?? false)
+  const canReturn = t?.featureReturn ?? false
   const onRentKeyOf = (itemId: string, variationId: string | null) => `${itemId}|${variationId ?? ''}`
   const pickedOut = returnMode ? t?.onRent.find((r) => onRentKeyOf(r.itemId, r.variationId) === lItem) ?? null : null
   const pickItem = items.find((i) => i.id === (returnMode ? pickedOut?.itemId : lItem))
@@ -494,7 +499,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
           {/* Everything still out on the JOB, listed for direct entry — type quantities
               against the rows you're handing back and post them in one go. Beats picking
               items out of a dropdown one at a time when a job comes off rent. */}
-          {t.onRent.length > 0 && (
+          {canReturn && t.onRent.length > 0 && (
             <div style={{ border: '1px solid var(--border-subtle, var(--border-emphasis))', borderRadius: 8, padding: 14, marginBottom: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 13, fontWeight: 500 }}>On rent for this job</span>
@@ -615,7 +620,7 @@ export default function TicketDetailClient({ ticketId }: { ticketId: string }) {
             </div>
           )}
 
-          {!locked && (
+          {!locked && canPickup && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', borderTop: '1px solid var(--border-subtle, var(--border-emphasis))', paddingTop: 14 }}>
               <div style={{ minWidth: 240 }}>
                 <label style={labelStyle}>{returnMode ? 'On rent' : 'Item'}</label>
