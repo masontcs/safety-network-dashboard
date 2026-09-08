@@ -48,7 +48,7 @@ const SECTIONS: NavSection[] = [
   },
 ]
 
-export default function BillingSidebar({ userName, role, billingRole = null, available }: { userName: string; role: Role; billingRole?: Role | null; available: InterfaceKey[] }) {
+export default function BillingSidebar({ userName, role, billingRole = null, available, open = false, onNavigate }: { userName: string; role: Role; billingRole?: Role | null; available: InterfaceKey[]; open?: boolean; onNavigate?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -65,8 +65,8 @@ export default function BillingSidebar({ userName, role, billingRole = null, ava
   }
 
   return (
-    <aside className="bx-side">
-      <Link href="/billing" className="bx-brand" style={{ color: 'var(--ink)' }}>
+    <aside className={`bx-side${open ? ' open' : ''}`}>
+      <Link href="/billing" className="bx-brand" style={{ color: 'var(--ink)' }} onClick={onNavigate}>
         <span className="dot" aria-hidden />
         <span>
           <b style={{ fontSize: 14.5, fontWeight: 600, letterSpacing: '-.01em', display: 'block' }}>Safety Network</b>
@@ -89,7 +89,7 @@ export default function BillingSidebar({ userName, role, billingRole = null, ava
               )
             }
             return (
-              <Link key={item.href} href={item.href} className={`bx-nav${active ? ' active' : ''}`} style={{ color: active ? 'var(--surface)' : 'var(--muted)' }}>
+              <Link key={item.href} href={item.href} onClick={onNavigate} className={`bx-nav${active ? ' active' : ''}`} style={{ color: active ? 'var(--surface)' : 'var(--muted)' }}>
                 <span style={{ width: 16, textAlign: 'center' }}>{item.icon}</span>
                 <span>{item.label}</span>
                 {item.badge ? <span className="badge">{item.badge}</span> : null}

@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import NavigationProgress from '@/components/layout/NavigationProgress'
 import { ThemeProvider } from '@/lib/theme/ThemeContext'
@@ -14,6 +14,14 @@ export const metadata: Metadata = {
   title: 'Safety Network Operations',
   description: 'Internal operations dashboard',
   robots: { index: false, follow: false },
+}
+
+// viewport-fit=cover is required for env(safe-area-inset-*) to report real values on
+// notched phones / PWAs — the billing shell uses those for the topbar and drawer padding.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 }
 
 // Reads localStorage before first paint so the correct data-theme is applied

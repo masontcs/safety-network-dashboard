@@ -5,26 +5,31 @@ import { useRouter } from 'next/navigation'
 import { useTheme } from '@/lib/theme/ThemeContext'
 import { useBranch } from '@/components/billing/BranchContext'
 import QuickCreateModal, { type QuickMode } from '@/components/billing/QuickCreateModal'
+import { canBillingArea, type BillingArea } from '@/lib/utils/interfaces'
+import type { Role } from '@/lib/supabase/database.types'
 
 /**
  * The concept's topbar: live search (customers / jobs / tickets / invoices), the
  * active-branch picker, the light/dark toggle, and a working "+ New" quick-create menu.
+ * On mobile a hamburger (left) opens the nav drawer.
  */
 
 interface Hit { type: string; label: string; sub: string | null; href: string }
 
-// Quick-create targets. Each opens a modal that asks only for the context it needs
-// (the parent), then creates the record and jumps to it.
-const NEW_ITEMS: { label: string; sub: string; mode: QuickMode }[] = [
-  { label: 'Customer', sub: 'Just name + code', mode: 'customer' },
-  { label: 'Billing profile', sub: 'Asks which customer', mode: 'profile' },
-  { label: 'Job', sub: 'Asks which billing profile', mode: 'job' },
-  { label: 'Ticket', sub: 'Asks which job', mode: 'ticket' },
-  { label: 'Proof', sub: 'Asks which job → preview', mode: 'proof' },
-  { label: 'Invoice', sub: 'Asks which job → generate', mode: 'invoice' },
+// Quick-create targets. Each opens a modal that asks only for the context it needs, and each
+// is gated to the billing AREA that action belongs to — so a Dispatcher (jobs/tickets, no
+// customers/invoices) only sees Job and Ticket, never Customer, Profile, Proof or Invoice.
+const NEW_ITEMS: { label: string; sub: string; mode: QuickMode; area: BillingArea }[] = [
+  { label: 'Customer', sub: 'Just name + code', mode: 'customer', area: 'customers' },
+  { label: 'Billing profile', sub: 'Asks which customer', mode: 'profile', area: 'customers' },
+  { label: 'Job', sub: 'Asks which billing profile', mode: 'job', area: 'jobs' },
+  { label: 'Ticket', sub: 'Asks which job', mode: 'ticket', area: 'tickets' },
+  { label: 'Proof', sub: 'Asks which job → preview', mode: 'proof', area: 'invoices' },
+  { label: 'Invoice', sub: 'Asks which job → generate', mode: 'invoice', area: 'invoices' },
 ]
 
-export default function BillingTopbar() {
+export default function BillingTopbar({ role, billingRole = null, onOpenNav }: { role: Role; billingRole?: Role | null; onOpenNav?: () => void }) {
+  const newItems = NEW_ITEMS.filter((it) => canBillingArea(role, it.area, billingRole))
   const router = useRouter()
   const { theme, toggle } = useTheme()
   const { branchId, setBranchId, branches, currentLabel } = useBranch()
@@ -71,6 +76,9 @@ export default function BillingTopbar() {
 
   return (
     <div className="bx-topbar">
+      {/* Hamburger — mobile only (CSS hides it on desktop) */}
+      <button className="bx-hamburger bx-iconbtn" onClick={onOpenNav} aria-label="Open menu" title="Menu">☰</button>
+
       {/* Search */}
       <div ref={searchRef} style={{ position: 'relative', flex: 1, maxWidth: 460 }}>
         <div className="bx-search">
@@ -120,14 +128,15 @@ export default function BillingTopbar() {
         {theme === 'dark' ? '☀' : '☾'}
       </button>
 
-      {/* Quick create */}
+      {/* Quick create — only when the user can create at least one thing */}
+      {newItems.length > 0 && (
       <div ref={newRef} style={{ position: 'relative' }}>
         <button className="bx-btn" title="Create something new" aria-haspopup="menu" aria-expanded={newOpen} onClick={() => setNewOpen((v) => !v)}>
           + New ▾
         </button>
         {newOpen && (
           <div role="menu" style={{ ...menuStyle, right: 0, left: 'auto', minWidth: 240 }}>
-            {NEW_ITEMS.map((it) => (
+            {newItems.map((it) => (
               <button key={it.label} role="menuitem" onClick={() => { setNewOpen(false); setQuickMode(it.mode) }} style={{ ...rowStyle, flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
                 <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{it.label}</span>
                 <span style={{ fontSize: 11, color: 'var(--dim)' }}>{it.sub}</span>
@@ -136,6 +145,7 @@ export default function BillingTopbar() {
           </div>
         )}
       </div>
+      )}
 
       {quickMode && <QuickCreateModal mode={quickMode} onClose={() => setQuickMode(null)} />}
     </div>
