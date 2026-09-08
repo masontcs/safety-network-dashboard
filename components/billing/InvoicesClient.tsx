@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react'
 import Link from 'next/link'
 import { useBranch } from '@/components/billing/BranchContext'
 import { useBroadcast } from '@/lib/realtime/useBroadcast'
@@ -28,9 +28,12 @@ export default function InvoicesClient() {
   const [qbStart, setQbStart] = useState(monthStart.toISOString().slice(0, 10))
   const [qbEnd, setQbEnd] = useState(new Date().toISOString().slice(0, 10))
   const [qbInclude, setQbInclude] = useState(false)
-  const [qbEntities, setQbEntities] = useState<{ entityId: string; code: string; name: string; invoiceCount: number; totalCents: number }[] | null>(null)
+  interface QbDetail { invoiceNumber: string; date: string; qbName: string; branch: string; totalCents: number; exported: boolean }
+  const [qbEntities, setQbEntities] = useState<{ entityId: string; code: string; name: string; invoiceCount: number; totalCents: number; invoices: QbDetail[] }[] | null>(null)
   const [qbBusy, setQbBusy] = useState(false)
   const [qbErr, setQbErr] = useState<string | null>(null)
+  const [qbOpen, setQbOpen] = useState<Set<string>>(new Set())
+  const toggleQbOpen = (id: string) => setQbOpen((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   const loadQbSummary = useCallback(() => {
     setQbBusy(true); setQbErr(null); setQbEntities(null)
@@ -111,14 +114,47 @@ export default function InvoicesClient() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead><tr>{['Entity', 'Invoices', 'Total', ''].map((h) => <th key={h} style={{ ...th, textAlign: h === 'Invoices' || h === 'Total' ? 'right' : 'left' }}>{h}</th>)}</tr></thead>
                 <tbody>
-                  {qbEntities.map((e) => (
-                    <tr key={e.entityId}>
-                      <td style={td}>{e.code}{e.name ? ` · ${e.name}` : ''}</td>
-                      <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{e.invoiceCount}</td>
-                      <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(e.totalCents)}</td>
-                      <td style={{ ...td, textAlign: 'right' }}><button onClick={() => downloadQb(e.entityId, e.code)} className="btn-primary" style={{ padding: '5px 14px', fontSize: 12.5 }}>Download .iif</button></td>
-                    </tr>
-                  ))}
+                  {qbEntities.map((e) => {
+                    const open = qbOpen.has(e.entityId)
+                    return (
+                      <Fragment key={e.entityId}>
+                        <tr>
+                          <td style={{ ...td, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleQbOpen(e.entityId)}>
+                            <span style={{ display: 'inline-block', width: 14, color: 'var(--text-muted)', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .12s' }}>▸</span>
+                            {e.code}{e.name ? ` · ${e.name}` : ''}
+                          </td>
+                          <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', cursor: 'pointer' }} onClick={() => toggleQbOpen(e.entityId)}>{e.invoiceCount}</td>
+                          <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', cursor: 'pointer' }} onClick={() => toggleQbOpen(e.entityId)}>{money(e.totalCents)}</td>
+                          <td style={{ ...td, textAlign: 'right' }}><button onClick={() => downloadQb(e.entityId, e.code)} className="btn-primary" style={{ padding: '5px 14px', fontSize: 12.5 }}>Download .iif</button></td>
+                        </tr>
+                        {open && (
+                          <tr>
+                            <td colSpan={4} style={{ padding: '0 0 8px 0', borderBottom: '1px solid var(--border-subtle, var(--border-emphasis))' }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--bg-nav, transparent)' }}>
+                                <thead><tr>{['Invoice', 'Date', 'QuickBooks name', 'Branch', 'Total'].map((h) => (
+                                  <th key={h} style={{ textAlign: h === 'Total' ? 'right' : 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-dim)', padding: '6px 12px' }}>{h}</th>
+                                ))}</tr></thead>
+                                <tbody>
+                                  {e.invoices.map((inv) => (
+                                    <tr key={inv.invoiceNumber}>
+                                      <td style={{ padding: '5px 12px', fontSize: 12.5, fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>
+                                        {inv.invoiceNumber}
+                                        {inv.exported && <span style={{ marginLeft: 6, fontSize: 9.5, fontWeight: 600, color: 'var(--pill-pending-fg)' }}>EXPORTED</span>}
+                                      </td>
+                                      <td style={{ padding: '5px 12px', fontSize: 12.5, fontVariantNumeric: 'tabular-nums', color: 'var(--text-muted)' }}>{inv.date}</td>
+                                      <td style={{ padding: '5px 12px', fontSize: 12.5, color: 'var(--text-secondary)' }}>{inv.qbName}</td>
+                                      <td style={{ padding: '5px 12px', fontSize: 12.5, color: 'var(--text-muted)' }}>{inv.branch}</td>
+                                      <td style={{ padding: '5px 12px', fontSize: 12.5, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(inv.totalCents)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    )
+                  })}
                 </tbody>
               </table>
             )}

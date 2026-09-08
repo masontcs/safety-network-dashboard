@@ -37,7 +37,8 @@ export async function GET(request: Request): Promise<NextResponse> {
       code: nameById.get(g.entityId)?.code ?? '',
       name: nameById.get(g.entityId)?.name ?? '',
       invoiceCount: g.invoiceIds.length,
-      totalCents: g.invoices.reduce((s, inv) => s + inv.taxCents + inv.splits.reduce((a, sp) => a + sp.amountCents, 0), 0),
+      totalCents: g.details.reduce((s, d) => s + d.totalCents, 0),
+      invoices: g.details, // per-invoice preview rows: number, date, qbName, branch, total, exported
     })).sort((a, b) => a.code.localeCompare(b.code))
 
     return NextResponse.json({ success: true, data: { start, end, includeExported, entities } })

@@ -52,7 +52,17 @@ function addDaysISO(iso: string, days: number): string {
 
 interface InvoiceRow {
   id: string; invoice_number: string; invoice_date: string; entity_id: string; branch_id: string
-  profile_id: string; job_id: string; tax_cents: number
+  profile_id: string; job_id: string; tax_cents: number; qb_exported_at: string | null
+}
+
+/** A human-readable row for the export preview (what a bookkeeper sees before downloading). */
+export interface QbInvoiceDetail {
+  invoiceNumber: string
+  date: string
+  qbName: string // customer - profile (the QuickBooks customer), without any :job suffix
+  branch: string
+  totalCents: number
+  exported: boolean // already exported once?
 }
 
 /** One entity's worth of export-ready invoices (plus the raw ids for stamping). */
@@ -60,6 +70,7 @@ export interface AssembledEntity {
   entityId: string
   invoiceIds: string[]
   invoices: QbInvoice[]
+  details: QbInvoiceDetail[]
 }
 
 export async function assembleForExport(
@@ -69,7 +80,7 @@ export async function assembleForExport(
 ): Promise<AssembledEntity[]> {
   let q = svc
     .from('billing_invoices')
-    .select('id, invoice_number, invoice_date, entity_id, branch_id, profile_id, job_id, tax_cents')
+    .select('id, invoice_number, invoice_date, entity_id, branch_id, profile_id, job_id, tax_cents, qb_exported_at')
     .eq('status', 'issued')
     .gte('invoice_date', filters.start)
     .lte('invoice_date', filters.end)
@@ -87,12 +98,15 @@ export async function assembleForExport(
   const jobIds = [...new Set(invoices.map((i) => i.job_id))]
   const invIds = invoices.map((i) => i.id)
 
-  const [{ data: profs }, { data: jobs }, { data: terms }, { data: lineRows }] = await Promise.all([
+  const branchIds = [...new Set(invoices.map((i) => i.branch_id))]
+  const [{ data: profs }, { data: jobs }, { data: terms }, { data: lineRows }, { data: branchRows }] = await Promise.all([
     svc.from('billing_profiles').select('id, name, payment_term_id, billing_customers(name, default_payment_term_id)').in('id', profileIds),
     svc.from('billing_jobs').select('id, name, po_number, customer_job_number').in('id', jobIds),
     svc.from('billing_payment_terms').select('id, net_days'),
     svc.from('billing_invoice_lines').select('invoice_id, kind, amount_cents').in('invoice_id', invIds),
+    svc.from('branches').select('id, name').in('id', branchIds),
   ])
+  const branchName = new Map((branchRows ?? []).map((b: { id: string; name: string }) => [b.id, b.name]))
 
   const netDaysById = new Map((terms ?? []).map((t) => [t.id as string, t.net_days as number]))
   type Prof = { id: string; name: string; payment_term_id: string | null; billing_customers: { name: string; default_payment_term_id: string | null } | null }
@@ -132,9 +146,17 @@ export async function assembleForExport(
       splits,
     }
 
-    const bucket = byEntity.get(inv.entity_id) ?? { entityId: inv.entity_id, invoiceIds: [], invoices: [] }
+    const bucket = byEntity.get(inv.entity_id) ?? { entityId: inv.entity_id, invoiceIds: [], invoices: [], details: [] }
     bucket.invoiceIds.push(inv.id)
     bucket.invoices.push(qb)
+    bucket.details.push({
+      invoiceNumber: inv.invoice_number,
+      date: inv.invoice_date,
+      qbName: baseName,
+      branch: branchName.get(inv.branch_id) ?? '',
+      totalCents: qb.taxCents + splits.reduce((a, sp) => a + sp.amountCents, 0),
+      exported: inv.qb_exported_at !== null,
+    })
     byEntity.set(inv.entity_id, bucket)
   }
 
