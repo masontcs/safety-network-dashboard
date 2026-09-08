@@ -121,7 +121,7 @@ export function interfacesFor(role: Role, fieldAccess = false, billingRole?: Rol
 /** Billing sub-area → the URL prefixes it covers. */
 const AREA_PATHS: Record<BillingArea, string[]> = {
   home: [], dispatch: ['/billing/dispatch'], jobs: ['/billing/jobs'], tickets: ['/billing/tickets'],
-  quotes: ['/billing/quotes'], invoices: ['/billing/invoices'], customers: ['/billing/customers', '/billing/profiles'],
+  quotes: ['/billing/quotes'], invoices: ['/billing/invoices', '/billing/qb-export'], customers: ['/billing/customers', '/billing/profiles'],
   items: ['/billing/items'], pricelists: ['/billing/price-lists'], technicians: ['/billing/technicians'],
   jobtypes: ['/billing/job-types'], time: ['/billing/time'],
   users: ['/billing/users'],

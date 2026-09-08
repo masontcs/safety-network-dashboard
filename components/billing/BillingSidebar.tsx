@@ -42,6 +42,7 @@ const SECTIONS: NavSection[] = [
       { href: '/billing/price-lists', label: 'Price Lists', icon: '≡', area: 'pricelists' },
       { href: '/billing/technicians', label: 'Technicians', icon: '☰', area: 'technicians' },
       { href: '/billing/job-types', label: 'Job Types', icon: '◫', area: 'jobtypes' },
+      { href: '/billing/qb-export', label: 'QuickBooks Export', icon: '⇪', area: 'invoices', exact: true },
       { href: '/billing/users', label: 'Users', icon: '◔', area: 'users' },
     ],
   },
