@@ -35,6 +35,11 @@ export default function TicketClient({ ticketId }: { ticketId: string }) {
   const [photos, setPhotos] = useState<TicketPhoto[]>([])
   const [photoBusy, setPhotoBusy] = useState(false)
   const photoInput = useRef<HTMLInputElement>(null)
+  // The camera stays locked until location access is granted — every field photo must carry a
+  // location, so we require the permission up front rather than silently saving a photo without one.
+  const [locGranted, setLocGranted] = useState(false)
+  const [locErr, setLocErr] = useState<string | null>(null)
+  const [locBusy, setLocBusy] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -51,6 +56,24 @@ export default function TicketClient({ ticketId }: { ticketId: string }) {
   }, [ticketId])
 
   useEffect(() => { load(); loadPhotos() }, [load, loadPhotos])
+
+  // If the browser already remembers geolocation as granted, unlock the camera without a re-prompt.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.permissions?.query) return
+    navigator.permissions.query({ name: 'geolocation' as PermissionName })
+      .then((s) => { if (s.state === 'granted') setLocGranted(true) })
+      .catch(() => { /* Permissions API unavailable — user taps Enable location */ })
+  }, [])
+
+  // Ask for location; only a successful fix unlocks the camera button.
+  async function enableLocation() {
+    if (locBusy) return
+    setLocBusy(true); setLocErr(null)
+    const pos = await getPosition()
+    setLocBusy(false)
+    if (pos) setLocGranted(true)
+    else setLocErr('Location is off or blocked. Allow location for this site in your browser settings, then tap Enable location again.')
+  }
 
   // Take/pick a photo, stamp it with the device's location + time, and attach it to the ticket.
   async function capturePhoto(file: File) {
@@ -245,9 +268,20 @@ export default function TicketClient({ ticketId }: { ticketId: string }) {
                 picker elsewhere. Location + time are attached on upload. */}
             <input ref={photoInput} type="file" accept="image/*" capture="environment" hidden
               onChange={(e) => { const f = e.target.files?.[0]; if (f) capturePhoto(f); e.target.value = '' }} />
-            <button className="tech-btn ghost block" style={{ marginTop: 10 }} disabled={photoBusy} onClick={() => photoInput.current?.click()}>
-              {photoBusy ? 'Adding…' : '+ Take / add photo'}
-            </button>
+            {locGranted ? (
+              // Direct gesture → camera opens (position is re-read at upload for the exact spot).
+              <button className="tech-btn ghost block" style={{ marginTop: 10 }} disabled={photoBusy} onClick={() => photoInput.current?.click()}>
+                {photoBusy ? 'Adding…' : '+ Take / add photo'}
+              </button>
+            ) : (
+              <>
+                <div className="tech-note info" style={{ marginTop: 10 }}>Location access is required before taking a photo — every photo is tagged with where it was taken.</div>
+                <button className="tech-btn block" style={{ marginTop: 8 }} disabled={locBusy} onClick={enableLocation}>
+                  {locBusy ? 'Requesting…' : 'Enable location'}
+                </button>
+              </>
+            )}
+            {locErr && <div className="tech-note err" style={{ marginTop: 8 }}>{locErr}</div>}
           </div>
         )}
 
