@@ -138,7 +138,7 @@
 
 /* ── mini bar chart ──────────────────────────────────────────────────────── */
 .bx-chart{display:flex;align-items:flex-end;gap:10px;height:120px;padding-top:8px}
-.bx-chart .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px}
+.bx-chart .col{flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px}
 .bx-chart .col>i{width:60%;background:linear-gradient(var(--accent),color-mix(in srgb,var(--accent) 60%,#000));border-radius:4px 4px 0 0;display:block;min-height:2px}
 .bx-chart .col small{font-size:10.5px;color:var(--dim)}
 
