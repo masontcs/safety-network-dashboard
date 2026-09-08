@@ -27,6 +27,7 @@ const ROLE_HOME: Record<Role, string> = {
   billing_branch_manager: '/billing',
   dispatcher:       '/billing/dispatch',
   biller:           '/billing',
+  accounting:       '/billing/invoices',
 }
 
 // Path prefixes each role is allowed to visit come from the single source of truth in

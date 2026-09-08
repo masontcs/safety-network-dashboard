@@ -53,7 +53,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       if (!targetBranches.some((b) => allow.has(b))) return bad('You do not manage this user.', 'FORBIDDEN', 403)
     }
 
-    const body = (await request.json()) as { role?: Role; branchIds?: string[]; isActive?: boolean; temporaryPassword?: string }
+    const body = (await request.json()) as { role?: Role; branchIds?: string[]; isActive?: boolean; temporaryPassword?: string; qbExport?: boolean; qbConfig?: boolean }
+
+    // QuickBooks capability grants are cross-cutting (any branch's money) — admin only.
+    if (body.qbExport !== undefined || body.qbConfig !== undefined) {
+      if (ctx.access.role !== 'admin') return bad('Only an admin can change QuickBooks permissions.', 'FORBIDDEN', 403)
+      const patch: { qb_export_enabled?: boolean; qb_config_enabled?: boolean } = {}
+      if (body.qbExport !== undefined) patch.qb_export_enabled = body.qbExport
+      if (body.qbConfig !== undefined) patch.qb_config_enabled = body.qbConfig
+      const { error } = await supabase.from('user_profiles').update(patch).eq('id', params.id)
+      if (error) throw new Error(error.message)
+    }
 
     // Password reset (both kinds).
     if (body.temporaryPassword !== undefined) {

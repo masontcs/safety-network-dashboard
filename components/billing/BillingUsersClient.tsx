@@ -18,18 +18,18 @@ import { useCallback, useEffect, useState } from 'react'
 interface BUser {
   id: string; displayName: string; username: string | null; email: string
   baseRole: string; billingRole: string | null; source: 'native' | 'granted'
-  isActive: boolean; branchIds: string[]
+  isActive: boolean; branchIds: string[]; qbExport: boolean; qbConfig: boolean
 }
 interface Candidate { id: string; displayName: string; username: string | null; email: string; baseRole: string; isField: boolean; branchIds: string[] }
 interface Branch { id: string; name: string }
 
-const ROLE_LABEL: Record<string, string> = { billing_branch_manager: 'Branch Manager', dispatcher: 'Dispatcher', biller: 'Biller' }
+const ROLE_LABEL: Record<string, string> = { billing_branch_manager: 'Branch Manager', dispatcher: 'Dispatcher', biller: 'Biller', accounting: 'Accounting' }
 const BASE_ROLE_LABEL: Record<string, string> = {
   admin: 'Admin', executive: 'Executive', district_manager: 'District Manager', branch_manager: 'Branch Manager',
   ar_manager: 'AR Manager', ar_team: 'AR Team', office_team: 'Office', project_manager: 'Project Manager',
-  sales: 'Sales', tech: 'Technician', billing_branch_manager: 'Branch Manager', dispatcher: 'Dispatcher', biller: 'Biller',
+  sales: 'Sales', tech: 'Technician', billing_branch_manager: 'Branch Manager', dispatcher: 'Dispatcher', biller: 'Biller', accounting: 'Accounting',
 }
-const ROLES = ['biller', 'dispatcher', 'billing_branch_manager'] as const
+const ROLES = ['biller', 'dispatcher', 'billing_branch_manager', 'accounting'] as const
 const genPassword = () => 'Bill-' + Math.random().toString(36).slice(2, 8) + Math.floor(10 + Math.random() * 89) + '!'
 
 const th: React.CSSProperties = { textAlign: 'left', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', padding: '8px 12px', borderBottom: '1px solid var(--border-emphasis)' }
@@ -252,6 +252,9 @@ function UserModal({ mode, user, isAdmin, branches, onClose, onDone }: {
   const [role, setRole] = useState<string>(user?.billingRole ?? 'dispatcher')
   const [branchIds, setBranchIds] = useState<string[]>(user?.branchIds ?? [])
   const [isActive, setIsActive] = useState(user?.isActive ?? true)
+  const [qbExport, setQbExport] = useState(user?.qbExport ?? false)
+  const [qbConfig, setQbConfig] = useState(user?.qbConfig ?? false)
+  const isAccounting = role === 'accounting'
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [created, setCreated] = useState<{ username: string; email: string; password: string } | null>(null)
@@ -267,9 +270,9 @@ function UserModal({ mode, user, isAdmin, branches, onClose, onDone }: {
       if (!email.trim()) return setErr('Email is required.')
       if (!/^[a-z0-9_]{3,20}$/.test(username.trim().toLowerCase())) return setErr('Username must be 3–20 chars: lowercase letters, numbers, underscore.')
       if (password.length < 8) return setErr('Password must be at least 8 characters.')
-      if (branchIds.length === 0) return setErr('Assign at least one branch.')
+      if (branchIds.length === 0 && !isAccounting) return setErr('Assign at least one branch.')
     }
-    if (mode === 'edit' && !granted && branchIds.length === 0) return setErr('Assign at least one branch.')
+    if (mode === 'edit' && !granted && !isAccounting && branchIds.length === 0) return setErr('Assign at least one branch.')
     setBusy(true)
     try {
       if (mode === 'create') {
@@ -280,8 +283,10 @@ function UserModal({ mode, user, isAdmin, branches, onClose, onDone }: {
         setCreated({ username: username.trim().toLowerCase(), email: email.trim(), password })
       } else {
         // Native: send role + branches + active. Granted: only the billing role (branches/active
-        // follow their account, enforced server-side).
-        const payload = granted ? { role } : { role, branchIds, isActive }
+        // follow their account, enforced server-side). Accounting is cross-branch → no branches.
+        const payload: Record<string, unknown> = granted ? { role } : { role, isActive }
+        if (!granted && !isAccounting) payload.branchIds = branchIds
+        if (isAdmin) { payload.qbExport = qbExport; payload.qbConfig = qbConfig } // admin-only caps
         const res = await fetch(`/api/billing/users/${user!.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         const j = await res.json()
         if (!j.success) return setErr(j.error ?? 'Failed')
@@ -360,7 +365,11 @@ function UserModal({ mode, user, isAdmin, branches, onClose, onDone }: {
               </select>
             </div>
 
-            {granted ? (
+            {isAccounting ? (
+              <div><label className="bx-lbl">Branches</label>
+                <div className="bx-sub">Accounting sees every branch — no branch selection needed.</div>
+              </div>
+            ) : granted ? (
               <div><label className="bx-lbl">Branches</label>
                 <div className="bx-sub">Follows their account: {branchIds.map(branchName).join(', ') || '—'}</div>
               </div>
@@ -371,6 +380,20 @@ function UserModal({ mode, user, isAdmin, branches, onClose, onDone }: {
                     <button key={b.id} type="button" className={`bx-btn ${branchIds.includes(b.id) ? 'accent' : 'ghost'} sm`} onClick={() => toggleBranch(b.id)}>{b.name}</button>
                   ))}
                   {branches.length === 0 && <div className="bx-sub">No assignable branches.</div>}
+                </div>
+              </div>
+            )}
+
+            {mode === 'edit' && isAdmin && (
+              <div style={{ borderTop: '1px solid var(--border-subtle, var(--border-emphasis))', paddingTop: 12 }}>
+                <label className="bx-lbl">QuickBooks permissions</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-secondary)' }}>
+                    <input type="checkbox" checked={qbExport} onChange={(e) => setQbExport(e.target.checked)} /> Can run the QuickBooks invoice export
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-secondary)' }}>
+                    <input type="checkbox" checked={qbConfig} onChange={(e) => setQbConfig(e.target.checked)} /> Can edit the QuickBooks export mapping settings
+                  </label>
                 </div>
               </div>
             )}

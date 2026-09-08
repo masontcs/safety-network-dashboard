@@ -60,6 +60,28 @@ export function guardBillingArea(access: UserAccess, area: BillingArea): NextRes
   )
 }
 
+/**
+ * QuickBooks export capability — a per-user grant layered on top of the billing role. Admins
+ * always pass. Anyone else needs the qb_export_enabled flag. Use in the export routes AFTER
+ * the invoices-area guard, so a user must both reach invoices AND be QB-enabled.
+ */
+export function guardQbExport(access: UserAccess): NextResponse | null {
+  if (access.role === 'admin' || access.qbExport) return null
+  return NextResponse.json(
+    { success: false, error: 'You are not enabled for the QuickBooks export.', code: 'FORBIDDEN' },
+    { status: 403 }
+  )
+}
+
+/** QuickBooks mapping-settings capability — admins plus users with qb_config_enabled. */
+export function guardQbConfig(access: UserAccess): NextResponse | null {
+  if (access.role === 'admin' || access.qbConfig) return null
+  return NextResponse.json(
+    { success: false, error: 'You are not enabled to change the QuickBooks export settings.', code: 'FORBIDDEN' },
+    { status: 403 }
+  )
+}
+
 // Admin or executive — used for allocation management, data explorer, etc.
 export function guardAdminOrExecutive(role: Role): NextResponse | null {
   if (role === 'admin' || role === 'executive') return null
@@ -127,7 +149,7 @@ export async function getAccessContext(): Promise<AccessResult> {
 
   const { data: profile, error: profileError } = await supabase
     .from('user_profiles')
-    .select('id, role, display_name, billing_role')
+    .select('id, role, display_name, billing_role, qb_export_enabled, qb_config_enabled')
     .eq('id', userId)
     .single()
 
@@ -144,6 +166,9 @@ export async function getAccessContext(): Promise<AccessResult> {
   const role = profile.role as Role
   const billingRole = (profile as unknown as { billing_role: Role | null }).billing_role ?? null
   const displayName = (profile as unknown as { display_name: string | null }).display_name ?? ''
+  const caps = profile as unknown as { qb_export_enabled?: boolean; qb_config_enabled?: boolean }
+  const qbExport = !!caps.qb_export_enabled
+  const qbConfig = !!caps.qb_config_enabled
 
   // A field tech with NO layered billing grant has no desktop access — reject here so they
   // can never reach a role guard at all. A tech who was ALSO granted billing (billing_role)
@@ -172,8 +197,10 @@ export async function getAccessContext(): Promise<AccessResult> {
   // Roles with null branchIds — either full access or customer-scoped (handled per AR route).
   // NOTE: a layered billing grant on one of these roles inherits null (all-branch) billing
   // scope by design; scoped billing staff use branch-scoped primary roles or native billing roles.
-  if (role === 'admin' || role === 'executive' || role === 'ar_manager' || role === 'ar_team' || role === 'office_team') {
-    return { ok: true, access: { userId, role, displayName, branchIds: null, billingRole } }
+  // Cross-branch roles get null branchIds (all access). Accounting joins them so it sees every
+  // branch's invoices for the QuickBooks export and reconciliation.
+  if (role === 'admin' || role === 'executive' || role === 'ar_manager' || role === 'ar_team' || role === 'office_team' || role === 'accounting') {
+    return { ok: true, access: { userId, role, displayName, branchIds: null, billingRole, qbExport, qbConfig } }
   }
 
   // sales, project_manager, district_manager, branch_manager: branch-scoped via assignments
@@ -194,7 +221,7 @@ export async function getAccessContext(): Promise<AccessResult> {
 
   const branchIds = (assignments ?? []).map((a) => a.branch_id)
 
-  return { ok: true, access: { userId, role, displayName, branchIds, billingRole } }
+  return { ok: true, access: { userId, role, displayName, branchIds, billingRole, qbExport, qbConfig } }
 }
 
 // ── AR team customer scope helper ──────────────────────────────────────────────

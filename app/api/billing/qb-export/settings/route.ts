@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
+import { getAccessContext, guardBillingArea, guardQbConfig } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import type { Database } from '@/lib/supabase/database.types'
@@ -27,7 +27,7 @@ export async function GET(): Promise<NextResponse> {
     return NextResponse.json({
       success: true,
       data: {
-        isAdmin: ctx.access.role === 'admin',
+        canManage: ctx.access.role === 'admin' || !!ctx.access.qbConfig,
         config: {
           arAccount: c?.ar_account ?? 'ACCOUNTS RECEIVABLE',
           taxAccount: c?.tax_account ?? 'Sales Tax Payable',
@@ -51,11 +51,10 @@ export async function PUT(request: Request): Promise<NextResponse> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access, 'invoices')
-    if (guard) return guard
-    if (ctx.access.role !== 'admin') {
-      return NextResponse.json({ success: false, error: 'Only an admin can change the QuickBooks export mapping.', code: 'FORBIDDEN' }, { status: 403 })
-    }
+    const areaGuard = guardBillingArea(ctx.access, 'invoices')
+    if (areaGuard) return areaGuard
+    const capGuard = guardQbConfig(ctx.access)
+    if (capGuard) return capGuard
 
     const b = (await request.json()) as {
       arAccount?: string; taxAccount?: string; taxZeroMemo?: string; taxExtra?: string

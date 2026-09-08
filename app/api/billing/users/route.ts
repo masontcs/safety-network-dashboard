@@ -31,13 +31,13 @@ export async function GET(): Promise<NextResponse> {
     const [{ data: profs }, { data: asg }, { data: branchRows }, authList] = await Promise.all([
       // Billing users are (a) NATIVE — role is itself a billing role — or (b) GRANTED — any
       // dashboard/tech user who was given a layered billing_role. List both.
-      supabase.from('user_profiles').select('id, role, billing_role, display_name, username, is_active')
-        .or('role.in.(billing_branch_manager,dispatcher,biller),billing_role.not.is.null'),
+      supabase.from('user_profiles').select('id, role, billing_role, display_name, username, is_active, qb_export_enabled, qb_config_enabled')
+        .or('role.in.(billing_branch_manager,dispatcher,biller,accounting),billing_role.not.is.null'),
       supabase.from('user_branch_assignments').select('user_id, branch_id'),
       supabase.from('branches').select('id, name').eq('is_active', true).order('name'),
       supabase.auth.admin.listUsers(),
     ])
-    const profiles = (profs ?? []) as { id: string; role: Role; billing_role: Role | null; display_name: string; username: string | null; is_active: boolean }[]
+    const profiles = (profs ?? []) as { id: string; role: Role; billing_role: Role | null; display_name: string; username: string | null; is_active: boolean; qb_export_enabled: boolean; qb_config_enabled: boolean }[]
     const assignments = (asg ?? []) as { user_id: string; branch_id: string }[]
     const branchByUser = new Map<string, string[]>()
     for (const a of assignments) branchByUser.set(a.user_id, [...(branchByUser.get(a.user_id) ?? []), a.branch_id])
@@ -56,6 +56,7 @@ export async function GET(): Promise<NextResponse> {
         billingRole,                 // effective billing role (what drives areas)
         source: granted ? 'granted' as const : 'native' as const,
         isActive: p.is_active, branchIds: branchByUser.get(p.id) ?? [],
+        qbExport: p.qb_export_enabled, qbConfig: p.qb_config_enabled,
       }
     })
     // A scoped manager only sees billing users who share one of their branches.
@@ -89,7 +90,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!uname || !/^[a-z0-9_]{3,20}$/.test(uname)) return bad('Username must be 3–20 chars: lowercase letters, numbers, underscore')
     if (!password || password.length < 8) return bad('A temporary password of at least 8 characters is required')
     if (!role || !isManageableRole(role)) return bad('Pick a billing role')
-    if (branchIds.length === 0) return bad('Assign at least one branch')
+    // Accounting is cross-branch (sees every branch), so it needs no branch assignment.
+    if (branchIds.length === 0 && role !== 'accounting') return bad('Assign at least one branch')
     // A scoped manager may only assign their own branches.
     if (ctx.access.branchIds !== null) {
       const allow = new Set(ctx.access.branchIds)
@@ -114,8 +116,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       .insert({ id: userId, role, display_name: displayName, username: uname, must_change_password: true })
     if (pErr) { await supabase.auth.admin.deleteUser(userId); throw new Error(pErr.message) }
 
-    const { error: bErr } = await supabase.from('user_branch_assignments').insert(branchIds.map((branch_id) => ({ user_id: userId, branch_id })))
-    if (bErr) { await supabase.from('user_profiles').delete().eq('id', userId); await supabase.auth.admin.deleteUser(userId); throw new Error(bErr.message) }
+    if (branchIds.length) {
+      const { error: bErr } = await supabase.from('user_branch_assignments').insert(branchIds.map((branch_id) => ({ user_id: userId, branch_id })))
+      if (bErr) { await supabase.from('user_profiles').delete().eq('id', userId); await supabase.auth.admin.deleteUser(userId); throw new Error(bErr.message) }
+    }
 
     await logAudit({
       userId: ctx.access.userId, userDisplayName: ctx.access.displayName, userRole: ctx.access.role,

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
+import { getAccessContext, guardBillingArea, guardQbExport } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { loadQbConfig, assembleForExport } from '@/lib/billing/qbExport'
@@ -15,8 +15,10 @@ export async function GET(request: Request): Promise<Response> {
   try {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
-    const guard = guardBillingArea(ctx.access, 'invoices')
-    if (guard) return guard
+    const areaGuard = guardBillingArea(ctx.access, 'invoices')
+    if (areaGuard) return areaGuard
+    const capGuard = guardQbExport(ctx.access)
+    if (capGuard) return capGuard
 
     const url = new URL(request.url)
     const start = url.searchParams.get('start')

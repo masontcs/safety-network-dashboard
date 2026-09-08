@@ -32,6 +32,7 @@ const ROLE_LABELS: Record<Role, string> = {
   billing_branch_manager: 'Branch Manager',
   dispatcher:       'Dispatcher',
   biller:           'Biller',
+  accounting:       'Accounting',
 }
 
 const ROLE_COLORS: Record<Role, string> = {
@@ -48,6 +49,7 @@ const ROLE_COLORS: Record<Role, string> = {
   billing_branch_manager: '#b8860b',
   dispatcher:       '#b8860b',
   biller:           '#b8860b',
+  accounting:       '#b8860b',
 }
 
 const selectStyle: React.CSSProperties = {

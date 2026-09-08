@@ -177,6 +177,7 @@ const NAV_CONFIG: Record<Role, NavConfig> = {
   billing_branch_manager: { primary: [], more: [] },
   dispatcher: { primary: [], more: [] },
   biller: { primary: [], more: [] },
+  accounting: { primary: [], more: [] },
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────

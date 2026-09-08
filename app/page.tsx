@@ -21,6 +21,7 @@ const DASHBOARD_ROUTES: Record<Role, string> = {
   billing_branch_manager: '/billing',
   dispatcher:       '/billing/dispatch',
   biller:           '/billing',
+  accounting:       '/billing/invoices',
 }
 
 export default async function RootPage() {

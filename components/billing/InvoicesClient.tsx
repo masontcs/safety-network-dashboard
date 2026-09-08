@@ -34,6 +34,8 @@ export default function InvoicesClient() {
   const [qbErr, setQbErr] = useState<string | null>(null)
   const [qbOpen, setQbOpen] = useState<Set<string>>(new Set())
   const toggleQbOpen = (id: string) => setQbOpen((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const [canExportQb, setCanExportQb] = useState(false)
+  useEffect(() => { fetch('/api/billing/qb-export/capability').then((r) => r.json()).then((j) => { if (j.success) setCanExportQb(j.data.canExport) }).catch(() => {}) }, [])
 
   const loadQbSummary = useCallback(() => {
     setQbBusy(true); setQbErr(null); setQbEntities(null)
@@ -74,11 +76,11 @@ export default function InvoicesClient() {
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
         <span style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)' }}>Invoices</span>
-        <button onClick={() => { setShowQb((v) => !v); if (!showQb) setTimeout(loadQbSummary, 0) }} style={{
+        {canExportQb && <button onClick={() => { setShowQb((v) => !v); if (!showQb) setTimeout(loadQbSummary, 0) }} style={{
           marginLeft: 'auto', background: showQb ? 'var(--text-primary)' : 'transparent', color: showQb ? 'var(--surface-2, #fff)' : 'var(--text-muted)',
           border: '1px solid var(--border-emphasis)', borderRadius: 6, padding: '4px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
-        }}>Export to QuickBooks</button>
-        <div style={{ display: 'flex', gap: 4 }}>
+        }}>Export to QuickBooks</button>}
+        <div style={{ display: 'flex', gap: 4, marginLeft: canExportQb ? undefined : 'auto' }}>
           {FILTERS.map((f) => (
             <button key={f} onClick={() => setFilter(f)} style={{
               background: filter === f ? 'var(--text-primary)' : 'transparent',

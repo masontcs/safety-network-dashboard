@@ -9,6 +9,10 @@ export type UserAccess = {
   // layered grant; a legacy pure-billing account instead carries the billing role in `role`.
   // getAccessContext always populates this; optional only so terse test fixtures may omit it.
   billingRole?: Role | null
+  // Per-user QuickBooks capabilities (layered on top of billing role; admins always allowed).
+  // Optional so terse test fixtures may omit them.
+  qbExport?: boolean // may run the QuickBooks invoice export
+  qbConfig?: boolean // may edit the QuickBooks export mapping settings
 }
 
 export function canAccessBranch(access: UserAccess, branchId: string): boolean {

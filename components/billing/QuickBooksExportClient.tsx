@@ -31,7 +31,7 @@ const td: React.CSSProperties = { padding: '6px 8px', verticalAlign: 'top' }
 export default function QuickBooksExportClient() {
   const [cfg, setCfg] = useState<Config | null>(null)
   const [branches, setBranches] = useState<Branch[]>([])
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [canManage, setCanManage] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -41,7 +41,7 @@ export default function QuickBooksExportClient() {
     setLoading(true)
     fetch('/api/billing/qb-export/settings').then((r) => r.json()).then((j) => {
       if (!j.success) throw new Error(j.error)
-      setCfg(j.data.config); setBranches(j.data.branches); setIsAdmin(j.data.isAdmin); setErr(null)
+      setCfg(j.data.config); setBranches(j.data.branches); setCanManage(j.data.canManage); setErr(null)
     }).catch((e: Error) => setErr(e.message)).finally(() => setLoading(false))
   }, [])
   useEffect(() => { load() }, [load])
@@ -78,7 +78,7 @@ export default function QuickBooksExportClient() {
       <div>
         <h1 style={{ fontSize: 22, fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>QuickBooks Export</h1>
         <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4 }}>
-          How invoices map into your QuickBooks .iif file. {isAdmin ? 'Changes take effect on the next export.' : 'Read-only — ask an admin to change these.'}
+          How invoices map into your QuickBooks .iif file. {canManage ? 'Changes take effect on the next export.' : 'Read-only — ask an admin to change these.'}
         </div>
       </div>
 
@@ -87,14 +87,14 @@ export default function QuickBooksExportClient() {
       <div className="card">
         <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 14 }}>Accounts</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
-          <div><label style={lbl}>A/R account</label><input style={inp} value={cfg.arAccount} disabled={!isAdmin} onChange={(e) => patch({ arAccount: e.target.value })} /></div>
-          <div><label style={lbl}>Sales tax account</label><input style={inp} value={cfg.taxAccount} disabled={!isAdmin} onChange={(e) => patch({ taxAccount: e.target.value })} /></div>
-          <div><label style={lbl}>Zero-tax memo</label><input style={inp} value={cfg.taxZeroMemo} disabled={!isAdmin} onChange={(e) => patch({ taxZeroMemo: e.target.value })} /></div>
-          <div><label style={lbl}>Tax "extra" field</label><input style={inp} value={cfg.taxExtra} disabled={!isAdmin} onChange={(e) => patch({ taxExtra: e.target.value })} /></div>
+          <div><label style={lbl}>A/R account</label><input style={inp} value={cfg.arAccount} disabled={!canManage} onChange={(e) => patch({ arAccount: e.target.value })} /></div>
+          <div><label style={lbl}>Sales tax account</label><input style={inp} value={cfg.taxAccount} disabled={!canManage} onChange={(e) => patch({ taxAccount: e.target.value })} /></div>
+          <div><label style={lbl}>Zero-tax memo</label><input style={inp} value={cfg.taxZeroMemo} disabled={!canManage} onChange={(e) => patch({ taxZeroMemo: e.target.value })} /></div>
+          <div><label style={lbl}>Tax "extra" field</label><input style={inp} value={cfg.taxExtra} disabled={!canManage} onChange={(e) => patch({ taxExtra: e.target.value })} /></div>
         </div>
         <div style={{ display: 'flex', gap: '14px 32px', marginTop: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ width: 160 }}><label style={lbl}>Default net days</label><input style={inp} value={cfg.defaultNetDays} disabled={!isAdmin} onChange={(e) => patch({ defaultNetDays: Number(e.target.value.replace(/\D/g, '')) || 0 })} /></div>
-          <Toggle label="Append job as :sub-customer" disabled={!isAdmin} checked={cfg.nameIncludesJob} onChange={(v) => patch({ nameIncludesJob: v })} />
+          <div style={{ width: 160 }}><label style={lbl}>Default net days</label><input style={inp} value={cfg.defaultNetDays} disabled={!canManage} onChange={(e) => patch({ defaultNetDays: Number(e.target.value.replace(/\D/g, '')) || 0 })} /></div>
+          <Toggle label="Append job as :sub-customer" disabled={!canManage} checked={cfg.nameIncludesJob} onChange={(v) => patch({ nameIncludesJob: v })} />
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 8 }}>Due date = invoice date + the profile/customer payment term (falls back to default net days). Customer name comes from each profile&apos;s QuickBooks name.</div>
       </div>
@@ -110,9 +110,9 @@ export default function QuickBooksExportClient() {
               return (
                 <tr key={key}>
                   <td style={{ ...td, fontSize: 12.5, color: 'var(--text-secondary)' }}>{label}</td>
-                  <td style={td}><input style={inp} value={m.account} disabled={!isAdmin} onChange={(e) => setKind(key, 'account', e.target.value)} /></td>
-                  <td style={td}><input style={inp} value={m.item} disabled={!isAdmin} onChange={(e) => setKind(key, 'item', e.target.value)} /></td>
-                  <td style={td}><input style={inp} value={m.memo} disabled={!isAdmin} onChange={(e) => setKind(key, 'memo', e.target.value)} /></td>
+                  <td style={td}><input style={inp} value={m.account} disabled={!canManage} onChange={(e) => setKind(key, 'account', e.target.value)} /></td>
+                  <td style={td}><input style={inp} value={m.item} disabled={!canManage} onChange={(e) => setKind(key, 'item', e.target.value)} /></td>
+                  <td style={td}><input style={inp} value={m.memo} disabled={!canManage} onChange={(e) => setKind(key, 'memo', e.target.value)} /></td>
                 </tr>
               )
             })}
@@ -127,13 +127,13 @@ export default function QuickBooksExportClient() {
           {branchesSorted.map((b) => (
             <div key={b.id}>
               <label style={lbl}>{b.name}{!b.revenue ? ' (non-revenue)' : ''}{!b.active ? ' · inactive' : ''}</label>
-              <input style={inp} value={cfg.branchClass[b.id] ?? ''} disabled={!isAdmin} placeholder=":TCS-XX" onChange={(e) => setClass(b.id, e.target.value)} />
+              <input style={inp} value={cfg.branchClass[b.id] ?? ''} disabled={!canManage} placeholder=":TCS-XX" onChange={(e) => setClass(b.id, e.target.value)} />
             </div>
           ))}
         </div>
       </div>
 
-      {isAdmin && (
+      {canManage && (
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <button onClick={save} disabled={saving} className="btn-primary" style={{ padding: '8px 22px', opacity: saving ? 0.5 : 1 }}>{saving ? 'Saving…' : 'Save settings'}</button>
           {msg && <span style={{ fontSize: 12.5, color: 'var(--alert-success-fg)' }}>{msg}</span>}

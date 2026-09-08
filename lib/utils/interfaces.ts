@@ -38,13 +38,13 @@ export const DASHBOARD_ROLES: readonly Role[] = [
  * admin-only. NOTE: billing_branch_manager is the BILLING role; the dashboard 'branch_manager'
  * is a separate role in a separate column — distinct strings on purpose.
  */
-export const BILLING_ROLES: readonly Role[] = ['admin', 'billing_branch_manager', 'dispatcher', 'biller'] as const
+export const BILLING_ROLES: readonly Role[] = ['admin', 'billing_branch_manager', 'dispatcher', 'biller', 'accounting'] as const
 
 /**
  * Roles that can be assigned to a billing user (native account or layered grant). Excludes
  * 'admin' and all dashboard roles — no privilege escalation out of billing.
  */
-export const MANAGEABLE_BILLING_ROLES: readonly Role[] = ['billing_branch_manager', 'dispatcher', 'biller'] as const
+export const MANAGEABLE_BILLING_ROLES: readonly Role[] = ['billing_branch_manager', 'dispatcher', 'biller', 'accounting'] as const
 
 /** Billing sub-areas — the unit of permission within the billing interface. */
 export type BillingArea = 'home' | 'dispatch' | 'jobs' | 'tickets' | 'quotes' | 'invoices' | 'customers' | 'items' | 'pricelists' | 'technicians' | 'jobtypes' | 'time' | 'users'
@@ -61,6 +61,9 @@ const BILLING_AREAS: Partial<Record<Role, BillingArea[]>> = {
   billing_branch_manager: ['home', 'dispatch', 'jobs', 'tickets', 'quotes', 'invoices', 'customers', 'items', 'pricelists', 'technicians', 'jobtypes', 'time'],
   dispatcher: ['dispatch', 'jobs', 'tickets', 'time'],
   biller: ['home', 'jobs', 'tickets', 'quotes', 'invoices', 'customers', 'pricelists', 'time'],
+  // Accounting: everything except user management, and cross-branch (see lib/api/auth). The
+  // QuickBooks export itself is further gated by a per-user capability (qbExport).
+  accounting: ['home', 'dispatch', 'jobs', 'tickets', 'quotes', 'invoices', 'customers', 'items', 'pricelists', 'technicians', 'jobtypes', 'time'],
 }
 
 /**
@@ -169,4 +172,5 @@ const DASHBOARD_PREFIXES: Record<Role, string[]> = {
   billing_branch_manager: [],
   dispatcher:       [],
   biller:           [],
+  accounting:       [],
 }
