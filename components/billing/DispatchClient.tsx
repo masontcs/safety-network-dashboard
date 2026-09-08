@@ -25,7 +25,7 @@ interface YardShift { id: string; technicianId: string; date: string }
 interface StagedShift { id: string; date: string; isYard: boolean; crewTechIds: string[]; leadTechId: string | null; jobNumber: string | null; jobName: string | null; customer: string | null; jobTypes: string[] }
 type Range = 'day' | 'week' | 'month'
 type GroupBy = 'tech' | 'customer' | 'jobtype'
-interface Board { range: Range; rangeStart: string; rangeEnd: string; days: string[]; technicians: { id: string; name: string }[]; tickets: Ticket[]; yard: YardShift[]; isAdmin: boolean }
+interface Board { range: Range; rangeStart: string; rangeEnd: string; days: string[]; technicians: { id: string; name: string }[]; tickets: Ticket[]; yard: YardShift[]; canDispatch: boolean }
 
 const addDays = (d: string, n: number) => { const dt = new Date(d + 'T00:00:00Z'); dt.setUTCDate(dt.getUTCDate() + n); return dt.toISOString().slice(0, 10) }
 const addMonths = (d: string, n: number) => { const dt = new Date(d + 'T00:00:00Z'); dt.setUTCMonth(dt.getUTCMonth() + n); return dt.toISOString().slice(0, 10) }
@@ -174,7 +174,7 @@ export default function DispatchClient() {
         <div style={{ flex: 1, minWidth: 220 }}>
           <h1 className="bx-h1">Dispatch</h1>
           <div className="bx-sub">
-            {rangeTitle}{board?.isAdmin && isTech && range !== 'month' ? ' · drag a ticket to another driver or day.' : ''}
+            {rangeTitle}{board?.canDispatch && isTech && range !== 'month' ? ' · drag a ticket to another driver or day.' : ''}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -193,14 +193,14 @@ export default function DispatchClient() {
             <button className="bx-btn ghost" onClick={() => step(-1)}>‹</button>
             <button className="bx-btn ghost" onClick={() => setAnchor(today())}>Today</button>
             <button className="bx-btn ghost" onClick={() => step(1)}>›</button>
-            {board?.isAdmin && <button className="bx-btn accent" onClick={() => setGeneralDispatch({ date: range === 'month' ? today() : anchor })}>+ Dispatch</button>}
+            {board?.canDispatch && <button className="bx-btn accent" onClick={() => setGeneralDispatch({ date: range === 'month' ? today() : anchor })}>+ Dispatch</button>}
           </div>
         </div>
       </div>
 
       {range === 'month'
         ? <MonthCalendar
-            days={days} anchor={anchor} board={board} staged={staged} isAdmin={!!board?.isAdmin}
+            days={days} anchor={anchor} board={board} staged={staged} canDispatch={!!board?.canDispatch}
             onOpenTicket={(t) => setDetailTicket(t)}
             onDispatchDay={(d) => setGeneralDispatch({ date: d })}
             onPublishShift={publishShift} onEditShift={(id) => setEditShiftId(id)} onDeleteShift={deleteShift} />
@@ -225,8 +225,8 @@ export default function DispatchClient() {
                     onPublishShift={publishShift}
                     onEditShift={(id) => setEditShiftId(id)}
                     onDeleteShift={deleteShift}
-                    canDrag={!!board?.isAdmin && isTech}
-                    canDispatch={!!board?.isAdmin && isTech}
+                    canDrag={!!board?.canDispatch && isTech}
+                    canDispatch={!!board?.canDispatch && isTech}
                     onDragStart={(t) => { drag.current = t }}
                     onDrop={(key, day) => { if (drag.current) { reassign(drag.current, key, day); drag.current = null } }}
                     onOpen={(t) => setDetailTicket(t)}
@@ -275,7 +275,7 @@ export default function DispatchClient() {
         <ShiftDetailDrawer
           ticket={detailTicket}
           technicians={board.technicians}
-          isAdmin={board.isAdmin}
+          canDispatch={board.canDispatch}
           onOpenFull={() => router.push(`/billing/tickets/${detailTicket.id}`)}
           onClose={() => setDetailTicket(null)}
           onChanged={() => load(range, anchor, true)}
@@ -387,8 +387,8 @@ function GridRow({ row, days, loading, groupBy, cardsFor, yardFor, stagedFor, on
    the left and STAYS interactive — so you can keep picking other days without closing the panel.
    The selected day is highlighted; ✕ collapses the panel. Selecting a day is local (range stays
    'month'). */
-function MonthCalendar({ days, anchor, board, staged, isAdmin, onOpenTicket, onDispatchDay, onPublishShift, onEditShift, onDeleteShift }: {
-  days: string[]; anchor: string; board: Board | null; staged: StagedShift[]; isAdmin: boolean
+function MonthCalendar({ days, anchor, board, staged, canDispatch, onOpenTicket, onDispatchDay, onPublishShift, onEditShift, onDeleteShift }: {
+  days: string[]; anchor: string; board: Board | null; staged: StagedShift[]; canDispatch: boolean
   onOpenTicket: (t: Ticket) => void; onDispatchDay: (d: string) => void
   onPublishShift: (id: string) => void; onEditShift: (id: string) => void; onDeleteShift: (id: string) => void
 }) {
@@ -456,8 +456,8 @@ function MonthCalendar({ days, anchor, board, staged, isAdmin, onOpenTicket, onD
           <div style={{ width: PANEL_W, padding: 18, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexShrink: 0 }}>
               <h3 style={{ margin: 0, fontSize: 14.5 }}>{selected ? dayLong(selected) : ''}</h3>
-              {isAdmin && selected && <button className="bx-btn accent sm" style={{ marginLeft: 'auto' }} onClick={() => onDispatchDay(selected)}>+ Dispatch</button>}
-              <button className="bx-iconbtn" onClick={() => setSelected(null)} title="Close" style={{ marginLeft: isAdmin ? 0 : 'auto' }}>✕</button>
+              {canDispatch && selected && <button className="bx-btn accent sm" style={{ marginLeft: 'auto' }} onClick={() => onDispatchDay(selected)}>+ Dispatch</button>}
+              <button className="bx-iconbtn" onClick={() => setSelected(null)} title="Close" style={{ marginLeft: canDispatch ? 0 : 'auto' }}>✕</button>
             </div>
 
             {selected && dayTickets.length === 0 && dayStaged.length === 0 && dayYard.length === 0 ? (
@@ -465,7 +465,7 @@ function MonthCalendar({ days, anchor, board, staged, isAdmin, onOpenTicket, onD
             ) : (
               <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 2 }}>
                 {dayTickets.map((t) => <AgendaTicketBox key={t.id} t={t} techName={techName} onOpen={() => onOpenTicket(t)} />)}
-                {dayStaged.map((s) => <AgendaStagedBox key={s.id} s={s} techName={techName} isAdmin={isAdmin} onPublish={() => onPublishShift(s.id)} onEdit={() => onEditShift(s.id)} onDelete={() => onDeleteShift(s.id)} />)}
+                {dayStaged.map((s) => <AgendaStagedBox key={s.id} s={s} techName={techName} canDispatch={canDispatch} onPublish={() => onPublishShift(s.id)} onEdit={() => onEditShift(s.id)} onDelete={() => onDeleteShift(s.id)} />)}
                 {dayYard.map((y) => (
                   <div key={y.id} style={{ ...agendaBox, borderStyle: 'solid', color: 'var(--muted)' }} title="Yard shift — no ticket">
                     <div style={agendaTitle}><span>Yard shift</span><Feature label="yard" /></div>
@@ -540,7 +540,7 @@ function AgendaTicketBox({ t, techName, onOpen }: { t: Ticket; techName: Map<str
   )
 }
 
-function AgendaStagedBox({ s, techName, isAdmin, onPublish, onEdit, onDelete }: { s: StagedShift; techName: Map<string, string>; isAdmin: boolean; onPublish: () => void; onEdit: () => void; onDelete: () => void }) {
+function AgendaStagedBox({ s, techName, canDispatch, onPublish, onEdit, onDelete }: { s: StagedShift; techName: Map<string, string>; canDispatch: boolean; onPublish: () => void; onEdit: () => void; onDelete: () => void }) {
   return (
     <div style={{ ...agendaBox, border: '1px dashed var(--accent)' }} title="Staged shift — not published yet">
       <div style={agendaTitle}>
@@ -551,7 +551,7 @@ function AgendaStagedBox({ s, techName, isAdmin, onPublish, onEdit, onDelete }: 
       {s.jobTypes.length > 0 && <Field label="Type" value={s.jobTypes.join(', ')} />}
       <div style={{ borderTop: '1px solid var(--line)', margin: '2px 0 1px' }} />
       <TechChips crewTechIds={s.crewTechIds} leadTechId={s.leadTechId} techName={techName} />
-      {isAdmin && (
+      {canDispatch && (
         <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
           <button className="bx-btn accent sm" onClick={onPublish}>Publish</button>
           <button className="bx-btn ghost sm" onClick={onEdit}>Edit</button>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
+import { canBillingArea } from '@/lib/utils/interfaces'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { broadcastDispatchChanged } from '@/lib/realtime/broadcast'
@@ -144,7 +145,10 @@ export async function GET(request: Request): Promise<NextResponse> {
           profile: t.billing_jobs?.billing_profiles?.name ?? null,
           jobTypes: jobTypesByTicket.get(t.id) ?? [],
         })),
-        isAdmin: ctx.access.role === 'admin',
+        // The board's write controls (dispatch/assign, drag, shift publish/edit) are gated on
+        // this. It's the DISPATCH-AREA capability, not admin — a Branch Manager, Dispatcher and
+        // Accounting all have the area (see BILLING_AREAS), so they can dispatch, not just admins.
+        canDispatch: canBillingArea(ctx.access.role, 'dispatch', ctx.access.billingRole),
       },
     })
   } catch (err) {

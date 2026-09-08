@@ -20,10 +20,10 @@ interface CrewRow { id: string; isLead: boolean; technician: { id: string; name:
 const featureLabel = (f: Ticket['feature']) => (f === 'return' ? 'pickup' : f === 'dtc' ? 'DTC' : 'set up')
 const dayLong = (d: string) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
 
-export default function ShiftDetailDrawer({ ticket, technicians, isAdmin, onOpenFull, onClose, onChanged }: {
+export default function ShiftDetailDrawer({ ticket, technicians, canDispatch, onOpenFull, onClose, onChanged }: {
   ticket: Ticket
   technicians: { id: string; name: string }[]
-  isAdmin: boolean
+  canDispatch: boolean
   onOpenFull: () => void
   onClose: () => void
   onChanged: () => void
@@ -33,7 +33,7 @@ export default function ShiftDetailDrawer({ ticket, technicians, isAdmin, onOpen
   const [date, setDate] = useState(ticket.date)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const editable = isAdmin && !ticket.voided
+  const editable = canDispatch && !ticket.voided
 
   useEffect(() => { const id = requestAnimationFrame(() => setEntered(true)); return () => cancelAnimationFrame(id) }, [])
   const close = useCallback(() => { setEntered(false); setTimeout(onClose, 240) }, [onClose])
