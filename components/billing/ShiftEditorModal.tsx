@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import Combobox from '@/components/billing/Combobox'
 import TechMultiSelect from '@/components/billing/TechMultiSelect'
 import { MEAL_TYPES } from '@/lib/billing/shiftConstants'
+import { useBranch } from '@/components/billing/BranchContext'
 
 /**
  * Stage or publish a SHIFT — the dispatch unit. A staged shift is a draft (no ticket, no
@@ -42,8 +43,12 @@ export default function ShiftEditorModal({
   onDone: (msg: string) => void
 }) {
   const editing = !!editShiftId
+  const { branches } = useBranch()
   // In general (pickDate) mode the date is chosen inside the modal; otherwise it's fixed by the cell.
   const [dateState, setDateState] = useState(date)
+  // Yard shift branch: default to the active branch; a single-branch user's is filled server-side,
+  // so this picker only matters for a cross-branch user working with "All branches" selected.
+  const [yardBranchId, setYardBranchId] = useState<string>(branchId ?? '')
   const [dayTickets, setDayTickets] = useState<TicketOpt[]>(ticketsForDay)
   const [mode, setMode] = useState<Mode>(!pickDate && ticketsForDay.length > 0 ? 'ticket' : 'job')
   const [busy, setBusy] = useState(false)
@@ -62,6 +67,9 @@ export default function ShiftEditorModal({
   const [notes, setNotes] = useState('')
   const [files, setFiles] = useState<{ id: string; filename: string | null; url: string | null }[]>([])
   const [uploading, setUploading] = useState(false)
+  // Files chosen BEFORE the shift exists (new-shift flow): held here and uploaded right after the
+  // shift is created, so a traffic plan can be attached at creation without staging first.
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
 
   // reference data
   const [jobs, setJobs] = useState<JobOpt[]>([])
@@ -74,6 +82,7 @@ export default function ShiftEditorModal({
   const [profileId, setProfileId] = useState('')
   const [entityId, setEntityId] = useState('')
   const [jobName, setJobName] = useState('')
+  const [prevailingWage, setPrevailingWage] = useState(false)
   const [certified, setCertified] = useState<boolean | null>(null)
   const [dir, setDir] = useState(''); const [contract, setContract] = useState(''); const [payClass, setPayClass] = useState('')
   const [poNumber, setPoNumber] = useState('')
@@ -178,7 +187,7 @@ export default function ShiftEditorModal({
     if (certified === null) { setErr('Answer whether this is a certified job.'); return null }
     if (certified && (!dir.trim() || !contract.trim() || !payClass.trim())) { setErr('Certified jobs need DIR #, contract #, and pay classification.'); return null }
     const jr = await post('/api/billing/jobs', {
-      profileId, entityId, name: jobName.trim() || null, certified,
+      profileId, entityId, name: jobName.trim() || null, certified, prevailingWage,
       dirNumber: certified ? dir.trim() : undefined, contractNumber: certified ? contract.trim() : undefined, payClassification: certified ? payClass.trim() : undefined,
       poNumber: poNumber.trim() || null, address: address.trim() || null, city: city.trim() || null,
     })
@@ -202,9 +211,24 @@ export default function ShiftEditorModal({
       resolvedJobId = await ensureJobId()
       if (!resolvedJobId) return null
     }
-    const r = await post('/api/billing/shifts', { ...payload, jobId: resolvedJobId, branchId })
+    // Yard branch: the chosen one (or the active branch); a single-branch user's is filled in
+    // server-side, so this may be blank for them. Job shifts derive branch from the job.
+    const shiftBranch = mode === 'yard' ? (yardBranchId || branchId) : branchId
+    const r = await post('/api/billing/shifts', { ...payload, jobId: resolvedJobId, branchId: shiftBranch })
     if (!r.success) { setErr(r.error ?? 'Failed to stage shift'); return null }
-    return (r.data as { id: string }).id
+    const newId = (r.data as { id: string }).id
+    // Attach any traffic-plan files chosen before the shift existed.
+    if (pendingFiles.length > 0) await uploadPendingTo(newId)
+    return newId
+  }
+
+  // Upload files that were queued before the shift had an id (new-shift flow).
+  async function uploadPendingTo(shiftId: string) {
+    for (const file of pendingFiles) {
+      const fd = new FormData(); fd.append('file', file)
+      await fetch(`/api/billing/shifts/${shiftId}/files`, { method: 'POST', body: fd }).catch(() => {})
+    }
+    setPendingFiles([])
   }
 
   async function onStage() {
@@ -327,6 +351,13 @@ export default function ShiftEditorModal({
                   </select></div>)}
             <div><label className="bx-lbl">Job name (optional)</label><input className="bx-f" style={{ width: '100%' }} value={jobName} onChange={(e) => setJobName(e.target.value)} placeholder="Northside Tower" /></div>
             <div>
+              <label className="bx-lbl">Prevailing wage?</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className={`bx-btn ${prevailingWage === false ? 'accent' : 'ghost'} sm`} onClick={() => setPrevailingWage(false)}>No</button>
+                <button type="button" className={`bx-btn ${prevailingWage === true ? 'accent' : 'ghost'} sm`} onClick={() => setPrevailingWage(true)}>Yes</button>
+              </div>
+            </div>
+            <div>
               <label className="bx-lbl">Certified job?</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="button" className={`bx-btn ${certified === false ? 'accent' : 'ghost'} sm`} onClick={() => setCertified(false)}>No</button>
@@ -345,9 +376,19 @@ export default function ShiftEditorModal({
             </div>
           </>)}
 
-          {mode === 'yard' && (
+          {mode === 'yard' && (<>
             <div className="bx-sub">Yard shift — no ticket (unless prepping for a job). Publishing logs the crew to the yard for the day; yard time is payroll-only.</div>
-          )}
+            {/* Branch: only ask when there's no active branch to inherit AND more than one to choose
+                from. A single-branch manager needs no field — the server fills in their branch. */}
+            {!branchId && branches.length > 1 && (
+              <div>
+                <label className="bx-lbl">Branch</label>
+                <select className="bx-f bx-select" value={yardBranchId} onChange={(e) => setYardBranchId(e.target.value)} style={{ width: '100%' }}>
+                  <option value="">Select…</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </div>
+            )}
+          </>)}
 
           {/* Rich shift fields — for any shift (not the immediate existing-ticket assign) */}
           {isShiftMode && (<>
@@ -393,7 +434,7 @@ export default function ShiftEditorModal({
             <div><label className="bx-lbl">Notes (optional)</label><textarea className="bx-f" style={{ width: '100%', minHeight: 54 }} value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
 
             <div>
-              <label className="bx-lbl">Traffic plan{editShiftId ? '' : ' (stage first, then re-open to attach)'}</label>
+              <label className="bx-lbl">Traffic plan (TCP)</label>
               {editShiftId ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {files.map((f) => (
@@ -408,7 +449,22 @@ export default function ShiftEditorModal({
                       onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(f); e.target.value = '' }} />
                   </label>
                 </div>
-              ) : <div className="bx-sub">Stage the shift, then re-open it from the board to attach traffic plans.</div>}
+              ) : (
+                // New shift: hold files client-side; they're uploaded the moment the shift is created.
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {pendingFiles.map((f, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 13 }}>📎 {f.name}</span>
+                      <button type="button" className="bx-iconbtn" title="Remove" onClick={() => setPendingFiles((cur) => cur.filter((_, ix) => ix !== i))} style={{ marginLeft: 'auto' }}>✕</button>
+                    </div>
+                  ))}
+                  <label className="bx-btn ghost sm" style={{ cursor: 'pointer', display: 'inline-block' }}>
+                    + Add file (PDF or image)
+                    <input type="file" accept="application/pdf,image/*" style={{ display: 'none' }}
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) setPendingFiles((cur) => [...cur, f]); e.target.value = '' }} />
+                  </label>
+                </div>
+              )}
             </div>
 
             {err && <div style={{ fontSize: 12, color: 'var(--danger)' }}>{err}</div>}

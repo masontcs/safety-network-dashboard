@@ -140,12 +140,18 @@ export async function POST(request: Request): Promise<NextResponse> {
       if (!job) return bad('Job not found', 'NOT_FOUND', 404)
       branchId = job.branch_id
     } else {
+      // Yard shift: branch from the request, or — when none was chosen — the user's own branch if
+      // it's unambiguous (a single-branch manager). Only a cross-branch/multi-branch user with no
+      // active branch has to pick one, so a Branch Manager never sees a phantom "branch required".
       branchId = body.branchId || null
+      if (!branchId && ctx.access.branchIds && ctx.access.branchIds.length === 1) {
+        branchId = ctx.access.branchIds[0]
+      }
     }
     if (branchId && ctx.access.branchIds !== null && !ctx.access.branchIds.includes(branchId)) {
       return bad('You do not have access to this branch.', 'FORBIDDEN', 403)
     }
-    if (!branchId) return bad('A branch is required for a yard shift')
+    if (!branchId) return bad('Pick a branch for this yard shift.')
 
     const { data: created, error } = await supabase
       .from('billing_shifts')
