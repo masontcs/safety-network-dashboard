@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import type { Database } from '@/lib/supabase/database.types'
-import { allowedPrefixesFor, canBillingArea } from '@/lib/utils/interfaces'
+import { allowedPrefixesFor, canBillingArea, canUseBilling, billingHomeFor } from '@/lib/utils/interfaces'
 import { surfaceForHost, surfaceForPath, surfaceUrl, cookieDomainForHost, SURFACE_HOME, isPortalHost, isPortalPath, PORTAL_URL } from '@/lib/utils/domains'
 
 type Role = Database['public']['Tables']['user_profiles']['Row']['role']
@@ -142,6 +142,13 @@ export async function middleware(request: NextRequest) {
   // would over-grant the whole /billing subtree to a role that only has the dashboard.
   const homeOk = pathname === '/billing' && canBillingArea(profile.role, 'home', profile.billing_role)
   if (!homeOk && !allowed.some((prefix) => pathname.startsWith(prefix))) {
+    // A billing-capable user who hits a billing path they lack — including the bare '/billing'
+    // when their role has no 'home' area (e.g. Dispatcher) — should land on THEIR billing home,
+    // not be bounced out to their dashboard. Without this, a hybrid (dashboard role + billing
+    // grant) switching into Billing gets ping-ponged back to Dashboards.
+    if (pathname.startsWith('/billing') && canUseBilling(profile.role, profile.billing_role)) {
+      return NextResponse.redirect(new URL(billingHomeFor(profile.role, profile.billing_role), request.url))
+    }
     return NextResponse.redirect(new URL(ROLE_HOME[profile.role], request.url))
   }
 

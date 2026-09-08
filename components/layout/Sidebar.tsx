@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { createBrowserClient } from '@/lib/supabase/client'
 import { useTheme } from '@/lib/theme/ThemeContext'
 import InterfaceSwitcher from '@/components/billing/InterfaceSwitcher'
-import { interfacesFor } from '@/lib/utils/interfaces'
+import { interfacesFor, billingHomeFor } from '@/lib/utils/interfaces'
 import type { Role } from '@/lib/supabase/database.types'
 
 interface NavItem {
@@ -310,6 +310,7 @@ export default function Sidebar({ role, fieldAccess = false, billingRole = null 
           <InterfaceSwitcher
             current="dashboards"
             available={interfacesFor(role, fieldAccess, billingRole)}
+            billingHref={billingHomeFor(role, billingRole)}
           />
         </div>
       )}

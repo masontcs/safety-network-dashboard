@@ -26,9 +26,17 @@ interface Props {
   available: InterfaceKey[]
   /** Dashboard sidebar collapses to an icon rail; render just the mark. */
   collapsed?: boolean
+  /**
+   * Per-user landing override for the Billing entry. The default target ('/billing/profiles') is
+   * under the Customers area, which some billing roles (e.g. Dispatcher) don't have — sending them
+   * there gets them bounced. The parent computes billingHomeFor(role, billingRole) and passes it so
+   * each user lands on a billing page they can actually reach.
+   */
+  billingHref?: string
 }
 
-export default function InterfaceSwitcher({ current, available, collapsed = false }: Props) {
+export default function InterfaceSwitcher({ current, available, collapsed = false, billingHref }: Props) {
+  const hrefFor = (k: InterfaceKey) => (k === 'billing' && billingHref ? billingHref : META[k].href)
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -116,7 +124,7 @@ export default function InterfaceSwitcher({ current, available, collapsed = fals
               <button
                 key={k}
                 role="menuitem"
-                onClick={() => { setOpen(false); if (!active) window.location.assign(m.href) }}
+                onClick={() => { setOpen(false); if (!active) window.location.assign(hrefFor(k)) }}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 8,
                   padding: '8px 9px', borderRadius: 7, border: 0, cursor: 'pointer',

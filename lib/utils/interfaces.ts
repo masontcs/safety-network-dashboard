@@ -145,6 +145,22 @@ export function billingPrefixesFor(role: Role, billingRole?: Role | null): strin
   return billingAreasFor(role, billingRole).flatMap((a) => AREA_PATHS[a])
 }
 
+/**
+ * Where a billing user should LAND — their first accessible billing area, as a real path.
+ * Most billing roles have the 'home' area and land on '/billing' (the billing dashboard). But a
+ * role WITHOUT 'home' (e.g. Dispatcher) must not be sent to '/billing' — it isn't in their
+ * allow-list, so the middleware would bounce them back to their dashboard. Send them to the
+ * first area they DO have instead. This is the single source for "the billing landing page",
+ * used by the interface switcher and the middleware's billing-path fallback.
+ */
+const BILLING_HOME_ORDER: BillingArea[] = ['home', 'dispatch', 'jobs', 'tickets', 'quotes', 'invoices', 'customers', 'items', 'pricelists', 'technicians', 'jobtypes', 'time']
+export function billingHomeFor(role: Role, billingRole?: Role | null): string {
+  const areas = billingAreasFor(role, billingRole)
+  if (areas.includes('home')) return '/billing'
+  const first = BILLING_HOME_ORDER.find((a) => a !== 'home' && areas.includes(a) && AREA_PATHS[a].length > 0)
+  return first ? AREA_PATHS[first][0] : '/billing'
+}
+
 /** Path prefixes a user may visit. Empty = no web access at all. */
 export function allowedPrefixesFor(role: Role, fieldAccess = false, billingRole?: Role | null): string[] {
   const prefixes: string[] = []
