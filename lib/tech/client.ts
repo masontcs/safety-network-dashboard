@@ -93,6 +93,18 @@ export interface TechShift {
 }
 export interface TechItem { id: string; code: string; name: string; tracked: boolean; variations: { id: string; name: string }[] }
 
+export interface TicketPhoto {
+  id: string
+  fileName: string
+  caption: string | null
+  latitude: number | null
+  longitude: number | null
+  accuracyM: number | null
+  capturedAt: string | null
+  createdAt: string
+  url: string | null
+}
+
 interface ApiEnvelope<T> { success: boolean; data?: T; error?: string; code?: string }
 
 export class TechApiError extends Error {
@@ -157,4 +169,11 @@ export const techApi = {
     call<void>(`/api/tech/tickets/${id}/equipment?entryId=${encodeURIComponent(entryId)}`, { method: 'DELETE' }),
 
   submit: (id: string) => call<void>(`/api/tech/tickets/${id}/submit`, { method: 'POST' }),
+
+  listPhotos: (id: string) => call<TicketPhoto[]>(`/api/tech/tickets/${id}/photos`),
+  // Multipart: pass a FormData with 'file' plus latitude/longitude/accuracy/capturedAt. No
+  // Content-Type header — the browser sets the multipart boundary itself.
+  addPhoto: (id: string, form: FormData) => call<void>(`/api/tech/tickets/${id}/photos`, { method: 'POST', body: form }),
+  deletePhoto: (id: string, photoId: string) =>
+    call<void>(`/api/tech/tickets/${id}/photos?photoId=${encodeURIComponent(photoId)}`, { method: 'DELETE' }),
 }

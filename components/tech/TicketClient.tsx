@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { techApi, TechApiError, type TicketDetail } from '@/lib/tech/client'
+import { techApi, TechApiError, type TicketDetail, type TicketPhoto } from '@/lib/tech/client'
 import FeatureTags from '@/components/tech/FeatureTags'
 import Sheet from '@/components/tech/Sheet'
 import AddTimeSheet from '@/components/tech/AddTimeSheet'
@@ -11,15 +11,30 @@ import { useBroadcast } from '@/lib/realtime/useBroadcast'
 
 type SheetKind = 'time' | 'equipment' | 'submit' | null
 
+/** Best-effort device location — resolves null if unavailable or denied, never rejects. */
+function getPosition(): Promise<GeolocationPosition | null> {
+  return new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) return resolve(null)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve(pos),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 },
+    )
+  })
+}
+
 /** Screen 2 — one ticket. Read-only header + Labor / Equipment tabs. Lead-only submit. */
 export default function TicketClient({ ticketId }: { ticketId: string }) {
   const router = useRouter()
   const [t, setT] = useState<TicketDetail | null>(null)
   const [gone, setGone] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const [tab, setTab] = useState<'labor' | 'equipment'>('labor')
+  const [tab, setTab] = useState<'labor' | 'equipment' | 'photos'>('labor')
   const [sheet, setSheet] = useState<SheetKind>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [photos, setPhotos] = useState<TicketPhoto[]>([])
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const photoInput = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     try {
@@ -31,7 +46,39 @@ export default function TicketClient({ ticketId }: { ticketId: string }) {
     }
   }, [ticketId])
 
-  useEffect(() => { load() }, [load])
+  const loadPhotos = useCallback(async () => {
+    try { setPhotos(await techApi.listPhotos(ticketId)) } catch { /* non-fatal */ }
+  }, [ticketId])
+
+  useEffect(() => { load(); loadPhotos() }, [load, loadPhotos])
+
+  // Take/pick a photo, stamp it with the device's location + time, and attach it to the ticket.
+  async function capturePhoto(file: File) {
+    if (photoBusy) return
+    setPhotoBusy(true); setErr(null)
+    try {
+      const pos = await getPosition()
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('capturedAt', new Date().toISOString())
+      if (pos) {
+        fd.append('latitude', String(pos.coords.latitude))
+        fd.append('longitude', String(pos.coords.longitude))
+        if (Number.isFinite(pos.coords.accuracy)) fd.append('accuracy', String(pos.coords.accuracy))
+      }
+      await techApi.addPhoto(ticketId, fd)
+      await loadPhotos()
+    } catch (e) {
+      setErr(e instanceof TechApiError ? e.message : 'Could not add that photo.')
+    } finally {
+      setPhotoBusy(false)
+    }
+  }
+  async function removePhoto(id: string) {
+    if (!window.confirm('Remove this photo?')) return
+    try { await techApi.deletePhoto(ticketId, id); loadPhotos() }
+    catch (e) { setErr(e instanceof TechApiError ? e.message : 'Could not remove that photo.') }
+  }
   // Live: crew/assignment/void changes from the office reflect without a refresh. If the
   // office voids this ticket, the refetch 404s and the screen shows it's no longer available.
   useBroadcast('billing', 'changed', load)
@@ -119,6 +166,7 @@ export default function TicketClient({ ticketId }: { ticketId: string }) {
         <div className="tech-tabs">
           <button className={`tech-tab ${tab === 'labor' ? 'on' : ''}`} onClick={() => setTab('labor')}>Labor</button>
           <button className={`tech-tab ${tab === 'equipment' ? 'on' : ''}`} onClick={() => setTab('equipment')}>Equipment</button>
+          <button className={`tech-tab ${tab === 'photos' ? 'on' : ''}`} onClick={() => setTab('photos')}>Photos{photos.length ? ` (${photos.length})` : ''}</button>
         </div>
 
         {tab === 'labor' && (
@@ -166,6 +214,40 @@ export default function TicketClient({ ticketId }: { ticketId: string }) {
             ))}
 
             <button className="tech-btn ghost block" onClick={() => setSheet('equipment')}>+ Add equipment</button>
+          </div>
+        )}
+
+        {tab === 'photos' && (
+          <div className="tech-card">
+            <span className="tech-lbl">Photos on this ticket</span>
+            {photos.length === 0 && <div className="tech-empty">No photos yet. Take one and it’s stamped with the time and your location, then goes to the office with the ticket.</div>}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10, marginTop: photos.length ? 8 : 0 }}>
+              {photos.map((p) => (
+                <div key={p.id} style={{ border: '1px solid var(--tech-line, #2a2a2a)', borderRadius: 10, overflow: 'hidden', background: 'var(--tech-surface2, #1a1a1a)' }}>
+                  {p.url
+                    ? <a href={p.url} target="_blank" rel="noreferrer" style={{ display: 'block', aspectRatio: '1 / 1' }}>
+                        <img src={p.url} alt={p.fileName} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      </a>
+                    : <div style={{ aspectRatio: '1 / 1', display: 'grid', placeItems: 'center', fontSize: 11, opacity: 0.6 }}>unavailable</div>}
+                  <div style={{ padding: '6px 8px', fontSize: 11, lineHeight: 1.4 }}>
+                    <div>{p.capturedAt ? new Date(p.capturedAt).toLocaleString() : new Date(p.createdAt).toLocaleString()}</div>
+                    {p.latitude != null && p.longitude != null
+                      ? <a href={`https://maps.google.com/?q=${p.latitude},${p.longitude}`} target="_blank" rel="noreferrer" style={{ color: 'var(--tech-accent, #ff6b00)' }}>
+                          📍 {p.latitude.toFixed(5)}, {p.longitude.toFixed(5)}
+                        </a>
+                      : <span style={{ opacity: 0.55 }}>No location</span>}
+                    <button className="tech-linkbtn" onClick={() => removePhoto(p.id)} style={{ display: 'block', marginTop: 4 }}>Remove</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* capture="environment" opens the rear camera on phones; falls back to the file/photo
+                picker elsewhere. Location + time are attached on upload. */}
+            <input ref={photoInput} type="file" accept="image/*" capture="environment" hidden
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) capturePhoto(f); e.target.value = '' }} />
+            <button className="tech-btn ghost block" style={{ marginTop: 10 }} disabled={photoBusy} onClick={() => photoInput.current?.click()}>
+              {photoBusy ? 'Adding…' : '+ Take / add photo'}
+            </button>
           </div>
         )}
 

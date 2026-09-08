@@ -12,6 +12,11 @@ interface Photo {
   sizeBytes: number | null
   createdAt: string
   url: string | null
+  caption: string | null
+  latitude: number | null
+  longitude: number | null
+  accuracyM: number | null
+  capturedAt: string | null
 }
 
 const ghost: React.CSSProperties = {
@@ -64,6 +69,22 @@ export default function TicketPhotosTab({ ticketId, canEdit }: { ticketId: strin
     finally { setBusy(false) }
   }
 
+  async function saveCaption(id: string, caption: string) {
+    // Optimistic — reflect the edit locally, persist in the background.
+    setPhotos((cur) => cur.map((p) => (p.id === id ? { ...p, caption: caption.trim() || null } : p)))
+    try {
+      await fetch(`/api/billing/tickets/${ticketId}/photos`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoId: id, caption }),
+      })
+    } catch { setMsg('Could not save the caption.') }
+  }
+
+  const meta = (p: Photo) => {
+    const when = p.capturedAt ?? p.createdAt
+    return { when: when ? new Date(when).toLocaleString() : '', hasGeo: p.latitude != null && p.longitude != null }
+  }
+
   return (
     <div className="card">
       {canEdit && (
@@ -99,12 +120,30 @@ export default function TicketPhotosTab({ ticketId, canEdit }: { ticketId: strin
                   ? <img src={p.url} alt={p.fileName} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                   : <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>unavailable</span>}
               </button>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px' }}>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={p.fileName}>{p.fileName}</span>
-                {canEdit && (
-                  <button onClick={() => remove(p.id)} disabled={busy} title="Delete photo"
-                    style={{ ...ghost, padding: '2px 7px', fontSize: 12, lineHeight: 1.2 }}>✕</button>
-                )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '6px 8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={p.fileName}>{p.fileName}</span>
+                  {canEdit && (
+                    <button onClick={() => remove(p.id)} disabled={busy} title="Delete photo"
+                      style={{ ...ghost, padding: '2px 7px', fontSize: 12, lineHeight: 1.2 }}>✕</button>
+                  )}
+                </div>
+                <div style={{ fontSize: 10.5, color: 'var(--text-dim)', lineHeight: 1.45 }}>
+                  {meta(p).when && <div>🕑 {meta(p).when}</div>}
+                  {meta(p).hasGeo
+                    ? <a href={`https://maps.google.com/?q=${p.latitude},${p.longitude}`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
+                        📍 {p.latitude!.toFixed(5)}, {p.longitude!.toFixed(5)}{p.accuracyM != null ? ` (±${Math.round(p.accuracyM)}m)` : ''}
+                      </a>
+                    : <span>No location</span>}
+                </div>
+                {canEdit
+                  ? <input
+                      defaultValue={p.caption ?? ''}
+                      placeholder="Add a caption…"
+                      onBlur={(e) => { if ((e.target.value.trim() || null) !== (p.caption ?? null)) saveCaption(p.id, e.target.value) }}
+                      style={{ width: '100%', fontSize: 11.5, padding: '3px 6px', border: '1px solid var(--border-emphasis)', borderRadius: 5, background: 'var(--bg-primary, transparent)', color: 'var(--text-primary)', fontFamily: 'inherit' }}
+                    />
+                  : p.caption && <div style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>{p.caption}</div>}
               </div>
             </div>
           ))}

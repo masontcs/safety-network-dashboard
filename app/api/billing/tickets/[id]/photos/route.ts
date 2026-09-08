@@ -33,7 +33,10 @@ function branchDenied(ctx: Ctx, ticket: { billing_jobs: { branch_id: string } | 
   return ctx.access.branchIds !== null && (!ticket.billing_jobs || !ctx.access.branchIds.includes(ticket.billing_jobs.branch_id))
 }
 
-interface PhotoRow { id: string; storage_path: string; file_name: string; content_type: string | null; size_bytes: number | null; created_at: string }
+interface PhotoRow {
+  id: string; storage_path: string; file_name: string; content_type: string | null; size_bytes: number | null; created_at: string
+  caption: string | null; latitude: number | null; longitude: number | null; accuracy_m: number | null; captured_at: string | null
+}
 
 export async function GET(_request: Request, { params }: { params: { id: string } }): Promise<NextResponse> {
   try {
@@ -47,7 +50,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
     const { data, error } = await supabase
       .from('billing_ticket_photos')
-      .select('id, storage_path, file_name, content_type, size_bytes, created_at')
+      .select('id, storage_path, file_name, content_type, size_bytes, created_at, caption, latitude, longitude, accuracy_m, captured_at')
       .eq('ticket_id', params.id)
       .order('created_at', { ascending: false })
     if (error) throw new Error(error.message)
@@ -55,7 +58,11 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
     const photos = await Promise.all(rows.map(async (r) => {
       const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrl(r.storage_path, 3600)
-      return { id: r.id, fileName: r.file_name, contentType: r.content_type, sizeBytes: r.size_bytes, createdAt: r.created_at, url: signed?.signedUrl ?? null }
+      return {
+        id: r.id, fileName: r.file_name, contentType: r.content_type, sizeBytes: r.size_bytes, createdAt: r.created_at,
+        caption: r.caption, latitude: r.latitude, longitude: r.longitude, accuracyM: r.accuracy_m, capturedAt: r.captured_at,
+        url: signed?.signedUrl ?? null,
+      }
     }))
 
     return NextResponse.json({ success: true, data: photos })
@@ -103,6 +110,35 @@ export async function POST(request: Request, { params }: { params: { id: string 
       await supabase.storage.from(BUCKET).remove([path]) // don't orphan the upload
       throw new Error(insErr.message)
     }
+
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    return billingApiError(err)
+  }
+}
+
+export async function PATCH(request: Request, { params }: { params: { id: string } }): Promise<NextResponse> {
+  try {
+    const ctx = await getAccessContext()
+    if (!ctx.ok) return ctx.response
+    const guard = guardBillingArea(ctx.access, 'tickets')
+    if (guard) return guard
+
+    const supabase = createServiceClient()
+    const ticket = await loadTicket(supabase, params.id)
+    if (!ticket) return bad('Ticket not found', 'NOT_FOUND', 404)
+    if (branchDenied(ctx, ticket)) return bad('You do not have access to this ticket’s branch.', 'FORBIDDEN', 403)
+
+    const body = (await request.json()) as { photoId?: string; caption?: string | null }
+    if (!body.photoId) return bad('photoId is required')
+    const caption = typeof body.caption === 'string' ? body.caption.trim() || null : null
+
+    const { error } = await supabase
+      .from('billing_ticket_photos')
+      .update({ caption })
+      .eq('id', body.photoId)
+      .eq('ticket_id', params.id)
+    if (error) throw new Error(error.message)
 
     return NextResponse.json({ success: true })
   } catch (err) {

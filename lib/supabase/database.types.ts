@@ -434,9 +434,9 @@ export type Database = {
         Relationships: []
       }
       billing_ticket_photos: {
-        Row: { id: string; ticket_id: string; storage_path: string; file_name: string; content_type: string | null; size_bytes: number | null; uploaded_by: string | null; created_at: string }
-        Insert: { id?: string; ticket_id: string; storage_path: string; file_name: string; content_type?: string | null; size_bytes?: number | null; uploaded_by?: string | null }
-        Update: { id?: string; ticket_id?: string; storage_path?: string; file_name?: string; content_type?: string | null; size_bytes?: number | null; uploaded_by?: string | null }
+        Row: { id: string; ticket_id: string; storage_path: string; file_name: string; content_type: string | null; size_bytes: number | null; uploaded_by: string | null; latitude: number | null; longitude: number | null; accuracy_m: number | null; captured_at: string | null; caption: string | null; created_at: string }
+        Insert: { id?: string; ticket_id: string; storage_path: string; file_name: string; content_type?: string | null; size_bytes?: number | null; uploaded_by?: string | null; latitude?: number | null; longitude?: number | null; accuracy_m?: number | null; captured_at?: string | null; caption?: string | null }
+        Update: { id?: string; ticket_id?: string; storage_path?: string; file_name?: string; content_type?: string | null; size_bytes?: number | null; uploaded_by?: string | null; latitude?: number | null; longitude?: number | null; accuracy_m?: number | null; captured_at?: string | null; caption?: string | null }
         Relationships: []
       }
       push_config: {
