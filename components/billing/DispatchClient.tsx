@@ -168,6 +168,10 @@ export default function DispatchClient() {
     <button type="button" className={`bx-btn ${range === r ? 'accent' : 'ghost'} sm`} onClick={() => pickRange(r)}>{label}</button>
   )
 
+  // Mobile agenda helpers: the anchor day's tickets, and a tech-id → name map for crew labels.
+  const agendaTickets = (board?.tickets ?? []).filter((t) => t.date === anchor).sort((a, b) => a.ticketNumber.localeCompare(b.ticketNumber))
+  const techNames = new Map((board?.technicians ?? []).map((t) => [t.id, t.name]))
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
@@ -177,7 +181,7 @@ export default function DispatchClient() {
             {rangeTitle}{board?.canDispatch && isTech && range !== 'month' ? ' · drag a ticket to another driver or day.' : ''}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="bx-deskctl" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: 4 }}>{seg('day', 'Day')}{seg('week', 'Week')}{seg('month', 'Month')}</div>
           {range !== 'month' && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted)' }}>
@@ -198,6 +202,7 @@ export default function DispatchClient() {
         </div>
       </div>
 
+      <div className="bx-deskgrid">
       {range === 'month'
         ? <MonthCalendar
             days={days} anchor={anchor} board={board} staged={staged} canDispatch={!!board?.canDispatch}
@@ -241,6 +246,42 @@ export default function DispatchClient() {
       {board && board.tickets.length === 0 && staged.length === 0 && range !== 'month' && (
         <div className="bx-empty" style={{ marginTop: 10 }}>Nothing scheduled in this {range}.</div>
       )}
+      </div>{/* /.bx-deskgrid */}
+
+      {/* Mobile agenda — a single-day, tap-driven view of the board (the driver×day grid and
+          drag-drop aren't usable on a phone). Shown only ≤860px via CSS; data is the same board. */}
+      <div className="bx-agenda">
+        <div className="card" style={{ padding: 0, marginTop: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid var(--line)' }}>
+            <button className="bx-btn ghost sm" onClick={() => setAnchor(addDays(anchor, -1))} aria-label="Previous day">‹</button>
+            <button className="bx-btn ghost sm" onClick={() => setAnchor(today())}>Today</button>
+            <div style={{ flex: 1, textAlign: 'center', fontWeight: 600, fontSize: 13 }}>{dayLong(anchor)}</div>
+            <button className="bx-btn ghost sm" onClick={() => setAnchor(addDays(anchor, 1))} aria-label="Next day">›</button>
+          </div>
+          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {!board ? <div className="bx-sub" style={{ margin: 0 }}>Loading…</div>
+              : agendaTickets.length === 0 ? <div className="bx-empty" style={{ padding: '6px 2px' }}>Nothing scheduled for this day.</div>
+              : agendaTickets.map((t) => {
+                  const lead = t.leadTechId ? techNames.get(t.leadTechId) ?? null : null
+                  const extra = t.crewTechIds.filter((id) => id !== t.leadTechId).length
+                  return (
+                    <button key={t.id} onClick={() => setDetailTicket(t)} className="bx-agenda-card">
+                      <div style={{ fontWeight: 600, fontSize: 13.5 }}>{t.customer ?? t.jobName ?? t.jobNumber}</div>
+                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>{t.ticketNumber}{t.jobNumber ? ` · ${t.jobNumber}` : ''}{t.voided ? ' · void' : ''}</div>
+                      <div style={{ fontSize: 12, marginTop: 2, color: lead ? 'var(--ink)' : 'var(--warn)' }}>
+                        {lead ? `👤 ${lead}${extra > 0 ? ` +${extra}` : ''}` : 'Unassigned — tap to assign'}
+                      </div>
+                    </button>
+                  )
+                })}
+          </div>
+          {board?.canDispatch && (
+            <div style={{ padding: '0 12px 12px' }}>
+              <button className="bx-btn accent" style={{ width: '100%' }} onClick={() => setGeneralDispatch({ date: anchor })}>+ Dispatch this day</button>
+            </div>
+          )}
+        </div>
+      </div>
 
       {toast && <div className="bx-toast">{toast}</div>}
 

@@ -194,6 +194,10 @@
 .bx-content{padding:24px 26px 70px;max-width:1800px;width:100%}
 .bx-hamburger{display:none}       /* desktop: no hamburger (sidebar is always shown) */
 .bx-nav-backdrop{display:none}    /* desktop: no drawer backdrop */
+.bx-agenda{display:none}          /* desktop: use the grid, not the mobile agenda */
+.bx-agenda-card{display:block;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);
+  border-left:3px solid var(--accent);border-radius:10px;padding:10px 12px;cursor:pointer;font-family:inherit;color:var(--ink)}
+.bx-agenda-card:active{opacity:.7}
 
 /* ── mobile / tablet ───────────────────────────────────────────────────────
    The billing interface was desktop-only (fixed 236px rail, wide tables). Below 860px
@@ -215,6 +219,10 @@
   .billing-root .card{padding:14px 14px}
   /* Wide tables: let them scroll inside their own strip rather than blowing out the layout. */
   .billing-root table{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+  /* Dispatch: hide the desktop driver×day grid + its range/group controls, show the agenda. */
+  .bx-deskgrid{display:none}
+  .bx-deskctl{display:none !important}
+  .bx-agenda{display:block}
 }
 @media (max-width: 520px){
   .kpis{grid-template-columns:1fr !important}
