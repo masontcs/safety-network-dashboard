@@ -111,6 +111,28 @@ export async function loadAssignedTicket(
   if (tErr) throw new Error(tErr.message)
   if (!ticket) return null
 
+  // Accept-before-it-appears: a dispatched ticket is born from a published shift the tech must
+  // ACKNOWLEDGE first. Until they accept it, the ticket is invisible everywhere — treated as
+  // not-found, the same way an unassigned ticket is (so its existence isn't confirmed). A ticket
+  // with no originating shift (created directly in billing) has nothing to accept and is shown.
+  const { data: shiftRows, error: sErr } = await supabase
+    .from('billing_shifts')
+    .select('id')
+    .eq('ticket_id', ticketId)
+    .limit(1)
+  if (sErr) throw new Error(sErr.message)
+  const shiftId = (shiftRows ?? [])[0]?.id as string | undefined
+  if (shiftId) {
+    const { data: crewRow, error: cErr } = await supabase
+      .from('billing_shift_crew')
+      .select('acknowledged_at')
+      .eq('shift_id', shiftId)
+      .eq('technician_id', technicianId)
+      .maybeSingle()
+    if (cErr) throw new Error(cErr.message)
+    if (crewRow && !crewRow.acknowledged_at) return null // pending acceptance → invisible
+  }
+
   return { ...(ticket as Omit<AssignedTicket, 'isLead'>), isLead: assignment.is_lead }
 }
 

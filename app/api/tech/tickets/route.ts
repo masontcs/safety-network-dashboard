@@ -60,6 +60,33 @@ export async function GET(): Promise<NextResponse> {
 
     const ticketIds = rows.map((r) => r.billing_tickets?.id).filter((id): id is string => !!id)
 
+    // Accept-before-it-appears: a dispatched ticket is born from a published shift the tech must
+    // ACKNOWLEDGE first (Accept on the shift card). Until they do, the ticket stays hidden here.
+    // Map each ticket to its originating shift, then check THIS tech's acknowledgement on it.
+    // Tickets with no originating shift (created directly in billing, not dispatched) have nothing
+    // to accept, so they're always shown.
+    const shiftByTicket = new Map<string, string>()
+    if (ticketIds.length > 0) {
+      const { data: shifts } = await supabase.from('billing_shifts').select('id, ticket_id').in('ticket_id', ticketIds)
+      for (const s of (shifts ?? []) as { id: string; ticket_id: string | null }[]) if (s.ticket_id) shiftByTicket.set(s.ticket_id, s.id)
+    }
+    const ackedByShift = new Map<string, boolean>()
+    const linkedShiftIds = [...new Set(shiftByTicket.values())]
+    if (linkedShiftIds.length > 0) {
+      const { data: crew } = await supabase
+        .from('billing_shift_crew')
+        .select('shift_id, acknowledged_at')
+        .eq('technician_id', ctx.tech.technicianId)
+        .in('shift_id', linkedShiftIds)
+      for (const c of (crew ?? []) as { shift_id: string; acknowledged_at: string | null }[]) ackedByShift.set(c.shift_id, !!c.acknowledged_at)
+    }
+    // A ticket is pending acceptance when it has an originating shift whose crew row for this tech
+    // exists but is not yet acknowledged. (No crew row / no shift → nothing to accept → show it.)
+    const pendingAcceptance = (ticketId: string): boolean => {
+      const shiftId = shiftByTicket.get(ticketId)
+      return !!shiftId && ackedByShift.get(shiftId) === false
+    }
+
     // My own logged hours per ticket — the one number a tech cares about on this screen.
     const myHours = new Map<string, number>()
     if (ticketIds.length > 0) {
@@ -75,7 +102,7 @@ export async function GET(): Promise<NextResponse> {
     }
 
     const tickets = rows
-      .filter((r) => r.billing_tickets)
+      .filter((r) => r.billing_tickets && !pendingAcceptance(r.billing_tickets.id))
       .map((r) => {
         const t = r.billing_tickets!
         const j = t.billing_jobs
