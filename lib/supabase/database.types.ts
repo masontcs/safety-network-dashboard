@@ -337,9 +337,9 @@ export type Database = {
         Relationships: []
       }
       billing_profile_contacts: {
-        Row: { id: string; profile_id: string; name: string; email: string | null; phone: string | null; is_invoice_recipient: boolean; created_at: string }
-        Insert: { id?: string; profile_id: string; name: string; email?: string | null; phone?: string | null; is_invoice_recipient?: boolean }
-        Update: { id?: string; profile_id?: string; name?: string; email?: string | null; phone?: string | null; is_invoice_recipient?: boolean }
+        Row: { id: string; profile_id: string; name: string; email: string | null; phone: string | null; is_invoice_recipient: boolean; role: string; title: string | null; sort_order: number; created_at: string }
+        Insert: { id?: string; profile_id: string; name: string; email?: string | null; phone?: string | null; is_invoice_recipient?: boolean; role?: string; title?: string | null; sort_order?: number }
+        Update: { id?: string; profile_id?: string; name?: string; email?: string | null; phone?: string | null; is_invoice_recipient?: boolean; role?: string; title?: string | null; sort_order?: number }
         Relationships: []
       }
       billing_items: {

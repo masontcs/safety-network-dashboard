@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
 import ProfileEntityConfigCard from '@/components/billing/ProfileEntityConfigCard'
 import ProfileCustomItemsCard from '@/components/billing/ProfileCustomItemsCard'
+import ProfileContactsCard from '@/components/billing/ProfileContactsCard'
 import ProfileJobsTab from '@/components/billing/ProfileJobsTab'
 import ProfileInvoicesTab from '@/components/billing/ProfileInvoicesTab'
 import Tabs from '@/components/billing/Tabs'
@@ -224,6 +225,7 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
         </div>
       </div>
 
+      <ProfileContactsCard profileId={profileId} />
       <ProfileEntityConfigCard profileId={profileId} />
       <ProfileCustomItemsCard profileId={profileId} />
       </>)}
