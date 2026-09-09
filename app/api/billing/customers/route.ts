@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
+import { effectiveBillingRole } from '@/lib/utils/interfaces'
 
 /**
  * Billing customers. A customer is entity-agnostic and branch-agnostic — it
@@ -23,18 +24,20 @@ export async function GET(): Promise<NextResponse> {
     const supabase = createServiceClient()
     const { data, error } = await supabase
       .from('billing_customers')
-      .select('id, code, name, is_active, default_payment_term_id, ar_customer_id, billing_profiles(id)')
+      .select('id, code, name, is_active, is_house_account, default_payment_term_id, ar_customer_id, billing_profiles(id)')
       .order('name')
     if (error) throw new Error(error.message)
 
     return NextResponse.json({
       success: true,
+      isAdmin: ctx.access.role === 'admin',
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: (data ?? []).map((c: any) => ({
         id: c.id,
         code: c.code,
         name: c.name,
         isActive: c.is_active,
+        isHouseAccount: c.is_house_account,
         defaultPaymentTermId: c.default_payment_term_id,
         arCustomerId: c.ar_customer_id,
         profileCount: (c.billing_profiles ?? []).length,
@@ -50,9 +53,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     const ctx = await getAccessContext()
     if (!ctx.ok) return ctx.response
 
-    // Billing roles are not defined yet — writes are admin-only until they are.
     const guard = guardBillingArea(ctx.access, 'customers')
     if (guard) return guard
+
+    // Front Counter never creates top-level customers — walk-ins go in as profiles under the
+    // House Account, which billing/admin has already set up.
+    if (effectiveBillingRole(ctx.access.role, ctx.access.billingRole) === 'front_counter') {
+      return bad('Front counter adds walk-ins as profiles under the House Account, not as new customers.', 'FORBIDDEN', 403)
+    }
 
     const body = (await request.json()) as {
       code?: string

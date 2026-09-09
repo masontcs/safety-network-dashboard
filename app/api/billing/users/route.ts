@@ -32,7 +32,7 @@ export async function GET(): Promise<NextResponse> {
       // Billing users are (a) NATIVE — role is itself a billing role — or (b) GRANTED — any
       // dashboard/tech user who was given a layered billing_role. List both.
       supabase.from('user_profiles').select('id, role, billing_role, display_name, username, is_active, qb_export_enabled, qb_config_enabled')
-        .or('role.in.(billing_branch_manager,dispatcher,biller,accounting),billing_role.not.is.null'),
+        .or('role.in.(billing_branch_manager,dispatcher,biller,accounting,front_counter),billing_role.not.is.null'),
       supabase.from('user_branch_assignments').select('user_id, branch_id'),
       supabase.from('branches').select('id, name').eq('is_active', true).order('name'),
       supabase.auth.admin.listUsers(),

@@ -5,6 +5,7 @@ import { billingApiError } from '@/lib/billing/http'
 import { nextNumber } from '@/lib/billing/rpc'
 import { buildJobInvoice, InvoiceBuildError } from '@/lib/billing/invoicing'
 import { broadcastBillingChanged } from '@/lib/realtime/broadcast'
+import { effectiveBillingRole } from '@/lib/utils/interfaces'
 
 /**
  * Invoices — list, and GENERATE from a job.
@@ -126,6 +127,29 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Preview: hand back exactly what would be written, having written nothing.
     if (body.preview) {
       return NextResponse.json({ success: true, data: { preview: true, ...draft } })
+    }
+
+    // Front Counter gate: they may RECORD an invoice only on the House Account (anything), or a
+    // sales-only invoice on a regular customer (a walk-in purchase). Any rental charge on a
+    // regular customer is the billing staff's job. (Admins and other billing roles are unaffected.)
+    if (effectiveBillingRole(ctx.access.role, ctx.access.billingRole) === 'front_counter') {
+      const hasRental = draft.lines.some((l) => l.kind === 'rental')
+      if (hasRental) {
+        const { data: prof } = await supabase
+          .from('billing_profiles')
+          .select('billing_customers(is_house_account)')
+          .eq('id', draft.job.profileId)
+          .maybeSingle()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const isHouse = (prof as any)?.billing_customers?.is_house_account === true
+        if (!isHouse) {
+          return NextResponse.json({
+            success: false,
+            error: 'Front counter can invoice sales only on a regular customer — rental charges must be invoiced by billing staff. (Anything can be invoiced on the House Account.)',
+            code: 'FORBIDDEN',
+          }, { status: 403 })
+        }
+      }
     }
 
     const invoiceDate = body.invoiceDate ?? draft.throughDate

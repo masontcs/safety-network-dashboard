@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
+import { effectiveBillingRole } from '@/lib/utils/interfaces'
 
 /**
  * Billing profiles — the spine of the system.
@@ -119,6 +120,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const supabase = createServiceClient()
+
+    // Front Counter sets up walk-ins under the House Account only — they can't create profiles
+    // on regular customers (that's billing staff's setup work).
+    if (effectiveBillingRole(ctx.access.role, ctx.access.billingRole) === 'front_counter') {
+      const { data: c } = await supabase.from('billing_customers').select('is_house_account').eq('id', customerId).maybeSingle()
+      if (!c?.is_house_account) return bad('Front counter can only add profiles under the House Account.', 'FORBIDDEN', 403)
+    }
 
     // The branch must actually be billing-enabled — otherwise it has no
     // 2-letter code and invoice numbers cannot be generated for it.

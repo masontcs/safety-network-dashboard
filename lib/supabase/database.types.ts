@@ -5,7 +5,7 @@
 // 'tech' is a FIELD role for the tech app only. It is deliberately NOT a dashboard role:
 // see DASHBOARD_ROLES in lib/api/auth.ts — techs are rejected by every dashboard/billing
 // API, and /api/tech/* requires it. Never add 'tech' to a dashboard role list.
-export type Role = 'admin' | 'executive' | 'district_manager' | 'branch_manager' | 'ar_manager' | 'ar_team' | 'office_team' | 'project_manager' | 'sales' | 'tech' | 'billing_branch_manager' | 'dispatcher' | 'biller' | 'accounting'
+export type Role = 'admin' | 'executive' | 'district_manager' | 'branch_manager' | 'ar_manager' | 'ar_team' | 'office_team' | 'project_manager' | 'sales' | 'tech' | 'billing_branch_manager' | 'dispatcher' | 'biller' | 'accounting' | 'front_counter'
 export type LaborType =
   | 'direct'
   | 'admin_hourly'
@@ -319,9 +319,9 @@ export type Database = {
         Relationships: []
       }
       billing_customers: {
-        Row: { id: string; code: string; name: string; ar_customer_id: string | null; default_payment_term_id: string | null; is_active: boolean; created_at: string; updated_at: string }
-        Insert: { id?: string; code: string; name: string; ar_customer_id?: string | null; default_payment_term_id?: string | null; is_active?: boolean }
-        Update: { id?: string; code?: string; name?: string; ar_customer_id?: string | null; default_payment_term_id?: string | null; is_active?: boolean }
+        Row: { id: string; code: string; name: string; ar_customer_id: string | null; default_payment_term_id: string | null; is_active: boolean; is_house_account: boolean; created_at: string; updated_at: string }
+        Insert: { id?: string; code: string; name: string; ar_customer_id?: string | null; default_payment_term_id?: string | null; is_active?: boolean; is_house_account?: boolean }
+        Update: { id?: string; code?: string; name?: string; ar_customer_id?: string | null; default_payment_term_id?: string | null; is_active?: boolean; is_house_account?: boolean }
         Relationships: []
       }
       billing_profiles: {

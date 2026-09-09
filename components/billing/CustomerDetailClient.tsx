@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation'
  * arrangement (branch, terms, price list). Jobs attach to a profile, not here.
  */
 
-interface Customer { id: string; code: string; name: string }
+interface Customer { id: string; code: string; name: string; isHouseAccount?: boolean }
 interface ProfileRow {
   id: string; code: string; name: string; isActive: boolean
   branch: { id: string; name: string } | null
@@ -28,6 +28,8 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
   const [terms, setTerms] = useState<PaymentTerm[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [houseBusy, setHouseBusy] = useState(false)
 
   // New-profile inline form
   const [adding, setAdding] = useState(false)
@@ -47,6 +49,7 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
       if (!cs.success) throw new Error(cs.error)
       const c = (cs.data as Customer[]).find((x) => x.id === customerId) ?? null
       setCustomer(c)
+      setIsAdmin(!!cs.isAdmin)
       if (ps.success) setProfiles(ps.data as ProfileRow[])
       setErr(null)
     }).catch((e: Error) => setErr(e.message)).finally(() => setLoading(false))
@@ -60,6 +63,21 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
       .then((ref) => { if (ref.success) { setBranches(ref.data.branches); setTerms(ref.data.paymentTerms) } })
       .catch(() => {})
   }, [adding, branches.length])
+
+  async function toggleHouseAccount() {
+    if (houseBusy || !customer) return
+    setHouseBusy(true); setErr(null)
+    try {
+      const res = await fetch(`/api/billing/customers/${customerId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isHouseAccount: !customer.isHouseAccount }),
+      })
+      const j = await res.json()
+      if (!j.success) { setErr(j.error); return }
+      load()
+    } catch { setErr('Could not update the House Account setting.') }
+    finally { setHouseBusy(false) }
+  }
 
   async function createProfile(e: React.FormEvent) {
     e.preventDefault()
@@ -85,8 +103,16 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
   return (
     <div style={{ maxWidth: 900 }}>
       <button className="bx-crumb" onClick={() => router.push('/billing/customers')}>← Customers</button>
-      <h1 className="bx-h1">{customer.name}</h1>
-      <div className="bx-sub">Customer · {customer.code} · identity only — billing lives on its profiles below</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <h1 className="bx-h1" style={{ margin: 0 }}>{customer.name}</h1>
+        {customer.isHouseAccount && <span className="tag t-blue">House Account</span>}
+        {isAdmin && (
+          <button className="bx-btn ghost sm" style={{ marginLeft: 'auto' }} disabled={houseBusy} onClick={toggleHouseAccount}>
+            {houseBusy ? 'Saving…' : customer.isHouseAccount ? 'Unset House Account' : 'Set as House Account'}
+          </button>
+        )}
+      </div>
+      <div className="bx-sub">Customer · {customer.code} · identity only — billing lives on its profiles below{customer.isHouseAccount ? ' · walk-ins (Front Counter) live here' : ''}</div>
 
       <div className="card">
         <div className="bx-cardhead">

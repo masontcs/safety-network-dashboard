@@ -33,6 +33,7 @@ const ROLE_LABELS: Record<Role, string> = {
   dispatcher:       'Dispatcher',
   biller:           'Biller',
   accounting:       'Accounting',
+  front_counter:    'Front Counter',
 }
 
 const ROLE_COLORS: Record<Role, string> = {
@@ -50,6 +51,7 @@ const ROLE_COLORS: Record<Role, string> = {
   dispatcher:       '#b8860b',
   biller:           '#b8860b',
   accounting:       '#b8860b',
+  front_counter:    '#b8860b',
 }
 
 const selectStyle: React.CSSProperties = {

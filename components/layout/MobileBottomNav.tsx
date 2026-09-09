@@ -178,6 +178,7 @@ const NAV_CONFIG: Record<Role, NavConfig> = {
   dispatcher: { primary: [], more: [] },
   biller: { primary: [], more: [] },
   accounting: { primary: [], more: [] },
+  front_counter: { primary: [], more: [] },
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
