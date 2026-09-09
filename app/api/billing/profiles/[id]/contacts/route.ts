@@ -3,16 +3,13 @@ import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { canBillingArea } from '@/lib/utils/interfaces'
+import { normContactRole as normRole } from '@/lib/billing/contacts'
 
 /**
  * Contacts on a billing profile — the people the office deals with per profile, by function:
  * AP (accounts payable / invoicing), PM (project manager), superintendent, safety, general, etc.
  * Read for anyone who can see the profile; create/edit/delete require the 'customers' area.
  */
-
-export const CONTACT_ROLES = ['general', 'ap', 'pm', 'superintendent', 'safety', 'estimator', 'scheduler', 'other'] as const
-type ContactRole = (typeof CONTACT_ROLES)[number]
-const normRole = (v: unknown): ContactRole => (CONTACT_ROLES as readonly string[]).includes(v as string) ? (v as ContactRole) : 'general'
 
 function bad(error: string, code = 'VALIDATION_ERROR', status = 400) {
   return NextResponse.json({ success: false, error, code }, { status })

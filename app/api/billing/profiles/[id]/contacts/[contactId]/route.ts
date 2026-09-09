@@ -2,11 +2,9 @@ import { NextResponse } from 'next/server'
 import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
-import { CONTACT_ROLES } from '../route'
+import { normContactRole as normRole } from '@/lib/billing/contacts'
 
 /** Edit or remove a single profile contact. Both require the 'customers' area. */
-
-const normRole = (v: unknown): string => (CONTACT_ROLES as readonly string[]).includes(v as string) ? (v as string) : 'general'
 
 function bad(error: string, code = 'VALIDATION_ERROR', status = 400) {
   return NextResponse.json({ success: false, error, code }, { status })
