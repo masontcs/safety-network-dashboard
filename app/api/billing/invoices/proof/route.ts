@@ -98,10 +98,13 @@ export async function GET(request: Request): Promise<Response> {
       React.createElement(InvoiceDocument, { data: pdfData }) as any
     )
 
+    // Default to INLINE so the proof renders on screen as a mockup; ?download=1 forces the
+    // browser to save it instead (the viewer's Download button uses that).
+    const disposition = url.searchParams.get('download') === '1' ? 'attachment' : 'inline'
     return new Response(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="Proof_${draft.job.jobNumber}.pdf"`,
+        'Content-Disposition': `${disposition}; filename="Proof_${draft.job.jobNumber}.pdf"`,
         'Cache-Control': 'no-store',
       },
     })

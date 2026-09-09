@@ -51,6 +51,8 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
   const [jobId, setJobId] = useState('')
   const [feature, setFeature] = useState<'add' | 'return' | 'dtc'>('add')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  // Proof preview: when set, the modal shows the proof PDF inline (mockup) instead of the form.
+  const [proofUrl, setProofUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const j = (r: Response) => r.json()
@@ -102,8 +104,9 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
         router.push(`/billing/tickets/${(r.data as { id: string }).id}`)
       } else if (mode === 'invoice') { // open the job's invoice generator (records a real invoice)
         router.push(`/billing/jobs/${jobId}?tab=invoices&generate=1`)
-      } else { // proof → download an unsaved preview PDF; nothing is recorded
-        window.location.href = `/api/billing/invoices/proof?jobId=${jobId}&through=${date}`
+      } else { // proof → show the unsaved preview inline as a mockup (download optional); nothing is recorded
+        setProofUrl(`/api/billing/invoices/proof?jobId=${encodeURIComponent(jobId)}&through=${encodeURIComponent(date)}`)
+        return // keep the modal open on the preview; don't onClose
       }
       onClose()
     } catch {
@@ -134,6 +137,27 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
   // .billing-root has no transform/filter/contain, so a fixed overlay inside it still fills
   // the viewport (and isn't clipped by its overflow:hidden).
   const host = document.querySelector('.billing-root') ?? document.body
+
+  // Proof preview mode — render the actual proof PDF inline as a mockup, with a Download button.
+  if (proofUrl) {
+    return createPortal((
+      <div onMouseDown={onClose} style={overlay}>
+        <div onMouseDown={(e) => e.stopPropagation()} className="card" style={{ width: '100%', maxWidth: 900, height: '90vh', display: 'flex', flexDirection: 'column', padding: 14 }}>
+          <div className="bx-cardhead" style={{ marginBottom: 10 }}>
+            <h3>Proof preview</h3>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              <a className="bx-btn accent sm" href={`${proofUrl}&download=1`}>Download PDF</a>
+              <button className="bx-btn ghost sm" onClick={() => setProofUrl(null)}>← Back</button>
+              <button className="bx-iconbtn" onClick={onClose} title="Close">✕</button>
+            </div>
+          </div>
+          <div className="bx-sub" style={{ margin: '0 0 10px' }}>A preview of what this job is ready to bill. It’s watermarked and nothing is recorded.</div>
+          <iframe title="Proof preview" src={proofUrl} style={{ flex: 1, width: '100%', border: '1px solid var(--line)', borderRadius: 8, background: '#fff' }} />
+        </div>
+      </div>
+    ), host)
+  }
+
   return createPortal((
     <div onMouseDown={onClose} style={overlay}>
       <div onMouseDown={(e) => e.stopPropagation()} className="card" style={{ width: '100%', maxWidth: 460, maxHeight: '86vh', overflowY: 'auto' }}>
@@ -207,7 +231,7 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
 
           <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
             <button className="bx-btn accent" type="submit" disabled={busy || !ready}>
-              {busy ? 'Working…' : mode === 'proof' ? 'Download proof' : mode === 'invoice' ? 'Continue →' : 'Create'}
+              {busy ? 'Working…' : mode === 'proof' ? 'View proof' : mode === 'invoice' ? 'Continue →' : 'Create'}
             </button>
             <button className="bx-btn ghost" type="button" onClick={onClose}>Cancel</button>
           </div>
