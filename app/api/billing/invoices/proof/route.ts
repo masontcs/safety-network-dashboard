@@ -57,6 +57,45 @@ export async function GET(request: Request): Promise<Response> {
       for (const v of (vs ?? []) as { id: string; name: string }[]) varName.set(v.id, v.name)
     }
 
+    // JSON mode powers the on-screen mockup (rendered natively like an invoice/quote), so the
+    // proof reads as part of the site rather than an embedded PDF. Same numbers as the PDF.
+    if (url.searchParams.get('format') === 'json') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const t = draft.totals as any
+      return NextResponse.json({
+        success: true,
+        data: {
+          jobId,
+          invoiceNumber: draft.job.jobNumber, // a proof has no invoice number — show the job's
+          jobNumber: jr?.job_number ?? draft.job.jobNumber,
+          jobName: jr?.name ?? draft.job.name,
+          customer: jr?.billing_profiles?.billing_customers?.name ?? null,
+          profile: jr?.billing_profiles?.name ?? null,
+          entityCode: jr?.entities?.code ?? null,
+          throughDate: draft.throughDate,
+          invoiceDate: through,
+          taxRatePct: Number(draft.taxRatePct),
+          totals: {
+            rentalSubtotalCents: t.rentalSubtotalCents,
+            salesSubtotalCents: t.salesSubtotalCents,
+            otherSubtotalCents: t.otherSubtotalCents,
+            rentalMinimumAdjustmentCents: t.rentalMinimumAdjustmentCents,
+            subtotalCents: t.subtotalCents,
+            taxableBaseCents: t.taxableBaseCents ?? 0,
+            taxCents: t.taxCents,
+            totalCents: t.totalCents,
+          },
+          lines: draft.lines.map((l, i) => ({
+            id: String(i), kind: l.kind, description: l.description,
+            variation: l.variationId ? (varName.get(l.variationId) ?? null) : null,
+            lotDate: l.lotDate, qty: Number(l.qty), units: l.units,
+            unitRateCents: l.unitRateCents, amountCents: l.amountCents, taxable: l.kind === 'sale',
+            rentalItemQty: l.rentalItemQty ?? null, rentalDays: l.rentalDays ?? null, periodEnd: l.periodEnd ?? null,
+          })),
+        },
+      })
+    }
+
     const pdfData: InvoicePdfData = {
       invoiceNumber: draft.job.jobNumber, // a proof has no invoice number — show the job's
       invoiceDate: through,

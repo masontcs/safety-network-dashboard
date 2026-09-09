@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Combobox from '@/components/billing/Combobox'
+import { TotalsBlock } from '@/components/billing/JobInvoicesSection'
 
 /**
  * Quick-create from the topbar "+ New". Each mode asks only for the context it needs
@@ -22,6 +23,17 @@ const TITLES: Record<QuickMode, string> = {
 interface ProfileOpt { id: string; name: string; code: string; branch: { name: string } | null; customer: { name: string } | null; billableEntityIds: string[] }
 interface EntityOpt { entityId: string; code: string; name: string }
 interface JobOpt { id: string; jobNumber: string; name: string | null; customer: string | null }
+
+// Proof preview shapes (mirrors the on-screen invoice view so a proof reads as part of the site).
+interface ProofLine { id: string; kind: string; description: string; variation: string | null; lotDate: string | null; qty: number; units: number; unitRateCents: number; amountCents: number; taxable: boolean; rentalItemQty: number | null; rentalDays: number | null; periodEnd: string | null }
+interface ProofTotals { rentalSubtotalCents: number; salesSubtotalCents: number; otherSubtotalCents: number; rentalMinimumAdjustmentCents: number; subtotalCents: number; taxableBaseCents: number; taxCents: number; totalCents: number }
+interface ProofData { invoiceNumber: string; jobId: string; jobNumber: string | null; jobName: string | null; customer: string | null; profile: string | null; entityCode: string | null; throughDate: string; invoiceDate: string; taxRatePct: number; totals: ProofTotals; lines: ProofLine[] }
+
+const pMoney = (c: number) => `$${(c / 100).toFixed(2)}`
+const pShortDate = (d: string | null) => d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit', timeZone: 'UTC' }) : ''
+const pIsDayRental = (l: ProofLine) => l.kind === 'rental' && l.rentalDays != null
+const pTh: React.CSSProperties = { textAlign: 'left', fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-muted)', padding: '8px 12px', borderBottom: '1px solid var(--border-emphasis)' }
+const pTd: React.CSSProperties = { padding: '9px 12px', borderBottom: '1px solid var(--border-subtle, var(--border-emphasis))', color: 'var(--text-primary)', fontSize: 13 }
 
 export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; onClose: () => void }) {
   const router = useRouter()
@@ -51,8 +63,10 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
   const [jobId, setJobId] = useState('')
   const [feature, setFeature] = useState<'add' | 'return' | 'dtc'>('add')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
-  // Proof preview: when set, the modal shows the proof PDF inline (mockup) instead of the form.
-  const [proofUrl, setProofUrl] = useState<string | null>(null)
+  // Proof preview: when proofData is set, the modal renders the proof as a native on-screen
+  // document (like viewing an invoice/quote); proofBase is the endpoint for the Download PDF link.
+  const [proofData, setProofData] = useState<ProofData | null>(null)
+  const [proofBase, setProofBase] = useState<string>('')
 
   useEffect(() => {
     const j = (r: Response) => r.json()
@@ -104,8 +118,11 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
         router.push(`/billing/tickets/${(r.data as { id: string }).id}`)
       } else if (mode === 'invoice') { // open the job's invoice generator (records a real invoice)
         router.push(`/billing/jobs/${jobId}?tab=invoices&generate=1`)
-      } else { // proof → show the unsaved preview inline as a mockup (download optional); nothing is recorded
-        setProofUrl(`/api/billing/invoices/proof?jobId=${encodeURIComponent(jobId)}&through=${encodeURIComponent(date)}`)
+      } else { // proof → render the unsaved preview as an on-screen document (download optional); nothing recorded
+        const base = `/api/billing/invoices/proof?jobId=${encodeURIComponent(jobId)}&through=${encodeURIComponent(date)}`
+        const r = await fetch(`${base}&format=json`).then((res) => res.json()).catch(() => ({ success: false, error: 'Failed to build the proof.' }))
+        if (!r.success) { setErr(r.error ?? 'Failed to build the proof.'); return }
+        setProofData(r.data); setProofBase(base)
         return // keep the modal open on the preview; don't onClose
       }
       onClose()
@@ -138,21 +155,51 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
   // the viewport (and isn't clipped by its overflow:hidden).
   const host = document.querySelector('.billing-root') ?? document.body
 
-  // Proof preview mode — render the actual proof PDF inline as a mockup, with a Download button.
-  if (proofUrl) {
+  // Proof preview mode — render the proof natively (like viewing an invoice/quote on the site).
+  if (proofData) {
     return createPortal((
       <div onMouseDown={onClose} style={overlay}>
-        <div onMouseDown={(e) => e.stopPropagation()} className="card" style={{ width: '100%', maxWidth: 900, height: '90vh', display: 'flex', flexDirection: 'column', padding: 14 }}>
-          <div className="bx-cardhead" style={{ marginBottom: 10 }}>
-            <h3>Proof preview</h3>
+        <div onMouseDown={(e) => e.stopPropagation()} className="card" style={{ width: '100%', maxWidth: 860, maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="bx-cardhead" style={{ marginBottom: 6 }}>
+            <h3>Proof</h3>
+            <span className="tag t-amber" style={{ marginLeft: 8 }}>Preview · not recorded</span>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-              <a className="bx-btn accent sm" href={`${proofUrl}&download=1`}>Download PDF</a>
-              <button className="bx-btn ghost sm" onClick={() => setProofUrl(null)}>← Back</button>
+              <a className="bx-btn accent sm" href={`${proofBase}&download=1`}>Download PDF</a>
+              <button className="bx-btn ghost sm" onClick={() => { setProofData(null); setProofBase('') }}>← Back</button>
               <button className="bx-iconbtn" onClick={onClose} title="Close">✕</button>
             </div>
           </div>
-          <div className="bx-sub" style={{ margin: '0 0 10px' }}>A preview of what this job is ready to bill. It’s watermarked and nothing is recorded.</div>
-          <iframe title="Proof preview" src={proofUrl} style={{ flex: 1, width: '100%', border: '1px solid var(--line)', borderRadius: 8, background: '#fff' }} />
+
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', marginTop: 4 }}>
+            <span style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)' }}>{proofData.customer ?? proofData.profile ?? 'Proof'}</span>
+            <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>{proofData.jobNumber}{proofData.jobName ? ` · ${proofData.jobName}` : ''}</span>
+          </div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 4, marginBottom: 16 }}>
+            {proofData.entityCode ?? '—'} · through {proofData.throughDate} · tax {proofData.taxRatePct}%
+          </div>
+
+          <div className="card" style={{ padding: 0 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr>{['Description', 'Qty', 'Rental period', 'Days', 'Rate', 'Amount'].map((h) => <th key={h} style={{ ...pTh, textAlign: ['Qty', 'Days', 'Rate', 'Amount'].includes(h) ? 'right' : 'left' }}>{h}</th>)}</tr></thead>
+              <tbody>
+                {proofData.lines.length === 0 && <tr><td style={{ ...pTd, color: 'var(--text-muted)' }} colSpan={6}>Nothing is ready to bill on this job through {proofData.throughDate}.</td></tr>}
+                {proofData.lines.map((l) => {
+                  const rental = pIsDayRental(l)
+                  return (
+                    <tr key={l.id}>
+                      <td style={pTd}>{l.description}{l.variation ? <span style={{ color: 'var(--text-dim)', marginLeft: 6, fontSize: 11 }}>{l.variation}</span> : null}</td>
+                      <td style={{ ...pTd, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{rental ? l.rentalItemQty : `${l.qty}${l.units > 1 ? ` × ${l.units}` : ''}`}</td>
+                      <td style={{ ...pTd, textAlign: 'left', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{rental ? `${pShortDate(l.lotDate)} – ${pShortDate(l.periodEnd)}` : ''}</td>
+                      <td style={{ ...pTd, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{rental ? l.rentalDays : ''}</td>
+                      <td style={{ ...pTd, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{pMoney(l.unitRateCents)}</td>
+                      <td style={{ ...pTd, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{pMoney(l.amountCents)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <TotalsBlock t={proofData.totals} />
+          </div>
         </div>
       </div>
     ), host)
