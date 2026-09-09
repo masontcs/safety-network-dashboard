@@ -13,11 +13,11 @@ import { TotalsBlock } from '@/components/billing/JobInvoicesSection'
  * proof/invoice: pick job, then open that job's invoice generator.
  */
 
-export type QuickMode = 'customer' | 'profile' | 'job' | 'ticket' | 'proof' | 'invoice'
+export type QuickMode = 'customer' | 'profile' | 'job' | 'ticket' | 'proof' | 'invoice' | 'walkin'
 
 const TITLES: Record<QuickMode, string> = {
   customer: 'New customer', profile: 'New billing profile', job: 'New job',
-  ticket: 'New ticket', proof: 'New proof', invoice: 'New invoice',
+  ticket: 'New ticket', proof: 'New proof', invoice: 'New invoice', walkin: 'New walk-in',
 }
 
 interface ProfileOpt { id: string; name: string; code: string; branch: { name: string } | null; customer: { name: string } | null; billableEntityIds: string[] }
@@ -70,7 +70,7 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
 
   useEffect(() => {
     const j = (r: Response) => r.json()
-    if (mode === 'profile') {
+    if (mode === 'profile' || mode === 'walkin') {
       Promise.all([fetch('/api/billing/customers').then(j), fetch('/api/billing/reference').then(j)]).then(([c, ref]) => {
         if (c.success) setCustomers(c.data); if (ref.success) { setBranches(ref.data.branches); setTerms(ref.data.paymentTerms) }
       }).catch(() => {})
@@ -116,6 +116,10 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
         const r = await post('/api/billing/tickets', { jobId, ticketDate: date, featureAdd: feature === 'add', featureReturn: feature === 'return', featureDtc: feature === 'dtc' })
         if (!r.success) return setErr(r.error ?? 'Failed')
         router.push(`/billing/tickets/${(r.data as { id: string }).id}`)
+      } else if (mode === 'walkin') { // one step: profile under House Account + pricing + job
+        const r = await post('/api/billing/walkins', { name: name.trim(), branchId: branchId || undefined })
+        if (!r.success) return setErr(r.error ?? 'Failed')
+        router.push(`/billing/jobs/${(r.data as { jobId: string }).jobId}`)
       } else if (mode === 'invoice') { // open the job's invoice generator (records a real invoice)
         router.push(`/billing/jobs/${jobId}?tab=invoices&generate=1`)
       } else { // proof → render the unsaved preview as an on-screen document (download optional); nothing recorded
@@ -135,6 +139,7 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
 
   // Is the form ready to submit?
   const ready = (() => {
+    if (mode === 'walkin') return !!name.trim() && (!!branchId || branches.length <= 1)
     if (mode === 'customer') return !!name.trim() && !!code.trim()
     if (mode === 'profile') return !!customerId && !!name.trim() && !!code.trim() && !!branchId
     if (mode === 'job') return !!profileId && !!entityId && certified !== null && (!certified || (!!dir.trim() && !!contract.trim() && !!payClass.trim()))
@@ -213,6 +218,16 @@ export default function QuickCreateModal({ mode, onClose }: { mode: QuickMode; o
         </div>
 
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
+          {mode === 'walkin' && (<>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: -2 }}>
+              Creates a profile under the House Account (priced from the admin House Account settings) and opens a job — add the ticket next.
+            </div>
+            <Field label="Walk-in name"><input className="bx-f" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="John Smith / cash sale" style={{ width: '100%' }} /></Field>
+            {branches.length > 1 && (
+              <Field label="Branch"><select className="bx-f bx-select" value={branchId} onChange={(e) => setBranchId(e.target.value)} style={{ width: '100%' }}><option value="">Select…</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></Field>
+            )}
+          </>)}
+
           {mode === 'customer' && (<>
             <Field label="Name"><input className="bx-f" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Wiring Connections" style={{ width: '100%' }} /></Field>
             <Field label="Code (internal)"><input className="bx-f" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="WIRCON" style={{ width: '100%' }} /></Field>

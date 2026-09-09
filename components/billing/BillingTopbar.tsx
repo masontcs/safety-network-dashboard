@@ -20,6 +20,7 @@ interface Hit { type: string; label: string; sub: string | null; href: string }
 // is gated to the billing AREA that action belongs to — so a Dispatcher (jobs/tickets, no
 // customers/invoices) only sees Job and Ticket, never Customer, Profile, Proof or Invoice.
 const NEW_ITEMS: { label: string; sub: string; mode: QuickMode; area: BillingArea }[] = [
+  { label: 'Walk-in', sub: 'New walk-in under the House Account', mode: 'walkin', area: 'jobs' },
   { label: 'Customer', sub: 'Just name + code', mode: 'customer', area: 'customers' },
   { label: 'Billing profile', sub: 'Asks which customer', mode: 'profile', area: 'customers' },
   { label: 'Job', sub: 'Asks which billing profile', mode: 'job', area: 'jobs' },

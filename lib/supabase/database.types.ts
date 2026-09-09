@@ -439,6 +439,12 @@ export type Database = {
         Update: { id?: string; ticket_id?: string; storage_path?: string; file_name?: string; content_type?: string | null; size_bytes?: number | null; uploaded_by?: string | null; latitude?: number | null; longitude?: number | null; accuracy_m?: number | null; captured_at?: string | null; caption?: string | null }
         Relationships: []
       }
+      billing_house_account_config: {
+        Row: { id: boolean; price_list_id: string | null; tier_id: string | null; updated_at: string }
+        Insert: { id?: boolean; price_list_id?: string | null; tier_id?: string | null; updated_at?: string }
+        Update: { id?: boolean; price_list_id?: string | null; tier_id?: string | null; updated_at?: string }
+        Relationships: []
+      }
       push_config: {
         Row: { id: boolean; public_key: string; private_key: string; subject: string; cron_secret: string | null; updated_at: string }
         Insert: { id?: boolean; public_key: string; private_key: string; subject: string; cron_secret?: string | null }

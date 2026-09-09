@@ -30,6 +30,12 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
   const [err, setErr] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [houseBusy, setHouseBusy] = useState(false)
+  // House Account pricing settings (admin only, when this customer is the House Account).
+  const [haLists, setHaLists] = useState<{ id: string; name: string; tiers: { id: string; name: string }[] }[]>([])
+  const [haPriceListId, setHaPriceListId] = useState('')
+  const [haTierId, setHaTierId] = useState('')
+  const [haSaving, setHaSaving] = useState(false)
+  const [haMsg, setHaMsg] = useState<string | null>(null)
 
   // New-profile inline form
   const [adding, setAdding] = useState(false)
@@ -63,6 +69,30 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
       .then((ref) => { if (ref.success) { setBranches(ref.data.branches); setTerms(ref.data.paymentTerms) } })
       .catch(() => {})
   }, [adding, branches.length])
+
+  // Load the House Account pricing settings once we know this is the house account and we're admin.
+  useEffect(() => {
+    if (!isAdmin || !customer?.isHouseAccount) return
+    fetch('/api/billing/house-account').then((r) => r.json()).then((j) => {
+      if (!j.success) return
+      setHaLists(j.data.priceLists); setHaPriceListId(j.data.priceListId ?? ''); setHaTierId(j.data.tierId ?? '')
+    }).catch(() => {})
+  }, [isAdmin, customer?.isHouseAccount])
+
+  async function saveHaConfig() {
+    if (haSaving || !haPriceListId || !haTierId) return
+    setHaSaving(true); setHaMsg(null)
+    try {
+      const res = await fetch('/api/billing/house-account', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceListId: haPriceListId, tierId: haTierId }),
+      })
+      const j = await res.json()
+      setHaMsg(j.success ? 'Saved.' : (j.error ?? 'Failed'))
+    } catch { setHaMsg('Could not save.') }
+    finally { setHaSaving(false) }
+  }
+  const haTiers = haLists.find((l) => l.id === haPriceListId)?.tiers ?? []
 
   async function toggleHouseAccount() {
     if (houseBusy || !customer) return
@@ -113,6 +143,29 @@ export default function CustomerDetailClient({ customerId }: { customerId: strin
         )}
       </div>
       <div className="bx-sub">Customer · {customer.code} · identity only — billing lives on its profiles below{customer.isHouseAccount ? ' · walk-ins (Front Counter) live here' : ''}</div>
+
+      {isAdmin && customer.isHouseAccount && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="bx-cardhead"><h3>Walk-in pricing (House Account)</h3></div>
+          <div className="bx-sub" style={{ margin: '-6px 0 12px' }}>
+            Every walk-in profile is auto-configured to this price list and tier. Front counter can’t change it.
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div><label className="bx-lbl">Price list</label>
+              <select className="bx-f bx-select" value={haPriceListId} onChange={(e) => { setHaPriceListId(e.target.value); setHaTierId(''); setHaMsg(null) }} style={{ width: 220 }}>
+                <option value="">Select…</option>{haLists.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            </div>
+            <div><label className="bx-lbl">Tier (all categories)</label>
+              <select className="bx-f bx-select" value={haTierId} onChange={(e) => { setHaTierId(e.target.value); setHaMsg(null) }} style={{ width: 160 }}>
+                <option value="">Select…</option>{haTiers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <button className="bx-btn accent" disabled={haSaving || !haPriceListId || !haTierId} onClick={saveHaConfig}>{haSaving ? 'Saving…' : 'Save'}</button>
+            {haMsg && <span style={{ fontSize: 12, color: haMsg === 'Saved.' ? 'var(--accent)' : 'var(--danger)' }}>{haMsg}</span>}
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <div className="bx-cardhead">
