@@ -44,6 +44,7 @@ export default function TimeManagementClient() {
   const [batches, setBatches] = useState<Batch[]>([])
   const [canApprove, setCanApprove] = useState(true)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [expandedTech, setExpandedTech] = useState<Set<string>>(new Set())
   const [returning, setReturning] = useState<string | null>(null)
   const [returnNote, setReturnNote] = useState('')
   const [edit, setEdit] = useState<{ id: string; start: string; end: string; date: string } | null>(null)
@@ -125,7 +126,20 @@ export default function TimeManagementClient() {
     if (r.success) { setGrants((g) => g.filter((x) => x.id !== id)) } else flash(r.error || 'Failed')
   }
 
-  const weekLabel = `${dayLabel(week && batches.length ? batches[0].date : week)}`
+  // Group the week's batches by technician for the drill-down view: a tech row summarises their
+  // week (days, total hours, how many still need review), expanding to their per-day times.
+  const techGroups = useMemo(() => {
+    const m = new Map<string, { technicianId: string; name: string; batches: Batch[]; total: number; pending: number; perDiem: boolean }>()
+    for (const b of batches) {
+      let g = m.get(b.technicianId)
+      if (!g) { g = { technicianId: b.technicianId, name: b.technicianName, batches: [], total: 0, pending: 0, perDiem: false }; m.set(b.technicianId, g) }
+      g.batches.push(b); g.total += b.totalHours; if (b.status !== 'approved') g.pending++; if (b.perDiem) g.perDiem = true
+    }
+    const groups = [...m.values()]
+    for (const g of groups) g.batches.sort((a, b) => a.date.localeCompare(b.date))
+    return groups.sort((a, b) => a.name.localeCompare(b.name))
+  }, [batches])
+
   const tabBtn = (t: Tab, label: string) => (
     <button onClick={() => setTab(t)} className={`bx-btn ${tab === t ? 'accent' : 'ghost'} sm`}>{label}</button>
   )
@@ -156,77 +170,104 @@ export default function TimeManagementClient() {
             <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>TSheets export</span>
               <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{branchId ? branches.find((b) => b.id === branchId)?.name : 'Select a branch in the top bar'}</span>
-              <input type="date" value={exportDate} onChange={(e) => setExportDate(e.target.value)} style={{ marginLeft: 'auto', padding: '6px 9px', border: '1px solid var(--border-emphasis)', borderRadius: 6, fontSize: 13 }} />
-              <button className="bx-btn accent sm" onClick={downloadExport} disabled={!branchId} title={branchId ? '' : 'Pick a branch first'}>Download day</button>
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button className="bx-btn ghost sm" title="Previous day" aria-label="Previous day" onClick={() => setExportDate((d) => addDays(d, -1))}>‹</button>
+                <input type="date" value={exportDate} onChange={(e) => { if (e.target.value) setExportDate(e.target.value) }} style={{ padding: '6px 9px', border: '1px solid var(--border-emphasis)', borderRadius: 6, fontSize: 13 }} />
+                <button className="bx-btn ghost sm" title="Next day" aria-label="Next day" onClick={() => setExportDate((d) => addDays(d, 1))}>›</button>
+                <button className="bx-btn ghost sm" onClick={() => setExportDate(new Date().toISOString().slice(0, 10))}>Today</button>
+                <button className="bx-btn accent sm" onClick={downloadExport} disabled={!branchId} title={branchId ? '' : 'Pick a branch first'}>Download day</button>
+              </div>
             </div>
           )}
           {!canApprove ? (
             <div className="card"><div className="bx-note amber">You aren&apos;t set up to approve any branch. Ask an admin to grant you approver access (Approvers tab).</div></div>
-          ) : batches.length === 0 ? (
+          ) : techGroups.length === 0 ? (
             <div className="card"><div className="bx-sub">No times for this week in your branches.</div></div>
-          ) : batches.map((b) => {
-            const open = expanded.has(b.key)
-            const pill = statusPill[b.status]
+          ) : techGroups.map((g) => {
+            const techOpen = expandedTech.has(g.technicianId)
             return (
-              <div key={b.key} className="card" style={{ padding: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', cursor: 'pointer' }}
-                  onClick={() => setExpanded((s) => { const n = new Set(s); n.has(b.key) ? n.delete(b.key) : n.add(b.key); return n })}>
-                  <span style={{ fontSize: 13, color: 'var(--text-muted)', width: 70 }}>{open ? '▾' : '▸'} {dayLabel(b.date)}</span>
-                  <span style={{ fontWeight: 600, fontSize: 14 }}>{b.technicianName}</span>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{branchName(b.branchId)}</span>
-                  {b.perDiem && <span style={{ fontSize: 11, fontWeight: 700, color: '#1a7a33' }}>PER DIEM</span>}
-                  <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{b.totalHours.toFixed(2)} h</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, background: pill.bg, color: pill.fg, padding: '3px 9px', borderRadius: 999 }}>{pill.label}</span>
+              <div key={g.technicianId} className="card" style={{ padding: 0 }}>
+                {/* Level 1 — the technician: a week summary that drills into their days. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', cursor: 'pointer' }}
+                  onClick={() => setExpandedTech((s) => { const n = new Set(s); n.has(g.technicianId) ? n.delete(g.technicianId) : n.add(g.technicianId); return n })}>
+                  <span style={{ fontSize: 13, color: 'var(--text-muted)', width: 14 }}>{techOpen ? '▾' : '▸'}</span>
+                  <span style={{ fontWeight: 600, fontSize: 15 }}>{g.name}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{g.batches.length} day{g.batches.length === 1 ? '' : 's'}</span>
+                  {g.perDiem && <span style={{ fontSize: 11, fontWeight: 700, color: '#1a7a33' }}>PER DIEM</span>}
+                  <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{g.total.toFixed(2)} h</span>
+                  {g.pending > 0
+                    ? <span style={{ fontSize: 11, fontWeight: 700, background: statusPill.submitted.bg, color: statusPill.submitted.fg, padding: '3px 9px', borderRadius: 999 }}>{g.pending} to review</span>
+                    : <span style={{ fontSize: 11, fontWeight: 700, background: statusPill.approved.bg, color: statusPill.approved.fg, padding: '3px 9px', borderRadius: 999 }}>All approved</span>}
                 </div>
 
-                {open && (
-                  <div style={{ borderTop: '1px solid var(--border-subtle,var(--border-emphasis))', padding: '4px 8px 12px' }}>
-                    {b.status === 'returned' && b.note && <div className="bx-note amber" style={{ margin: '8px 6px' }}>Returned: {b.note}</div>}
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead><tr>{['Activity', 'Where', 'Start', 'End', 'Hours', ''].map((h) => <th key={h} style={{ ...th, textAlign: h === 'Hours' ? 'right' : 'left' }}>{h}</th>)}</tr></thead>
-                      <tbody>
-                        {b.entries.map((e) => {
-                          const editing = edit?.id === e.id
-                          return (
-                            <tr key={e.id}>
-                              <td style={td}>{e.activity}</td>
-                              <td style={{ ...td, color: 'var(--text-muted)' }}>{e.kind === 'yard' ? 'Yard' : e.ticketNumber}</td>
-                              {editing ? (<>
-                                <td style={td}><input type="time" value={edit.start} onChange={(ev) => setEdit({ ...edit, start: ev.target.value })} /></td>
-                                <td style={td}><input type="time" value={edit.end} onChange={(ev) => setEdit({ ...edit, end: ev.target.value })} /></td>
-                                <td style={{ ...td, textAlign: 'right' }}><input type="date" value={edit.date} onChange={(ev) => setEdit({ ...edit, date: ev.target.value })} style={{ width: 140 }} /></td>
-                                <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                                  <button className="bx-btn accent sm" onClick={() => saveEntry(e)}>Save</button>{' '}
-                                  <button className="bx-btn ghost sm" onClick={() => setEdit(null)}>Cancel</button>
-                                </td>
-                              </>) : (<>
-                                <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{hhmm(e.startTime)}</td>
-                                <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{hhmm(e.endTime)}{e.date !== b.date ? ` (${dayLabel(e.date)})` : ''}</td>
-                                <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{e.hours.toFixed(2)}</td>
-                                <td style={{ ...td, whiteSpace: 'nowrap' }}>
-                                  <button className="bx-linkbtn" onClick={() => setEdit({ id: e.id, start: hhmm(e.startTime), end: hhmm(e.endTime), date: e.date })} style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}>edit</button>{' · '}
-                                  <button className="bx-linkbtn" onClick={() => deleteEntry(e)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}>delete</button>
-                                </td>
-                              </>)}
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
+                {techOpen && (
+                  <div style={{ borderTop: '1px solid var(--border-subtle,var(--border-emphasis))' }}>
+                    {g.batches.map((b) => {
+                      const open = expanded.has(b.key)
+                      const pill = statusPill[b.status]
+                      return (
+                        <div key={b.key} style={{ borderBottom: '1px solid var(--border-subtle,var(--border-emphasis))' }}>
+                          {/* Level 2 — a submitted day for this tech. */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px 10px 30px', cursor: 'pointer' }}
+                            onClick={() => setExpanded((s) => { const n = new Set(s); n.has(b.key) ? n.delete(b.key) : n.add(b.key); return n })}>
+                            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{open ? '▾' : '▸'} {dayLabel(b.date)}</span>
+                            <span style={{ marginLeft: 'auto', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{b.totalHours.toFixed(2)} h</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, background: pill.bg, color: pill.fg, padding: '3px 9px', borderRadius: 999 }}>{pill.label}</span>
+                          </div>
 
-                    {returning === b.key ? (
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 6px 0' }}>
-                        <input value={returnNote} onChange={(e) => setReturnNote(e.target.value)} placeholder="What should the tech fix?" style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border-emphasis)', borderRadius: 6, fontSize: 13 }} />
-                        <button className="bx-btn accent sm" onClick={() => doReturn(b)}>Send back</button>
-                        <button className="bx-btn ghost sm" onClick={() => { setReturning(null); setReturnNote('') }}>Cancel</button>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', gap: 8, padding: '10px 6px 0' }}>
-                        {b.status !== 'approved' && <button className="bx-btn accent sm" onClick={() => approve(b)}>Approve</button>}
-                        {b.status === 'approved' && <button className="bx-btn ghost sm" onClick={() => approve(b)} disabled>Approved ✓</button>}
-                        <button className="bx-btn ghost sm" onClick={() => { setReturning(b.key); setReturnNote('') }}>Return to adjust</button>
-                      </div>
-                    )}
+                          {open && (
+                            <div style={{ padding: '2px 8px 12px 30px', background: 'var(--bg-secondary, transparent)' }}>
+                              {b.status === 'returned' && b.note && <div className="bx-note amber" style={{ margin: '8px 6px' }}>Returned: {b.note}</div>}
+                              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead><tr>{['Activity', 'Where', 'Start', 'End', 'Hours', ''].map((h) => <th key={h} style={{ ...th, textAlign: h === 'Hours' ? 'right' : 'left' }}>{h}</th>)}</tr></thead>
+                                <tbody>
+                                  {b.entries.map((e) => {
+                                    const editing = edit?.id === e.id
+                                    return (
+                                      <tr key={e.id}>
+                                        <td style={td}>{e.activity}</td>
+                                        <td style={{ ...td, color: 'var(--text-muted)' }}>{e.kind === 'yard' ? 'Yard' : e.ticketNumber}</td>
+                                        {editing ? (<>
+                                          <td style={td}><input type="time" value={edit.start} onChange={(ev) => setEdit({ ...edit, start: ev.target.value })} /></td>
+                                          <td style={td}><input type="time" value={edit.end} onChange={(ev) => setEdit({ ...edit, end: ev.target.value })} /></td>
+                                          <td style={{ ...td, textAlign: 'right' }}><input type="date" value={edit.date} onChange={(ev) => setEdit({ ...edit, date: ev.target.value })} style={{ width: 140 }} /></td>
+                                          <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                                            <button className="bx-btn accent sm" onClick={() => saveEntry(e)}>Save</button>{' '}
+                                            <button className="bx-btn ghost sm" onClick={() => setEdit(null)}>Cancel</button>
+                                          </td>
+                                        </>) : (<>
+                                          <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{hhmm(e.startTime)}</td>
+                                          <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{hhmm(e.endTime)}{e.date !== b.date ? ` (${dayLabel(e.date)})` : ''}</td>
+                                          <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{e.hours.toFixed(2)}</td>
+                                          <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                                            <button className="bx-linkbtn" onClick={() => setEdit({ id: e.id, start: hhmm(e.startTime), end: hhmm(e.endTime), date: e.date })} style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}>edit</button>{' · '}
+                                            <button className="bx-linkbtn" onClick={() => deleteEntry(e)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}>delete</button>
+                                          </td>
+                                        </>)}
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
+
+                              {returning === b.key ? (
+                                <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 6px 0' }}>
+                                  <input value={returnNote} onChange={(e) => setReturnNote(e.target.value)} placeholder="What should the tech fix?" style={{ flex: 1, padding: '7px 10px', border: '1px solid var(--border-emphasis)', borderRadius: 6, fontSize: 13 }} />
+                                  <button className="bx-btn accent sm" onClick={() => doReturn(b)}>Send back</button>
+                                  <button className="bx-btn ghost sm" onClick={() => { setReturning(null); setReturnNote('') }}>Cancel</button>
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', gap: 8, padding: '10px 6px 0' }}>
+                                  {b.status !== 'approved' && <button className="bx-btn accent sm" onClick={() => approve(b)}>Approve</button>}
+                                  {b.status === 'approved' && <button className="bx-btn ghost sm" onClick={() => approve(b)} disabled>Approved ✓</button>}
+                                  <button className="bx-btn ghost sm" onClick={() => { setReturning(b.key); setReturnNote('') }}>Return to adjust</button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
