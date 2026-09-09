@@ -28,6 +28,7 @@ interface Profile {
   rentalMinimumEnabled: boolean
   rentalMinimumCents: number
   portalEnabled: boolean
+  status: string
   branch: { id: string; name: string }
   customer: { id: string; code: string; name: string } | null
   qbName: string
@@ -58,6 +59,8 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
   const [minEnabled, setMinEnabled] = useState(true)
   const [minDollars, setMinDollars] = useState('25.00')
   const [portalEnabled, setPortalEnabled] = useState(false)
+  const [status, setStatus] = useState('active')
+  const [deleting, setDeleting] = useState(false)
 
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -80,6 +83,7 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
         setMinEnabled(prof.rentalMinimumEnabled)
         setMinDollars((prof.rentalMinimumCents / 100).toFixed(2))
         setPortalEnabled(prof.portalEnabled)
+        setStatus(prof.status ?? 'active')
         setFetchError(null)
       })
       .catch((err: Error) => setFetchError(err.message))
@@ -103,6 +107,7 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
           rentalMinimumEnabled: minEnabled,
           rentalMinimumCents: Math.round(dollars * 100), // integer cents, rounded once
           portalEnabled,
+          status,
         }),
       })
       const json = await res.json()
@@ -112,6 +117,18 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
       load()
     } catch { setSaveError('Network error — please try again.') }
     finally { setSaving(false) }
+  }
+
+  async function handleDelete() {
+    if (deleting || !profile) return
+    if (!window.confirm(`Permanently delete “${profile.name}” and ALL its jobs, tickets, invoices, quotes and settings? This cannot be undone.`)) return
+    setDeleting(true); setSaveError(null)
+    try {
+      const res = await fetch(`/api/billing/profiles/${profileId}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!json.success) { setSaveError(json.error); setDeleting(false); return }
+      window.location.href = profile.customer ? `/billing/customers/${profile.customer.id}` : '/billing/customers'
+    } catch { setSaveError('Could not delete the profile.'); setDeleting(false) }
   }
 
   if (fetchError) {
@@ -171,6 +188,14 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
                 placeholder="Use customer default"
                 options={[{ value: '', label: 'Use customer default' }, ...terms.map((t) => ({ value: t.id, label: t.name }))]} />
             </div>
+            <div>
+              <label style={labelStyle}>Status</label>
+              <Select ariaLabel="Profile status" value={status} disabled={!isAdmin} onChange={(v) => { setStatus(v); setSaveSuccess(false) }}>
+                <option value="active">Active</option>
+                <option value="on_hold">On hold — blocks new jobs & tickets</option>
+                <option value="inactive">Inactive — blocks new jobs & tickets</option>
+              </Select>
+            </div>
           </div>
 
           <div>
@@ -221,6 +246,19 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
               style={{ alignSelf: 'flex-start', padding: '8px 20px', opacity: saving || !name.trim() ? 0.5 : 1 }}>
               {saving ? 'Saving…' : 'Save'}
             </button>
+          )}
+
+          {isAdmin && (
+            <div style={{ marginTop: 8, paddingTop: 14, borderTop: '1px solid var(--border-emphasis)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Danger zone</div>
+              <button onClick={handleDelete} disabled={deleting}
+                style={{ background: 'transparent', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: 6, padding: '7px 16px', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', opacity: deleting ? 0.5 : 1 }}>
+                {deleting ? 'Deleting…' : 'Delete profile'}
+              </button>
+              <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 6 }}>
+                Removes the profile and all its jobs, tickets, invoices and settings. Blocked if it has issued invoices. Admin only.
+              </div>
+            </div>
           )}
         </div>
       </div>

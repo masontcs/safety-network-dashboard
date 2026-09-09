@@ -145,7 +145,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Profile → branch (+ access check). Branch is derived, never chosen.
     const { data: profile, error: pErr } = await supabase
       .from('billing_profiles')
-      .select('id, branch_id')
+      .select('id, branch_id, status')
       .eq('id', body.profileId)
       .maybeSingle()
     if (pErr) throw new Error(pErr.message)
@@ -153,6 +153,13 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     if (ctx.access.branchIds !== null && !ctx.access.branchIds.includes(profile.branch_id)) {
       return bad('You do not have access to this profile’s branch.', 'FORBIDDEN', 403)
+    }
+
+    // A profile that's on hold or inactive can't take new work.
+    if (profile.status !== 'active') {
+      return bad(profile.status === 'on_hold'
+        ? 'This billing profile is on hold — new jobs can’t be created until it’s taken off hold.'
+        : 'This billing profile is inactive — new jobs can’t be created.', 'CONFLICT', 409)
     }
 
     // The entity must be ENABLED for this profile, or there's no price list to bill against.

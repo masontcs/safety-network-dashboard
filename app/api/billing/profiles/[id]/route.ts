@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
+import { getAccessContext, guardBillingArea, guardAdminOnly } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import type { Database } from '@/lib/supabase/database.types'
@@ -50,7 +50,7 @@ export async function GET(
     const { data: raw, error } = await supabase
       .from('billing_profiles')
       .select(`
-        id, code, name, branch_id, is_active, payment_term_id,
+        id, code, name, branch_id, is_active, status, payment_term_id,
         rental_minimum_enabled, rental_minimum_cents, portal_enabled,
         billing_customers(id, code, name, default_payment_term_id),
         branches(id, name),
@@ -74,6 +74,7 @@ export async function GET(
         code: p.code,
         name: p.name,
         isActive: p.is_active,
+        status: (p as unknown as { status: string }).status ?? 'active',
         paymentTermId: p.payment_term_id,
         rentalMinimumEnabled: p.rental_minimum_enabled,
         rentalMinimumCents: p.rental_minimum_cents,
@@ -125,9 +126,15 @@ export async function PATCH(
       rentalMinimumCents?: number
       portalEnabled?: boolean
       isActive?: boolean
+      status?: string
     }
 
     const patch: ProfileUpdate = {}
+    if (body.status !== undefined) {
+      if (!['active', 'on_hold', 'inactive'].includes(body.status)) return bad('Invalid status')
+      patch.status = body.status
+      patch.is_active = body.status === 'active' // keep the legacy flag in step with status
+    }
     if (body.name !== undefined) {
       const name = body.name.trim()
       if (!name) return bad('Profile name cannot be empty')
@@ -148,6 +155,63 @@ export async function PATCH(
 
     const { error } = await supabase.from('billing_profiles').update(patch).eq('id', params.id)
     if (error) throw new Error(error.message)
+
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    return billingApiError(err)
+  }
+}
+
+/**
+ * Delete a billing profile and everything under it — jobs, tickets, invoices, quotes, shifts,
+ * price-list config, custom items, contacts. ADMIN ONLY (for clearing test data). Refuses if the
+ * profile has any ISSUED (non-void) invoice, so real financial records can't be wiped by accident.
+ * Deletes children in FK-safe order; ticket/job/invoice/quote/shift children cascade in the DB.
+ */
+export async function DELETE(
+  _request: Request,
+  { params }: { params: { id: string } }
+): Promise<NextResponse> {
+  try {
+    const ctx = await getAccessContext()
+    if (!ctx.ok) return ctx.response
+    const adminGuard = guardAdminOnly(ctx.access.role)
+    if (adminGuard) return adminGuard
+
+    const supabase = createServiceClient()
+    const { data: existing } = await supabase.from('billing_profiles').select('id').eq('id', params.id).maybeSingle()
+    if (!existing) return bad('Billing profile not found', 'NOT_FOUND', 404)
+
+    // Protect real records: never delete a profile that carries an issued invoice.
+    const { count: issued } = await supabase
+      .from('billing_invoices')
+      .select('id', { count: 'exact', head: true })
+      .eq('profile_id', params.id)
+      .eq('status', 'issued')
+    if ((issued ?? 0) > 0) {
+      return bad('This profile has issued invoices and can’t be deleted. Void them first if this is test data.', 'CONFLICT', 409)
+    }
+
+    const { data: jobRows } = await supabase.from('billing_jobs').select('id').eq('profile_id', params.id)
+    const jobIds = (jobRows ?? []).map((j) => j.id as string)
+
+    // Order matters: rows that RESTRICT their parent must go first. Everything with an ON DELETE
+    // CASCADE parent (ticket/job/invoice/quote/shift children, profile config/contacts/items) is
+    // removed automatically when we delete the parent below.
+    if (jobIds.length) {
+      await supabase.from('billing_shifts').delete().in('job_id', jobIds)      // shifts restrict jobs + tickets
+      await supabase.from('billing_invoices').delete().in('job_id', jobIds)    // invoice_lines cascade
+      await supabase.from('billing_quotes').delete().in('converted_job_id', jobIds)
+    }
+    await supabase.from('billing_invoices').delete().eq('profile_id', params.id)
+    await supabase.from('billing_quotes').delete().eq('profile_id', params.id)
+    if (jobIds.length) {
+      await supabase.from('billing_tickets').delete().in('job_id', jobIds)     // ticket children cascade
+      await supabase.from('billing_jobs').delete().in('id', jobIds)            // ledger cascade
+    }
+    // Finally the profile — cascades billing_profile_entities, contacts, and owner-scoped custom items.
+    const { error: delErr } = await supabase.from('billing_profiles').delete().eq('id', params.id)
+    if (delErr) throw new Error(delErr.message)
 
     return NextResponse.json({ success: true })
   } catch (err) {

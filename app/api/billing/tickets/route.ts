@@ -115,7 +115,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const { data: job, error: jErr } = await supabase
       .from('billing_jobs')
-      .select('id, entity_id, branch_id')
+      .select('id, entity_id, branch_id, profile_id')
       .eq('id', body.jobId)
       .maybeSingle()
     if (jErr) throw new Error(jErr.message)
@@ -123,6 +123,14 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     if (ctx.access.branchIds !== null && !ctx.access.branchIds.includes(job.branch_id)) {
       return bad('You do not have access to this job’s branch.', 'FORBIDDEN', 403)
+    }
+
+    // A held/inactive profile takes no new tickets.
+    const { data: prof } = await supabase.from('billing_profiles').select('status').eq('id', job.profile_id).maybeSingle()
+    if (prof && prof.status !== 'active') {
+      return bad(prof.status === 'on_hold'
+        ? 'This job’s billing profile is on hold — new tickets can’t be created until it’s taken off hold.'
+        : 'This job’s billing profile is inactive — new tickets can’t be created.', 'CONFLICT', 409)
     }
 
     // [entity][seq][branch]T e.g. S0000005BKT — per-(entity, branch), inherits the job's branch.
