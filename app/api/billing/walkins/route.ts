@@ -39,6 +39,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!cfg?.price_list_id || !cfg.tier_id) return bad('House Account pricing isn’t set up. An admin needs to choose the walk-in price list and tier first.', 'CONFLICT', 409)
     const { data: pl } = await supabase.from('billing_price_lists').select('id, entity_id').eq('id', cfg.price_list_id).maybeSingle()
     if (!pl?.entity_id) return bad('The House Account price list is misconfigured (no entity).', 'CONFLICT', 409)
+    // That entity must be billing-enabled, or job numbers can't be generated for it.
+    const { data: es } = await supabase.from('billing_entity_settings').select('billing_enabled').eq('entity_id', pl.entity_id).maybeSingle()
+    if (!es?.billing_enabled) return bad('The House Account price list’s entity isn’t billing-enabled. An admin needs to enable it before walk-ins can be created.', 'CONFLICT', 409)
 
     // 3) Resolve the branch: explicit, else the user's own when unambiguous.
     let branchId = body.branchId || null

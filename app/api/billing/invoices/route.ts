@@ -133,8 +133,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     // sales-only invoice on a regular customer (a walk-in purchase). Any rental charge on a
     // regular customer is the billing staff's job. (Admins and other billing roles are unaffected.)
     if (effectiveBillingRole(ctx.access.role, ctx.access.billingRole) === 'front_counter') {
-      const hasRental = draft.lines.some((l) => l.kind === 'rental')
-      if (hasRental) {
+      // Sales-only = every line is a plain sale. Anything else (rental, DTC, labor, lump sum,
+      // misc, lost, adjustment) is billing staff's job on a regular customer.
+      const salesOnly = draft.lines.every((l) => l.kind === 'sale')
+      if (!salesOnly) {
         const { data: prof } = await supabase
           .from('billing_profiles')
           .select('billing_customers(is_house_account)')
@@ -145,7 +147,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         if (!isHouse) {
           return NextResponse.json({
             success: false,
-            error: 'Front counter can invoice sales only on a regular customer — rental charges must be invoiced by billing staff. (Anything can be invoiced on the House Account.)',
+            error: 'On a regular customer, front counter can invoice sales only — rentals, labor and other charges must be invoiced by billing staff. (Anything can be invoiced on the House Account.)',
             code: 'FORBIDDEN',
           }, { status: 403 })
         }

@@ -127,6 +127,10 @@ export async function GET(request: Request): Promise<Response> {
         unitRateCents: l.unitRateCents,
         amountCents: l.amountCents,
         taxable: l.kind === 'sale', // matches how a real invoice derives taxability
+        // Day-rental display columns, same as the JSON/on-screen view so the PDF doesn't diverge.
+        rentalItemQty: l.rentalItemQty ?? null,
+        rentalDays: l.rentalDays ?? null,
+        periodEnd: l.periodEnd ?? null,
       })),
       companyName: 'Safety Network',
       proof: true,

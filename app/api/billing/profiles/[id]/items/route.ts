@@ -92,9 +92,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
     const supabase = createServiceClient()
 
-    // Make sure the profile exists before hanging items off it.
-    const { data: profile } = await supabase.from('billing_profiles').select('id').eq('id', params.id).maybeSingle()
+    // Make sure the profile exists (and is in a branch this user may touch) before hanging items off it.
+    const { data: profile } = await supabase.from('billing_profiles').select('id, branch_id').eq('id', params.id).maybeSingle()
     if (!profile) return bad('Profile not found.', 'NOT_FOUND', 404)
+    if (ctx.access.branchIds !== null && !ctx.access.branchIds.includes(profile.branch_id)) {
+      return bad('You do not have access to this profile’s branch.', 'FORBIDDEN', 403)
+    }
 
     const { data: item, error: iErr } = await supabase
       .from('billing_items')

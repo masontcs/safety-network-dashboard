@@ -28,6 +28,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     const supabase = createServiceClient()
 
+    // The profile must be in a branch this user may touch.
+    const { data: prof } = await supabase.from('billing_profiles').select('branch_id').eq('id', params.id).maybeSingle()
+    if (!prof) return bad('Profile not found', 'NOT_FOUND', 404)
+    if (ctx.access.branchIds !== null && !ctx.access.branchIds.includes(prof.branch_id)) {
+      return bad('You do not have access to this profile’s branch.', 'FORBIDDEN', 403)
+    }
+
     // Must exist AND belong to this profile — one profile can't edit another's item.
     const { data: item } = await supabase
       .from('billing_items')
@@ -123,6 +130,12 @@ export async function DELETE(_req: Request, { params }: { params: { id: string; 
     if (guard) return guard
 
     const supabase = createServiceClient()
+
+    const { data: prof } = await supabase.from('billing_profiles').select('branch_id').eq('id', params.id).maybeSingle()
+    if (!prof) return bad('Profile not found', 'NOT_FOUND', 404)
+    if (ctx.access.branchIds !== null && !ctx.access.branchIds.includes(prof.branch_id)) {
+      return bad('You do not have access to this profile’s branch.', 'FORBIDDEN', 403)
+    }
 
     // Scope the delete to THIS profile so one profile can't delete another's item.
     const { data: item } = await supabase

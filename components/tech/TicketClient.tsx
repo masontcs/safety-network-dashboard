@@ -81,14 +81,19 @@ export default function TicketClient({ ticketId }: { ticketId: string }) {
     setPhotoBusy(true); setErr(null)
     try {
       const pos = await getPosition()
+      if (!pos) {
+        // Every field photo must carry a location. If the fix dropped, don't save a blank one —
+        // re-lock and make them re-enable so the coordinates are real.
+        setLocGranted(false)
+        setLocErr('Couldn’t get your location for that photo, so it wasn’t saved. Re-enable location and try again.')
+        return
+      }
       const fd = new FormData()
       fd.append('file', file)
       fd.append('capturedAt', new Date().toISOString())
-      if (pos) {
-        fd.append('latitude', String(pos.coords.latitude))
-        fd.append('longitude', String(pos.coords.longitude))
-        if (Number.isFinite(pos.coords.accuracy)) fd.append('accuracy', String(pos.coords.accuracy))
-      }
+      fd.append('latitude', String(pos.coords.latitude))
+      fd.append('longitude', String(pos.coords.longitude))
+      if (Number.isFinite(pos.coords.accuracy)) fd.append('accuracy', String(pos.coords.accuracy))
       await techApi.addPhoto(ticketId, fd)
       await loadPhotos()
     } catch (e) {
