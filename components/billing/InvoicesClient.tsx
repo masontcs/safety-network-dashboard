@@ -171,17 +171,17 @@ export default function InvoicesClient() {
             {rows.length === 0 ? 'No invoices yet. Open a job and generate one from its Invoices tab.' : 'No invoices with that status.'}
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="bx-list" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr>{['Invoice', 'Job', 'Date', 'Through', 'Status', 'Total'].map((h) => <th key={h} style={{ ...th, textAlign: h === 'Total' ? 'right' : 'left' }}>{h}</th>)}</tr></thead>
             <tbody>
               {shown.map((inv) => (
                 <tr key={inv.id}>
-                  <td style={td}><Link href={`/billing/invoices/${inv.id}`} style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>{inv.invoiceNumber}</Link></td>
-                  <td style={{ ...td, color: 'var(--text-muted)' }}>{inv.jobNumber ?? '—'}</td>
-                  <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{inv.invoiceDate}</td>
-                  <td style={{ ...td, fontVariantNumeric: 'tabular-nums', color: 'var(--text-muted)' }}>{inv.throughDate}</td>
-                  <td style={td}><span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: statusColor[inv.status] ?? 'var(--text-muted)' }}>{inv.status}</span></td>
-                  <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{money(inv.totalCents)}</td>
+                  <td style={td} data-label="Invoice"><Link href={`/billing/invoices/${inv.id}`} style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>{inv.invoiceNumber}</Link></td>
+                  <td style={{ ...td, color: 'var(--text-muted)' }} data-label="Job">{inv.jobNumber ?? '—'}</td>
+                  <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }} data-label="Date">{inv.invoiceDate}</td>
+                  <td style={{ ...td, fontVariantNumeric: 'tabular-nums', color: 'var(--text-muted)' }} data-label="Through">{inv.throughDate}</td>
+                  <td style={td} data-label="Status"><span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: statusColor[inv.status] ?? 'var(--text-muted)' }}>{inv.status}</span></td>
+                  <td style={{ ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 500 }} data-label="Total">{money(inv.totalCents)}</td>
                 </tr>
               ))}
             </tbody>

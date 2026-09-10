@@ -224,6 +224,29 @@
   .bx-deskctl{display:none !important}
   .bx-agenda{display:block}
 }
+/* ── mobile: list tables → stacked cards ─────────────────────────────────────
+   A list <table> tagged class="bx-list" (with data-label="Column" on each <td>)
+   drops its header row on phones and renders each row as a bordered card of
+   label : value lines. The `table.bx-list` selector outranks the ≤860 rule above
+   that turns generic tables into horizontal-scroll strips. */
+@media (max-width: 640px){
+  .billing-root table.bx-list,
+  .billing-root table.bx-list tbody{display:block;white-space:normal}
+  .billing-root table.bx-list thead{display:none}
+  .billing-root table.bx-list tbody tr{
+    display:block;background:var(--surface);border:1px solid var(--line);
+    border-radius:12px;padding:4px 13px;margin-bottom:11px;box-shadow:var(--shadow-card)}
+  .billing-root table.bx-list tbody tr td{
+    display:flex;align-items:center;justify-content:space-between;gap:14px;
+    padding:9px 0 !important;border:none !important;border-bottom:1px solid var(--line) !important;
+    text-align:right !important;white-space:normal !important;font-size:13px}
+  .billing-root table.bx-list tbody tr td:last-child{border-bottom:none !important}
+  .billing-root table.bx-list tbody tr td::before{
+    content:attr(data-label);flex:none;text-align:left;
+    font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--dim);font-weight:600}
+  /* decorative cells (chevron / row-affordance) carry data-label="" — drop them on mobile */
+  .billing-root table.bx-list tbody tr td[data-label=""]{display:none}
+}
 @media (max-width: 520px){
   .kpis{grid-template-columns:1fr !important}
 }

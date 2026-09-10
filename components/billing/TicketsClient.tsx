@@ -97,22 +97,22 @@ export default function TicketsClient() {
           <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '18px 2px' }}>{tickets.length === 0 ? 'No tickets yet.' : 'No tickets match.'}</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <table className="bx-list" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead><tr>{['Ticket #', 'Date', 'Job', 'Customer', 'Features', 'Status'].map((h) => <th key={h} style={th}>{h}</th>)}</tr></thead>
               <tbody>
                 {filtered.map((t) => (
                   <tr key={t.id} {...rowOpen(() => router.push(`/billing/tickets/${t.id}`))} style={{ cursor: 'pointer', opacity: t.voided ? 0.55 : 1 }}>
-                    <td style={td}>
+                    <td style={td} data-label="Ticket #">
                       <Link href={`/billing/tickets/${t.id}`} onClick={(e) => e.stopPropagation()} style={{ color: t.voided ? 'var(--text-muted)' : 'var(--accent)', fontWeight: 500, textDecoration: t.voided ? 'line-through' : 'none', fontVariantNumeric: 'tabular-nums' }}>{t.ticketNumber}</Link>
                       {!t.voided && t.recurring && <span title="Equipment still out" style={{ marginLeft: 6, fontSize: 9.5, color: 'var(--pill-pending-fg)' }}>REC</span>}
                     </td>
-                    <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{t.date}</td>
-                    <td style={td}>{t.job ? <Link href={`/billing/jobs/${t.job.id}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--accent)', textDecoration: 'none' }}>{t.job.number}</Link> : '—'}</td>
-                    <td style={{ ...td, color: 'var(--text-muted)' }}>{t.customer ?? '—'}</td>
-                    <td style={{ ...td, color: 'var(--text-secondary)' }}>{t.features.join(' + ') || '—'}</td>
+                    <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }} data-label="Date">{t.date}</td>
+                    <td style={td} data-label="Job">{t.job ? <Link href={`/billing/jobs/${t.job.id}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--accent)', textDecoration: 'none' }}>{t.job.number}</Link> : '—'}</td>
+                    <td style={{ ...td, color: 'var(--text-muted)' }} data-label="Customer">{t.customer ?? '—'}</td>
+                    <td style={{ ...td, color: 'var(--text-secondary)' }} data-label="Features">{t.features.join(' + ') || '—'}</td>
                     {t.voided
-                      ? <td style={{ ...td, fontSize: 11, fontWeight: 700, color: 'var(--pill-overdue-fg)', letterSpacing: '0.04em' }}>VOID</td>
-                      : <td style={{ ...td, fontSize: 11, fontWeight: 600, color: statusColors[t.status], textTransform: 'capitalize' }}>{t.status.replace('_', ' ')}</td>}
+                      ? <td style={{ ...td, fontSize: 11, fontWeight: 700, color: 'var(--pill-overdue-fg)', letterSpacing: '0.04em' }} data-label="Status">VOID</td>
+                      : <td style={{ ...td, fontSize: 11, fontWeight: 600, color: statusColors[t.status], textTransform: 'capitalize' }} data-label="Status">{t.status.replace('_', ' ')}</td>}
                   </tr>
                 ))}
               </tbody>

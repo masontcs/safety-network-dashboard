@@ -286,22 +286,22 @@ export default function JobsClient({ isAdmin }: { isAdmin: boolean }) {
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <table className="bx-list" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr>{['Job #', 'Name', 'Customer', 'Profile', 'Entity', 'Status'].map((h) => <th key={h} style={thStyle}>{h}</th>)}</tr>
               </thead>
               <tbody>
                 {filtered.map((j) => (
                   <tr key={j.id} {...rowOpen(() => router.push(`/billing/jobs/${j.id}`))} style={{ cursor: 'pointer' }}>
-                    <td style={tdStyle}>
+                    <td style={tdStyle} data-label="Job #">
                       <Link href={`/billing/jobs/${j.id}`} onClick={(e) => e.stopPropagation()} style={{ color: 'var(--accent)', fontWeight: 500, textDecoration: 'none', fontVariantNumeric: 'tabular-nums' }}>{j.jobNumber}</Link>
                       {j.certified && <span title="Certified" style={{ marginLeft: 6, fontSize: 10, color: 'var(--pill-pending-fg)' }}>CERT</span>}
                     </td>
-                    <td style={tdStyle}>{j.name ?? '—'}</td>
-                    <td style={tdStyle}>{j.customer ?? '—'}</td>
-                    <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{j.profile?.name ?? '—'}</td>
-                    <td style={tdStyle}>{j.entityCode}</td>
-                    <td style={tdStyle}>{statusPill(j.status)}</td>
+                    <td style={tdStyle} data-label="Name">{j.name ?? '—'}</td>
+                    <td style={tdStyle} data-label="Customer">{j.customer ?? '—'}</td>
+                    <td style={{ ...tdStyle, color: 'var(--text-muted)' }} data-label="Profile">{j.profile?.name ?? '—'}</td>
+                    <td style={tdStyle} data-label="Entity">{j.entityCode}</td>
+                    <td style={tdStyle} data-label="Status">{statusPill(j.status)}</td>
                   </tr>
                 ))}
               </tbody>

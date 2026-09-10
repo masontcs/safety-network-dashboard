@@ -86,15 +86,15 @@ export default function CustomersClient() {
         ) : rows.length === 0 ? (
           <div className="bx-empty">No customers yet — use “+ New customer” to add one.</div>
         ) : (
-          <table>
+          <table className="bx-list">
             <thead><tr><th>Customer</th><th>Code</th><th className="num">Profiles</th><th></th></tr></thead>
             <tbody>
               {rows.map((c) => (
                 <tr key={c.id} className="bx-rowlink" onClick={() => router.push(`/billing/customers/${c.id}`)}>
-                  <td><b>{c.name}</b>{!c.isActive && <span className="tag t-gray" style={{ marginLeft: 8 }}>inactive</span>}</td>
-                  <td className="mono" style={{ color: 'var(--muted)' }}>{c.code}</td>
-                  <td className="num mono">{c.profileCount}</td>
-                  <td className="num" style={{ color: 'var(--dim)' }}>›</td>
+                  <td data-label="Customer"><b>{c.name}</b>{!c.isActive && <span className="tag t-gray" style={{ marginLeft: 8 }}>inactive</span>}</td>
+                  <td className="mono" style={{ color: 'var(--muted)' }} data-label="Code">{c.code}</td>
+                  <td className="num mono" data-label="Profiles">{c.profileCount}</td>
+                  <td className="num" style={{ color: 'var(--dim)' }} data-label="">›</td>
                 </tr>
               ))}
             </tbody>
