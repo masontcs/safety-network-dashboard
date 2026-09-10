@@ -55,7 +55,8 @@ describe('price-list editor — collapse + single-rate + per-variation grids', (
     render(<PriceListEditorClient priceListId="pl1" />)
     await waitFor(() => expect(screen.getByText('MSG-BOARD')).toBeTruthy())
     open('MSG-BOARD')
-    for (const label of ['Daily', 'Weekly', 'Monthly']) {
+    // Cadence rows are labeled "<cadence> / day" since rates are entered as a per-day price.
+    for (const label of ['Daily / day', 'Weekly / day', 'Monthly / day']) {
       expect(screen.getByText(label), `missing ${label}`).toBeTruthy()
     }
   })
