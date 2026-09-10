@@ -52,7 +52,7 @@ function addDaysISO(iso: string, days: number): string {
 
 interface InvoiceRow {
   id: string; invoice_number: string; invoice_date: string; entity_id: string; branch_id: string
-  profile_id: string; job_id: string; tax_cents: number; qb_exported_at: string | null
+  profile_id: string; job_id: string; tax_cents: number; total_cents: number; qb_exported_at: string | null
 }
 
 /** A human-readable row for the export preview (what a bookkeeper sees before downloading). */
@@ -80,7 +80,7 @@ export async function assembleForExport(
 ): Promise<AssembledEntity[]> {
   let q = svc
     .from('billing_invoices')
-    .select('id, invoice_number, invoice_date, entity_id, branch_id, profile_id, job_id, tax_cents, qb_exported_at')
+    .select('id, invoice_number, invoice_date, entity_id, branch_id, profile_id, job_id, tax_cents, total_cents, qb_exported_at')
     .eq('status', 'issued')
     .gte('invoice_date', filters.start)
     .lte('invoice_date', filters.end)
@@ -133,6 +133,17 @@ export async function assembleForExport(
       ?? cfg.defaultNetDays
     const klass = cfg.branchClass[inv.branch_id] ?? ''
     const splits = linesToSplits(linesByInvoice.get(inv.id) ?? [], cfg.kindMap, klass)
+
+    // Reconcile: the QB A/R for this invoice is tax + the mapped revenue splits. If a line's kind
+    // isn't mapped (and there's no 'other' bucket) it gets dropped, which would post LESS A/R than
+    // the customer's actual invoice. Refuse to export rather than silently under-report.
+    const derived = inv.tax_cents + splits.reduce((a, sp) => a + sp.amountCents, 0)
+    if (derived !== inv.total_cents) {
+      throw new Error(
+        `Invoice ${inv.invoice_number} would export ${(derived / 100).toFixed(2)} but its total is ${(inv.total_cents / 100).toFixed(2)}. ` +
+        `A charge type has no QuickBooks account mapping — add it (or an "other" fallback) in QuickBooks Export settings before exporting.`,
+      )
+    }
 
     const qb: QbInvoice = {
       docNum: inv.invoice_number,
