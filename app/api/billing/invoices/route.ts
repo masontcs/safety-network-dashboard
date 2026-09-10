@@ -189,6 +189,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       draft.lines.map((l) => ({
         invoice_id: created.id,
         ticket_id: l.ticketId,
+        source_line_id: l.sourceLineId,
         kind: l.kind,
         item_id: l.itemId,
         variation_id: l.variationId,

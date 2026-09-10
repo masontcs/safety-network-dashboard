@@ -116,6 +116,54 @@ describe('buildJobInvoice — orchestration', () => {
     await expect(buildJobInvoice(client, { jobId: 'job1', throughDate: '2026-01-01' })).rejects.toBeInstanceOf(InvoiceBuildError)
   })
 
+  it('re-billing a ticket picks up a NEWLY-ADDED charge without re-billing the old one', async () => {
+    // The under-count bug: a ticket was invoiced (its sale line l1 billed), then a second sale
+    // line l2 was added. The old ticket|kind guard saw a prior 'sale' on t1 and dropped l2 too.
+    // Deduping on source_line_id, l1 is skipped by its id and l2 (a new id) bills.
+    const client = base({
+      billing_tickets: [{ id: 't1', ticket_number: 'T-1', status: 'invoiced', feature_dtc: false }],
+      billing_ticket_ledger: [],
+      billing_ticket_lines: [
+        { id: 'l1', ticket_id: 't1', kind: 'sale', item_id: null, variation_id: null, description: 'Gloves', qty: 1, units: 1, unit_rate_cents: 1000, taxable: true, billing_items: null },
+        { id: 'l2', ticket_id: 't1', kind: 'sale', item_id: null, variation_id: null, description: 'Vest', qty: 1, units: 1, unit_rate_cents: 2000, taxable: true, billing_items: null },
+      ],
+      // l1 already sits on an issued invoice, tracked by its source ticket-line id.
+      billing_invoice_lines: [{ source_line_id: 'l1', ticket_id: 't1', kind: 'sale', billing_invoices: { status: 'issued' } }],
+    })
+
+    const d = await buildJobInvoice(client, { jobId: 'job1', throughDate: '2026-01-03', taxRatePct: 0 })
+    expect(d.lines).toHaveLength(1)
+    expect(d.lines[0].sourceLineId).toBe('l2')
+    expect(d.lines[0].amountCents).toBe(2000)
+  })
+
+  it('re-billing is idempotent when the only charge line was already billed by source id', async () => {
+    const client = base({
+      billing_tickets: [{ id: 't1', ticket_number: 'T-1', status: 'invoiced', feature_dtc: false }],
+      billing_ticket_ledger: [],
+      billing_ticket_lines: [
+        { id: 'l1', ticket_id: 't1', kind: 'sale', item_id: null, variation_id: null, description: 'Gloves', qty: 1, units: 1, unit_rate_cents: 1000, taxable: true, billing_items: null },
+      ],
+      billing_invoice_lines: [{ source_line_id: 'l1', ticket_id: 't1', kind: 'sale', billing_invoices: { status: 'issued' } }],
+    })
+    await expect(buildJobInvoice(client, { jobId: 'job1', throughDate: '2026-01-03' })).rejects.toBeInstanceOf(InvoiceBuildError)
+  })
+
+  it('a voided prior invoice frees a charge line to bill again (by source id)', async () => {
+    // l1 was billed, then that invoice was voided — the line must bill again.
+    const client = base({
+      billing_tickets: [{ id: 't1', ticket_number: 'T-1', status: 'invoiced', feature_dtc: false }],
+      billing_ticket_ledger: [],
+      billing_ticket_lines: [
+        { id: 'l1', ticket_id: 't1', kind: 'sale', item_id: null, variation_id: null, description: 'Gloves', qty: 1, units: 1, unit_rate_cents: 1000, taxable: true, billing_items: null },
+      ],
+      billing_invoice_lines: [{ source_line_id: 'l1', ticket_id: 't1', kind: 'sale', billing_invoices: { status: 'void' } }],
+    })
+    const d = await buildJobInvoice(client, { jobId: 'job1', throughDate: '2026-01-03', taxRatePct: 0 })
+    expect(d.lines).toHaveLength(1)
+    expect(d.lines[0].sourceLineId).toBe('l1')
+  })
+
   it('a DTC bills the pickup day only, never accruing across the window', async () => {
     const client = base({
       billing_tickets: [{ id: 't1', ticket_number: 'T-1', status: 'final_edit', feature_dtc: true }],

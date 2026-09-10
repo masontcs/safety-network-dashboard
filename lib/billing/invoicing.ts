@@ -34,6 +34,13 @@ export interface DraftLine extends InvoiceLine {
   ticketId: string | null
   itemId: string | null
   variationId: string | null
+  /**
+   * The billing_ticket_lines row this charge was billed from. This is the precise dedup key for
+   * re-billing: a ticket's later-added charge line has a new source_line_id, so it bills even when
+   * an earlier charge of the same kind on that ticket was already invoiced. Null for rentals (they
+   * come from the accrual ledger, not a ticket line) and for the rental-minimum adjustment.
+   */
+  sourceLineId: string | null
   /** The pickup lot a rental line came from — its billing anchor (= the period start). */
   lotDate: string | null
   // Display-only splits for the invoice columns (rentals). The billing truth stays in qty x
@@ -227,7 +234,7 @@ export async function buildJobInvoice(
       const costCents = (item?.costCents ?? 0) + (variation?.costAdjCents ?? 0)
       lines.push({
         ...lostLine({ description: `${label} — lost/stolen`, itemCode: item?.code ?? '', variation: variation?.name ?? null, qty: lostQty, costCents }),
-        ticketId, itemId, variationId, lotDate: null,
+        ticketId, itemId, variationId, lotDate: null, sourceLineId: null,
       })
     }
 
@@ -290,7 +297,7 @@ export async function buildJobInvoice(
           units: 1, // qty-units are already qty x days — keep the billing truth here
           unitRateCents,
         }),
-        ticketId, itemId, variationId, lotDate: row.start,
+        ticketId, itemId, variationId, lotDate: row.start, sourceLineId: null,
         rentalItemQty: itemQty, rentalDays, periodEnd,
       })
       accruals.push({
@@ -315,17 +322,24 @@ export async function buildJobInvoice(
     billing_items: { code: string; category: string } | null
   }[]
 
-  // Already invoiced? A ticket's non-rental lines bill exactly once.
+  // Already invoiced? Each ticket charge line bills exactly once. We dedup on the source ticket
+  // line id so that adding a NEW charge to a ticket after it was invoiced bills only the new line
+  // (the old coarse ticket|kind key dropped any later same-kind charge — the under-count bug).
   const { data: priorLines } = await supabase
     .from('billing_invoice_lines')
-    .select('ticket_id, kind, billing_invoices!inner(status)')
+    .select('source_line_id, ticket_id, kind, billing_invoices!inner(status)')
     .in('ticket_id', billableIds)
     .neq('kind', 'rental')
-  const alreadyCharged = new Set(
-    ((priorLines ?? []) as unknown as { ticket_id: string | null; kind: string; billing_invoices: { status: string } | null }[])
-      .filter((l) => l.billing_invoices?.status !== 'void')
-      .map((l) => `${l.ticket_id}|${l.kind}`)
-  )
+  const priorNonVoid = ((priorLines ?? []) as unknown as {
+    source_line_id: string | null; ticket_id: string | null; kind: string; billing_invoices: { status: string } | null
+  }[]).filter((l) => l.billing_invoices?.status !== 'void')
+  // Precise guard: this exact ticket line already billed. Won't block its siblings.
+  const billedSourceLineIds = new Set(priorNonVoid.filter((l) => l.source_line_id).map((l) => l.source_line_id as string))
+  // Legacy guard: lines invoiced before source_line_id existed carry no link. For those we can't
+  // tell which ticket line was billed, so fall back to the old ticket|kind key — conservatively, so
+  // historical charges are never re-billed (at the cost of not picking up a new same-kind charge on
+  // a ticket that only has pre-migration invoices; going forward everything is tracked precisely).
+  const legacyCharged = new Set(priorNonVoid.filter((l) => !l.source_line_id).map((l) => `${l.ticket_id}|${l.kind}`))
 
   // Labor / lump sum carry no stored rate — price them from the list, same as the ticket.
   const needsRate = charges.filter((c) => c.unit_rate_cents == null && c.item_id && c.billing_items?.category)
@@ -340,7 +354,8 @@ export async function buildJobInvoice(
   })
 
   for (const c of charges) {
-    if (alreadyCharged.has(`${c.ticket_id}|${c.kind}`)) continue
+    if (billedSourceLineIds.has(c.id)) continue // this exact ticket line already billed
+    if (legacyCharged.has(`${c.ticket_id}|${c.kind}`)) continue // pre-migration invoice, no link
     const unitRateCents = c.unit_rate_cents ?? (c.item_id ? chargeRates.get(rateKeyOf(c.item_id, c.variation_id, 'flat')) ?? null : null)
     if (unitRateCents == null) {
       warnings.push(`Ticket ${ticketNumber.get(c.ticket_id)}: "${c.description}" has no price-list rate — not billed.`)
@@ -357,6 +372,7 @@ export async function buildJobInvoice(
       unitRateCents,
       amountCents: Math.round(qty * c.units * unitRateCents),
       ticketId: c.ticket_id, itemId: c.item_id, variationId: c.variation_id, lotDate: null,
+      sourceLineId: c.id,
     })
   }
 
@@ -377,7 +393,7 @@ export async function buildJobInvoice(
   // buildInvoice may append the rental-minimum adjustment; carry the identity columns.
   const draftLines: DraftLine[] = built.lines.map((l) => {
     const src = lines.find((d) => d === l) as DraftLine | undefined
-    return src ?? { ...l, ticketId: null, itemId: null, variationId: null, lotDate: null }
+    return src ?? { ...l, ticketId: null, itemId: null, variationId: null, lotDate: null, sourceLineId: null }
   })
 
   return { job, throughDate, taxRatePct, lines: draftLines, totals: built.totals, accruals, warnings }
