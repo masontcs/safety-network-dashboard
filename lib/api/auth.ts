@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createRouteClient, createServiceClient } from '@/lib/supabase/server'
 import type { UserAccess } from '@/lib/utils/access'
 import type { Role } from '@/lib/supabase/database.types'
-import { DASHBOARD_ROLES, BILLING_ROLES, isFieldRole, canBillingArea, canUseBilling, type BillingArea } from '@/lib/utils/interfaces'
+import { DASHBOARD_ROLES, BILLING_ROLES, isFieldRole, canBillingArea, canUseBilling, effectiveBillingRole, type BillingArea } from '@/lib/utils/interfaces'
 
 type AccessResult =
   | { ok: true; access: UserAccess }
@@ -58,6 +58,22 @@ export function guardBillingArea(access: UserAccess, area: BillingArea): NextRes
     { success: false, error: 'You do not have access to this billing area.', code: 'FORBIDDEN' },
     { status: 403 }
   )
+}
+
+/**
+ * Void guard — voiding a ticket or invoice reverses billing and is a biller/manager action,
+ * NOT a front-counter one. Front counter can create walk-in tickets/invoices but must not be
+ * able to void anything (the UI hides it; this enforces it at the API too). Everyone else who
+ * reached the tickets/invoices area may void; call this AFTER the area guard.
+ */
+export function guardVoid(access: UserAccess): NextResponse | null {
+  if (effectiveBillingRole(access.role, access.billingRole) === 'front_counter') {
+    return NextResponse.json(
+      { success: false, error: 'Front counter can’t void tickets or invoices — ask a biller or manager.', code: 'FORBIDDEN' },
+      { status: 403 },
+    )
+  }
+  return null
 }
 
 /**

@@ -6,6 +6,7 @@ import { useBranch } from '@/components/billing/BranchContext'
 import ShiftEditorModal from '@/components/billing/ShiftEditorModal'
 import ShiftDetailDrawer from '@/components/billing/ShiftDetailDrawer'
 import { useBroadcast } from '@/lib/realtime/useBroadcast'
+import { pacificToday } from '@/lib/utils/date'
 
 /**
  * Dispatch board with multiple views:
@@ -29,7 +30,7 @@ interface Board { range: Range; rangeStart: string; rangeEnd: string; days: stri
 
 const addDays = (d: string, n: number) => { const dt = new Date(d + 'T00:00:00Z'); dt.setUTCDate(dt.getUTCDate() + n); return dt.toISOString().slice(0, 10) }
 const addMonths = (d: string, n: number) => { const dt = new Date(d + 'T00:00:00Z'); dt.setUTCMonth(dt.getUTCMonth() + n); return dt.toISOString().slice(0, 10) }
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => pacificToday()
 const dayCol = (d: string) => { const dt = new Date(d + 'T00:00:00Z'); return dt.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', timeZone: 'UTC' }) }
 const dayLong = (d: string) => { const dt = new Date(d + 'T00:00:00Z'); return dt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' }) }
 const monthLabel = (d: string) => { const dt = new Date(d + 'T00:00:00Z'); return dt.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }) }

@@ -50,3 +50,19 @@ export function toISODate(date: Date): string {
 export function isValidDate(s: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s))
 }
+
+/**
+ * Current date in Pacific time as an ISO yyyy-mm-dd string.
+ *
+ * The business runs in Pacific time. `new Date().toISOString().slice(0,10)` gives the UTC
+ * date, so any evening after ~4–5pm PT it has already rolled to *tomorrow* — which made
+ * "today" buttons and default date seeds in dispatch/time-management jump a day ahead for
+ * the whole late shift. Formatting in America/Los_Angeles keeps "today" meaning today where
+ * the crews actually are. en-CA renders as YYYY-MM-DD; the timeZone option does the shift.
+ */
+export function pacificToday(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
+}

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
+import { getAccessContext, guardBillingArea, guardVoid } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { broadcastBillingChanged } from '@/lib/realtime/broadcast'
@@ -164,6 +164,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     if (body.action === 'void') {
+      const voidGuard = guardVoid(ctx.access)
+      if (voidGuard) return voidGuard
       if (inv.status === 'void') return bad('This invoice is already void.', 'CONFLICT', 409)
 
       // Reverse the rental accruals this invoice added: subtract each rental line's

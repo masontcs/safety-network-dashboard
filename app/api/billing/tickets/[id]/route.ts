@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
+import { getAccessContext, guardBillingArea, guardVoid } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { BILLING_TYPES } from '@/lib/billing/constants'
@@ -269,6 +269,8 @@ export async function PATCH(
     // while the ticket is billed on a live (non-void) invoice — void that invoice first,
     // so its totals reverse before the ticket disappears. Un-void simply restores it.
     if (body.action === 'void' || body.action === 'unvoid') {
+      const voidGuard = guardVoid(ctx.access)
+      if (voidGuard) return voidGuard
       const wantVoid = body.action === 'void'
       if (wantVoid === ex.is_voided) {
         return bad(wantVoid ? 'This ticket is already voided.' : 'This ticket is not voided.', 'CONFLICT', 409)

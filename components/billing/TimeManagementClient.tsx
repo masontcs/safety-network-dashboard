@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useBranch } from '@/components/billing/BranchContext'
 import { useBroadcast } from '@/lib/realtime/useBroadcast'
+import { pacificToday } from '@/lib/utils/date'
 
 /**
  * Time Management — the approver's surface. Times flow in from techs; here they're reviewed,
@@ -35,7 +36,7 @@ const td: React.CSSProperties = { padding: '9px 12px', borderBottom: '1px solid 
 export default function TimeManagementClient() {
   const { branchId, branches } = useBranch()
   const [tab, setTab] = useState<Tab>('review')
-  const [week, setWeek] = useState<string>(() => new Date().toISOString().slice(0, 10))
+  const [week, setWeek] = useState<string>(() => pacificToday())
   const [toast, setToast] = useState<string | null>(null)
   const flash = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2200) }
   const branchName = (id: string | null) => (id ? branches.find((b) => b.id === id)?.name ?? 'Branch' : '—')
@@ -48,7 +49,7 @@ export default function TimeManagementClient() {
   const [returning, setReturning] = useState<string | null>(null)
   const [returnNote, setReturnNote] = useState('')
   const [edit, setEdit] = useState<{ id: string; start: string; end: string; date: string } | null>(null)
-  const [exportDate, setExportDate] = useState<string>(() => new Date().toISOString().slice(0, 10))
+  const [exportDate, setExportDate] = useState<string>(() => pacificToday())
 
   async function downloadExport() {
     if (!branchId) { flash('Pick a branch in the top bar to export.'); return }
@@ -153,7 +154,7 @@ export default function TimeManagementClient() {
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <button className="bx-btn ghost" onClick={() => setWeek(addDays(week, -7))}>‹ Prev</button>
-          <button className="bx-btn ghost" onClick={() => setWeek(new Date().toISOString().slice(0, 10))}>This week</button>
+          <button className="bx-btn ghost" onClick={() => setWeek(pacificToday())}>This week</button>
           <button className="bx-btn ghost" onClick={() => setWeek(addDays(week, 7))}>Next ›</button>
         </div>
       </div>
@@ -174,7 +175,7 @@ export default function TimeManagementClient() {
                 <button className="bx-btn ghost sm" title="Previous day" aria-label="Previous day" onClick={() => setExportDate((d) => addDays(d, -1))}>‹</button>
                 <input type="date" value={exportDate} onChange={(e) => { if (e.target.value) setExportDate(e.target.value) }} style={{ padding: '6px 9px', border: '1px solid var(--border-emphasis)', borderRadius: 6, fontSize: 13 }} />
                 <button className="bx-btn ghost sm" title="Next day" aria-label="Next day" onClick={() => setExportDate((d) => addDays(d, 1))}>›</button>
-                <button className="bx-btn ghost sm" onClick={() => setExportDate(new Date().toISOString().slice(0, 10))}>Today</button>
+                <button className="bx-btn ghost sm" onClick={() => setExportDate(pacificToday())}>Today</button>
                 <button className="bx-btn accent sm" onClick={downloadExport} disabled={!branchId} title={branchId ? '' : 'Pick a branch first'}>Download day</button>
               </div>
             </div>
