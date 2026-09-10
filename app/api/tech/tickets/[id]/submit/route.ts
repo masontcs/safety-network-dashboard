@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getTechContext, loadAssignedTicket, techBad, isEditable } from '@/lib/api/tech'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
+import { broadcastBillingChanged } from '@/lib/realtime/broadcast'
 
 /**
  * The lead hands the ticket back to the office: active → in_review.
@@ -40,6 +41,38 @@ export async function POST(_request: Request, { params }: { params: { id: string
       .eq('id', params.id)
       .eq('status', 'active') // don't race a status change from the office
     if (error) throw new Error(error.message)
+
+    // A resubmit after a return-to-adjust must clear the stale "Returned" label: any time-approval
+    // batch that covers this ticket's logged time (per technician + work day) goes back to
+    // 'submitted' so it re-enters the office review queue. Only 'returned' rows are touched —
+    // approved batches are left alone.
+    const { data: tkRow } = await supabase
+      .from('billing_tickets')
+      .select('ticket_date, billing_jobs!inner(branch_id)')
+      .eq('id', params.id)
+      .maybeSingle()
+    const branchId = (tkRow as unknown as { billing_jobs: { branch_id: string } | null } | null)?.billing_jobs?.branch_id ?? null
+    const ticketDate = (tkRow as unknown as { ticket_date: string } | null)?.ticket_date ?? null
+    if (branchId && ticketDate) {
+      const { data: lab } = await supabase
+        .from('billing_ticket_labor')
+        .select('technician_id, work_date')
+        .eq('ticket_id', params.id)
+      const pairs = new Map<string, { tech: string; date: string }>()
+      for (const l of (lab ?? []) as { technician_id: string; work_date: string | null }[]) {
+        const date = l.work_date ?? ticketDate
+        pairs.set(`${l.technician_id}|${date}`, { tech: l.technician_id, date })
+      }
+      for (const { tech, date } of pairs.values()) {
+        await supabase
+          .from('billing_time_approvals')
+          .update({ status: 'submitted', note: null, updated_at: new Date().toISOString() })
+          .eq('technician_id', tech).eq('branch_id', branchId).eq('work_date', date).eq('status', 'returned')
+      }
+    }
+
+    // Reflect the resubmit live on the office's Time Management + tickets views.
+    await broadcastBillingChanged()
 
     return NextResponse.json({ success: true })
   } catch (err) {

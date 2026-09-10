@@ -172,6 +172,11 @@ export default function DispatchClient() {
   // Mobile agenda helpers: the anchor day's tickets, and a tech-id → name map for crew labels.
   const agendaTickets = (board?.tickets ?? []).filter((t) => t.date === anchor).sort((a, b) => a.ticketNumber.localeCompare(b.ticketNumber))
   const techNames = new Map((board?.technicians ?? []).map((t) => [t.id, t.name]))
+  // The agenda mirrors the desktop grid: it must also show yard shifts and staged (draft) shifts
+  // for the day, not just published tickets — otherwise a phone user can't see or publish drafts.
+  const agendaYard = (board?.yard ?? []).filter((y) => y.date === anchor)
+  const agendaStaged = staged.filter((s) => s.date === anchor)
+  const agendaEmpty = agendaTickets.length === 0 && agendaYard.length === 0 && agendaStaged.length === 0
 
   return (
     <div>
@@ -261,8 +266,9 @@ export default function DispatchClient() {
           </div>
           <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {!board ? <div className="bx-sub" style={{ margin: 0 }}>Loading…</div>
-              : agendaTickets.length === 0 ? <div className="bx-empty" style={{ padding: '6px 2px' }}>Nothing scheduled for this day.</div>
-              : agendaTickets.map((t) => {
+              : agendaEmpty ? <div className="bx-empty" style={{ padding: '6px 2px' }}>Nothing scheduled for this day.</div>
+              : <>
+                {agendaTickets.map((t) => {
                   const lead = t.leadTechId ? techNames.get(t.leadTechId) ?? null : null
                   const extra = t.crewTechIds.filter((id) => id !== t.leadTechId).length
                   return (
@@ -275,6 +281,34 @@ export default function DispatchClient() {
                     </button>
                   )
                 })}
+                {/* Yard shifts — a tech on the yard with no ticket. Read-only card (remove if allowed). */}
+                {agendaYard.map((y) => (
+                  <div key={y.id} className="bx-agenda-card" style={{ borderLeftColor: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13.5 }}>Yard shift</div>
+                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>👤 {techNames.get(y.technicianId) ?? '—'} · no ticket</div>
+                    </div>
+                    {board?.canDispatch && <button className="bx-btn ghost sm" onClick={() => removeYard(y.id)}>Remove</button>}
+                  </div>
+                ))}
+                {/* Staged (draft) shifts — not yet published. Publish/edit inline so a phone can act. */}
+                {agendaStaged.map((s) => (
+                  <div key={s.id} className="bx-agenda-card" style={{ borderStyle: 'dashed', borderLeftColor: 'var(--accent)' }}>
+                    <div style={{ fontWeight: 600, fontSize: 13.5 }}>{s.customer ?? s.jobName ?? s.jobNumber ?? (s.isYard ? 'Yard shift' : 'Shift')} <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--accent)' }}>· draft</span></div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                      {s.isYard ? 'yard shift (draft)' : (s.jobTypes.length ? s.jobTypes.join(', ') : (s.jobNumber ?? '—'))}
+                      {s.leadTechId ? ` · 👤 ${techNames.get(s.leadTechId) ?? '—'}${s.crewTechIds.filter((id) => id !== s.leadTechId).length ? ` +${s.crewTechIds.filter((id) => id !== s.leadTechId).length}` : ''}` : ''}
+                    </div>
+                    {board?.canDispatch && (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                        <button className="bx-btn accent sm" onClick={() => publishShift(s.id)}>Publish</button>
+                        <button className="bx-btn ghost sm" onClick={() => setEditShiftId(s.id)}>Edit</button>
+                        <button className="bx-btn ghost sm" onClick={() => deleteShift(s.id)}>Delete</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </>}
           </div>
           {board?.canDispatch && (
             <div style={{ padding: '0 12px 12px' }}>
