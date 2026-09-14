@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useConfirm } from '@/components/ui/DialogProvider'
 
 /**
  * Manage BILLING users from inside the billing interface.
@@ -243,6 +244,7 @@ function UserModal({ mode, user, isAdmin, branches, onClose, onDone }: {
   mode: 'create' | 'edit'; user?: BUser; isAdmin: boolean; branches: Branch[]
   onClose: () => void; onDone: (msg: string) => void
 }) {
+  const confirm = useConfirm()
   const granted = mode === 'edit' && user!.source === 'granted'
   const [name] = useState(user?.displayName ?? '')
   const [email, setEmail] = useState('')
@@ -309,7 +311,7 @@ function UserModal({ mode, user, isAdmin, branches, onClose, onDone }: {
 
   async function revokeGrant() {
     if (busy || !user) return
-    if (!confirm(`Remove billing access from ${user.displayName}? They keep their other access.`)) return
+    if (!(await confirm({ message: `Remove billing access from ${user.displayName}? They keep their other access.`, confirmLabel: 'Remove access', danger: true }))) return
     setBusy(true); setErr(null)
     try {
       const res = await fetch('/api/billing/users/grant', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user.id }) })

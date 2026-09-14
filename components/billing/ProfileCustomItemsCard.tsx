@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useConfirm } from '@/components/ui/DialogProvider'
 
 /**
  * Custom items for ONE billing profile — negotiated Lump Sum / Labor lines made just for
@@ -15,6 +16,7 @@ const money = (c: number | null) => (c == null ? '—' : `$${(c / 100).toFixed(2
 const toCents = (s: string) => Math.round(parseFloat(s || '0') * 100)
 
 export default function ProfileCustomItemsCard({ profileId }: { profileId: string }) {
+  const confirm = useConfirm()
   const [items, setItems] = useState<ScopedItem[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -88,7 +90,7 @@ export default function ProfileCustomItemsCard({ profileId }: { profileId: strin
   }
 
   async function remove(id: string) {
-    if (!window.confirm('Delete this custom item?')) return
+    if (!(await confirm({ message: 'Delete this custom item?', confirmLabel: 'Delete', danger: true }))) return
     const j = await fetch(`/api/billing/profiles/${profileId}/items/${id}`, { method: 'DELETE' }).then((r) => r.json())
     if (!j.success) { setErr(j.error); return }
     load()

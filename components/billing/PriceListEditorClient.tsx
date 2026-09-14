@@ -8,6 +8,7 @@ import MoneyInput from '@/components/billing/MoneyInput'
 import Select from '@/components/billing/Select'
 import Toggle from '@/components/billing/Toggle'
 import { BILLING_TYPES, BILLING_TYPE_LABELS, FLAT_RATE } from '@/lib/billing/constants'
+import { useConfirm } from '@/components/ui/DialogProvider'
 import { buildTierGrid } from '@/lib/billing/pricing/tier-grid'
 import type { RateKey } from '@/lib/supabase/database.types'
 
@@ -85,6 +86,7 @@ let tmp = 0
 const nextKey = () => `k${++tmp}`
 
 export default function PriceListEditorClient({ priceListId }: { priceListId: string }) {
+  const confirm = useConfirm()
   const [name, setName] = useState('')
   const [tiers, setTiers] = useState<Tier[]>([])
   const [items, setItems] = useState<EditorItem[]>([])
@@ -378,7 +380,7 @@ export default function PriceListEditorClient({ priceListId }: { priceListId: st
                           <button
                             style={{ ...ghostBtn, padding: '3px 8px', fontSize: 11 }}
                             title="Copy this variation's rates to every variation (overwrites the others)"
-                            onClick={() => { if (confirm(`Copy ${v.name}'s rates to all ${it.variations.length} variations? This overwrites the others.`)) applyToAllVariations(it.key, v.id) }}
+                            onClick={async () => { if (await confirm({ message: `Copy ${v.name}'s rates to all ${it.variations.length} variations? This overwrites the others.`, confirmLabel: 'Apply to all' })) applyToAllVariations(it.key, v.id) }}
                           >Apply to all →</button>
                         )}
                       </div>

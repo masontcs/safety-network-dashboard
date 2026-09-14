@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useAlert } from '@/components/ui/DialogProvider'
 import Skeleton from '@/components/ui/Skeleton'
 
 interface FiscalMonth {
@@ -249,6 +250,7 @@ function QuarterFormRow({
 }
 
 export default function FiscalQuartersClient() {
+  const alert = useAlert()
   const [quarters, setQuarters] = useState<FiscalQuarter[]>([])
   const [allMonths, setAllMonths] = useState<FiscalMonth[]>([])
   const [loading, setLoading] = useState(true)
@@ -370,11 +372,11 @@ export default function FiscalQuartersClient() {
     try {
       const res = await fetch(`/api/fiscal-quarters/${id}`, { method: 'DELETE' })
       const json = await res.json()
-      if (!json.success) { alert(json.error); return }
+      if (!json.success) { await alert(json.error); return }
       setQuarters((prev) => prev.filter((q) => q.id !== id))
       setDeleteId(null)
     } catch {
-      alert('Network error — please try again.')
+      await alert('Network error — please try again.')
     } finally {
       setDeleteLoading(false)
     }

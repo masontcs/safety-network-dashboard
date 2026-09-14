@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useConfirm, useAlert } from '@/components/ui/DialogProvider'
 import Skeleton from '@/components/ui/Skeleton'
 import BranchMultiSelect, { type SelectableBranch } from '@/components/ui/BranchMultiSelect'
 import type { Role } from '@/lib/supabase/database.types'
@@ -90,6 +91,8 @@ function generatePassword(): string {
 }
 
 export default function UsersClient() {
+  const confirm = useConfirm()
+  const alert = useAlert()
   const [users, setUsers] = useState<User[]>([])
   const [branches, setBranches] = useState<SelectableBranch[]>([])
   const [loading, setLoading] = useState(true)
@@ -182,7 +185,7 @@ export default function UsersClient() {
   }
 
   async function handleDeleteTestAccounts() {
-    if (!confirm('Delete all three test accounts? This cannot be undone.')) return
+    if (!(await confirm({ message: 'Delete all three test accounts? This cannot be undone.', confirmLabel: 'Delete', danger: true }))) return
     setTestDeleting(true)
     setTestMsg(null)
     try {
@@ -217,7 +220,7 @@ export default function UsersClient() {
   async function saveEdit(userId: string) {
     const uname = editUsername.trim().toLowerCase()
     if (uname && !USERNAME_REGEX.test(uname)) {
-      alert('Username must be 3–20 characters: lowercase letters, numbers, underscores only.')
+      await alert('Username must be 3–20 characters: lowercase letters, numbers, underscores only.')
       return
     }
     setSaving(true)
@@ -234,7 +237,7 @@ export default function UsersClient() {
       )
       setEditing(null)
     } catch (err) {
-      alert((err as Error).message)
+      await alert((err as Error).message)
     } finally {
       setSaving(false)
     }
@@ -254,11 +257,11 @@ export default function UsersClient() {
       const json = await res.json() as { success: boolean; error?: string }
       if (!json.success) {
         setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, isActive: !nextActive } : u))
-        alert(json.error ?? 'Failed to update user')
+        await alert(json.error ?? 'Failed to update user')
       }
     } catch {
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, isActive: !nextActive } : u))
-      alert('Network error — please try again')
+      await alert('Network error — please try again')
     }
   }
 

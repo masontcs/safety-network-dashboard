@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useAlert } from '@/components/ui/DialogProvider'
 import Skeleton from '@/components/ui/Skeleton'
 
 interface FiscalMonth {
@@ -126,6 +127,7 @@ function FormRow({
 }
 
 export default function FiscalMonthsClient() {
+  const alert = useAlert()
   const [months, setMonths] = useState<FiscalMonth[]>([])
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -233,11 +235,11 @@ export default function FiscalMonthsClient() {
     try {
       const res = await fetch(`/api/fiscal-months/${id}`, { method: 'DELETE' })
       const json = await res.json()
-      if (!json.success) { alert(json.error); return }
+      if (!json.success) { await alert(json.error); return }
       setMonths((prev) => prev.filter((m) => m.id !== id))
       setDeleteId(null)
     } catch {
-      alert('Network error — please try again.')
+      await alert('Network error — please try again.')
     } finally {
       setDeleteLoading(false)
     }

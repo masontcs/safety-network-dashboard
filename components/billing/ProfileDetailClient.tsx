@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useConfirm } from '@/components/ui/DialogProvider'
 import Link from 'next/link'
 import Skeleton from '@/components/ui/Skeleton'
 import ProfileEntityConfigCard from '@/components/billing/ProfileEntityConfigCard'
@@ -48,6 +49,7 @@ const labelStyle: React.CSSProperties = {
 }
 
 export default function ProfileDetailClient({ profileId }: { profileId: string }) {
+  const confirm = useConfirm()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [terms, setTerms] = useState<PaymentTerm[]>([])
   const [tab, setTab] = useState<'details' | 'jobs' | 'invoices'>('details')
@@ -121,7 +123,7 @@ export default function ProfileDetailClient({ profileId }: { profileId: string }
 
   async function handleDelete() {
     if (deleting || !profile) return
-    if (!window.confirm(`Permanently delete “${profile.name}” and ALL its jobs, tickets, invoices, quotes and settings? This cannot be undone.`)) return
+    if (!(await confirm({ title: 'Delete profile', message: `Permanently delete “${profile.name}” and ALL its jobs, tickets, invoices, quotes and settings? This cannot be undone.`, confirmLabel: 'Delete', danger: true }))) return
     setDeleting(true); setSaveError(null)
     try {
       const res = await fetch(`/api/billing/profiles/${profileId}`, { method: 'DELETE' })

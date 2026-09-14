@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useConfirm, useAlert } from '@/components/ui/DialogProvider'
 import { formatCurrency } from '@/lib/utils/format'
 
 interface Branch {
@@ -55,6 +56,8 @@ function fiscalMonthLabel(fm: FiscalMonth): string {
 }
 
 export default function TargetsClient({ branches, fiscalMonths }: Props) {
+  const confirm = useConfirm()
+  const alert = useAlert()
   const [selectedBranchId, setSelectedBranchId] = useState<string>(branches[0]?.id ?? '')
   const [targets, setTargets] = useState<Target[]>([])
   const [loading, setLoading] = useState(false)
@@ -158,14 +161,14 @@ export default function TargetsClient({ branches, fiscalMonths }: Props) {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Delete this target?')) return
+    if (!(await confirm({ message: 'Delete this target?', confirmLabel: 'Delete', danger: true }))) return
     try {
       const res = await fetch(`/api/targets/${id}`, { method: 'DELETE' })
       const json = await res.json()
       if (!json.success) throw new Error(json.error)
       loadTargets()
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Delete failed')
+      await alert(e instanceof Error ? e.message : 'Delete failed')
     }
   }
 

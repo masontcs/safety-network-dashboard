@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useConfirm } from '@/components/ui/DialogProvider'
 
 /**
  * Manage job types — the vocabulary the dispatch picker offers when staging/publishing a shift.
@@ -11,6 +12,7 @@ import { useCallback, useEffect, useState } from 'react'
 interface JobType { id: string; name: string; sortOrder: number; isActive: boolean }
 
 export default function JobTypesClient() {
+  const confirm = useConfirm()
   const [rows, setRows] = useState<JobType[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
@@ -52,7 +54,7 @@ export default function JobTypesClient() {
     if (await call(`/api/billing/job-types/${t.id}`, 'PATCH', { isActive })) load()
   }
   async function remove(t: JobType) {
-    if (!confirm(`Delete "${t.name}"? This can't be undone. (Shifts that already used it keep the name.)`)) return
+    if (!(await confirm({ message: `Delete "${t.name}"? This can't be undone. (Shifts that already used it keep the name.)`, confirmLabel: 'Delete', danger: true }))) return
     if (await call(`/api/billing/job-types/${t.id}`, 'DELETE')) { flash(`"${t.name}" deleted.`); load() }
   }
   // Swap sort order with the adjacent active row.

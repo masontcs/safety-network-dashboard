@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useConfirm } from '@/components/ui/DialogProvider'
 
 /**
  * Manage field technicians — the crew who get assigned to tickets and dispatched, and
@@ -11,6 +12,7 @@ import { useCallback, useEffect, useState } from 'react'
 interface Tech { id: string; name: string; isActive: boolean; hasLogin?: boolean; username?: string | null; email?: string | null }
 
 export default function TechniciansClient() {
+  const confirm = useConfirm()
   const [techs, setTechs] = useState<Tech[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
@@ -54,7 +56,7 @@ export default function TechniciansClient() {
     if (await call(`/api/billing/technicians/${t.id}`, 'PATCH', { isActive })) load()
   }
   async function remove(t: Tech) {
-    if (!confirm(`Delete ${t.name}? This can't be undone.`)) return
+    if (!(await confirm({ message: `Delete ${t.name}? This can't be undone.`, confirmLabel: 'Delete', danger: true }))) return
     if (await call(`/api/billing/technicians/${t.id}`, 'DELETE')) { flash(`${t.name} deleted.`); load() }
   }
 

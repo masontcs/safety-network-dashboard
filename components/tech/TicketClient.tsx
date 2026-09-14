@@ -8,6 +8,7 @@ import Sheet from '@/components/tech/Sheet'
 import AddTimeSheet from '@/components/tech/AddTimeSheet'
 import AddEquipmentSheet from '@/components/tech/AddEquipmentSheet'
 import { useBroadcast } from '@/lib/realtime/useBroadcast'
+import { useConfirm } from '@/components/ui/DialogProvider'
 
 type SheetKind = 'time' | 'equipment' | 'submit' | null
 
@@ -26,6 +27,7 @@ function getPosition(): Promise<GeolocationPosition | null> {
 /** Screen 2 — one ticket. Read-only header + Labor / Equipment tabs. Lead-only submit. */
 export default function TicketClient({ ticketId }: { ticketId: string }) {
   const router = useRouter()
+  const confirm = useConfirm()
   const [t, setT] = useState<TicketDetail | null>(null)
   const [gone, setGone] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -103,7 +105,7 @@ export default function TicketClient({ ticketId }: { ticketId: string }) {
     }
   }
   async function removePhoto(id: string) {
-    if (!window.confirm('Remove this photo?')) return
+    if (!(await confirm({ message: 'Remove this photo?', confirmLabel: 'Remove', danger: true }))) return
     try { await techApi.deletePhoto(ticketId, id); loadPhotos() }
     catch (e) { setErr(e instanceof TechApiError ? e.message : 'Could not remove that photo.') }
   }
@@ -112,12 +114,12 @@ export default function TicketClient({ ticketId }: { ticketId: string }) {
   useBroadcast('billing', 'changed', load)
 
   async function removeLabor(entryId: string) {
-    if (!window.confirm('Remove this time entry?')) return
+    if (!(await confirm({ message: 'Remove this time entry?', confirmLabel: 'Remove', danger: true }))) return
     try { await techApi.deleteLabor(ticketId, entryId); load() }
     catch (e) { setErr(e instanceof TechApiError ? e.message : 'Could not remove that entry.') }
   }
   async function removeEquipment(entryId: string) {
-    if (!window.confirm('Remove this equipment?')) return
+    if (!(await confirm({ message: 'Remove this equipment?', confirmLabel: 'Remove', danger: true }))) return
     try { await techApi.deleteEquipment(ticketId, entryId); load() }
     catch (e) { setErr(e instanceof TechApiError ? e.message : 'Could not remove that item.') }
   }

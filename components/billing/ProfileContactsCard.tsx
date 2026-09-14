@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useConfirm } from '@/components/ui/DialogProvider'
 import Select from '@/components/billing/Select'
 import Toggle from '@/components/billing/Toggle'
 
@@ -45,6 +46,7 @@ type Draft = { name: string; role: string; title: string; email: string; phone: 
 const emptyDraft = (): Draft => ({ name: '', role: 'general', title: '', email: '', phone: '', isInvoiceRecipient: false })
 
 export default function ProfileContactsCard({ profileId }: { profileId: string }) {
+  const confirm = useConfirm()
   const [contacts, setContacts] = useState<Contact[]>([])
   const [canManage, setCanManage] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -83,7 +85,7 @@ export default function ProfileContactsCard({ profileId }: { profileId: string }
     finally { setBusy(false) }
   }
   async function remove(id: string) {
-    if (!window.confirm('Remove this contact?')) return
+    if (!(await confirm({ message: 'Remove this contact?', confirmLabel: 'Remove', danger: true }))) return
     setBusy(true)
     try {
       const res = await fetch(`/api/billing/profiles/${profileId}/contacts/${id}`, { method: 'DELETE' })

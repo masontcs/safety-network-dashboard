@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useConfirm } from '@/components/ui/DialogProvider'
 import Skeleton from '@/components/ui/Skeleton'
 
 interface Group {
@@ -31,6 +32,7 @@ function bucketColor(bucket: Group['bucket']): string {
 }
 
 export default function PayrollGroupsCard() {
+  const confirm = useConfirm()
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -102,7 +104,7 @@ export default function PayrollGroupsCard() {
 
   async function remove(id: string, name: string) {
     if (busy) return
-    if (!window.confirm(`Delete the group "${name}"? This can't be undone.`)) return
+    if (!(await confirm({ message: `Delete the group "${name}"? This can't be undone.`, confirmLabel: 'Delete', danger: true }))) return
     setBusy(true)
     setActionError(null)
     try {

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
+import { useAlert } from '@/components/ui/DialogProvider'
 // recharts removed — charts replaced with inline bar strips
 import type { Role } from '@/lib/supabase/database.types'
 import { createBrowserClient } from '@/lib/supabase/client'
@@ -433,6 +434,7 @@ function NoteRow({
 }
 
 export default function ArCustomerDetail({ customer, entity, branchId: initialBranchId, branchName: initialBranchName, role, branches, onBack, onRefresh }: Props) {
+  const alert              = useAlert()
   const isAdmin            = role === 'admin'
   const isArAdmin          = role === 'admin' || role === 'ar_manager' || role === 'ar_team'
   const canVoid            = role === 'admin' || role === 'executive' || role === 'ar_manager' || role === 'ar_team'
@@ -1893,7 +1895,7 @@ export default function ArCustomerDetail({ customer, entity, branchId: initialBr
 
       {showMerge && profile && (
         <MergeModal customerId={customer.id} customerName={customer.displayName} onClose={() => setShowMerge(false)}
-          onMerged={(name) => { setShowMerge(false); fetchProfile(); alert(`Merged "${name}" into ${customer.displayName}.`) }} />
+          onMerged={(name) => { setShowMerge(false); fetchProfile(); void alert(`Merged "${name}" into ${customer.displayName}.`) }} />
       )}
     </div>
   )

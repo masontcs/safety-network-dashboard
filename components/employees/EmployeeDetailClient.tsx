@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useAlert } from '@/components/ui/DialogProvider'
 import { useRouter } from 'next/navigation'
 import BarChart, { type BarChartDataPoint } from '@/components/charts/BarChart'
 import { formatCurrency } from '@/lib/utils/format'
@@ -154,6 +155,7 @@ function toWeekBucket(dateStr: string): string {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function EmployeeDetailClient({ employeeId, role, returnPath }: Props) {
+  const alert = useAlert()
   const router = useRouter()
   const isAdmin = role === 'admin'
 
@@ -528,7 +530,7 @@ export default function EmployeeDetailClient({ employeeId, role, returnPath }: P
       loadTransfers()
       load()
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Revert failed')
+      await alert(e instanceof Error ? e.message : 'Revert failed')
     } finally {
       setRevertingId(null)
     }

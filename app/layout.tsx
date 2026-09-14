@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import NavigationProgress from '@/components/layout/NavigationProgress'
 import { ThemeProvider } from '@/lib/theme/ThemeContext'
+import { DialogProvider } from '@/components/ui/DialogProvider'
 import './globals.css'
 
 const inter = Inter({
@@ -35,8 +36,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Must be first child — runs sync before any render to set data-theme */}
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <ThemeProvider>
-          <NavigationProgress />
-          {children}
+          <DialogProvider>
+            <NavigationProgress />
+            {children}
+          </DialogProvider>
         </ThemeProvider>
       </body>
     </html>
