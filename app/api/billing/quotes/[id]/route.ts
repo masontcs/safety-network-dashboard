@@ -26,7 +26,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
     const { data: qRaw, error } = await supabase
       .from('billing_quotes')
-      .select('id, quote_number, profile_id, entity_id, branch_id, status, quote_date, job_name, notes, tax_rate_pct, subtotal_cents, tax_cents, total_cents, converted_job_id, prospect_company, prospect_contact_name, prospect_contact_email, prospect_contact_phone, converted_customer_id, converted_profile_id, billing_profiles(name, billing_customers(name))')
+      .select('id, quote_number, profile_id, entity_id, branch_id, status, quote_date, job_name, notes, tax_rate_pct, subtotal_cents, tax_cents, total_cents, converted_job_id, prospect_company, prospect_contact_name, prospect_contact_email, prospect_contact_phone, converted_customer_id, converted_profile_id, billing_profiles!profile_id(name, billing_customers(name))')
       .eq('id', params.id).maybeSingle()
     if (error) throw new Error(error.message)
     const q = qRaw as unknown as {

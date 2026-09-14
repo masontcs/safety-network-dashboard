@@ -32,7 +32,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const supabase = createServiceClient()
     let q = supabase
       .from('billing_quotes')
-      .select('id, quote_number, status, quote_date, job_name, total_cents, branch_id, prospect_company, billing_profiles(name, billing_customers(name))')
+      .select('id, quote_number, status, quote_date, job_name, total_cents, branch_id, prospect_company, billing_profiles!profile_id(name, billing_customers(name))')
       .order('quote_date', { ascending: false })
     if (profileId) q = q.eq('profile_id', profileId)
     const reqBranch = url.searchParams.get('branchId') || ''
