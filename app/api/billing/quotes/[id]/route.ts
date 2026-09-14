@@ -3,7 +3,8 @@ import { getAccessContext, guardBillingArea } from '@/lib/api/auth'
 import { createServiceClient } from '@/lib/supabase/server'
 import { billingApiError } from '@/lib/billing/http'
 import { nextNumber } from '@/lib/billing/rpc'
-import { resolveCompiledRates, rateKeyOf } from '@/lib/billing/livePricing'
+import { resolveCompiledRates, resolveCompiledRatesForList, rateKeyOf } from '@/lib/billing/livePricing'
+import { TIERED_CATEGORIES } from '@/lib/billing/constants'
 import type { BillingItemCategory, BillingType, BillingQuoteStatus, RateKey } from '@/lib/supabase/database.types'
 
 /**
@@ -25,17 +26,20 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
     const { data: qRaw, error } = await supabase
       .from('billing_quotes')
-      .select('id, quote_number, profile_id, entity_id, branch_id, status, quote_date, job_name, notes, tax_rate_pct, subtotal_cents, tax_cents, total_cents, converted_job_id, billing_profiles(name, billing_customers(name))')
+      .select('id, quote_number, profile_id, entity_id, branch_id, status, quote_date, job_name, notes, tax_rate_pct, subtotal_cents, tax_cents, total_cents, converted_job_id, prospect_company, prospect_contact_name, prospect_contact_email, prospect_contact_phone, converted_customer_id, converted_profile_id, billing_profiles(name, billing_customers(name))')
       .eq('id', params.id).maybeSingle()
     if (error) throw new Error(error.message)
     const q = qRaw as unknown as {
-      id: string; quote_number: string; profile_id: string; entity_id: string; branch_id: string; status: string
+      id: string; quote_number: string; profile_id: string | null; entity_id: string; branch_id: string; status: string
       quote_date: string; job_name: string | null; notes: string | null; tax_rate_pct: number
       subtotal_cents: number; tax_cents: number; total_cents: number; converted_job_id: string | null
+      prospect_company: string | null; prospect_contact_name: string | null; prospect_contact_email: string | null; prospect_contact_phone: string | null
+      converted_customer_id: string | null; converted_profile_id: string | null
       billing_profiles: { name: string; billing_customers: { name: string } | null } | null
     } | null
     if (!q) return bad('Quote not found', 'NOT_FOUND', 404)
     if (ctx.access.branchIds !== null && !ctx.access.branchIds.includes(q.branch_id)) return bad('No access to this branch.', 'FORBIDDEN', 403)
+    const isProspect = !q.profile_id && !!q.prospect_company
 
     const { data: lines } = await supabase
       .from('billing_quote_lines')
@@ -52,7 +56,12 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       data: {
         id: q.id, quoteNumber: q.quote_number, profileId: q.profile_id, status: q.status, quoteDate: q.quote_date,
         jobName: q.job_name, notes: q.notes, taxRatePct: Number(q.tax_rate_pct),
-        customer: q.billing_profiles?.billing_customers?.name ?? null, profile: q.billing_profiles?.name ?? null,
+        customer: q.billing_profiles?.billing_customers?.name ?? q.prospect_company ?? null,
+        profile: q.billing_profiles?.name ?? null,
+        isProspect,
+        prospect: isProspect ? { company: q.prospect_company, contactName: q.prospect_contact_name, contactEmail: q.prospect_contact_email, contactPhone: q.prospect_contact_phone } : null,
+        convertedCustomerId: q.converted_customer_id,
+        convertedProfileId: q.converted_profile_id,
         convertedJobId: q.converted_job_id,
         totals: { subtotalCents: q.subtotal_cents, taxCents: q.tax_cents, totalCents: q.total_cents },
         lines: ((lines ?? []) as { id: string; kind: string; item_id: string | null; variation_id: string | null; description: string; billing_type: string | null; qty: number; units: number; unit_rate_cents: number; amount_cents: number }[])
@@ -79,10 +88,11 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       lines?: { kind: string; itemId?: string | null; variationId?: string | null; description?: string; billingType?: string | null; qty?: number; units?: number; unitRateCents?: number }[]
     }
     const supabase = createServiceClient()
-    const { data: q } = await supabase.from('billing_quotes').select('id, profile_id, entity_id, branch_id, status').eq('id', params.id).maybeSingle()
+    const { data: q } = await supabase.from('billing_quotes').select('id, profile_id, entity_id, branch_id, status, prospect_price_list_id, prospect_tier_id').eq('id', params.id).maybeSingle()
     if (!q) return bad('Quote not found', 'NOT_FOUND', 404)
     if (ctx.access.branchIds !== null && !ctx.access.branchIds.includes(q.branch_id)) return bad('No access to this branch.', 'FORBIDDEN', 403)
     if (q.status === 'won') return bad('This quote was won and converted — it can’t be edited.', 'CONFLICT', 409)
+    const qq = q as unknown as { profile_id: string | null; entity_id: string; prospect_price_list_id: string | null; prospect_tier_id: string | null }
 
     const linesIn = body.lines ?? []
     // Price item-backed lines from the price list (equipment: cadence or flat; charge: flat;
@@ -100,7 +110,13 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     }))
     // equipment: also request 'flat' as the single-rate fallback
     for (const l of linesIn) if (l.kind === 'equipment' && l.itemId) reqs.push({ itemId: l.itemId, variationId: l.variationId ?? null, category: 'Equipment', rateKey: 'flat' })
-    const rates = await resolveCompiledRates(supabase, { profileId: q.profile_id, entityId: q.entity_id, requests: reqs })
+    // A prospect quote has no profile config — price against its chosen list + tier; an
+    // existing-customer quote prices through the profile's per-category config as before.
+    const rates = qq.profile_id
+      ? await resolveCompiledRates(supabase, { profileId: qq.profile_id, entityId: qq.entity_id, requests: reqs })
+      : (qq.prospect_price_list_id && qq.prospect_tier_id)
+        ? await resolveCompiledRatesForList(supabase, { priceListId: qq.prospect_price_list_id, tierId: qq.prospect_tier_id, requests: reqs })
+        : new Map<string, number>()
 
     let subtotal = 0, taxable = 0
     const rows = linesIn.map((l, idx) => {
@@ -148,9 +164,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const body = (await request.json()) as { action?: string; status?: string }
     const supabase = createServiceClient()
 
-    const { data: q } = await supabase.from('billing_quotes').select('id, profile_id, entity_id, branch_id, status, job_name, converted_job_id').eq('id', params.id).maybeSingle()
+    const { data: q } = await supabase.from('billing_quotes').select('id, profile_id, entity_id, branch_id, status, job_name, converted_job_id, prospect_company, prospect_contact_name, prospect_contact_email, prospect_contact_phone, prospect_price_list_id, prospect_tier_id, converted_customer_id').eq('id', params.id).maybeSingle()
     if (!q) return bad('Quote not found', 'NOT_FOUND', 404)
     if (ctx.access.branchIds !== null && !ctx.access.branchIds.includes(q.branch_id)) return bad('No access to this branch.', 'FORBIDDEN', 403)
+    const qp = q as unknown as {
+      profile_id: string | null; entity_id: string; branch_id: string
+      prospect_company: string | null; prospect_contact_name: string | null; prospect_contact_email: string | null; prospect_contact_phone: string | null
+      prospect_price_list_id: string | null; prospect_tier_id: string | null; converted_customer_id: string | null
+    }
 
     if (body.action === 'status') {
       if (!['draft', 'sent', 'lost'].includes(body.status ?? '')) return bad('Status must be draft, sent, or lost')
@@ -162,13 +183,16 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     if (body.action === 'convert') {
       if (q.converted_job_id) return bad('This quote was already converted.', 'CONFLICT', 409)
+      // A prospect quote has no profile until it's won — win it first (creates the customer).
+      if (!qp.profile_id) return bad('Mark this prospect quote won first to create the customer, then convert.', 'CONFLICT', 409)
+      const profileId = qp.profile_id
 
       // Create the job under the profile, then a first active Add ticket, then seed its
       // equipment ledger with a pickup per equipment line (at its quoted cadence). Charge
       // lines aren't seeded — the office adds those on the ticket.
       const jobNumber = await nextNumber(supabase, 'job', q.entity_id, q.branch_id)
       const { data: job, error: jErr } = await supabase.from('billing_jobs').insert({
-        profile_id: q.profile_id, entity_id: q.entity_id, branch_id: q.branch_id,
+        profile_id: profileId, entity_id: q.entity_id, branch_id: q.branch_id,
         job_number: jobNumber, certified: false, name: q.job_name ?? `From quote`, status: 'new',
       }).select('id').single()
       if (jErr || !job) throw new Error(jErr?.message ?? 'Failed to create the job')
@@ -191,6 +215,57 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       const { error } = await supabase.from('billing_quotes').update({ status: 'won', converted_job_id: job.id }).eq('id', params.id)
       if (error) throw new Error(error.message)
       return NextResponse.json({ success: true, data: { jobId: job.id, jobNumber, ticketsSeeded: pickups.length } })
+    }
+
+    // ── Prospect won → create the real customer + profile ─────────────────────────
+    // Turns a prospect quote into a billing customer + one profile, priced from the quote's
+    // chosen price list + tier (so the follow-up "Convert to job" prices exactly as quoted).
+    // The quote is then a normal customer quote; convert-to-job is the next, separate step.
+    if (body.action === 'win') {
+      if (!qp.prospect_company || qp.profile_id) return bad('This isn’t a prospect quote (it already has a customer).', 'CONFLICT', 409)
+      if (qp.converted_customer_id) return bad('A customer was already created from this quote.', 'CONFLICT', 409)
+      if (!qp.prospect_price_list_id || !qp.prospect_tier_id) return bad('This prospect quote has no price list/tier set.', 'CONFLICT', 409)
+
+      // 1) Customer — unique internal code derived from the company name.
+      const base = qp.prospect_company.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6) || 'CUST'
+      const code = `${base}${Date.now().toString(36).toUpperCase().slice(-4)}`
+      const { data: customer, error: cErr } = await supabase
+        .from('billing_customers')
+        .insert({ code, name: qp.prospect_company })
+        .select('id')
+        .single()
+      if (cErr || !customer) throw new Error(cErr?.message ?? 'Failed to create the customer')
+
+      // 2) Profile under it, on the quote's branch.
+      const pcode = `${base}${Date.now().toString(36).toUpperCase().slice(-4)}P`
+      const { data: profile, error: prErr } = await supabase
+        .from('billing_profiles')
+        .insert({ customer_id: customer.id, branch_id: qp.branch_id, code: pcode, name: qp.prospect_company, status: 'active', is_active: true })
+        .select('id')
+        .single()
+      if (prErr || !profile) throw new Error(prErr?.message ?? 'Failed to create the profile')
+
+      // 3) Configure the profile's entity pricing to the quoted price list + tier (all categories).
+      const { data: pe, error: peErr } = await supabase
+        .from('billing_profile_entities')
+        .insert({ profile_id: profile.id, entity_id: qp.entity_id, enabled: true, price_list_id: qp.prospect_price_list_id })
+        .select('id')
+        .single()
+      if (peErr || !pe) throw new Error(peErr?.message ?? 'Failed to configure the profile pricing')
+      const tierRows = TIERED_CATEGORIES.map((category) => ({
+        profile_entity_id: pe.id, category, price_list_id: qp.prospect_price_list_id as string, tier_id: qp.prospect_tier_id as string,
+      }))
+      const { error: tErr } = await supabase.from('billing_profile_entity_category_tiers').insert(tierRows)
+      if (tErr) throw new Error(tErr.message)
+
+      // 4) Link the quote to its new customer/profile. Status is unchanged, so the existing
+      //    Convert-to-job step (draft/sent) still runs next and stamps 'won' when the job is made.
+      const { error: uErr } = await supabase.from('billing_quotes')
+        .update({ profile_id: profile.id, converted_customer_id: customer.id, converted_profile_id: profile.id, updated_at: new Date().toISOString() })
+        .eq('id', params.id)
+      if (uErr) throw new Error(uErr.message)
+
+      return NextResponse.json({ success: true, data: { customerId: customer.id, profileId: profile.id } })
     }
 
     return bad('Unknown action')

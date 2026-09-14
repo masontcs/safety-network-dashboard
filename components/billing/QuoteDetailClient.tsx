@@ -10,9 +10,11 @@ import { useRouter } from 'next/navigation'
 
 interface CatItem { id: string; code: string; name: string; category: string; salePriceCents: number | null; variations: { id: string; name: string }[] }
 interface Line { key: string; kind: string; itemId: string | null; variationId: string | null; billingType: string | null; description: string; qty: number; units: number; amountCents: number }
+interface Prospect { company: string | null; contactName: string | null; contactEmail: string | null; contactPhone: string | null }
 interface Quote {
   id: string; quoteNumber: string; status: string; jobName: string | null; taxRatePct: number
   customer: string | null; profile: string | null; convertedJobId: string | null
+  isProspect?: boolean; prospect?: Prospect | null; convertedCustomerId?: string | null; convertedProfileId?: string | null
   totals: { subtotalCents: number; taxCents: number; totalCents: number }
   lines: { id: string; kind: string; itemId: string | null; variationId: string | null; billingType: string | null; description: string; qty: number; units: number; amountCents: number }[]
   catalog: CatItem[]; isAdmin: boolean
@@ -74,6 +76,7 @@ export default function QuoteDetailClient({ quoteId }: { quoteId: string }) {
       const j = await res.json()
       if (!j.success) { setMsg(j.error); return }
       if (action === 'convert') { router.push(`/billing/jobs/${j.data.jobId}`); return }
+      if (action === 'win') { setMsg('Customer + profile created — you can now convert to a job.'); load(); return }
       load()
     } catch { setMsg('Network error.') } finally { setBusy(false) }
   }
@@ -89,11 +92,30 @@ export default function QuoteDetailClient({ quoteId }: { quoteId: string }) {
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           {!locked && <button className="bx-btn" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>}
           {q.status === 'draft' && <button className="bx-btn ghost" onClick={() => act('status', { status: 'sent' })} disabled={busy}>Mark sent</button>}
-          {(q.status === 'draft' || q.status === 'sent') && <button className="bx-btn accent" onClick={() => act('convert')} disabled={busy}>Convert to job →</button>}
+          {/* Prospect not yet turned into a customer: win it first (creates customer + profile). */}
+          {q.isProspect && !q.convertedCustomerId && (
+            <button className="bx-btn accent" onClick={() => act('win')} disabled={busy}>Won — create customer →</button>
+          )}
+          {/* Once it's a real profile quote (incl. a won prospect), convert to a job. */}
+          {!q.isProspect && (q.status === 'draft' || q.status === 'sent') && (
+            <button className="bx-btn accent" onClick={() => act('convert')} disabled={busy}>Convert to job →</button>
+          )}
+          {q.convertedProfileId && <button className="bx-btn ghost" onClick={() => router.push(`/billing/profiles/${q.convertedProfileId}`)}>Open customer →</button>}
           {q.convertedJobId && <button className="bx-btn ghost" onClick={() => router.push(`/billing/jobs/${q.convertedJobId}`)}>Open job →</button>}
         </span>
       </div>
-      <div className="bx-sub">{q.customer ?? '—'} · {q.profile} · prices resolve from this profile's price list</div>
+      {q.isProspect && q.prospect ? (
+        <div className="bx-sub">
+          <span className="tag t-blue" style={{ marginRight: 8 }}>prospect</span>
+          <strong>{q.prospect.company}</strong>
+          {q.prospect.contactName ? ` · ${q.prospect.contactName}` : ''}
+          {q.prospect.contactEmail ? ` · ${q.prospect.contactEmail}` : ''}
+          {q.prospect.contactPhone ? ` · ${q.prospect.contactPhone}` : ''}
+          {' · prices resolve from the chosen price list'}
+        </div>
+      ) : (
+        <div className="bx-sub">{q.customer ?? '—'} · {q.profile} · prices resolve from this profile's price list</div>
+      )}
 
       {msg && <div className={`bx-note ${msg.includes('Saved') ? 'green' : 'amber'}`}>{msg}</div>}
       {locked && <div className="bx-note green">This quote was won and converted to a job — it's locked.</div>}

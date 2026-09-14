@@ -106,6 +106,54 @@ export async function resolveCompiledRates(
   return out
 }
 
+/**
+ * Resolve rates directly from a chosen price list + tier — no profile involved. This is the
+ * prospect-quote path: a company that isn't a customer yet has no profile config, so the
+ * estimator picks a price list and tier and every category prices against that same pair.
+ * Otherwise identical to resolveCompiledRates (steps 3–5): read the price-list items, then the
+ * compiled rates, and resolve each request (a per-item tier exception still wins over the tier).
+ */
+export async function resolveCompiledRatesForList(
+  supabase: Client,
+  params: { priceListId: string; tierId: string; requests: RateRequest[] }
+): Promise<Map<string, number>> {
+  const { priceListId, tierId, requests } = params
+  const out = new Map<string, number>()
+  if (requests.length === 0) return out
+
+  const itemIds = [...new Set(requests.map((r) => r.itemId))]
+  const { data: plis } = await supabase
+    .from('billing_price_list_items')
+    .select('id, item_id, tier_exception_tier_id')
+    .eq('price_list_id', priceListId)
+    .in('item_id', itemIds)
+  const pliByItem = new Map<string, { id: string; tierExceptionTierId: string | null }>()
+  for (const p of (plis ?? []) as { id: string; item_id: string; tier_exception_tier_id: string | null }[]) {
+    pliByItem.set(p.item_id, { id: p.id, tierExceptionTierId: p.tier_exception_tier_id })
+  }
+  if (pliByItem.size === 0) return out
+
+  const pliIds = [...pliByItem.values()].map((p) => p.id)
+  const { data: rates } = await supabase
+    .from('billing_price_list_rates')
+    .select('price_list_item_id, variation_id, tier_id, billing_type, rate_cents')
+    .in('price_list_item_id', pliIds)
+  const compiled = new Map<string, number>()
+  for (const r of (rates ?? []) as { price_list_item_id: string; variation_id: string | null; tier_id: string; billing_type: RateKey; rate_cents: number }[]) {
+    compiled.set(`${r.price_list_item_id}|${r.variation_id ?? ''}|${r.tier_id}|${r.billing_type}`, r.rate_cents)
+  }
+
+  for (const req of requests) {
+    const pli = pliByItem.get(req.itemId)
+    if (!pli) continue
+    const useTier = pli.tierExceptionTierId ?? tierId
+    const cents = compiled.get(`${pli.id}|${req.variationId ?? ''}|${useTier}|${req.rateKey}`)
+    if (cents == null) continue
+    out.set(rateKeyOf(req.itemId, req.variationId, req.rateKey), cents)
+  }
+  return out
+}
+
 // ── Ticket live pricing (Labor / Lump Sum lines) ─────────────────────────────
 
 export interface LineToPrice {

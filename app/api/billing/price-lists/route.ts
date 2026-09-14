@@ -20,7 +20,7 @@ interface ListRow {
   is_active: boolean
   updated_at: string
   entities: { code: string; name: string } | null
-  billing_price_list_tiers: { id: string }[]
+  billing_price_list_tiers: { id: string; name: string; position: number }[]
   billing_price_list_items: { id: string }[]
   billing_profile_entities: { id: string }[]
 }
@@ -36,7 +36,7 @@ export async function GET(): Promise<NextResponse> {
       .select(`
         id, name, entity_id, is_active, updated_at,
         entities(code, name),
-        billing_price_list_tiers(id),
+        billing_price_list_tiers(id, name, position),
         billing_price_list_items(id),
         billing_profile_entities(id)
       `)
@@ -55,6 +55,7 @@ export async function GET(): Promise<NextResponse> {
         isActive: p.is_active,
         updatedAt: p.updated_at,
         tierCount: (p.billing_price_list_tiers ?? []).length,
+        tiers: (p.billing_price_list_tiers ?? []).slice().sort((a, b) => a.position - b.position).map((t) => ({ id: t.id, name: t.name, position: t.position })),
         itemCount: (p.billing_price_list_items ?? []).length,
         // A list used by a profile cannot be deleted (the DB enforces this).
         inUseByProfiles: (p.billing_profile_entities ?? []).length,
