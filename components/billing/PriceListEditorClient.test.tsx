@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, waitFor, fireEvent } from '@testing-library/react'
 import PriceListEditorClient from './PriceListEditorClient'
+import { DialogProvider } from '@/components/ui/DialogProvider'
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <a>{children}</a> }))
 
@@ -44,7 +45,7 @@ const open = (code: string) => fireEvent.click(screen.getByText(code))
 
 describe('price-list editor — collapse + single-rate + per-variation grids', () => {
   it('collapses items by default: no rate inputs until you open one', async () => {
-    render(<PriceListEditorClient priceListId="pl1" />)
+    render(<DialogProvider><PriceListEditorClient priceListId="pl1" /></DialogProvider>)
     await waitFor(() => expect(screen.getByText('MSG-BOARD')).toBeTruthy())
     expect(screen.queryByLabelText('MSG-BOARD daily base')).toBeNull() // collapsed
     open('MSG-BOARD')
@@ -52,7 +53,7 @@ describe('price-list editor — collapse + single-rate + per-variation grids', (
   })
 
   it('shows the three billing types for a by-cadence item when opened', async () => {
-    render(<PriceListEditorClient priceListId="pl1" />)
+    render(<DialogProvider><PriceListEditorClient priceListId="pl1" /></DialogProvider>)
     await waitFor(() => expect(screen.getByText('MSG-BOARD')).toBeTruthy())
     open('MSG-BOARD')
     // Cadence rows are labeled "<cadence> / day" since rates are entered as a per-day price.
@@ -62,7 +63,7 @@ describe('price-list editor — collapse + single-rate + per-variation grids', (
   })
 
   it('a single-rate item shows one Rate row, not the cadences', async () => {
-    render(<PriceListEditorClient priceListId="pl1" />)
+    render(<DialogProvider><PriceListEditorClient priceListId="pl1" /></DialogProvider>)
     await waitFor(() => expect(screen.getByText('CONE-28')).toBeTruthy())
     open('CONE-28')
     expect(screen.queryByText('Weekly')).toBeNull()
@@ -70,7 +71,7 @@ describe('price-list editor — collapse + single-rate + per-variation grids', (
   })
 
   it('prices each variation on its own grid', async () => {
-    render(<PriceListEditorClient priceListId="pl1" />)
+    render(<DialogProvider><PriceListEditorClient priceListId="pl1" /></DialogProvider>)
     await waitFor(() => expect(screen.getByText('CONE-28')).toBeTruthy())
     open('CONE-28')
     expect(screen.getByText('Orange')).toBeTruthy()
@@ -82,14 +83,14 @@ describe('price-list editor — collapse + single-rate + per-variation grids', (
   })
 
   it('offers the single-rate toggle for equipment', async () => {
-    render(<PriceListEditorClient priceListId="pl1" />)
+    render(<DialogProvider><PriceListEditorClient priceListId="pl1" /></DialogProvider>)
     await waitFor(() => expect(screen.getByText('MSG-BOARD')).toBeTruthy())
     open('MSG-BOARD')
     expect(screen.getByText('Single rate')).toBeTruthy()
   })
 
   it('does not offer single-rate for a charge item (it is inherently flat)', async () => {
-    render(<PriceListEditorClient priceListId="pl1" />)
+    render(<DialogProvider><PriceListEditorClient priceListId="pl1" /></DialogProvider>)
     await waitFor(() => expect(screen.getByText('CREW-1')).toBeTruthy())
     open('CREW-1')
     expect(screen.getByLabelText('CREW-1 rate base')).toBeTruthy()
