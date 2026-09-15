@@ -1,8 +1,10 @@
 /**
  * A tiny in-memory stand-in for the Supabase service client, for the CMR access tests.
- * Supports the query shapes lib/api/cmr.ts and /api/cmr/access use:
+ * Supports the query shapes lib/api/cmr.ts and the /api/cmr routes use:
  *   from(t).select(cols, {count, head}).eq(c, v).order(..).maybeSingle() / await
  *   from(t).insert(row) / .update(patch).eq(..) / .delete().eq(..)
+ *   from(t).insert(row).select(..).single()   (returns the inserted row)
+ *   rpc(name, args)                           (handlers supplied via options.rpc)
  * Every call is recorded in `calls` so tests can assert what was (not) read or written.
  */
 
@@ -10,7 +12,7 @@ type Row = Record<string, unknown>
 
 export interface FakeCall {
   table: string
-  op: 'select' | 'insert' | 'update' | 'delete'
+  op: 'select' | 'insert' | 'update' | 'delete' | 'rpc'
   columns?: string
   filters: [string, unknown][]
   payload?: unknown
@@ -20,7 +22,15 @@ export interface FakeOptions {
   /** Tables whose reads return an error (to prove callers fail closed). */
   failTables?: string[]
   authUsers?: { id: string; email?: string }[]
+  /** Column defaults applied on insert, per table (e.g. a generated id). */
+  defaults?: Record<string, () => Row>
+  /** Unique checks run on insert/update, per table: return an error message to reject. */
+  unique?: Record<string, (candidate: Row, others: Row[]) => string | null>
+  /** rpc(name, args) handlers; they may mutate `tables` directly. */
+  rpc?: Record<string, (args: Record<string, unknown>, tables: Record<string, Row[]>) => { message: string } | null>
 }
+
+type FakeError = { message: string; code?: string }
 
 export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions = {}) {
   const tables: Record<string, Row[]> = Object.fromEntries(
@@ -28,17 +38,19 @@ export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions =
   )
   const calls: FakeCall[] = []
 
-  class Query implements PromiseLike<{ data: unknown; error: { message: string } | null; count?: number | null }> {
+  class Query implements PromiseLike<{ data: unknown; error: FakeError | null; count?: number | null }> {
     private op: FakeCall['op'] = 'select'
     private columns = '*'
     private filters: [string, unknown][] = []
     private payload: unknown
     private head = false
     private wantCount = false
+    private returning = false
 
     constructor(private table: string) {}
 
     select(columns = '*', o?: { count?: string; head?: boolean }) {
+      if (this.op !== 'select') { this.returning = true; return this }
       this.columns = columns
       if (o?.head) this.head = true
       if (o?.count) this.wantCount = true
@@ -52,7 +64,7 @@ export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions =
     maybeSingle() { return this.exec('maybe') }
     single() { return this.exec('single') }
     then<A, B>(
-      onok?: ((v: { data: unknown; error: { message: string } | null; count?: number | null }) => A | PromiseLike<A>) | null,
+      onok?: ((v: { data: unknown; error: FakeError | null; count?: number | null }) => A | PromiseLike<A>) | null,
       onerr?: ((e: unknown) => B | PromiseLike<B>) | null,
     ) {
       return this.exec('many').then(onok, onerr)
@@ -60,7 +72,7 @@ export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions =
 
     private match = (r: Row) => this.filters.every(([c, v]) => r[c] === v)
 
-    private async exec(mode: 'many' | 'maybe' | 'single') {
+    private async exec(mode: 'many' | 'maybe' | 'single'): Promise<{ data: unknown; error: FakeError | null; count?: number | null }> {
       calls.push({ table: this.table, op: this.op, columns: this.columns, filters: [...this.filters], payload: this.payload })
       const rows = (tables[this.table] ??= [])
       if (opts.failTables?.includes(this.table)) return { data: null, error: { message: `${this.table} unavailable` } }
@@ -70,12 +82,29 @@ export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions =
         if (this.table === 'cmr_access' && rows.some((r) => r.user_id === row.user_id)) {
           return { data: null, error: { message: 'duplicate key value violates unique constraint "cmr_access_pkey"' } }
         }
-        rows.push({ created_at: new Date('2026-09-15T12:00:00Z').toISOString(), created_by: null, ...row })
-        return { data: null, error: null }
+        const full: Row = {
+          created_at: new Date('2026-09-15T12:00:00Z').toISOString(),
+          created_by: null,
+          ...(opts.defaults?.[this.table]?.() ?? {}),
+          ...row,
+        }
+        const clash = opts.unique?.[this.table]?.(full, rows)
+        if (clash) return { data: null, error: { message: clash, code: '23505' } }
+        rows.push(full)
+        if (!this.returning) return { data: null, error: null }
+        return { data: mode === 'many' ? [{ ...full }] : { ...full }, error: null }
       }
       if (this.op === 'update') {
-        rows.filter(this.match).forEach((r) => Object.assign(r, this.payload as Row))
-        return { data: null, error: null }
+        const hit = rows.filter(this.match)
+        for (const r of hit) {
+          const next = { ...r, ...(this.payload as Row) }
+          const clash = opts.unique?.[this.table]?.(next, rows.filter((o) => o !== r))
+          if (clash) return { data: null, error: { message: clash, code: '23505' } }
+        }
+        hit.forEach((r) => Object.assign(r, this.payload as Row))
+        if (!this.returning) return { data: null, error: null }
+        const out = hit.map((r) => ({ ...r }))
+        return { data: mode === 'many' ? out : out[0] ?? null, error: null }
       }
       if (this.op === 'delete') {
         tables[this.table] = rows.filter((r) => !this.match(r))
@@ -93,6 +122,13 @@ export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions =
 
   const client = {
     from: (table: string) => new Query(table),
+    rpc: async (name: string, args: Record<string, unknown> = {}) => {
+      calls.push({ table: name, op: 'rpc', filters: [], payload: args })
+      const fn = opts.rpc?.[name]
+      if (!fn) return { data: null, error: { message: `function ${name} does not exist` } }
+      const error = fn(args, tables)
+      return { data: null, error }
+    },
     auth: {
       admin: {
         listUsers: async () => ({ data: { users: opts.authUsers ?? [] }, error: null }),

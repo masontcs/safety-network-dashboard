@@ -34,6 +34,13 @@ export type AuditAction =
   | 'cmr.access.grant'
   | 'cmr.access.update'
   | 'cmr.access.revoke'
+  // SN Cash Ledger — accounts (never deleted; deactivated instead)
+  | 'cmr.account.create'
+  | 'cmr.account.rename'
+  | 'cmr.account.retype'
+  | 'cmr.account.activate'
+  | 'cmr.account.deactivate'
+  | 'cmr.account.reorder'
 
 // ── Payload ────────────────────────────────────────────────────────────────────
 

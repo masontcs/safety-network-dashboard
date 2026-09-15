@@ -115,6 +115,12 @@ export type Database = {
         Update: { user_id?: string; role?: CmrRole; created_by?: string | null; created_at?: string }
         Relationships: []
       }
+      cmr_accounts: {
+        Row: { id: string; name: string; account_type: string | null; active: boolean; sort_order: number; created_by: string | null; created_at: string }
+        Insert: { id?: string; name: string; account_type?: string | null; active?: boolean; sort_order?: number; created_by?: string | null; created_at?: string }
+        Update: { id?: string; name?: string; account_type?: string | null; active?: boolean; sort_order?: number; created_by?: string | null; created_at?: string }
+        Relationships: []
+      }
       user_profiles: {
         Row: { id: string; role: Role; display_name: string; must_change_password: boolean; is_active: boolean; username: string | null; field_access: boolean; billing_role: Role | null; qb_export_enabled: boolean; qb_config_enabled: boolean }
         Insert: { id: string; role: Role; display_name?: string; must_change_password?: boolean; is_active?: boolean; username?: string | null; field_access?: boolean; billing_role?: Role | null; qb_export_enabled?: boolean; qb_config_enabled?: boolean }
