@@ -30,6 +30,10 @@ export type AuditAction =
   // Billing — changing a profile's price list / category tiers re-rates every
   // uninvoiced line for that profile, so it is always logged.
   | 'billing.profile_entity_config.update'
+  // SN Cash Ledger — access grants
+  | 'cmr.access.grant'
+  | 'cmr.access.update'
+  | 'cmr.access.revoke'
 
 // ── Payload ────────────────────────────────────────────────────────────────────
 

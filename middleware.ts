@@ -1,9 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import type { Database } from '@/lib/supabase/database.types'
 import { allowedPrefixesFor, canBillingArea, canUseBilling, billingHomeFor } from '@/lib/utils/interfaces'
-import { surfaceForHost, surfaceForPath, surfaceUrl, cookieDomainForHost, SURFACE_HOME, isPortalHost, isPortalPath, PORTAL_URL } from '@/lib/utils/domains'
+import { surfaceForHost, surfaceForPath, surfaceUrl, cookieDomainForHost, SURFACE_HOME, isPortalHost, isPortalPath, PORTAL_URL, isCmrPath, CMR_NO_ACCESS_PATH } from '@/lib/utils/domains'
+import { isCmrRole } from '@/lib/cmr/roles'
 
 type Role = Database['public']['Tables']['user_profiles']['Row']['role']
 
@@ -33,6 +35,27 @@ const ROLE_HOME: Record<Role, string> = {
 
 // Path prefixes each role is allowed to visit come from the single source of truth in
 // lib/utils/interfaces — allow-lists only, so an unlisted role reaches nothing.
+
+/**
+ * SN Cash Ledger gate. CMR access is an explicit cmr_access grant — never a role — and that
+ * table is service-role only (RLS on, no policies), so the check uses the service client.
+ * Fails CLOSED: a missing key, a read error, or no row all mean "no access". This is the first
+ * of two independent gates; the /cmr layout (getCmrContext) is the second, and every
+ * /api/cmr route runs getCmrContext itself.
+ */
+async function hasCmrGrant(userId: string): Promise<boolean> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return false
+  try {
+    const svc = createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+    const { data, error } = await svc.from('cmr_access').select('role').eq('user_id', userId).maybeSingle()
+    if (error || !data) return false
+    return isCmrRole((data as { role: unknown }).role)
+  } catch {
+    return false
+  }
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -112,9 +135,10 @@ export async function middleware(request: NextRequest) {
     .single()
   const profile = data as { role: Role; must_change_password: boolean; field_access: boolean; billing_role: Role | null } | null
 
-  // Authenticated user on a public path → redirect to their home page
+  // Authenticated user on a public path → redirect to their home page (on the cmr. host the
+  // home is always /cmr; its own gate decides from there).
   if (PUBLIC_PATHS.includes(pathname)) {
-    const home = profile ? ROLE_HOME[profile.role] : '/dashboard'
+    const home = surface === 'cmr' ? SURFACE_HOME.cmr : profile ? ROLE_HOME[profile.role] : '/dashboard'
     return NextResponse.redirect(new URL(home, request.url))
   }
 
@@ -132,7 +156,17 @@ export async function middleware(request: NextRequest) {
 
   // After password change, redirect to role home
   if (pathname === '/change-password') {
-    return NextResponse.redirect(new URL(ROLE_HOME[profile.role], request.url))
+    return NextResponse.redirect(new URL(surface === 'cmr' ? SURFACE_HOME.cmr : ROLE_HOME[profile.role], request.url))
+  }
+
+  // SN Cash Ledger — explicit grant only, independent of profile.role (a platform admin with
+  // no cmr_access row is bounced like anyone else). The role allow-list below does not apply.
+  if (isCmrPath(pathname)) {
+    if (pathname === CMR_NO_ACCESS_PATH) return res
+    if (!(await hasCmrGrant(user.id))) {
+      return NextResponse.redirect(new URL(CMR_NO_ACCESS_PATH, request.url))
+    }
+    return res
   }
 
   // Block cross-role path access. allowedPrefixesFor is an allow-list: a role with no
@@ -181,5 +215,9 @@ export const config = {
     // in the middleware body returns before any staff-auth logic runs.
     '/portal',
     '/portal/:path*',
+    // SN Cash Ledger — session required + cmr_access grant checked here, and again in the
+    // /cmr layout and every /api/cmr route (independent gates).
+    '/cmr',
+    '/cmr/:path*',
   ],
 }

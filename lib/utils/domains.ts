@@ -5,6 +5,7 @@
  *   billing.safetynetworkteams.com     → the billing interface (/billing)
  *   dashboards.safetynetworkteams.com  → the dashboards interface (/dashboard, /ar, /fuel, …)
  *   field.safetynetworkteams.com       → the field tech app (/tech)
+ *   cmr.safetynetworkteams.com         → SN Cash Ledger (/cmr) — explicit-grant only (cmr_access)
  *
  * The apex (safetynetworkteams.com) is NOT served by this app (it's a separate base44 site),
  * so it never reaches here. The …vercel.app host has no surface, so it keeps serving everything
@@ -27,12 +28,13 @@ export const portalSetPasswordRedirect = (): string =>
 export const isPortalHost = (host?: string | null): boolean => (host ?? '').split(':')[0].toLowerCase() === PORTAL_HOST
 export const isPortalPath = (pathname: string): boolean => pathname === '/portal' || pathname.startsWith('/portal/')
 
-export type Surface = 'billing' | 'dashboards' | 'field'
+export type Surface = 'billing' | 'dashboards' | 'field' | 'cmr'
 
 export const SUBDOMAIN_HOST: Record<Surface, string> = {
   billing: `billing.${ROOT_DOMAIN}`,
   dashboards: `dashboards.${ROOT_DOMAIN}`,
   field: `field.${ROOT_DOMAIN}`,
+  cmr: `cmr.${ROOT_DOMAIN}`,
 }
 
 const bareHost = (host?: string | null) => (host ?? '').split(':')[0].toLowerCase()
@@ -43,22 +45,32 @@ export function surfaceForHost(host?: string | null): Surface | null {
   if (h === SUBDOMAIN_HOST.billing) return 'billing'
   if (h === SUBDOMAIN_HOST.dashboards) return 'dashboards'
   if (h === SUBDOMAIN_HOST.field) return 'field'
+  if (h === SUBDOMAIN_HOST.cmr) return 'cmr'
   return null
 }
 
+/** True for the Cash Ledger path tree (/cmr and below). */
+export const isCmrPath = (pathname: string): boolean => pathname === '/cmr' || pathname.startsWith('/cmr/')
+
+/** The one /cmr page any signed-in user may see: the access-denied notice. */
+export const CMR_NO_ACCESS_PATH = '/cmr/no-access'
+
 /** Where each surface's root ('/') should land. */
-export const SURFACE_HOME: Record<Surface, string> = { billing: '/billing', dashboards: '/dashboard', field: '/tech' }
+export const SURFACE_HOME: Record<Surface, string> = { billing: '/billing', dashboards: '/dashboard', field: '/tech', cmr: '/cmr' }
 
 /** The path prefixes that belong to each surface — used to route/guard by host. */
 export const SURFACE_PREFIXES: Record<Surface, string[]> = {
   billing: ['/billing'],
   dashboards: ['/dashboard', '/ar', '/fuel', '/admin', '/executive', '/district', '/manager'],
   field: ['/tech'],
+  // SN Cash Ledger. Access here is NOT role-based — it's an explicit cmr_access grant, checked
+  // in the middleware and again by getCmrContext (lib/api/cmr) in the /cmr layout + API routes.
+  cmr: ['/cmr'],
 }
 
 /** Which surface a path belongs to (by prefix), or null for shared/unknown paths. */
 export function surfaceForPath(pathname: string): Surface | null {
-  for (const s of ['billing', 'dashboards', 'field'] as Surface[]) {
+  for (const s of ['billing', 'dashboards', 'field', 'cmr'] as Surface[]) {
     if (SURFACE_PREFIXES[s].some((p) => pathname === p || pathname.startsWith(p + '/'))) return s
   }
   return null

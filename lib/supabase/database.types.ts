@@ -5,6 +5,9 @@
 // 'tech' is a FIELD role for the tech app only. It is deliberately NOT a dashboard role:
 // see DASHBOARD_ROLES in lib/api/auth.ts — techs are rejected by every dashboard/billing
 // API, and /api/tech/* requires it. Never add 'tech' to a dashboard role list.
+// SN Cash Ledger (CMR) role — a separate grant in cmr_access, NOT derived from Role.
+export type CmrRole = 'controller' | 'requester' | 'viewer'
+
 export type Role = 'admin' | 'executive' | 'district_manager' | 'branch_manager' | 'ar_manager' | 'ar_team' | 'office_team' | 'project_manager' | 'sales' | 'tech' | 'billing_branch_manager' | 'dispatcher' | 'biller' | 'accounting' | 'front_counter'
 export type LaborType =
   | 'direct'
@@ -104,6 +107,12 @@ export type Database = {
         Row: { id: string; code: string; branch_id: string; entity_id: string; is_active: boolean }
         Insert: { id?: string; code: string; branch_id: string; entity_id: string; is_active?: boolean }
         Update: { id?: string; code?: string; branch_id?: string; entity_id?: string; is_active?: boolean }
+        Relationships: []
+      }
+      cmr_access: {
+        Row: { user_id: string; role: CmrRole; created_by: string | null; created_at: string }
+        Insert: { user_id: string; role: CmrRole; created_by?: string | null; created_at?: string }
+        Update: { user_id?: string; role?: CmrRole; created_by?: string | null; created_at?: string }
         Relationships: []
       }
       user_profiles: {
