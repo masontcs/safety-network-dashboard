@@ -1,26 +1,37 @@
 import type { Metadata } from 'next'
-import ComingSoon from '@/components/cmr/ComingSoon'
+import { redirect } from 'next/navigation'
+import { getCmrPageContext } from '@/lib/cmr/session'
+import CmrLedgerClient from '@/components/cmr/CmrLedgerClient'
 import { pacificToday } from '@/lib/utils/date'
+import { parseLedgerDate, parsePeriod } from '@/lib/cmr/ledger'
 
 export const metadata: Metadata = { title: 'Daily ledger' }
 
-/** Pacific-day label for the page head, e.g. "Tue, Sep 15". */
-function pacificDayLabel(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  return new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
-    .format(new Date(Date.UTC(y, m - 1, d)))
-}
+/**
+ * The Cash Ledger home: the daily ledger for one (date, period) snapshot.
+ *
+ * Every CMR role reads this page (Controller, Requester, Viewer). The (secure) layout is the
+ * gate — explicit grant only, no admin inheritance — and this repeats it so the page can never
+ * render on its own. Edit controls appear only when /api/cmr/ledger says `canEdit`
+ * (Controller), and every /api/cmr/ledger write re-checks the role.
+ *
+ * ?date=YYYY-MM-DD&period=am|pm pick the snapshot; anything missing or invalid falls back to
+ * today (Pacific) and AM.
+ */
+export default async function CmrDailyLedgerPage({
+  searchParams,
+}: {
+  searchParams?: { date?: string | string[]; period?: string | string[] }
+}) {
+  const ctx = await getCmrPageContext()
+  if (!ctx.ok) redirect(ctx.status === 401 ? '/login' : '/cmr/no-access')
 
-export default function CmrDailyLedgerPage() {
-  const today = pacificToday()
+  const date = parseLedgerDate(searchParams?.date)
+  const period = parsePeriod(searchParams?.period)
   return (
-    <ComingSoon
-      title="Daily ledger"
-      intro="One consolidated cash position for the day, with AM and PM snapshots."
-      icon="ledger"
-      what="Beginning cash for AM and PM, adjustment lines with cover-by notes, the pending-in-bank breakdown by account, and the running current balance."
-      phase="Phase 3"
-      aside={<time className="cmr-pill" dateTime={today}>{pacificDayLabel(today)} · Pacific</time>}
+    <CmrLedgerClient
+      initialDate={date.ok ? date.value : pacificToday()}
+      initialPeriod={period.ok ? period.value : 'am'}
     />
   )
 }

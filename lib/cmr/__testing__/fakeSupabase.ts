@@ -4,6 +4,7 @@
  *   from(t).select(cols, {count, head}).eq(c, v).order(..).maybeSingle() / await
  *   from(t).insert(row) / .update(patch).eq(..) / .delete().eq(..)
  *   from(t).insert(row).select(..).single()   (returns the inserted row)
+ *   from(t).upsert(row, {onConflict, ignoreDuplicates}).select(..)   (returns written rows)
  *   rpc(name, args)                           (handlers supplied via options.rpc)
  * Every call is recorded in `calls` so tests can assert what was (not) read or written.
  */
@@ -12,7 +13,7 @@ type Row = Record<string, unknown>
 
 export interface FakeCall {
   table: string
-  op: 'select' | 'insert' | 'update' | 'delete' | 'rpc'
+  op: 'select' | 'insert' | 'update' | 'delete' | 'upsert' | 'rpc'
   columns?: string
   filters: [string, unknown][]
   payload?: unknown
@@ -46,6 +47,7 @@ export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions =
     private head = false
     private wantCount = false
     private returning = false
+    private conflict: { keys: string[]; ignore: boolean } = { keys: ['id'], ignore: false }
 
     constructor(private table: string) {}
 
@@ -59,6 +61,12 @@ export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions =
     eq(col: string, val: unknown) { this.filters.push([col, val]); return this }
     order() { return this }
     insert(payload: Row) { this.op = 'insert'; this.payload = payload; return this }
+    upsert(payload: Row, o?: { onConflict?: string; ignoreDuplicates?: boolean }) {
+      this.op = 'upsert'
+      this.payload = payload
+      this.conflict = { keys: (o?.onConflict ?? 'id').split(',').map((k) => k.trim()), ignore: !!o?.ignoreDuplicates }
+      return this
+    }
     update(payload: Row) { this.op = 'update'; this.payload = payload; return this }
     delete() { this.op = 'delete'; return this }
     maybeSingle() { return this.exec('maybe') }
@@ -77,7 +85,18 @@ export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions =
       const rows = (tables[this.table] ??= [])
       if (opts.failTables?.includes(this.table)) return { data: null, error: { message: `${this.table} unavailable` } }
 
-      if (this.op === 'insert') {
+      if (this.op === 'upsert') {
+        const row = this.payload as Row
+        const hit = rows.find((r) => this.conflict.keys.every((k) => r[k] === row[k]))
+        if (hit) {
+          if (!this.conflict.ignore) Object.assign(hit, row)
+          const out = this.conflict.ignore ? [] : [{ ...hit }]
+          if (!this.returning) return { data: null, error: null }
+          return { data: mode === 'many' ? out : out[0] ?? null, error: null }
+        }
+        // no conflict → behaves like insert
+      }
+      if (this.op === 'insert' || this.op === 'upsert') {
         const row = this.payload as Row
         if (this.table === 'cmr_access' && rows.some((r) => r.user_id === row.user_id)) {
           return { data: null, error: { message: 'duplicate key value violates unique constraint "cmr_access_pkey"' } }
