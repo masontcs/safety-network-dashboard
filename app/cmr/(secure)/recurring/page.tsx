@@ -1,16 +1,18 @@
 import type { Metadata } from 'next'
-import ComingSoon from '@/components/cmr/ComingSoon'
+import { redirect } from 'next/navigation'
+import { getCmrPageContext } from '@/lib/cmr/session'
+import CmrRecurringClient from '@/components/cmr/CmrRecurringClient'
 
 export const metadata: Metadata = { title: 'Recurring vendors' }
 
-export default function CmrRecurringPage() {
-  return (
-    <ComingSoon
-      title="Recurring vendors"
-      intro="The payments that come around every week or month, remembered so none are missed."
-      icon="recurring"
-      what="Weekly, monthly and urgent payment-plan vendors, with on-hold flags and the last amount sent."
-      phase="Phase 2"
-    />
-  )
+/**
+ * Every CMR role reads this page (Controller, Requester, Viewer). The (secure) layout is the
+ * gate — explicit grant only, no admin inheritance — and this repeats it so the page can never
+ * render on its own. Edit controls appear only when /api/cmr/recurring says `canEdit`
+ * (Controller), and that API re-checks the role on every write.
+ */
+export default async function CmrRecurringPage() {
+  const ctx = await getCmrPageContext()
+  if (!ctx.ok) redirect(ctx.status === 401 ? '/login' : '/cmr/no-access')
+  return <CmrRecurringClient />
 }

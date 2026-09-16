@@ -7,6 +7,8 @@
 // API, and /api/tech/* requires it. Never add 'tech' to a dashboard role list.
 // SN Cash Ledger (CMR) role — a separate grant in cmr_access, NOT derived from Role.
 export type CmrRole = 'controller' | 'requester' | 'viewer'
+// SN Cash Ledger recurring-vendor section (cmr_recurring_vendors.section check constraint).
+export type CmrRecurringSection = 'weekly' | 'monthly' | 'urgent'
 
 export type Role = 'admin' | 'executive' | 'district_manager' | 'branch_manager' | 'ar_manager' | 'ar_team' | 'office_team' | 'project_manager' | 'sales' | 'tech' | 'billing_branch_manager' | 'dispatcher' | 'biller' | 'accounting' | 'front_counter'
 export type LaborType =
@@ -119,6 +121,12 @@ export type Database = {
         Row: { id: string; name: string; account_type: string | null; active: boolean; sort_order: number; created_by: string | null; created_at: string }
         Insert: { id?: string; name: string; account_type?: string | null; active?: boolean; sort_order?: number; created_by?: string | null; created_at?: string }
         Update: { id?: string; name?: string; account_type?: string | null; active?: boolean; sort_order?: number; created_by?: string | null; created_at?: string }
+        Relationships: []
+      }
+      cmr_recurring_vendors: {
+        Row: { id: string; account_id: string; vendor_name: string; amount_cents: number; section: CmrRecurringSection; recurrence_detail: string | null; last_amount_sent_cents: number | null; plan_terms: string | null; plan_due_date: string | null; notes: string | null; on_hold: boolean; active: boolean; sort_order: number; created_by: string | null; created_at: string }
+        Insert: { id?: string; account_id: string; vendor_name: string; amount_cents?: number; section: CmrRecurringSection; recurrence_detail?: string | null; last_amount_sent_cents?: number | null; plan_terms?: string | null; plan_due_date?: string | null; notes?: string | null; on_hold?: boolean; active?: boolean; sort_order?: number; created_by?: string | null; created_at?: string }
+        Update: { id?: string; account_id?: string; vendor_name?: string; amount_cents?: number; section?: CmrRecurringSection; recurrence_detail?: string | null; last_amount_sent_cents?: number | null; plan_terms?: string | null; plan_due_date?: string | null; notes?: string | null; on_hold?: boolean; active?: boolean; sort_order?: number; created_by?: string | null; created_at?: string }
         Relationships: []
       }
       user_profiles: {

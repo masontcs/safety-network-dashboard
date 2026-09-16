@@ -41,6 +41,16 @@ export type AuditAction =
   | 'cmr.account.activate'
   | 'cmr.account.deactivate'
   | 'cmr.account.reorder'
+  // SN Cash Ledger — recurring vendors (never deleted; deactivated instead)
+  | 'cmr.recurring.create'
+  | 'cmr.recurring.update'
+  | 'cmr.recurring.move'
+  | 'cmr.recurring.last_sent'
+  | 'cmr.recurring.hold'
+  | 'cmr.recurring.release'
+  | 'cmr.recurring.activate'
+  | 'cmr.recurring.deactivate'
+  | 'cmr.recurring.reorder'
 
 // ── Payload ────────────────────────────────────────────────────────────────────
 
