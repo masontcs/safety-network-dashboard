@@ -17,7 +17,7 @@ vi.mock('@/lib/supabase/server', () => ({
   createServiceClient: () => server.serviceClient,
 }))
 
-import { getCmrContext, guardCmr, guardCmrController } from '@/lib/api/cmr'
+import { getCmrContext, guardCmr, guardCmrCanRequest, guardCmrController } from '@/lib/api/cmr'
 
 const ADMIN = '00000000-0000-4000-8000-00000000a0a0'
 const CONTROLLER = '00000000-0000-4000-8000-00000000c0c0'
@@ -132,5 +132,45 @@ describe('guardCmr / guardCmrController', () => {
     const role = 'admin' as unknown as 'viewer'
     expect(guardCmr({ role })?.status).toBe(403)
     expect(guardCmrController({ role })?.status).toBe(403)
+  })
+})
+
+/**
+ * guardCmrCanRequest is the ONE opening in the Controller-only write wall: submitting a vendor
+ * request. It must let exactly controller + requester through and nobody else — a Viewer is
+ * read-only, and an unknown role fails closed like everywhere else.
+ */
+describe('guardCmrCanRequest — the only non-Controller write', () => {
+  it('controller and requester pass', () => {
+    expect(guardCmrCanRequest({ role: 'controller' })).toBeNull()
+    expect(guardCmrCanRequest({ role: 'requester' })).toBeNull()
+  })
+
+  it('VIEWER is refused 403', async () => {
+    const res = guardCmrCanRequest({ role: 'viewer' })
+    expect(res?.status).toBe(403)
+    expect(res && (await res.json()).code).toBe('FORBIDDEN')
+  })
+
+  it('an unknown role fails closed', () => {
+    const role = 'admin' as unknown as 'viewer'
+    expect(guardCmrCanRequest({ role })?.status).toBe(403)
+  })
+
+  it('is strictly weaker than guardCmrController and strictly stronger than guardCmr', () => {
+    // requester: reads yes, can-request yes, controller no — the whole point of the new guard.
+    expect(guardCmr({ role: 'requester' })).toBeNull()
+    expect(guardCmrCanRequest({ role: 'requester' })).toBeNull()
+    expect(guardCmrController({ role: 'requester' })?.status).toBe(403)
+    // viewer: reads yes, can-request no.
+    expect(guardCmr({ role: 'viewer' })).toBeNull()
+    expect(guardCmrCanRequest({ role: 'viewer' })?.status).toBe(403)
+  })
+
+  it('a no-grant platform admin never reaches it — getCmrContext denies first', async () => {
+    setup(ADMIN, [{ user_id: CONTROLLER, role: 'controller' }])
+    const ctx = await getCmrContext()
+    expect(ctx.ok).toBe(false)
+    if (!ctx.ok) expect(ctx.status).toBe(403)
   })
 })

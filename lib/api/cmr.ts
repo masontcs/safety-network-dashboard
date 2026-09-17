@@ -70,3 +70,18 @@ export function guardCmr(access: { role: CmrRole }): NextResponse | null {
 export function guardCmrController(access: { role: CmrRole }): NextResponse | null {
   return access.role === 'controller' ? null : forbidden('Only a Cash Ledger Controller can do this.')
 }
+
+/**
+ * Controller OR Requester — submitting, editing and withdrawing a vendor request, the ONLY
+ * write a non-Controller can make anywhere in Cash Ledger. A Viewer is read-only and is
+ * refused here.
+ *
+ * This guard is about the KIND of write, not about whose row it is. A Requester may only touch
+ * their OWN request and only while it is still queued; the route enforces that ownership /
+ * status check separately, after this guard. Placing and declining stay guardCmrController.
+ */
+export function guardCmrCanRequest(access: { role: CmrRole }): NextResponse | null {
+  return access.role === 'controller' || access.role === 'requester'
+    ? null
+    : forbidden('Only a Cash Ledger Controller or Requester can submit vendor requests.')
+}

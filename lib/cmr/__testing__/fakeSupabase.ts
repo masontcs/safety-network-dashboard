@@ -27,8 +27,15 @@ export interface FakeOptions {
   defaults?: Record<string, () => Row>
   /** Unique checks run on insert/update, per table: return an error message to reject. */
   unique?: Record<string, (candidate: Row, others: Row[]) => string | null>
-  /** rpc(name, args) handlers; they may mutate `tables` directly. */
-  rpc?: Record<string, (args: Record<string, unknown>, tables: Record<string, Row[]>) => { message: string } | null>
+  /**
+   * rpc(name, args) handlers; they may mutate `tables` directly. Return null for success with
+   * no payload, `{ message }` to make the call fail, or `{ data }` for a function that returns
+   * a value (e.g. the CMR placement functions, which return the new row's id).
+   */
+  rpc?: Record<
+    string,
+    (args: Record<string, unknown>, tables: Record<string, Row[]>) => { message: string } | { data: unknown } | null
+  >
 }
 
 type FakeError = { message: string; code?: string }
@@ -151,8 +158,9 @@ export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions =
       calls.push({ table: name, op: 'rpc', filters: [], payload: args })
       const fn = opts.rpc?.[name]
       if (!fn) return { data: null, error: { message: `function ${name} does not exist` } }
-      const error = fn(args, tables)
-      return { data: null, error }
+      const out = fn(args, tables)
+      if (out && 'data' in out) return { data: out.data, error: null }
+      return { data: null, error: out }
     },
     auth: {
       admin: {

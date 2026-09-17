@@ -72,6 +72,13 @@ export type AuditAction =
   | 'cmr.priority.reopen'
   | 'cmr.priority.delete'
   | 'cmr.priority.reorder'
+  // SN Cash Ledger — vendor requests (the only write a non-Controller can make; a withdrawn
+  // request is hard-deleted, so the audit entry is the only record it ever existed)
+  | 'cmr.request.submit'
+  | 'cmr.request.update'
+  | 'cmr.request.withdraw'
+  | 'cmr.request.place'
+  | 'cmr.request.decline'
 
 // ── Payload ────────────────────────────────────────────────────────────────────
 

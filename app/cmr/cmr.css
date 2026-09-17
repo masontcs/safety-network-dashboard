@@ -609,6 +609,37 @@ li.cmr-pr-row:not(:has(> .cmr-handle)) { padding-left: 10px; }
 .cmr-pr-topfield { justify-content: flex-end; }
 .cmr-pr-form .acts { align-self: end; }
 
+/* ── vendor requests screen ────────────────────────────────────────────── */
+.cmr-rq-row .who { gap: 3px; }
+.cmr-rq-row.mine { box-shadow: inset 3px 0 0 var(--cmr-gold-mark); }
+.cmr-rq-row.done .nm, .cmr-rq-row.done .amt { color: var(--cmr-dim); }
+.cmr-rq-row.declined .nm { text-decoration: line-through; }
+.cmr-rq-row .cmr-pill .cmr-ic { stroke-width: 2.4; }
+.cmr-rq-row .amt { min-width: 1px; }
+.cmr-rq-when { color: var(--cmr-dim); }
+.cmr-rq-decide { display: flex; gap: 6px; justify-content: flex-end; }
+.cmr-rq-form .acts { align-self: end; }
+
+/* the Place dialog — in-app, never a native prompt */
+.cmr-rq-scrim {
+  position: fixed; inset: 0; z-index: 80; display: grid; place-items: center;
+  padding: 20px 16px; background: rgba(15, 23, 20, .46); backdrop-filter: blur(1.5px);
+}
+.cmr-rq-dialog {
+  width: min(460px, 100%); max-height: calc(100dvh - 40px); overflow: auto;
+  padding: 20px; box-shadow: var(--cmr-shadow-lg);
+}
+.cmr-rq-dialog h2 { margin: 0; font-size: 19px; font-weight: 500; overflow-wrap: anywhere; }
+.cmr-rq-dialog > p { margin: 5px 0 16px; color: var(--cmr-muted); font-size: 12.5px; }
+.cmr-rq-seg { width: 100%; }
+.cmr-rq-seg button { flex: 1; }
+.cmr-rq-dialogfields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 16px; }
+.cmr-rq-dialogfields .span-all { grid-column: 1 / -1; }
+.cmr-rq-dialognote { margin: 2px 0 0; color: var(--cmr-muted); font-size: 12px; line-height: 1.5; }
+.cmr-rq-dialognote b { color: var(--cmr-text); font-weight: 600; }
+.cmr-rq-weekjump .cmr-seg button { padding-left: 8px; padding-right: 8px; }
+.cmr-rq-dialog .acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
 /* ── no-access ─────────────────────────────────────────────────────────── */
 .cmr-gate { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; }
 .cmr-gate .cmr-card { width: min(460px, 100%); }
@@ -669,6 +700,10 @@ li.cmr-pr-row:not(:has(> .cmr-handle)) { padding-left: 10px; }
   .cmr-lg-row .ctl { flex-basis: 100%; justify-content: flex-end; }
   .cmr-lg-row .ctl .moves { margin-right: auto; margin-left: 38px; }
   .cmr-lg-form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .cmr-rq-row .who { flex-basis: calc(100% - 130px); }
+  .cmr-rq-row .ctl { flex-basis: 100%; justify-content: flex-end; flex-wrap: wrap; row-gap: 8px; }
+  .cmr-rq-decide { margin-right: auto; }
+  .cmr-rq-dialog { padding: 18px; }
   .cmr-pr-row .who { flex-basis: calc(100% - 160px); }
   .cmr-pr-row .ctl { flex-wrap: wrap; row-gap: 8px; }
   .cmr-pr-status { min-width: 0; margin-left: 76px; }
@@ -690,6 +725,14 @@ li.cmr-pr-row:not(:has(> .cmr-handle)) { padding-left: 10px; }
   .cmr-lg-row .amt { margin-left: 38px; }
   li.cmr-lg-row:not(:has(> .cmr-handle)) .amt, .cmr-lg-rollup .amt, .cmr-lg-total .amt, div.cmr-lg-row > .amt { margin-left: auto; }
   .cmr-root input[type="date"].cmr-lg-date { width: 140px; }
+  .cmr-rq-row .who { flex-basis: calc(100% - 40px); }
+  .cmr-rq-row .amt { margin-left: 38px; }
+  li.cmr-rq-row:not(:has(> .cmr-handle)) .amt { margin-left: auto; }
+  .cmr-rq-row .ctl { gap: 6px; }
+  .cmr-rq-decide { flex-basis: 100%; margin-right: 0; }
+  .cmr-rq-decide .cmr-btn { flex: 1; }
+  .cmr-rq-dialogfields { grid-template-columns: minmax(0, 1fr); }
+  .cmr-rq-dialog .acts .cmr-btn { flex: 1; }
   .cmr-pr-row .who { flex-basis: calc(100% - 76px); }
   .cmr-pr-row .amt { margin-left: 76px; }
   li.cmr-pr-row:not(:has(> .cmr-handle)) .amt { margin-left: 38px; }
