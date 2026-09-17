@@ -10,6 +10,7 @@ import {
   computePriorityTotals,
   toCmrPriority,
   type CmrPrioritiesView,
+  type CmrPriorityLinks,
   type CmrPriorityRow,
 } from '@/lib/cmr/priorities'
 
@@ -83,11 +84,82 @@ export async function displayNames(supabase: Supabase, ids: (string | null)[]): 
   return new Map(rows.filter((r) => r.display_name).map((r) => [r.id, r.display_name as string]))
 }
 
+/**
+ * Resolve both ends of every carry touching these rows: a 'carried' original → the week its
+ * forward copy landed in, and a forward copy → the week it came from. Both live on OTHER rows,
+ * so this is two id lookups, and only when such rows exist.
+ */
+export async function priorityLinks(supabase: Supabase, rows: CmrPriorityRow[]): Promise<CmrPriorityLinks> {
+  const links: CmrPriorityLinks = { carriedTo: new Map(), carriedFrom: new Map() }
+  const carriedIds = rows.filter((r) => r.status === 'carried').map((r) => r.id)
+  const fromIds = [...new Set(rows.map((r) => r.carried_from_id).filter((x): x is string => !!x))]
+  if (!carriedIds.length && !fromIds.length) return links
+
+  type Lite = { id: string; week_start: string; carried_from_id: string | null }
+  const lite = async (col: 'id' | 'carried_from_id', ids: string[]): Promise<Lite[]> => {
+    if (!ids.length) return []
+    const { data, error } = await supabase.from('cmr_weekly_priorities').select('id, week_start, carried_from_id').in(col, ids)
+    if (error) throw new Error(error.message)
+    return (data ?? []) as unknown as Lite[]
+  }
+  const [copies, sources] = await Promise.all([lite('carried_from_id', carriedIds), lite('id', fromIds)])
+
+  for (const c of copies) if (c.carried_from_id) links.carriedTo.set(c.carried_from_id, c.week_start)
+  const weekOf = new Map(sources.map((r) => [r.id, r.week_start]))
+  for (const r of rows) {
+    const w = r.carried_from_id ? weekOf.get(r.carried_from_id) : undefined
+    if (w) links.carriedFrom.set(r.id, w)
+  }
+  return links
+}
+
+// ── carry (service role only) ───────────────────────────────────────────────
+
+/** A carry the DB refused: the priority had already moved on, or it is already in that week. */
+export class CarryConflict extends Error {
+  constructor(readonly reason: 'NOT_FOUND' | 'NOT_OPEN' | 'SAME_WEEK') {
+    super(reason)
+    this.name = 'CarryConflict'
+  }
+}
+
+/**
+ * Copy an open priority into another week AND mark the original carried in ONE database call
+ * (cmr_carry_priority), which re-checks the priority is still open while holding its row
+ * locked — so it can never be carried twice or half-carried. Returns the new id.
+ *
+ * Called as a member of the client — supabase-js rpc() needs `this`. Cast because the Database
+ * `Functions` type is deliberately empty (see database.types.ts).
+ */
+export async function carryPriority(
+  supabase: Supabase,
+  args: { priorityId: string; actorId: string; weekStart: string; sortOrder: number },
+): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = (await (supabase as any).rpc('cmr_carry_priority', {
+    p_priority_id: args.priorityId,
+    p_actor: args.actorId,
+    p_week_start: args.weekStart,
+    p_sort_order: args.sortOrder,
+  })) as { data: unknown; error: { message: string } | null }
+  if (error) {
+    for (const reason of ['NOT_FOUND', 'NOT_OPEN', 'SAME_WEEK'] as const) {
+      if (error.message.includes(reason)) throw new CarryConflict(reason)
+    }
+    throw new Error(error.message)
+  }
+  if (typeof data !== 'string' || !UUID_RE.test(data)) throw new Error('Carrying the priority did not return the new row.')
+  return data
+}
+
 /** Everything the Weekly priorities screen needs for one week, with the derived totals. */
 export async function buildPrioritiesView(supabase: Supabase, weekStart: string, canEdit: boolean): Promise<CmrPrioritiesView> {
   const rows = await weekRows(supabase, weekStart)
-  const names = await displayNames(supabase, rows.map((r) => r.paid_by))
-  const priorities = rows.map((r) => toCmrPriority(r, names))
+  const [names, links] = await Promise.all([
+    displayNames(supabase, rows.map((r) => r.paid_by)),
+    priorityLinks(supabase, rows),
+  ])
+  const priorities = rows.map((r) => toCmrPriority(r, names, links))
   const today = pacificToday()
   return {
     weekStart,

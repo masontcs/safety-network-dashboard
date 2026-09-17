@@ -84,11 +84,11 @@ describe('statusPatch', () => {
 })
 
 describe('validation', () => {
-  it('status: open/resolved/paid only; carried has its own code', () => {
+  it('status: open/resolved/paid only; carried has its own code (use the carry route)', () => {
     for (const s of ['open', 'resolved', 'paid']) expect(parseWritableStatus(s)).toEqual({ ok: true, value: s })
     const c = parseWritableStatus('carried')
     expect(c.ok).toBe(false)
-    expect(c.code).toBe('CARRY_NOT_AVAILABLE')
+    expect(c.code).toBe('USE_CARRY')
     for (const s of ['pushed', 'OPEN', '', null, undefined, 1]) expect(parseWritableStatus(s).ok).toBe(false)
   })
 

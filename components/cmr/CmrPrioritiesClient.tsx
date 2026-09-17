@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   DndContext,
   KeyboardSensor,
@@ -24,22 +24,28 @@ import {
   CMR_PRIORITY_DESCRIPTION_MAX,
   CMR_PRIORITY_NOTES_MAX,
   CMR_PRIORITY_STATUS_LABEL,
+  canCarryPriority,
   initialsOf,
   isDone,
+  isPriorityHistory,
   type CmrPrioritiesView,
   type CmrPriority,
   type CmrPriorityWritableStatus,
 } from '@/lib/cmr/priorities'
-import { formatDueDate, formatWeekRange, formatWeekRangeShort, shiftWeek } from '@/lib/cmr/week'
+import { formatWeekRange, formatDueDate, formatWeekRangeShort, shiftWeek, weekStartSunday } from '@/lib/cmr/week'
 
 /**
  * Weekly priorities — what has to be paid or handled in one Sunday → Saturday week.
  *
  * Every CMR role reads this screen. Only a Controller (`canEdit` from the API) gets the edit
  * controls: add (amount optional), edit, flag / unflag Top, resolve, mark paid, reopen / unpay,
- * delete (in-app confirm — never window.confirm) and reorder (@dnd-kit drag — pointer or
- * keyboard — plus up/down buttons, WCAG 2.5.7). Hiding controls is cosmetic:
+ * CARRY to another week, delete (in-app confirm — never window.confirm) and reorder (@dnd-kit
+ * drag — pointer or keyboard — plus up/down buttons, WCAG 2.5.7). Hiding controls is cosmetic:
  * /api/cmr/priorities re-checks the Controller role on every write.
+ *
+ * Carrying keeps the history: the priority stays in this week greyed and marked "carried to …",
+ * and because it is no longer open it drops straight out of "still needed this week". The copy
+ * in the target week is the live one and shows "carried from …".
  *
  * The week is in the URL (?week=YYYY-MM-DD, its Sunday) so a view can be reloaded or shared.
  */
@@ -87,6 +93,7 @@ export default function CmrPrioritiesClient({ initialWeek }: { initialWeek: stri
   const [mode, setMode] = useState<Mode>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [reordering, setReordering] = useState(false)
+  const [carrying, setCarrying] = useState<CmrPriority | null>(null)
 
   const weekRef = useRef(week)
   weekRef.current = week
@@ -133,7 +140,7 @@ export default function CmrPrioritiesClient({ initialWeek }: { initialWeek: stri
   // The data on screen must be for the week in the controls; otherwise show a skeleton.
   const current = view && view.weekStart === week ? view : null
   const canEdit = current?.canEdit === true
-  const locked = mode !== null || reordering
+  const locked = mode !== null || reordering || carrying !== null
   const isThisWeek = current ? current.thisWeekStart === week : false
   const thisWeek = view?.thisWeekStart ?? null
   const range = formatWeekRange(week)
@@ -212,6 +219,25 @@ export default function CmrPrioritiesClient({ initialWeek }: { initialWeek: stri
     setStatus(`${p.description} deleted.`)
     await reload()
     focusLater('add')
+  }
+
+  async function carry(p: CmrPriority, body: Record<string, unknown>): Promise<boolean> {
+    setBusyId(p.id)
+    const r = await api<{ where: string; to: { weekStart: string } }>('/api/cmr/priorities/carry', {
+      method: 'POST',
+      body: JSON.stringify({ id: p.id, ...body }),
+    })
+    setBusyId(null)
+    if (!r.success) {
+      await alert({ title: 'Could not carry the priority', message: r.error })
+      if (r.code === 'NOT_FOUND' || r.code === 'NOT_OPEN') { setCarrying(null); await reload() }
+      return false
+    }
+    setStatus(`${p.description} carried to the week of ${r.data.where}. It stays in this week as history.`)
+    setCarrying(null)
+    await reload()
+    focusLater('add')
+    return true
   }
 
   // Optimistic reorder; one at a time; rolled back if the save fails.
@@ -372,6 +398,7 @@ export default function CmrPrioritiesClient({ initialWeek }: { initialWeek: stri
                       onDelete={() => void remove(p)}
                       onTop={(t) => void setTop(p, t)}
                       onStatus={(s) => void setStatusOf(p, s)}
+                      onCarry={() => setCarrying(p)}
                       onMove={(d) => {
                         const to = i + d
                         if (to < 0 || to >= list.length) return
@@ -409,12 +436,145 @@ export default function CmrPrioritiesClient({ initialWeek }: { initialWeek: stri
           {canEdit && list.length > 1 && (
             <p className="cmr-hint">
               Drag the <CmrIcon name="grip" size={12} /> handle or use the arrows to reorder. The star marks a top priority.
-              Carrying an unfinished priority into next week comes in a later update.
+              Carry moves an unfinished priority to another week — it stays here as history and comes off what’s still needed.
             </p>
           )}
         </>
       )}
+
+      {carrying && current && (
+        <CarryDialog
+          p={carrying}
+          thisWeekStart={current.thisWeekStart}
+          busy={busyId === carrying.id}
+          onCarry={(b) => carry(carrying, b)}
+          onCancel={() => { const id = carrying.id; setCarrying(null); focusLater(`carry:${id}`) }}
+        />
+      )}
     </>
+  )
+}
+
+// ── the Carry dialog (in-app; never a native prompt) ────────────────────────
+
+function CarryDialog({
+  p,
+  thisWeekStart,
+  busy,
+  onCarry,
+  onCancel,
+}: {
+  p: CmrPriority
+  thisWeekStart: string
+  busy: boolean
+  onCarry: (body: Record<string, unknown>) => Promise<boolean>
+  onCancel: () => void
+}) {
+  // The default IS the answer most weeks: the week after the one it is in.
+  const [week, setWeek] = useState(shiftWeek(p.weekStart, 1))
+  const [saving, setSaving] = useState(false)
+
+  const wrap = useRef<HTMLDivElement>(null)
+  const firstRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { requestAnimationFrame(() => firstRef.current?.focus()) }, [])
+
+  // Escape closes; Tab is kept inside the dialog while it is open.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); onCancel(); return }
+      if (e.key !== 'Tab' || !wrap.current) return
+      const items = wrap.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )
+      if (!items.length) return
+      const first = items[0]
+      const last = items[items.length - 1]
+      if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCancel])
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    await onCarry({ targetWeek: week })
+    setSaving(false)
+  }
+
+  const busyNow = saving || busy
+  const sameWeek = week === p.weekStart
+
+  return (
+    <div className="cmr-rq-scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}>
+      <div
+        ref={wrap}
+        className="cmr-rq-dialog cmr-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cmr-pr-carry-title"
+        aria-describedby="cmr-pr-carry-desc"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <h2 id="cmr-pr-carry-title" className="cmr-serif">Carry {p.description}</h2>
+        <p id="cmr-pr-carry-desc">
+          {p.amountCents > 0 ? `${formatCents(p.amountCents)} · ` : ''}now in the week of {formatWeekRangeShort(p.weekStart)}
+          {p.isTopPriority ? ' · top priority' : ''}
+        </p>
+
+        <form onSubmit={submit} noValidate>
+          <div className="cmr-rq-dialogfields">
+            <label className="cmr-field">
+              <span className="cmr-label">Week</span>
+              <input
+                ref={firstRef}
+                className="cmr-input"
+                type="date"
+                value={week}
+                min="2000-01-01"
+                max="2100-12-31"
+                onChange={(e) => setWeek(e.target.value ? weekStartSunday(e.target.value) : week)}
+                disabled={busyNow}
+                required
+              />
+            </label>
+            <div className="cmr-field cmr-rq-weekjump">
+              <span className="cmr-label">Jump</span>
+              <div className="cmr-seg cmr-lg-dir" role="group" aria-label="Move a week">
+                <button type="button" onClick={() => setWeek(shiftWeek(week, -1))} disabled={busyNow} aria-label="The week before">
+                  <CmrIcon name="left" size={14} />
+                </button>
+                <button type="button" onClick={() => setWeek(shiftWeek(p.weekStart, 1))} disabled={busyNow}>Next week</button>
+                <button type="button" onClick={() => setWeek(shiftWeek(week, 1))} disabled={busyNow} aria-label="The week after">
+                  <CmrIcon name="right" size={14} />
+                </button>
+              </div>
+            </div>
+            <p className="cmr-rq-dialognote span-all">
+              {sameWeek ? (
+                <>That’s the week it’s already in — choose another one.</>
+              ) : (
+                <>
+                  Moves to the week of <b>{formatWeekRangeShort(week)}</b>
+                  {week === thisWeekStart ? ' (this week)' : ''}, open, keeping its amount, due date, notes and Top flag. It
+                  stays in {formatWeekRangeShort(p.weekStart)} as history and comes off what’s still needed there.
+                </>
+              )}
+            </p>
+          </div>
+
+          <div className="acts">
+            <button type="button" className="cmr-btn sm ghost" onClick={onCancel} disabled={busyNow}>Cancel</button>
+            <button type="submit" className="cmr-btn sm" disabled={busyNow || sameWeek}>
+              <CmrIcon name="right" size={14} />
+              {busyNow ? 'Carrying…' : 'Carry it forward'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   )
 }
 
@@ -580,6 +740,7 @@ function PriorityRow({
   onDelete,
   onTop,
   onStatus,
+  onCarry,
   onMove,
 }: {
   p: CmrPriority
@@ -597,10 +758,11 @@ function PriorityRow({
   onDelete: () => void
   onTop: (top: boolean) => void
   onStatus: (s: CmrPriorityWritableStatus) => void
+  onCarry: () => void
   onMove: (delta: -1 | 1) => void
 }) {
   const done = isDone(p.status)
-  const carried = p.status === 'carried'
+  const carried = isPriorityHistory(p)
   const overdue = p.status === 'open' && p.dueDate !== null && p.dueDate < today
   const cls = [
     'cmr-row',
@@ -651,23 +813,7 @@ function PriorityRow({
           )}
           {overdue && <span className="cmr-pill danger">Overdue</span>}
         </span>
-        {(p.dueDate || p.status === 'paid') && (
-          <span className="mt">
-            {p.dueDate && <>Due <time dateTime={p.dueDate}>{formatDueDate(p.dueDate, year)}</time></>}
-            {p.dueDate && p.status === 'paid' && ' · '}
-            {p.status === 'paid' && p.paidAt && (
-              <span className="cmr-pr-stamp">
-                Paid {STAMP_FMT.format(new Date(p.paidAt))}
-                {p.paidByName && (
-                  <>
-                    {' · '}
-                    <abbr title={p.paidByName}>{initialsOf(p.paidByName)}</abbr>
-                  </>
-                )}
-              </span>
-            )}
-          </span>
-        )}
+        <PriorityMeta p={p} year={year} />
         {p.notes && <span className="note">{p.notes}</span>}
       </div>
       <span className="amt cmr-num">
@@ -721,6 +867,19 @@ function PriorityRow({
                     <CmrIcon name="undo" size={14} /> Unpay
                   </button>
                 )}
+                {canCarryPriority(p) && (
+                  <button
+                    type="button"
+                    ref={refFor(`carry:${p.id}`)}
+                    className="cmr-btn sm ghost"
+                    onClick={onCarry}
+                    disabled={disabled}
+                    aria-label={`Carry ${p.description} to another week`}
+                    title="Carry to another week"
+                  >
+                    <CmrIcon name="right" size={14} /> Carry
+                  </button>
+                )}
               </div>
             )}
             <div className="moves">
@@ -745,6 +904,53 @@ function PriorityRow({
         </>
       )}
     </SortableLi>
+  )
+}
+
+/**
+ * The second line of a priority: the due date, where it was carried to (on the original the
+ * week keeps) or came from (on the copy), and the paid stamp. Read-only for every role.
+ */
+function PriorityMeta({ p, year }: { p: CmrPriority; year: string }) {
+  const bits: React.ReactNode[] = []
+  if (p.dueDate) {
+    bits.push(
+      <span key="due">
+        Due <time dateTime={p.dueDate}>{formatDueDate(p.dueDate, year)}</time>
+      </span>,
+    )
+  }
+  if (p.carriedToWeek) {
+    bits.push(<span key="to">Carried to the week of {formatWeekRangeShort(p.carriedToWeek)}</span>)
+  } else if (p.status === 'carried') {
+    bits.push(<span key="to">Carried to another week</span>)
+  }
+  if (p.carriedFromWeek) {
+    bits.push(<span key="from">Carried from the week of {formatWeekRangeShort(p.carriedFromWeek)}</span>)
+  }
+  if (p.status === 'paid' && p.paidAt) {
+    bits.push(
+      <span key="paid" className="cmr-pr-stamp">
+        Paid {STAMP_FMT.format(new Date(p.paidAt))}
+        {p.paidByName && (
+          <>
+            {' · '}
+            <abbr title={p.paidByName}>{initialsOf(p.paidByName)}</abbr>
+          </>
+        )}
+      </span>,
+    )
+  }
+  if (!bits.length) return null
+  return (
+    <span className="mt">
+      {bits.map((b, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && ' · '}
+          {b}
+        </React.Fragment>
+      ))}
+    </span>
   )
 }
 

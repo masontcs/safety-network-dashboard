@@ -29,6 +29,8 @@ let snaps: Map<string, Snap>
 let canEdit: boolean
 let calls: { method: string; url: string; body: unknown }[]
 let reorderFails = false
+let pushFails = false
+let unpushFails = false
 
 const accounts: CmrLedgerAccountRef[] = [
   { id: 'a1', name: 'TCS', accountType: 'Checking', active: true, sortOrder: 0 },
@@ -40,9 +42,19 @@ const accName = (id: string) => accounts.find((a) => a.id === id)!.name
 const adj = (id: string, description: string, amountCents: number, sortOrder: number, over: Partial<CmrLedgerAdjustment> = {}): CmrLedgerAdjustment => ({
   id, description, amountCents, sortOrder, note: null, warnNote: null, createdAt: '2026-09-16T14:00:00Z', ...over,
 })
-const item = (id: string, accountId: string, payee: string, amountCents: number, sortOrder: number): CmrPendingItem => ({
+const item = (
+  id: string,
+  accountId: string,
+  payee: string,
+  amountCents: number,
+  sortOrder: number,
+  over: Partial<CmrPendingItem> = {},
+): CmrPendingItem => ({
   id, accountId, accountName: accName(accountId), accountActive: true, payee, amountCents,
   status: 'pending', source: 'manual', notes: null, sortOrder, createdAt: '2026-09-16T14:00:00Z',
+  originalDate: null, effectiveDate: null, paidAt: null, paidBy: null, paidByName: null,
+  pushedFromId: null, pushedFrom: null, pushedTo: null, canUnpush: false, unpushBlockedReason: null,
+  ...over,
 })
 
 const viewFor = (date: string, period: 'am' | 'pm'): CmrLedgerView => {
@@ -91,6 +103,8 @@ beforeEach(() => {
   canEdit = true
   calls = []
   reorderFails = false
+  pushFails = false
+  unpushFails = false
   nextId = 0
   window.confirm = vi.fn(() => true)
   window.alert = vi.fn()
@@ -134,6 +148,18 @@ beforeEach(() => {
         return json({ success: true, data: { item: it } })
       }
       if (method === 'PATCH') {
+        // The paid check-off is its own shape: status + the stamp, nothing else.
+        if ('status' in body) {
+          const paid = body.status === 'paid'
+          for (const s of allSnaps()) {
+            s.items = s.items.map((i) =>
+              i.id === body.id
+                ? { ...i, status: body.status, paidAt: paid ? '2026-09-16T18:30:00Z' : null, paidByName: paid ? 'Cora Controller' : null }
+                : i,
+            )
+          }
+          return json({ success: true, data: { item: allSnaps().flatMap((s) => s.items).find((x) => x.id === body.id), changed: true } })
+        }
         for (const s of allSnaps()) {
           s.items = s.items.map((i) => (i.id === body.id ? { ...i, ...body, accountName: accName(body.accountId ?? i.accountId) } : i))
         }
@@ -144,6 +170,40 @@ beforeEach(() => {
         for (const s of allSnaps()) s.items = s.items.filter((i) => i.id !== id)
         return json({ success: true, data: { deleted: true } })
       }
+    }
+    if (u.pathname === '/api/cmr/ledger/pending/push' && method === 'POST') {
+      if (pushFails) return json({ success: false, error: 'It is no longer pending.', code: 'NOT_PENDING' })
+      const from = [...snaps.entries()].find(([, s]) => s.items.some((i) => i.id === body.id))!
+      const src = from[1].items.find((i) => i.id === body.id)!
+      const [fromDate, fromPeriod] = from[0].split(':') as [string, 'am' | 'pm']
+      const to = { date: body.targetDate as string, period: body.targetPeriod as 'am' | 'pm' }
+      from[1].items = from[1].items.map((i) =>
+        i.id === src.id ? { ...i, status: 'pushed', pushedTo: to, canUnpush: true, unpushBlockedReason: null } : i,
+      )
+      const target = snapOf({ date: to.date, period: to.period })
+      target.items.push({
+        ...src,
+        id: `x${++nextId}`,
+        status: 'pending',
+        sortOrder: 99,
+        pushedFromId: src.id,
+        pushedFrom: { date: fromDate, period: fromPeriod },
+        originalDate: src.originalDate ?? fromDate,
+        effectiveDate: to.date,
+      })
+      return json({ success: true, data: { pushedId: src.id, to, where: `${to.date} ${to.period.toUpperCase()}` } })
+    }
+    if (u.pathname === '/api/cmr/ledger/pending/unpush' && method === 'POST') {
+      if (unpushFails) return json({ success: false, error: 'It was already paid.', code: 'ROW_PAID' })
+      let copyId: string | null = null
+      for (const s of allSnaps()) {
+        const copy = s.items.find((i) => i.pushedFromId === body.id)
+        if (copy) { copyId = copy.id; s.items = s.items.filter((i) => i.id !== copy.id) }
+      }
+      for (const s of allSnaps()) {
+        s.items = s.items.map((i) => (i.id === body.id ? { ...i, status: 'pending', pushedTo: null, canUnpush: false, unpushBlockedReason: null } : i))
+      }
+      return json({ success: true, data: { removedCopyId: copyId } })
     }
     if (u.pathname.endsWith('/reorder')) {
       if (reorderFails) return json({ success: false, error: 'Boom', code: 'INTERNAL_ERROR' })
@@ -432,5 +492,250 @@ describe('CmrLedgerClient — controller', () => {
     fireEvent.click(within(screen.getByRole('form', { name: 'Edit Wires from prior week' })).getByRole('button', { name: /Save/ }))
     await waitFor(() => expect(screen.queryByRole('form', { name: 'Edit Wires from prior week' })).toBeNull())
     expect(writes()).toHaveLength(0)
+  })
+})
+
+// ── Phase 6: the paid check-off and push-to-another-day ─────────────────────
+
+describe('CmrLedgerClient — check off and push', () => {
+  const rowFor = (payee: string) => screen.getByText(payee).closest('li') as HTMLElement
+  const paidBox = (payee: string) => within(rowFor(payee)).getByRole('checkbox') as HTMLInputElement
+  const dialog = () => screen.getByRole('dialog')
+
+  it('read-only roles see the history and the stamp, and get no check-off or Push', async () => {
+    canEdit = false
+    snaps.get('2026-09-16:am')!.items = [
+      item('p1', 'a1', 'Ferguson Enterprises', 21_000_000, 0, { status: 'pushed', pushedTo: { date: '2026-09-17', period: 'am' } }),
+      item('p2', 'a1', 'Sunbelt Rentals', 10_200_000, 1, { status: 'paid', paidAt: '2026-09-16T18:30:00Z', paidByName: 'Cora Controller' }),
+      item('p3', 'a1', 'From yesterday', 500, 2, { pushedFromId: 'old', pushedFrom: { date: '2026-09-15', period: 'pm' } }),
+    ]
+    mount()
+    await screen.findByText('Ferguson Enterprises')
+
+    const pushed = rowFor('Ferguson Enterprises')
+    expect(within(pushed).getByText('Pushed')).toBeTruthy()
+    expect(pushed.textContent).toContain('Pushed to Thu, Sep 17 AM')
+    expect(pushed.className).toContain('pushed')
+
+    expect(rowFor('Sunbelt Rentals').textContent).toContain('Paid')
+    expect(rowFor('From yesterday').textContent).toContain('Pushed from Tue, Sep 15 PM')
+
+    expect(screen.queryByRole('checkbox')).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Push / })).toBeNull()
+  })
+
+  it('a pushed item is off this day’s total and has no controls at all', async () => {
+    snaps.get('2026-09-16:am')!.items = [
+      item('p1', 'a1', 'Ferguson Enterprises', 21_000_000, 0, { status: 'pushed', pushedTo: { date: '2026-09-17', period: 'am' } }),
+      item('p2', 'a1', 'Sunbelt Rentals', 10_200_000, 1),
+    ]
+    mount()
+    await screen.findByText('Ferguson Enterprises')
+    // $482,300 + $16,000 − $102,000 (the pushed $210,000 is gone)
+    expect(stmt('Pending in bank')).toBe('−$102,000.00')
+    const pushed = rowFor('Ferguson Enterprises')
+    expect(within(pushed).queryByRole('checkbox')).toBeNull()
+    expect(within(pushed).queryByRole('button', { name: /^Push / })).toBeNull()
+    expect(within(pushed).queryByRole('button', { name: /^Edit / })).toBeNull()
+  })
+
+  it('the check-off, Push and the edit controls share ONE control group on the row', async () => {
+    mount()
+    await screen.findByText('Sunbelt Rentals')
+    const row = rowFor('Sunbelt Rentals')
+    expect(row.querySelectorAll('.ctl')).toHaveLength(1)
+    const ctl = row.querySelector('.ctl')!
+    expect(within(ctl as HTMLElement).getByRole('checkbox')).toBeTruthy()
+    expect(within(ctl as HTMLElement).getByRole('button', { name: /^Push / })).toBeTruthy()
+    expect(within(ctl as HTMLElement).getByRole('button', { name: /^Edit / })).toBeTruthy()
+    expect(within(ctl as HTMLElement).getByRole('button', { name: /^Delete / })).toBeTruthy()
+  })
+
+  it('checking the box pays it (stamp shown); unchecking asks first and clears it', async () => {
+    mount()
+    await screen.findByText('Sunbelt Rentals')
+    expect(paidBox('Sunbelt Rentals').checked).toBe(false)
+
+    fireEvent.click(paidBox('Sunbelt Rentals'))
+    await waitFor(() => expect(paidBox('Sunbelt Rentals').checked).toBe(true))
+    expect(writes().at(-1)).toMatchObject({ method: 'PATCH', body: { id: 'p2', status: 'paid' } })
+    expect(rowFor('Sunbelt Rentals').textContent).toContain('Paid')
+    // Paid money still left the bank today: the total is unchanged.
+    expect(stmt('Pending in bank')).toBe('−$489,520.00')
+
+    fireEvent.click(paidBox('Sunbelt Rentals'))
+    // useConfirm renders role="alertdialog" — never window.confirm.
+    const ask = await screen.findByRole('alertdialog')
+    expect(window.confirm).not.toHaveBeenCalled()
+    expect(ask.textContent).toContain('Mark Sunbelt Rentals unpaid?')
+    fireEvent.click(within(ask).getByRole('button', { name: 'Mark unpaid' }))
+    await waitFor(() => expect(paidBox('Sunbelt Rentals').checked).toBe(false))
+    expect(writes().at(-1)).toMatchObject({ method: 'PATCH', body: { id: 'p2', status: 'pending' } })
+  })
+
+  it('declining the unpay confirm leaves it paid and writes nothing', async () => {
+    snaps.get('2026-09-16:am')!.items = [item('p2', 'a1', 'Sunbelt Rentals', 10_200_000, 0, { status: 'paid', paidAt: '2026-09-16T18:30:00Z' })]
+    mount()
+    await screen.findByText('Sunbelt Rentals')
+    fireEvent.click(paidBox('Sunbelt Rentals'))
+    const ask = await screen.findByRole('alertdialog')
+    fireEvent.click(within(ask).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(paidBox('Sunbelt Rentals').checked).toBe(true)
+    expect(writes()).toHaveLength(0)
+  })
+
+  it('Push defaults to the next day and the same snapshot, and says what stays behind', async () => {
+    mount()
+    await screen.findByText('Ferguson Enterprises')
+    fireEvent.click(within(rowFor('Ferguson Enterprises')).getByRole('button', { name: 'Push Ferguson Enterprises to another day' }))
+
+    const d = dialog()
+    expect(within(d).getByText('Push Ferguson Enterprises')).toBeTruthy()
+    expect((within(d).getByLabelText('Move to') as HTMLInputElement).value).toBe('2026-09-17')
+    expect(within(d).getByRole('button', { name: 'AM' }).getAttribute('aria-pressed')).toBe('true')
+    expect(d.textContent).toContain('stays on Wed, Sep 16 AM as history')
+
+    fireEvent.click(within(d).getByRole('button', { name: 'Push it forward' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(writes().at(-1)).toMatchObject({
+      method: 'POST',
+      url: '/api/cmr/ledger/pending/push',
+      body: { id: 'p1', targetDate: '2026-09-17', targetPeriod: 'am' },
+    })
+
+    // It stayed here as history, and the balance went up by its amount.
+    await waitFor(() => expect(rowFor('Ferguson Enterprises').textContent).toContain('Pushed to Thu, Sep 17 AM'))
+    expect(stmt('Pending in bank')).toBe('−$279,520.00')
+  })
+
+  it('a different day and snapshot can be chosen, and the copy shows where it came from', async () => {
+    mount()
+    await screen.findByText('Ferguson Enterprises')
+    fireEvent.click(within(rowFor('Ferguson Enterprises')).getByRole('button', { name: 'Push Ferguson Enterprises to another day' }))
+    const d = dialog()
+    fireEvent.change(within(d).getByLabelText('Move to'), { target: { value: '2026-09-21' } })
+    fireEvent.click(within(d).getByRole('button', { name: 'PM' }))
+    fireEvent.click(within(d).getByRole('button', { name: 'Push it forward' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(writes().at(-1)).toMatchObject({ body: { id: 'p1', targetDate: '2026-09-21', targetPeriod: 'pm' } })
+
+    fireEvent.change(screen.getByLabelText('Ledger date'), { target: { value: '2026-09-21' } })
+    fireEvent.click(screen.getByRole('button', { name: 'PM' }))
+    await screen.findByText('Ferguson Enterprises')
+    expect(rowFor('Ferguson Enterprises').textContent).toContain('Pushed from Wed, Sep 16 AM')
+  })
+
+  it('the dialog refuses the snapshot it is already on, and Escape closes it without writing', async () => {
+    mount()
+    await screen.findByText('Ferguson Enterprises')
+    fireEvent.click(within(rowFor('Ferguson Enterprises')).getByRole('button', { name: 'Push Ferguson Enterprises to another day' }))
+    const d = dialog()
+    fireEvent.change(within(d).getByLabelText('Move to'), { target: { value: '2026-09-16' } })
+    expect((within(d).getByRole('button', { name: 'Push it forward' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(d.textContent).toContain('already on')
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(writes()).toHaveLength(0)
+  })
+
+  it('a refused push is reported in-app and nothing changes on screen', async () => {
+    pushFails = true
+    mount()
+    await screen.findByText('Ferguson Enterprises')
+    fireEvent.click(within(rowFor('Ferguson Enterprises')).getByRole('button', { name: 'Push Ferguson Enterprises to another day' }))
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Push it forward' }))
+    // useAlert renders its own in-app dialog — never window.alert.
+    await screen.findByText('Could not push the item')
+    expect(screen.getByText('It is no longer pending.')).toBeTruthy()
+    expect(window.alert).not.toHaveBeenCalled()
+    expect(rowFor('Ferguson Enterprises').textContent).not.toContain('Pushed to')
+  })
+})
+
+// ── Phase 6: taking a push back ─────────────────────────────────────────────
+
+describe('CmrLedgerClient — un-push', () => {
+  const rowFor = (payee: string) => screen.getByText(payee).closest('li') as HTMLElement
+  const unpushBtn = (payee: string) => within(rowFor(payee)).getByRole('button', { name: `Take back the push of ${payee}` })
+
+  const pushedItem = (over: Partial<CmrPendingItem> = {}) =>
+    item('p1', 'a1', 'Ferguson Enterprises', 21_000_000, 0, {
+      status: 'pushed',
+      pushedTo: { date: '2026-09-17', period: 'am' },
+      canUnpush: true,
+      unpushBlockedReason: null,
+      ...over,
+    })
+
+  it('read-only roles never see Un-push', async () => {
+    canEdit = false
+    snaps.get('2026-09-16:am')!.items = [pushedItem()]
+    mount()
+    await screen.findByText('Ferguson Enterprises')
+    expect(screen.queryByRole('button', { name: /^Take back the push/ })).toBeNull()
+  })
+
+  it('asks in-app, then puts the item back and restores the day’s total', async () => {
+    snaps.get('2026-09-16:am')!.items = [pushedItem(), item('p2', 'a1', 'Sunbelt Rentals', 10_200_000, 1)]
+    snaps.set('2026-09-17:am', {
+      beginning: 0,
+      exists: true,
+      adjustments: [],
+      items: [item('x1', 'a1', 'Ferguson Enterprises', 21_000_000, 0, { pushedFromId: 'p1', pushedFrom: { date: '2026-09-16', period: 'am' } })],
+    })
+    mount()
+    await screen.findByText('Ferguson Enterprises')
+    expect(stmt('Pending in bank')).toBe('−$102,000.00') // the pushed one isn't counted
+
+    fireEvent.click(unpushBtn('Ferguson Enterprises'))
+    const ask = await screen.findByRole('alertdialog')
+    expect(ask.textContent).toContain('Take back the push of Ferguson Enterprises?')
+    expect(window.confirm).not.toHaveBeenCalled()
+    fireEvent.click(within(ask).getByRole('button', { name: 'Take the push back' }))
+
+    await waitFor(() => expect(stmt('Pending in bank')).toBe('−$312,000.00'))
+    expect(writes().at(-1)).toMatchObject({ method: 'POST', url: '/api/cmr/ledger/pending/unpush', body: { id: 'p1' } })
+    // Back to an ordinary pending row: no history note, and the usual controls return.
+    expect(rowFor('Ferguson Enterprises').textContent).not.toContain('Pushed to')
+    expect(within(rowFor('Ferguson Enterprises')).getByRole('checkbox')).toBeTruthy()
+
+    // …and the copy is gone from the day it had been pushed to.
+    fireEvent.change(screen.getByLabelText('Ledger date'), { target: { value: '2026-09-17' } })
+    await waitFor(() => expect(screen.queryByText('Ferguson Enterprises')).toBeNull())
+  })
+
+  it('cancelling the confirm writes nothing', async () => {
+    snaps.get('2026-09-16:am')!.items = [pushedItem()]
+    mount()
+    await screen.findByText('Ferguson Enterprises')
+    fireEvent.click(unpushBtn('Ferguson Enterprises'))
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(writes()).toHaveLength(0)
+    expect(rowFor('Ferguson Enterprises').textContent).toContain('Pushed to')
+  })
+
+  it('is disabled with the reason on the row once the copy was paid or moved', async () => {
+    snaps.get('2026-09-16:am')!.items = [
+      pushedItem({ canUnpush: false, unpushBlockedReason: 'The item it became was already paid — mark that one unpaid first.' }),
+    ]
+    mount()
+    await screen.findByText('Ferguson Enterprises')
+    expect((unpushBtn('Ferguson Enterprises') as HTMLButtonElement).disabled).toBe(true)
+    expect(rowFor('Ferguson Enterprises').textContent).toContain('Can’t be taken back: The item it became was already paid')
+  })
+
+  it('a refusal from the server is reported in-app and the row stays pushed', async () => {
+    unpushFails = true
+    snaps.get('2026-09-16:am')!.items = [pushedItem()]
+    mount()
+    await screen.findByText('Ferguson Enterprises')
+    fireEvent.click(unpushBtn('Ferguson Enterprises'))
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Take the push back' }))
+    await screen.findByText('Could not take the push back')
+    expect(window.alert).not.toHaveBeenCalled()
+    expect(rowFor('Ferguson Enterprises').textContent).toContain('Pushed to')
   })
 })

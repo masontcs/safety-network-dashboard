@@ -12,14 +12,16 @@ import { weekStartSunday } from '@/lib/cmr/week'
  *   • amount is OPTIONAL: a priority can be a task with no dollar figure. It is stored as 0 and
  *     shown blank. Totals simply sum whatever amounts exist.
  *   • status: open ↔ resolved, open ↔ paid (paid stamps paid_at/paid_by; leaving paid clears
- *     them). 'carried' is reserved for Phase 6 (carry forward) and is never written here.
+ *     them). 'carried' is never set by hand — carrying an OPEN priority into another week
+ *     (POST /api/cmr/priorities/carry) copies it there and marks the original carried, which
+ *     takes it out of "needed this week" while keeping it on the week it came from.
  *   • Money is integer cents everywhere.
  */
 
 export type { CmrPriorityStatus }
 
 export const CMR_PRIORITY_STATUSES: readonly CmrPriorityStatus[] = ['open', 'resolved', 'paid', 'carried'] as const
-/** The statuses Phase 4 may write. */
+/** The statuses a PATCH may write. 'carried' is only ever set by the carry function. */
 export const CMR_PRIORITY_WRITABLE_STATUSES = ['open', 'resolved', 'paid'] as const
 export type CmrPriorityWritableStatus = (typeof CMR_PRIORITY_WRITABLE_STATUSES)[number]
 
@@ -48,6 +50,10 @@ export interface CmrPriority {
   isTopPriority: boolean
   status: CmrPriorityStatus
   carriedFromId: string | null
+  /** Set on a 'carried' original: the week (its Sunday) it was carried to. */
+  carriedToWeek: string | null
+  /** Set on a forward copy: the week (its Sunday) it was carried from. */
+  carriedFromWeek: string | null
   paidAt: string | null
   paidBy: string | null
   /** Display name of paidBy, when known. */
@@ -107,7 +113,23 @@ export const CMR_PRIORITY_COLS =
 // bigint columns: PostgREST sends JSON numbers (cents stay far below 2^53). Normalise defensively.
 const cents = (v: number | string): number => Number(v)
 
-export function toCmrPriority(r: CmrPriorityRow, names: Map<string, string> = new Map()): CmrPriority {
+/**
+ * Which week each carried priority went to, and which week each forward copy came from, keyed
+ * by priority id. Those weeks live on OTHER rows, so the server resolves them; everywhere else
+ * they are simply absent.
+ */
+export interface CmrPriorityLinks {
+  carriedTo: Map<string, string>
+  carriedFrom: Map<string, string>
+}
+
+export const noPriorityLinks = (): CmrPriorityLinks => ({ carriedTo: new Map(), carriedFrom: new Map() })
+
+export function toCmrPriority(
+  r: CmrPriorityRow,
+  names: Map<string, string> = new Map(),
+  links: CmrPriorityLinks = noPriorityLinks(),
+): CmrPriority {
   return {
     id: r.id,
     weekStart: r.week_start,
@@ -118,6 +140,8 @@ export function toCmrPriority(r: CmrPriorityRow, names: Map<string, string> = ne
     isTopPriority: r.is_top_priority,
     status: r.status,
     carriedFromId: r.carried_from_id,
+    carriedToWeek: links.carriedTo.get(r.id) ?? null,
+    carriedFromWeek: links.carriedFrom.get(r.id) ?? null,
     paidAt: r.paid_at,
     paidBy: r.paid_by,
     paidByName: r.paid_by ? names.get(r.paid_by) ?? null : null,
@@ -134,6 +158,10 @@ export const comparePriorities = (a: Ordered, b: Ordered): number =>
 // ── the math ────────────────────────────────────────────────────────────────
 
 export const isDone = (s: CmrPriorityStatus): boolean => s === 'paid' || s === 'resolved'
+
+/** Only an OPEN priority carries forward; a carried one is history and can't be edited. */
+export const canCarryPriority = (p: { status: CmrPriorityStatus }): boolean => p.status === 'open'
+export const isPriorityHistory = (p: { status: CmrPriorityStatus }): boolean => p.status === 'carried'
 
 /**
  * Week totals. needed = Σ open; paid/resolved = Σ paid + resolved; total = Σ every row.
@@ -202,12 +230,13 @@ export function isPriorityStatus(v: unknown): v is CmrPriorityStatus {
 }
 
 /**
- * A status this phase may set. 'carried' is refused with its own code — carrying a priority
- * forward is Phase 6 and needs the new-week copy that comes with it.
+ * A status a PATCH may set. 'carried' is refused with its own code: a priority only becomes
+ * carried by being copied into another week, which is what POST /api/cmr/priorities/carry does
+ * — setting the flag alone would lose the copy and the week would simply stop showing the work.
  */
 export function parseWritableStatus(v: unknown): Parsed<CmrPriorityWritableStatus> & { code?: string } {
   if (v === 'carried') {
-    return { ok: false, error: 'Carrying a priority to another week isn’t available yet.', code: 'CARRY_NOT_AVAILABLE' }
+    return { ok: false, error: 'Use Carry to move a priority to another week.', code: 'USE_CARRY' }
   }
   if (typeof v === 'string' && (CMR_PRIORITY_WRITABLE_STATUSES as readonly string[]).includes(v)) {
     return { ok: true, value: v as CmrPriorityWritableStatus }

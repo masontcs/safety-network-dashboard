@@ -8,7 +8,9 @@ import { formatCurrency } from '@/lib/utils/format'
  * formatter, so client components can import it too.
  *
  *   • Each (ledger_date, period) is its own INDEPENDENT snapshot: AM and PM each have their own
- *     beginning cash, adjustments and pending items. Nothing carries over (that's Phase 6).
+ *     beginning cash, adjustments and pending items. Nothing rolls over on its own — a pending
+ *     item only moves when the Controller PUSHES it, which copies it onto the target day and
+ *     leaves the original behind marked 'pushed'.
  *   • A ledger row exists only once something is written; until then it is "virtual" (id null,
  *     beginning cash $0).
  *   • Current balance = beginning cash + Σ manual adjustments (signed) − Σ pending items.
@@ -62,6 +64,12 @@ export interface CmrLedgerAdjustment {
   createdAt: string
 }
 
+/** Where a pushed item went, or where a forward copy came from. */
+export interface CmrPendingWhere {
+  date: string
+  period: CmrLedgerPeriod
+}
+
 export interface CmrPendingItem {
   id: string
   accountId: string
@@ -73,6 +81,24 @@ export interface CmrPendingItem {
   status: CmrPendingStatus
   source: CmrPendingSource
   notes: string | null
+  /** The day this item was FIRST dated, however many times it has been pushed. */
+  originalDate: string | null
+  /** The ledger day it sits on now. */
+  effectiveDate: string | null
+  paidAt: string | null
+  paidBy: string | null
+  /** Display name of paidBy, when known. */
+  paidByName: string | null
+  /** The item this one was pushed forward from (null unless it is a forward copy). */
+  pushedFromId: string | null
+  /** Set on a forward copy: the day/period it was pushed from. */
+  pushedFrom: CmrPendingWhere | null
+  /** Set on a 'pushed' original: the day/period it was pushed to. */
+  pushedTo: CmrPendingWhere | null
+  /** Pushed, and the copy it became can still be taken back (Controller only; the API re-checks). */
+  canUnpush: boolean
+  /** Why un-pushing is not possible, in the reader's terms — null when it is. */
+  unpushBlockedReason: string | null
   sortOrder: number
   createdAt: string
 }
@@ -151,6 +177,8 @@ export type CmrPendingRow = {
   paid_by: string | null
   source: CmrPendingSource
   source_ref_id: string | null
+  /** The item this one was pushed forward from; that item carries status 'pushed'. */
+  pushed_from_id: string | null
   notes: string | null
   sort_order: number
   created_by: string | null
@@ -161,7 +189,7 @@ export const CMR_LEDGER_COLS = 'id, ledger_date, period, beginning_cash_cents, c
 export const CMR_ADJUSTMENT_COLS =
   'id, daily_ledger_id, description, amount_cents, note, warn_note, kind, sort_order, created_by, created_at'
 export const CMR_PENDING_COLS =
-  'id, daily_ledger_id, account_id, payee, amount_cents, status, original_date, effective_date, paid_at, paid_by, source, source_ref_id, notes, sort_order, created_by, created_at'
+  'id, daily_ledger_id, account_id, payee, amount_cents, status, original_date, effective_date, paid_at, paid_by, source, source_ref_id, pushed_from_id, notes, sort_order, created_by, created_at'
 
 // bigint columns: PostgREST sends JSON numbers (cents stay far below 2^53). Normalise defensively.
 const cents = (v: number | string): number => Number(v)
@@ -194,7 +222,29 @@ export const toCmrAdjustment = (r: CmrAdjustmentRow): CmrLedgerAdjustment => ({
   createdAt: r.created_at,
 })
 
-export function toCmrPendingItem(r: CmrPendingRow, accounts: Map<string, CmrLedgerAccountRef>): CmrPendingItem {
+/**
+ * Where each pushed item went and where each forward copy came from, keyed by item id. The
+ * server resolves these (they live on other ledgers); everywhere else they are simply absent.
+ */
+export interface CmrPendingLinks {
+  pushedTo: Map<string, CmrPendingWhere>
+  pushedFrom: Map<string, CmrPendingWhere>
+  /** The live status of each pushed item's forward copy, keyed by the ORIGINAL's id. */
+  copyStatus: Map<string, CmrPendingStatus>
+}
+
+export const noPendingLinks = (): CmrPendingLinks => ({
+  pushedTo: new Map(),
+  pushedFrom: new Map(),
+  copyStatus: new Map(),
+})
+
+export function toCmrPendingItem(
+  r: CmrPendingRow,
+  accounts: Map<string, CmrLedgerAccountRef>,
+  links: CmrPendingLinks = noPendingLinks(),
+  names: Map<string, string> = new Map(),
+): CmrPendingItem {
   const acc = accounts.get(r.account_id)
   return {
     id: r.id,
@@ -206,6 +256,16 @@ export function toCmrPendingItem(r: CmrPendingRow, accounts: Map<string, CmrLedg
     status: r.status,
     source: r.source,
     notes: r.notes,
+    originalDate: r.original_date,
+    effectiveDate: r.effective_date,
+    paidAt: r.paid_at,
+    paidBy: r.paid_by,
+    paidByName: r.paid_by ? names.get(r.paid_by) ?? null : null,
+    pushedFromId: r.pushed_from_id,
+    pushedFrom: links.pushedFrom.get(r.id) ?? null,
+    pushedTo: links.pushedTo.get(r.id) ?? null,
+    canUnpush: r.status === 'pushed' && unpushRefusal(links.copyStatus.get(r.id) ?? null) === null,
+    unpushBlockedReason: r.status === 'pushed' ? unpushRefusal(links.copyStatus.get(r.id) ?? null) : null,
     sortOrder: r.sort_order,
     createdAt: r.created_at,
   }
@@ -219,11 +279,42 @@ export const compareOrdered = (a: Ordered, b: Ordered): number =>
 // ── the math ────────────────────────────────────────────────────────────────
 
 /**
- * Whether a pending item still counts against the balance. Phase 3 only creates 'pending'
- * items. A 'paid' item stays in the day's breakdown (it left the bank that day); a 'pushed' one
- * has moved to another day and is counted there instead (Phase 6).
+ * Whether a pending item still counts against the balance. A 'paid' item stays in the day's
+ * breakdown (it left the bank that day); a 'pushed' one has moved to another day and is counted
+ * there instead.
  */
 export const countsTowardPending = (i: { status: CmrPendingStatus }): boolean => i.status !== 'pushed'
+
+/**
+ * The Phase 6 rules, shared by the API (which enforces them) and the client (which only hides
+ * buttons):
+ *
+ *   • PUSH moves a still-pending item to another day. A paid item already left the bank, and an
+ *     already-pushed one is history — its forward copy is the live row.
+ *   • PAY / UNPAY toggles the check-off on an item that is still on its own day, whatever it
+ *     came from (manual, recurring or a placed request). A pushed item can't be paid.
+ *   • EDIT / DELETE / REORDER stay what they were: hand-entered, still-pending items only.
+ */
+/**
+ * Whether a PUSHED item can be taken back, and why not when it can't — the mirror of
+ * unplaceRefusal for requests. Un-pushing deletes the forward copy, so it is allowed only while
+ * that copy is still an untouched pending item:
+ *
+ *   • the copy is still 'pending'   → yes;
+ *   • the copy was paid             → no, that payment would be erased;
+ *   • the copy was pushed on again  → no, undo that push first;
+ *   • the copy is already gone      → yes (the original is simply put back — and the delete
+ *     trigger will normally have done that already).
+ */
+export function unpushRefusal(copyStatus: CmrPendingStatus | null): string | null {
+  if (copyStatus === 'paid') return 'The item it became was already paid — mark that one unpaid first.'
+  if (copyStatus === 'pushed') return 'The item it became was pushed on to another day. Undo that push first.'
+  return null
+}
+
+export const canPushPending = (i: { status: CmrPendingStatus }): boolean => i.status === 'pending'
+export const canPayPending = (i: { status: CmrPendingStatus }): boolean => i.status !== 'pushed'
+export const isPendingHistory = (i: { status: CmrPendingStatus }): boolean => i.status === 'pushed'
 
 export function computeLedgerTotals(
   beginningCashCents: number,
@@ -309,6 +400,10 @@ export function shiftLedgerDate(d: string, days: number): string {
 
 export const ledgerLabel = (date: string, period: CmrLedgerPeriod): string => `${date} ${CMR_LEDGER_PERIOD_LABEL[period]}`
 
+/** "Thu, Sep 17 · PM" — a day/period in the reader's terms. */
+export const formatWhere = (w: CmrPendingWhere, opts: { year?: boolean } = {}): string =>
+  `${formatLedgerDate(w.date, opts)} ${CMR_LEDGER_PERIOD_LABEL[w.period]}`
+
 // ── validation ──────────────────────────────────────────────────────────────
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; error: string }
@@ -387,3 +482,36 @@ export const reorderCmrAdjustments = (supabase: Service, ledgerId: string, ids: 
 
 export const reorderCmrPendingItems = (supabase: Service, ledgerId: string, ids: string[]) =>
   rpc(supabase, 'cmr_reorder_pending_items', { p_ledger_id: ledgerId, p_ids: ids })
+
+// ── check-off ───────────────────────────────────────────────────────────────
+
+/** The two states the paid check-off moves a pending item between. */
+export const CMR_PENDING_CHECKOFF = ['pending', 'paid'] as const
+export type CmrPendingCheckoff = (typeof CMR_PENDING_CHECKOFF)[number]
+
+export function parseCheckoff(v: unknown): Parsed<CmrPendingCheckoff> {
+  if (v === 'pushed') {
+    return { ok: false, error: 'Use Push to move an item to another day.' }
+  }
+  return v === 'pending' || v === 'paid'
+    ? { ok: true, value: v }
+    : { ok: false, error: 'Status must be paid or pending.' }
+}
+
+/**
+ * The columns the check-off writes. → paid stamps paid_at/paid_by (keeping an existing stamp);
+ * back to pending clears them. Mirrors statusPatch for weekly priorities.
+ */
+export function checkoffPatch(
+  prev: { status: CmrPendingStatus; paid_at: string | null; paid_by: string | null },
+  next: CmrPendingCheckoff,
+  actorId: string,
+  now: string,
+): { status: CmrPendingCheckoff; paid_at: string | null; paid_by: string | null } {
+  if (next === 'paid') {
+    return prev.status === 'paid'
+      ? { status: 'paid', paid_at: prev.paid_at ?? now, paid_by: prev.paid_by }
+      : { status: 'paid', paid_at: now, paid_by: actorId }
+  }
+  return { status: 'pending', paid_at: null, paid_by: null }
+}

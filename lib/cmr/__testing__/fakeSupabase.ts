@@ -3,6 +3,7 @@
  * Supports the query shapes lib/api/cmr.ts and the /api/cmr routes use:
  *   from(t).select(cols, {count, head}).eq(c, v).in(c, vs).order(..).maybeSingle() / await
  *   from(t).insert(row) / .update(patch).eq(..) / .delete().eq(..)
+ *   from(t).update(patch).eq(..).select(..)   (returns the rows the predicate actually matched)
  *   from(t).insert(row).select(..).single()   (returns the inserted row)
  *   from(t).upsert(row, {onConflict, ignoreDuplicates}).select(..)   (returns written rows)
  *   rpc(name, args)                           (handlers supplied via options.rpc)
@@ -27,6 +28,13 @@ export interface FakeOptions {
   defaults?: Record<string, () => Row>
   /** Unique checks run on insert/update, per table: return an error message to reject. */
   unique?: Record<string, (candidate: Row, others: Row[]) => string | null>
+  /**
+   * AFTER DELETE trigger stand-ins, per table: called with the rows the delete removed and the
+   * whole store, so a test can state what the database does on its own (e.g.
+   * cmr_revive_pushed_source putting a pushed item back when its forward copy is deleted).
+   * Runs for every delete on that table, whichever query issued it.
+   */
+  onDelete?: Record<string, (deleted: Row[], tables: Record<string, Row[]>) => void>
   /**
    * rpc(name, args) handlers; they may mutate `tables` directly. Return null for success with
    * no payload, `{ message }` to make the call fail, or `{ data }` for a function that returns
@@ -139,7 +147,9 @@ export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions =
         return { data: mode === 'many' ? out : out[0] ?? null, error: null }
       }
       if (this.op === 'delete') {
+        const removed = rows.filter((r) => this.match(r))
         tables[this.table] = rows.filter((r) => !this.match(r))
+        if (removed.length) opts.onDelete?.[this.table]?.(removed, tables)
         return { data: null, error: null }
       }
 

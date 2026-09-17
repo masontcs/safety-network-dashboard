@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   DndContext,
   KeyboardSensor,
@@ -29,10 +29,14 @@ import {
   CMR_PAYEE_MAX,
   CMR_PENDING_NOTES_MAX,
   CMR_WARN_SUGGESTIONS,
+  canPayPending,
+  canPushPending,
   formatBalanceCents,
   formatCents,
   formatLedgerDate,
   formatSignedCents,
+  formatWhere,
+  isPendingHistory,
   parseLedgerDate,
   shiftLedgerDate,
   type CmrLedger,
@@ -43,6 +47,7 @@ import {
   type CmrPendingGroup,
   type CmrPendingItem,
 } from '@/lib/cmr/ledger'
+import { initialsOf } from '@/lib/cmr/priorities'
 
 /**
  * Daily ledger — the Cash Ledger home (/cmr).
@@ -55,8 +60,14 @@ import {
  *
  * Every CMR role reads this screen. Only a Controller (`canEdit` from the API) gets edit
  * controls — set beginning cash; add / edit / delete / reorder adjustment lines and pending
- * items (deletes confirm in-app; reorder is @dnd-kit drag plus up/down buttons, WCAG 2.5.7).
- * Hiding controls is cosmetic: /api/cmr/ledger/* re-checks the Controller role on every write.
+ * items (deletes confirm in-app; reorder is @dnd-kit drag plus up/down buttons, WCAG 2.5.7);
+ * check a pending item off as PAID; and PUSH one to another day. Hiding controls is cosmetic:
+ * /api/cmr/ledger/* re-checks the Controller role on every write.
+ *
+ * Pushing keeps the history: the item stays on this day greyed and marked "pushed to …", and
+ * because a pushed item is left out of the roll-up it stops counting against this day's balance
+ * at once. The copy on the target day shows "pushed from …". Paid items stay in the day's
+ * breakdown and keep counting — the money left the bank here.
  */
 
 type ApiResult<T> = { success: true; data: T } | { success: false; error: string; code?: string }
@@ -113,6 +124,7 @@ export default function CmrLedgerClient({
   const [mode, setMode] = useState<Mode>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [reordering, setReordering] = useState<string | null>(null)
+  const [pushing, setPushing] = useState<CmrPendingItem | null>(null)
 
   const keyRef = useRef({ date, period })
   keyRef.current = { date, period }
@@ -162,7 +174,7 @@ export default function CmrLedgerClient({
   // The data on screen must be for the date/period in the controls; otherwise show a skeleton.
   const current = view && view.ledger.ledgerDate === date && view.ledger.period === period ? view : null
   const canEdit = current?.canEdit === true
-  const locked = mode !== null || reordering !== null
+  const locked = mode !== null || reordering !== null || pushing !== null
   const periodLabel = CMR_LEDGER_PERIOD_LABEL[period]
   const dayLabel = formatLedgerDate(date)
   const isToday = date === today
@@ -273,6 +285,73 @@ export default function CmrLedgerClient({
     setStatus(`${i.payee} deleted.`)
     await reload()
     focusLater('addPending')
+  }
+
+  async function setPaid(i: CmrPendingItem, paid: boolean) {
+    if (!paid) {
+      const ok = await confirm({
+        title: `Mark ${i.payee} unpaid?`,
+        message: `This clears the paid stamp${i.paidAt ? ` (${TIME_FMT.format(new Date(i.paidAt))}${i.paidByName ? `, ${i.paidByName}` : ''})` : ''} and puts it back to pending on this snapshot. The change is recorded in the audit log.`,
+        confirmLabel: 'Mark unpaid',
+      })
+      if (!ok) return
+    }
+    setBusyId(i.id)
+    const r = await api<{ item: CmrPendingItem; changed: boolean }>('/api/cmr/ledger/pending', {
+      method: 'PATCH',
+      body: JSON.stringify({ id: i.id, status: paid ? 'paid' : 'pending' }),
+    })
+    setBusyId(null)
+    if (!r.success) {
+      await alert({ title: paid ? 'Could not check it off' : 'Could not mark it unpaid', message: r.error })
+      if (r.code === 'NOT_FOUND' || r.code === 'NOT_EDITABLE') await reload()
+      return
+    }
+    setStatus(`${i.payee} ${paid ? 'checked off as paid' : 'marked unpaid'}.`)
+    await reload()
+    focusLater(`paid:${i.id}`)
+  }
+
+  async function unpushItem(i: CmrPendingItem) {
+    const ok = await confirm({
+      title: `Take back the push of ${i.payee}?`,
+      message: `This deletes the ${formatCents(i.amountCents)} item on ${i.pushedTo ? formatWhere(i.pushedTo, { year: false }) : 'the day it was pushed to'} and puts this one back to pending on ${dayLabel} ${periodLabel}, where it will count against the balance again. The change is recorded in the audit log.`,
+      confirmLabel: 'Take the push back',
+    })
+    if (!ok) return
+    setBusyId(i.id)
+    const r = await api<{ removedCopyId: string | null }>('/api/cmr/ledger/pending/unpush', {
+      method: 'POST',
+      body: JSON.stringify({ id: i.id }),
+    })
+    setBusyId(null)
+    if (!r.success) {
+      await alert({ title: 'Could not take the push back', message: r.error })
+      await reload()
+      return
+    }
+    setStatus(`${i.payee} is back on this snapshot as pending.`)
+    await reload()
+    focusLater(`pend:${i.id}`)
+  }
+
+  async function pushItem(i: CmrPendingItem, body: Record<string, unknown>): Promise<boolean> {
+    setBusyId(i.id)
+    const r = await api<{ where: string; to: { date: string; period: CmrLedgerPeriod } }>('/api/cmr/ledger/pending/push', {
+      method: 'POST',
+      body: JSON.stringify({ id: i.id, ...body }),
+    })
+    setBusyId(null)
+    if (!r.success) {
+      await alert({ title: 'Could not push the item', message: r.error })
+      if (r.code === 'NOT_FOUND' || r.code === 'NOT_PENDING') { setPushing(null); await reload() }
+      return false
+    }
+    setStatus(`${i.payee} pushed to ${formatWhere(r.data.to)}. It stays on this day as history.`)
+    setPushing(null)
+    await reload()
+    focusLater('addPending')
+    return true
   }
 
   // Optimistic reorders; one at a time; rolled back if the save fails.
@@ -594,6 +673,9 @@ export default function CmrLedgerClient({
                   onSave={savePending}
                   onCancel={(it) => { setMode(null); focusLater(`pend:${it.id}`) }}
                   onOrder={(next, moved) => void reorderPending(g, next, moved)}
+                  onPaid={(it, paid) => void setPaid(it, paid)}
+                  onPush={(it) => setPushing(it)}
+                  onUnpush={(it) => void unpushItem(it)}
                 />
               ))}
               {canEdit && mode?.kind === 'addPending' && (
@@ -616,13 +698,157 @@ export default function CmrLedgerClient({
           {canEdit && (current.adjustments.length > 1 || pendingCount > 1) && (
             <p className="cmr-hint">
               Drag the <CmrIcon name="grip" size={12} /> handle or use the arrows to reorder. Pending items reorder within their
-              account; edit an item to move it to another account. AM and PM are separate snapshots — nothing carries over
-              between them.
+              account; edit an item to move it to another account. AM and PM are separate snapshots — nothing moves between
+              them on its own; push an item to send it forward, and un-push to bring it back.
             </p>
           )}
         </>
       )}
+
+      {pushing && current && (
+        <PushDialog
+          item={pushing}
+          from={{ date: current.ledger.ledgerDate, period: current.ledger.period }}
+          busy={busyId === pushing.id}
+          onPush={(b) => pushItem(pushing, b)}
+          onCancel={() => { const id = pushing.id; setPushing(null); focusLater(`push:${id}`) }}
+        />
+      )}
     </>
+  )
+}
+
+// ── the Push dialog (in-app; never a native prompt) ─────────────────────────
+
+function PushDialog({
+  item,
+  from,
+  busy,
+  onPush,
+  onCancel,
+}: {
+  item: CmrPendingItem
+  from: { date: string; period: CmrLedgerPeriod }
+  busy: boolean
+  onPush: (body: Record<string, unknown>) => Promise<boolean>
+  onCancel: () => void
+}) {
+  // The default IS the answer most days: tomorrow, same snapshot. Both are free to change.
+  const [date, setDate] = useState(shiftLedgerDate(from.date, 1))
+  const [period, setPeriod] = useState<CmrLedgerPeriod>(from.period)
+  const [saving, setSaving] = useState(false)
+
+  const wrap = useRef<HTMLDivElement>(null)
+  const firstRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { requestAnimationFrame(() => firstRef.current?.focus()) }, [])
+
+  // Escape closes; Tab is kept inside the dialog while it is open.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); onCancel(); return }
+      if (e.key !== 'Tab' || !wrap.current) return
+      const items = wrap.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )
+      if (!items.length) return
+      const first = items[0]
+      const last = items[items.length - 1]
+      if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCancel])
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    await onPush({ targetDate: date, targetPeriod: period })
+    setSaving(false)
+  }
+
+  const busyNow = saving || busy
+  const sameSnapshot = date === from.date && period === from.period
+
+  return (
+    <div className="cmr-rq-scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel() }}>
+      <div
+        ref={wrap}
+        className="cmr-rq-dialog cmr-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cmr-lg-push-title"
+        aria-describedby="cmr-lg-push-desc"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <h2 id="cmr-lg-push-title" className="cmr-serif">Push {item.payee}</h2>
+        <p id="cmr-lg-push-desc">
+          {item.accountName} · {formatCents(item.amountCents)} · now on {formatWhere(from)}
+        </p>
+
+        <form onSubmit={submit} noValidate>
+          <div className="cmr-rq-dialogfields">
+            <label className="cmr-field">
+              <span className="cmr-label">Move to</span>
+              <input
+                ref={firstRef}
+                className="cmr-input"
+                type="date"
+                value={date}
+                min="2000-01-01"
+                max="2100-12-31"
+                onChange={(e) => setDate(e.target.value || date)}
+                disabled={busyNow}
+                required
+              />
+            </label>
+            <div className="cmr-field">
+              <span className="cmr-label">Snapshot</span>
+              <div className="cmr-seg cmr-lg-dir" role="group" aria-label="AM or PM">
+                {CMR_LEDGER_PERIODS.map((p) => (
+                  <button key={p} type="button" aria-pressed={period === p} onClick={() => setPeriod(p)} disabled={busyNow}>
+                    {CMR_LEDGER_PERIOD_LABEL[p]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="cmr-field cmr-rq-weekjump">
+              <span className="cmr-label">Jump</span>
+              <div className="cmr-seg cmr-lg-dir" role="group" aria-label="Move a day">
+                <button type="button" onClick={() => setDate(shiftLedgerDate(date, -1))} disabled={busyNow} aria-label="The day before">
+                  <CmrIcon name="left" size={14} />
+                </button>
+                <button type="button" onClick={() => { setDate(shiftLedgerDate(from.date, 1)); setPeriod(from.period) }} disabled={busyNow}>
+                  Next day
+                </button>
+                <button type="button" onClick={() => setDate(shiftLedgerDate(date, 1))} disabled={busyNow} aria-label="The day after">
+                  <CmrIcon name="right" size={14} />
+                </button>
+              </div>
+            </div>
+            <p className="cmr-rq-dialognote span-all">
+              {sameSnapshot ? (
+                <>That’s the snapshot it’s already on — choose another day or AM/PM.</>
+              ) : (
+                <>
+                  Moves to <b>{formatWhere({ date, period })}</b> under {item.accountName}. It stays on{' '}
+                  {formatWhere(from, { year: false })} as history, marked pushed, and stops counting against that balance.
+                </>
+              )}
+            </p>
+          </div>
+
+          <div className="acts">
+            <button type="button" className="cmr-btn sm ghost" onClick={onCancel} disabled={busyNow}>Cancel</button>
+            <button type="submit" className="cmr-btn sm" disabled={busyNow || sameSnapshot}>
+              <CmrIcon name="right" size={14} />
+              {busyNow ? 'Pushing…' : 'Push it forward'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   )
 }
 
@@ -784,12 +1010,17 @@ function SortableLi({
   )
 }
 
+/**
+ * Move / edit / delete for one row. `bare` leaves off the .ctl wrapper, for a row that already
+ * has one of its own (a pending item, whose check-off and Push sit in the same group).
+ */
 function RowControls({
   name,
   index,
   total,
   disabled,
   editRef,
+  bare = false,
   onMove,
   onEdit,
   onDelete,
@@ -799,12 +1030,14 @@ function RowControls({
   total: number
   disabled: boolean
   editRef: (el: HTMLElement | null) => void
+  bare?: boolean
   onMove: (delta: -1 | 1) => void
   onEdit: () => void
   onDelete: () => void
 }) {
+  const Wrap = bare ? React.Fragment : 'div'
   return (
-    <div className="ctl">
+    <Wrap {...(bare ? {} : { className: 'ctl' })}>
       <div className="moves">
         <button type="button" className="cmr-iconbtn sm" onClick={() => onMove(-1)} disabled={disabled || index === 0} aria-label={`Move ${name} up`} title="Move up">
           <CmrIcon name="up" />
@@ -819,7 +1052,7 @@ function RowControls({
       <button type="button" className="cmr-iconbtn sm danger" onClick={onDelete} disabled={disabled} aria-label={`Delete ${name}`} title="Delete">
         <CmrIcon name="trash" />
       </button>
-    </div>
+    </Wrap>
   )
 }
 
@@ -915,6 +1148,9 @@ function PendingGroupBlock({
   onSave,
   onCancel,
   onOrder,
+  onPaid,
+  onPush,
+  onUnpush,
 }: {
   group: CmrPendingGroup
   canEdit: boolean
@@ -929,6 +1165,9 @@ function PendingGroupBlock({
   onSave: (it: CmrPendingItem, body: Record<string, unknown>) => Promise<boolean>
   onCancel: (it: CmrPendingItem) => void
   onOrder: (next: CmrPendingItem[], movedId: string) => void
+  onPaid: (it: CmrPendingItem, paid: boolean) => void
+  onPush: (it: CmrPendingItem) => void
+  onUnpush: (it: CmrPendingItem) => void
 }) {
   const headId = `cmr-lg-acct-${g.accountId}`
   const title = `${g.accountName}${g.accountType ? ` · ${g.accountType}` : ''}`
@@ -957,7 +1196,16 @@ function PendingGroupBlock({
           const busy = busyId === it.id
           const editing = editingId === it.id
           const editable = it.status === 'pending' && it.source === 'manual'
-          const cls = ['cmr-row', 'cmr-lg-row', it.status === 'paid' ? 'paid' : '', editing ? 'editing' : ''].filter(Boolean).join(' ')
+          const history = isPendingHistory(it)
+          const cls = [
+            'cmr-row',
+            'cmr-lg-row',
+            it.status === 'paid' ? 'paid' : '',
+            history ? 'pushed' : '',
+            editing ? 'editing' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')
           const body = (
             <>
               <div className="who">
@@ -966,6 +1214,12 @@ function PendingGroupBlock({
                   {it.status !== 'pending' && <span className="cmr-pill viewer">{it.status === 'paid' ? 'Paid' : 'Pushed'}</span>}
                   {it.source !== 'manual' && <span className="cmr-pill">{it.source === 'recurring' ? 'Recurring' : 'Request'}</span>}
                 </span>
+                <PendingMeta it={it} />
+                {it.status === 'pushed' && it.unpushBlockedReason && (
+                  <span className="mt cmr-rq-blocked">
+                    <CmrIcon name="lock" size={11} /> Can’t be taken back: {it.unpushBlockedReason}
+                  </span>
+                )}
                 {it.notes && <span className="note">{it.notes}</span>}
               </div>
               <span className="amt cmr-num out">{formatSignedCents(-it.amountCents)}</span>
@@ -981,24 +1235,64 @@ function PendingGroupBlock({
               ) : (
                 <>
                   {body}
-                  {editable ? (
-                    <RowControls
-                      name={it.payee}
-                      index={i}
-                      total={g.items.length}
-                      disabled={locked || busy}
-                      editRef={refFor(`pend:${it.id}`)}
-                      onMove={(d) => {
-                        const to = i + d
-                        if (to < 0 || to >= g.items.length) return
-                        onOrder(arrayMove(g.items, i, to), it.id)
-                      }}
-                      onEdit={() => onEdit(it)}
-                      onDelete={() => onDelete(it)}
-                    />
-                  ) : (
-                    <div className="ctl" />
-                  )}
+                  <div className="ctl">
+                    {canPayPending(it) && (
+                      <label className={`cmr-lg-check${it.status === 'paid' ? ' on' : ''}`}>
+                        <input
+                          type="checkbox"
+                          ref={refFor(`paid:${it.id}`) as (el: HTMLInputElement | null) => void}
+                          checked={it.status === 'paid'}
+                          disabled={locked || busy}
+                          onChange={(e) => onPaid(it, e.target.checked)}
+                          aria-label={`Paid: ${it.payee}, ${formatCents(it.amountCents)}`}
+                        />
+                        <span aria-hidden="true">Paid</span>
+                      </label>
+                    )}
+                    {canPushPending(it) && (
+                      <button
+                        type="button"
+                        ref={refFor(`push:${it.id}`)}
+                        className="cmr-btn sm ghost"
+                        onClick={() => onPush(it)}
+                        disabled={locked || busy}
+                        aria-label={`Push ${it.payee} to another day`}
+                        title="Push to another day"
+                      >
+                        <CmrIcon name="right" size={14} /> <span className="cmr-pr-lbl">Push</span>
+                      </button>
+                    )}
+                    {history && (
+                      <button
+                        type="button"
+                        ref={refFor(`unpush:${it.id}`)}
+                        className="cmr-btn sm ghost"
+                        onClick={() => onUnpush(it)}
+                        disabled={locked || busy || !it.canUnpush}
+                        aria-label={`Take back the push of ${it.payee}`}
+                        title={it.unpushBlockedReason ?? 'Delete the item it became and put this one back to pending'}
+                      >
+                        <CmrIcon name="undo" size={14} /> <span className="cmr-pr-lbl">Un-push</span>
+                      </button>
+                    )}
+                    {editable && (
+                      <RowControls
+                        bare
+                        name={it.payee}
+                        index={i}
+                        total={g.items.length}
+                        disabled={locked || busy}
+                        editRef={refFor(`pend:${it.id}`)}
+                        onMove={(d) => {
+                          const to = i + d
+                          if (to < 0 || to >= g.items.length) return
+                          onOrder(arrayMove(g.items, i, to), it.id)
+                        }}
+                        onEdit={() => onEdit(it)}
+                        onDelete={() => onDelete(it)}
+                      />
+                    )}
+                  </div>
                 </>
               )}
             </SortableLi>
@@ -1006,6 +1300,55 @@ function PendingGroupBlock({
         })}
       </Reorderable>
     </div>
+  )
+}
+
+/**
+ * The second line of a pending item: where it was pushed to (on the original this day keeps),
+ * where it came from (on a forward copy), and the paid stamp. Read-only for every role — this
+ * is the history the phase is for.
+ */
+function PendingMeta({ it }: { it: CmrPendingItem }) {
+  const bits: React.ReactNode[] = []
+  if (it.pushedTo) {
+    bits.push(
+      <span key="to">
+        Pushed to <time dateTime={it.pushedTo.date}>{formatWhere(it.pushedTo, { year: false })}</time>
+      </span>,
+    )
+  } else if (it.status === 'pushed') {
+    bits.push(<span key="to">Pushed to another day</span>)
+  }
+  if (it.pushedFrom) {
+    bits.push(
+      <span key="from">
+        Pushed from <time dateTime={it.pushedFrom.date}>{formatWhere(it.pushedFrom, { year: false })}</time>
+      </span>,
+    )
+  }
+  if (it.status === 'paid' && it.paidAt) {
+    bits.push(
+      <span key="paid" className="cmr-pr-stamp">
+        Paid {TIME_FMT.format(new Date(it.paidAt))}
+        {it.paidByName && (
+          <>
+            {' · '}
+            <abbr title={it.paidByName}>{initialsOf(it.paidByName)}</abbr>
+          </>
+        )}
+      </span>,
+    )
+  }
+  if (!bits.length) return null
+  return (
+    <span className="mt">
+      {bits.map((b, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && ' · '}
+          {b}
+        </React.Fragment>
+      ))}
+    </span>
   )
 }
 

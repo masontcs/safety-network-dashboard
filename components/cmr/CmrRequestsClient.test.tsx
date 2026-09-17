@@ -31,6 +31,7 @@ let canEdit: boolean
 let canRequest: boolean
 let calls: { method: string; url: string; body: any }[] // eslint-disable-line @typescript-eslint/no-explicit-any
 let placeFails: string | null
+let unplaceFails: string | null
 
 const rq = (id: string, over: Partial<CmrRequest> = {}): CmrRequest => ({
   id,
@@ -50,6 +51,8 @@ const rq = (id: string, over: Partial<CmrRequest> = {}): CmrRequest => ({
   placedBy: null,
   placedByName: null,
   createdAt: '2026-09-15T15:00:00Z',
+  canUnplace: false,
+  unplaceBlockedReason: null,
   ...over,
 })
 
@@ -90,6 +93,7 @@ beforeEach(() => {
       placedBy: THEM,
       placedByName: 'Mason Doty',
       createdAt: '2026-09-15T12:00:00Z',
+      canUnplace: true,
     }),
     rq('nope', { vendor: 'Already declined', status: 'declined', createdAt: '2026-09-15T11:00:00Z' }),
   ]
@@ -97,6 +101,7 @@ beforeEach(() => {
   canRequest = true
   calls = []
   placeFails = null
+  unplaceFails = null
   window.confirm = vi.fn(() => true)
   window.alert = vi.fn()
   window.prompt = vi.fn(() => 'x')
@@ -125,8 +130,23 @@ beforeEach(() => {
     if (u.pathname === '/api/cmr/requests/place') {
       if (placeFails) return json({ success: false, error: placeFails, code: 'NOT_QUEUED' }, 409)
       const row = store.find((r) => r.id === body.id)!
-      Object.assign(row, { status: 'placed', placedKind: body.target, placedRefId: 'ref', placedAt: '2026-09-16T12:00:00Z', placedByName: 'Mason Doty' })
+      Object.assign(row, { status: 'placed', placedKind: body.target, placedRefId: 'ref', placedAt: '2026-09-16T12:00:00Z', placedByName: 'Mason Doty', canUnplace: true, unplaceBlockedReason: null })
       return json({ success: true, data: { request: row, placedKind: body.target, placedRefId: 'ref', where: body.target === 'pending' ? `${body.date} ${body.period}` : 'Sep 13 – 19' } })
+    }
+    if (u.pathname === '/api/cmr/requests/unplace') {
+      if (unplaceFails) return json({ success: false, error: unplaceFails, code: 'ROW_PAID' }, 409)
+      const row = store.find((r) => r.id === body.id)!
+      Object.assign(row, {
+        status: 'queued',
+        placedKind: null,
+        placedRefId: null,
+        placedAt: null,
+        placedBy: null,
+        placedByName: null,
+        canUnplace: false,
+        unplaceBlockedReason: null,
+      })
+      return json({ success: true, data: { request: row, removedRowId: 'ref' } })
     }
     if (u.pathname === '/api/cmr/requests/decline') {
       const row = store.find((r) => r.id === body.id)!
@@ -195,16 +215,37 @@ describe('role → controls', () => {
     expect(screen.getByText(/Only a Controller or a Requester can submit/)).toBeTruthy()
   })
 
-  it('a settled request is read-only for everyone, and says where it went', async () => {
+  it('a settled request says where it went; only a Controller gets Undo placement, and only on a placed one', async () => {
     mount()
     await ready()
     const placed = within(rowFor('Already placed'))
     expect(placed.getByText('Placed')).toBeTruthy()
     expect(placed.getByText('Daily pending')).toBeTruthy()
-    expect(placed.queryByRole('button')).toBeNull()
+    // The one control a settled row ever has — and the fixture says its line is still untouched.
+    expect(placed.getByRole('button', { name: 'Undo the placement of Already placed' })).toBeTruthy()
     const declined = within(rowFor('Already declined'))
     expect(declined.getByText('Declined')).toBeTruthy()
     expect(declined.queryByRole('button')).toBeNull()
+  })
+
+  it('a requester or viewer never sees Undo placement', async () => {
+    canEdit = false
+    mount()
+    await ready()
+    expect(screen.queryByRole('button', { name: /^Undo the placement/ })).toBeNull()
+  })
+
+  it('Undo placement is disabled, with the reason on the row, once the line was paid or moved', async () => {
+    store = store.map((r) =>
+      r.vendor === 'Already placed'
+        ? { ...r, canUnplace: false, unplaceBlockedReason: 'It was already paid — undoing would erase the payment. Mark it unpaid first.' }
+        : r,
+    )
+    mount()
+    await ready()
+    const placed = within(rowFor('Already placed'))
+    expect((placed.getByRole('button', { name: 'Undo the placement of Already placed' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(placed.getByText(/Can’t be undone: It was already paid/)).toBeTruthy()
   })
 })
 
@@ -415,5 +456,60 @@ describe('the queue', () => {
     mount()
     await screen.findByText('Database unavailable.')
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+  })
+})
+
+// ── Phase 6: undoing a placement ────────────────────────────────────────────
+
+describe('undo placement', () => {
+  it('takes the request back to the queue after an in-app confirm (never window.confirm)', async () => {
+    mount()
+    await ready()
+    fireEvent.click(within(rowFor('Already placed')).getByRole('button', { name: 'Undo the placement of Already placed' }))
+
+    const ask = await screen.findByRole('alertdialog')
+    expect(ask.textContent).toContain('Undo the placement of Already placed?')
+    expect(ask.textContent).toContain('deletes the daily pending line')
+    expect(window.confirm).not.toHaveBeenCalled()
+    fireEvent.click(within(ask).getByRole('button', { name: 'Undo placement' }))
+
+    await waitFor(() => expect(calls.some((c) => c.url === '/api/cmr/requests/unplace')).toBe(true))
+    expect(calls.find((c) => c.url === '/api/cmr/requests/unplace')!.body).toMatchObject({ id: 'done' })
+    // It is back in the queue, with the queue's controls again.
+    await waitFor(() => expect(within(rowFor('Already placed')).getByRole('button', { name: 'Place the request for Already placed' })).toBeTruthy())
+    expect(screen.queryByRole('button', { name: /^Undo the placement/ })).toBeNull()
+  })
+
+  it('cancelling the confirm writes nothing', async () => {
+    mount()
+    await ready()
+    fireEvent.click(within(rowFor('Already placed')).getByRole('button', { name: 'Undo the placement of Already placed' }))
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(calls.some((c) => c.url === '/api/cmr/requests/unplace')).toBe(false)
+    expect(within(rowFor('Already placed')).getByText('Placed')).toBeTruthy()
+  })
+
+  it('a refusal from the server is reported in-app and the row stays placed', async () => {
+    unplaceFails = 'What this request became was already paid — undoing would erase the payment.'
+    mount()
+    await ready()
+    fireEvent.click(within(rowFor('Already placed')).getByRole('button', { name: 'Undo the placement of Already placed' }))
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Undo placement' }))
+    await screen.findByText('Could not undo the placement')
+    expect(window.alert).not.toHaveBeenCalled()
+    expect(within(rowFor('Already placed')).getByText('Placed')).toBeTruthy()
+  })
+
+  it('a request just placed can be taken straight back', async () => {
+    mount()
+    await ready()
+    fireEvent.click(within(rowFor('Sunbelt Rentals')).getByRole('button', { name: 'Place the request for Sunbelt Rentals' }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Add to that day' }))
+    await waitFor(() => expect(within(rowFor('Sunbelt Rentals')).getByText('Placed')).toBeTruthy())
+
+    fireEvent.click(within(rowFor('Sunbelt Rentals')).getByRole('button', { name: 'Undo the placement of Sunbelt Rentals' }))
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Undo placement' }))
+    await waitFor(() => expect(within(rowFor('Sunbelt Rentals')).getByRole('button', { name: 'Place the request for Sunbelt Rentals' })).toBeTruthy())
   })
 })

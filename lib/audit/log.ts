@@ -62,6 +62,12 @@ export type AuditAction =
   | 'cmr.ledger.pending.update'
   | 'cmr.ledger.pending.delete'
   | 'cmr.ledger.pending.reorder'
+  // SN Cash Ledger — moving work forward and checking it off (Phase 6). A pushed item stays on
+  // its old day as history; the forward copy is the live one.
+  | 'cmr.pending.push'
+  | 'cmr.pending.unpush'
+  | 'cmr.pending.pay'
+  | 'cmr.pending.unpay'
   // SN Cash Ledger — weekly priorities (Controller may hard-delete; carry-forward is Phase 6)
   | 'cmr.priority.create'
   | 'cmr.priority.update'
@@ -72,6 +78,7 @@ export type AuditAction =
   | 'cmr.priority.reopen'
   | 'cmr.priority.delete'
   | 'cmr.priority.reorder'
+  | 'cmr.priority.carry'
   // SN Cash Ledger — vendor requests (the only write a non-Controller can make; a withdrawn
   // request is hard-deleted, so the audit entry is the only record it ever existed)
   | 'cmr.request.submit'
@@ -79,6 +86,7 @@ export type AuditAction =
   | 'cmr.request.withdraw'
   | 'cmr.request.place'
   | 'cmr.request.decline'
+  | 'cmr.request.unplace'
 
 // ── Payload ────────────────────────────────────────────────────────────────────
 

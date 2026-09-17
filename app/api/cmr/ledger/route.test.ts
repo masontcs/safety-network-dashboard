@@ -32,6 +32,7 @@ import * as adjRoute from './adjustments/route'
 import * as adjReorderRoute from './adjustments/reorder/route'
 import * as pendRoute from './pending/route'
 import * as pendReorderRoute from './pending/reorder/route'
+import * as pendPushRoute from './pending/push/route'
 
 const ADMIN = '00000000-0000-4000-8000-00000000a0a0'
 const CONTROLLER = '00000000-0000-4000-8000-00000000c0c0'
@@ -189,12 +190,13 @@ const api = {
   editPend: (body: unknown) => pendRoute.PATCH(req('PATCH', '/pending', body)),
   delPend: (id: string) => pendRoute.DELETE(req('DELETE', `/pending?id=${id}`)),
   orderPend: (body: unknown) => pendReorderRoute.POST(req('POST', '/pending/reorder', body)),
+  pushPend: (body: unknown) => pendPushRoute.POST(req('POST', '/pending/push', body)),
 }
 
 const AM = { date: '2026-09-16', period: 'am' }
 const PM = { date: '2026-09-16', period: 'pm' }
 
-/** One call of every write, for the access tests. */
+/** One call of every write, for the access tests (Phase 6's check-off and push included). */
 const everyWrite = () => [
   api.begin({ ...AM, beginningCashCents: 1 }),
   api.addAdj({ ...AM, description: 'Hacked', amountCents: 1 }),
@@ -205,6 +207,8 @@ const everyWrite = () => [
   api.editPend({ id: P.FERG, amountCents: 1 }),
   api.delPend(P.FERG),
   api.orderPend({ ...AM, accountId: ACC.TCS, ids: [P.SUN, P.FERG] }),
+  api.editPend({ id: P.FERG, status: 'paid' }),
+  api.pushPend({ id: P.FERG }),
 ]
 
 const writes = (fake: ReturnType<typeof world>) => fake.calls.filter((c) => c.op !== 'select')
@@ -221,7 +225,7 @@ afterEach(() => { vi.restoreAllMocks() })
 describe('/api/cmr/ledger — access', () => {
   it('route files export only HTTP handlers + dynamic (BUG-019)', () => {
     const allowed = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'dynamic'])
-    for (const mod of [ledgerRoute, adjRoute, adjReorderRoute, pendRoute, pendReorderRoute]) {
+    for (const mod of [ledgerRoute, adjRoute, adjReorderRoute, pendRoute, pendReorderRoute, pendPushRoute]) {
       for (const k of Object.keys(mod)) expect(allowed.has(k), k).toBe(true)
       expect((mod as { dynamic?: string }).dynamic).toBe('force-dynamic')
     }
@@ -232,7 +236,7 @@ describe('/api/cmr/ledger — access', () => {
     for (const uid of [ADMIN, STRANGER]) {
       const fake = world(uid)
       const statuses = [(await api.get()).status, ...(await Promise.all(everyWrite())).map((r) => r.status)]
-      expect(statuses).toEqual(Array(10).fill(403))
+      expect(statuses).toEqual(Array(12).fill(403))
       expect(writes(fake)).toHaveLength(0)
       expect(fake.calls.some((c) => c.table.startsWith('cmr_') && c.table !== 'cmr_access')).toBe(false)
     }
@@ -251,7 +255,7 @@ describe('/api/cmr/ledger — access', () => {
       expect(data.totals.currentBalanceCents).toBe(48_230_000 + 1_600_000 - 48_952_000)
 
       const results = await Promise.all(everyWrite())
-      expect(results.map((r) => r.status)).toEqual(Array(9).fill(403))
+      expect(results.map((r) => r.status)).toEqual(Array(11).fill(403))
       for (const r of results) expect((await bodyOf(r)).code).toBe('FORBIDDEN')
       expect(writes(fake)).toHaveLength(0)
       expect(fake.tables.cmr_daily_ledger).toHaveLength(2)
@@ -264,7 +268,7 @@ describe('/api/cmr/ledger — access', () => {
   it('no session: 401 on GET and every write', async () => {
     const fake = world(null)
     const statuses = [(await api.get()).status, ...(await Promise.all(everyWrite())).map((r) => r.status)]
-    expect(statuses).toEqual(Array(10).fill(401))
+    expect(statuses).toEqual(Array(12).fill(401))
     expect(writes(fake)).toHaveLength(0)
   })
 

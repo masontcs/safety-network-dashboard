@@ -12,6 +12,7 @@ import {
   compareQueued,
   computeRequestTotals,
   toCmrRequest,
+  type CmrPlacedRowState,
   type CmrRequest,
   type CmrRequestAccountRef,
   type CmrRequestRow,
@@ -72,6 +73,35 @@ export function sortedAccounts(map: Map<string, CmrRequestAccountRef>): CmrReque
 }
 
 /**
+ * The live state of the row each PLACED request created, keyed by that row's id, so the screen
+ * can tell whether the placement can still be undone (and say why not). Rows that have since
+ * been deleted come back `{ present: false }`, which is undoable — the request just returns to
+ * the queue.
+ */
+type PlacedStatus = Extract<CmrPlacedRowState, { present: true }>['status']
+
+export async function placedRowStates(supabase: Supabase, rows: CmrRequestRow[]): Promise<Map<string, CmrPlacedRowState>> {
+  const out = new Map<string, CmrPlacedRowState>()
+  const idsOf = (kind: 'pending' | 'priority') => [
+    ...new Set(
+      rows
+        .filter((r) => r.status === 'placed' && r.placed_kind === kind && r.placed_ref_id)
+        .map((r) => r.placed_ref_id as string),
+    ),
+  ]
+  const read = async (table: 'cmr_pending_items' | 'cmr_weekly_priorities', ids: string[]) => {
+    if (!ids.length) return
+    const { data, error } = await supabase.from(table).select('id, status').in('id', ids)
+    if (error) throw new Error(error.message)
+    const found = (data ?? []) as unknown as { id: string; status: PlacedStatus }[]
+    for (const r of found) out.set(r.id, { present: true, status: r.status })
+    for (const id of ids) if (!out.has(id)) out.set(id, { present: false })
+  }
+  await Promise.all([read('cmr_pending_items', idsOf('pending')), read('cmr_weekly_priorities', idsOf('priority'))])
+  return out
+}
+
+/**
  * Everything the Requests screen needs: the queue oldest-first, the settled history
  * newest-first, the totals, and the accounts for the submit form.
  */
@@ -80,9 +110,12 @@ export async function buildRequestsView(
   actor: { userId: string; canEdit: boolean; canRequest: boolean },
 ): Promise<CmrRequestsView> {
   const [accounts, rows] = await Promise.all([loadAccounts(supabase), allRequestRows(supabase)])
-  const names = await displayNames(supabase, [...rows.map((r) => r.requested_by), ...rows.map((r) => r.placed_by)])
+  const [names, placed] = await Promise.all([
+    displayNames(supabase, [...rows.map((r) => r.requested_by), ...rows.map((r) => r.placed_by)]),
+    placedRowStates(supabase, rows),
+  ])
 
-  const all: CmrRequest[] = rows.map((r) => toCmrRequest(r, accounts, names))
+  const all: CmrRequest[] = rows.map((r) => toCmrRequest(r, accounts, names, placed))
   const queued = all.filter((r) => r.status === 'queued').sort(compareQueued)
   const history = all.filter((r) => r.status !== 'queued').sort(compareHistory)
 
@@ -141,17 +174,30 @@ export function auditor(ctx: CmrAccess, request: Request) {
 
 // ── placement RPCs ──────────────────────────────────────────────────────────
 
-/** A placement the DB refused because the request had already left the queue (or vanished). */
+/**
+ * A placement (or an undo) the DB refused: the request had already left the queue or vanished,
+ * it is not placed at all, or the row the placement created has since been paid or moved on.
+ */
+export type PlacementConflictReason = 'NOT_QUEUED' | 'NOT_FOUND' | 'NOT_PLACED' | 'ROW_PAID' | 'ROW_MOVED' | 'ROW_SETTLED'
+
 export class PlacementConflict extends Error {
-  constructor(readonly reason: 'NOT_QUEUED' | 'NOT_FOUND') {
+  constructor(readonly reason: PlacementConflictReason) {
     super(reason)
     this.name = 'PlacementConflict'
   }
 }
 
+const CONFLICTS: readonly PlacementConflictReason[] = [
+  'NOT_QUEUED',
+  'NOT_PLACED',
+  'ROW_PAID',
+  'ROW_MOVED',
+  'ROW_SETTLED',
+  'NOT_FOUND',
+] as const
+
 function placementError(message: string): never {
-  if (/NOT_QUEUED/.test(message)) throw new PlacementConflict('NOT_QUEUED')
-  if (/NOT_FOUND/.test(message)) throw new PlacementConflict('NOT_FOUND')
+  for (const reason of CONFLICTS) if (message.includes(reason)) throw new PlacementConflict(reason)
   throw new Error(message)
 }
 
@@ -196,6 +242,21 @@ export const placeRequestIntoPending = (
     p_date: args.date,
     p_sort_order: args.sortOrder,
   })
+
+/**
+ * Undo a placement: delete the row it created and put the request back in the queue, in ONE
+ * database call (cmr_unplace_request), which re-checks `placed` and the row's own state while
+ * holding both locked. Returns the id it removed, or null when that row was already gone.
+ */
+export async function unplaceRequest(supabase: Supabase, requestId: string): Promise<string | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = (await (supabase as any).rpc('cmr_unplace_request', { p_request_id: requestId })) as {
+    data: unknown
+    error: { message: string } | null
+  }
+  if (error) placementError(error.message)
+  return typeof data === 'string' && UUID_RE.test(data) ? data : null
+}
 
 export const placeRequestIntoPriority = (
   supabase: Supabase,

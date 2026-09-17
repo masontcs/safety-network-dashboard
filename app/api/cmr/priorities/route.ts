@@ -40,8 +40,9 @@ import {
  *                            → create at the end of that week. CONTROLLER.
  *   PATCH  { id, ...fields, isTopPriority?, status? }
  *                            → edit / flag / resolve / pay / reopen. → paid stamps paid_at +
- *                              paid_by; leaving paid clears them. status 'carried' is refused
- *                              (carry-forward is Phase 6). CONTROLLER.
+ *                              paid_by; leaving paid clears them. status 'carried' is refused —
+ *                              carrying is POST /api/cmr/priorities/carry, which makes the
+ *                              next week's copy at the same time. CONTROLLER.
  *   DELETE ?id=              → hard delete. CONTROLLER.
  *   (reorder lives at /api/cmr/priorities/reorder)
  *
@@ -67,7 +68,7 @@ const STATUS_ACTION: Record<'open' | 'resolved' | 'paid', AuditAction> = {
   paid: 'cmr.priority.pay',
 }
 
-const LOCKED = 'This priority was carried to another week and can’t be changed here.'
+const LOCKED = 'This priority was carried to another week — change the copy in that week instead.'
 
 export async function GET(request: Request): Promise<NextResponse> {
   try {
@@ -154,7 +155,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     const id = typeof body.id === 'string' ? body.id.trim() : ''
     if (!UUID_RE.test(id)) return bad('Choose a priority.')
     if ('weekStart' in body || 'date' in body || 'carriedFromId' in body) {
-      return bad('A priority stays in its week. Moving it to another week isn’t available yet.', 'CARRY_NOT_AVAILABLE')
+      return bad('A priority stays in its week. Use Carry to move it to another one.', 'USE_CARRY')
     }
 
     // ── parse whatever was sent ──
@@ -210,9 +211,21 @@ export async function PATCH(request: Request): Promise<NextResponse> {
       return NextResponse.json({ success: true, data: { priority: toCmrPriority(before), changed: false } })
     }
 
-    const { error } = await supabase.from('cmr_weekly_priorities').update(changes).eq('id', id)
+    // Compare-and-swap on the status we just read. Carrying writes this same column from
+    // another connection (under a row lock), so an unguarded update could mark a priority paid
+    // that had already been carried into another week — and the amount would then count in
+    // both. Matching zero rows means it moved under us.
+    const { data: written, error } = await supabase
+      .from('cmr_weekly_priorities')
+      .update(changes)
+      .eq('id', id)
+      .eq('status', before.status)
+      .select('id')
     if (isInputViolation(error)) return bad(`That change couldn't be saved: ${error?.message ?? 'invalid values'}.`)
     if (error) throw new Error(error.message)
+    if (!((written ?? []) as unknown[]).length) {
+      return bad('That priority changed while you were looking at it — reload and try again.', 'STALE', 409)
+    }
     const after: Row = { ...before, ...changes }
 
     // ── audit: one entry per kind of change, each with before → after of its fields ──

@@ -15,7 +15,9 @@ import { parseDueDate } from '@/lib/cmr/priorities'
  *   • The Controller PLACES a queued request into the daily pending list or a weekly priority,
  *     choosing the day/period or the week then (the request's due date only pre-fills it).
  *     The placed request records where it went (placedKind + placedRefId).
- *   • status 'paid' is defined for Phase 6; Phase 5 only moves queued → placed / declined.
+ *   • A placement can be UNDONE: the row it created is deleted and the request returns to the
+ *     queue — but only while that row is untouched. Once it has been paid, or pushed / carried
+ *     onward, undoing would erase work that has moved on, so it is refused and the row says why.
  *   • Money is integer cents; amount is optional and stored as 0 when there's no figure.
  */
 
@@ -62,6 +64,10 @@ export interface CmrRequest {
   placedBy: string | null
   placedByName: string | null
   createdAt: string
+  /** Placed, and the row it created can still be removed (Controller only; the API re-checks). */
+  canUnplace: boolean
+  /** Why undoing is not possible, in the reader's terms — null when it is. */
+  unplaceBlockedReason: string | null
 }
 
 export interface CmrRequestAccountRef {
@@ -124,10 +130,50 @@ export const CMR_REQUEST_COLS =
 // bigint columns: PostgREST sends JSON numbers (cents stay far below 2^53). Normalise defensively.
 const cents = (v: number | string): number => Number(v)
 
+/** The live state of the row a placed request created (absent when nothing was looked up). */
+export type CmrPlacedRowState =
+  | { present: false }
+  | { present: true; status: 'pending' | 'paid' | 'pushed' | 'open' | 'resolved' | 'carried' }
+
+/**
+ * Whether a placed request can be undone, and why not when it can't. THE rule of the undo:
+ * a placement may be taken back only while the row it created is still untouched, because
+ * undoing deletes that row.
+ *
+ *   • pending item — still 'pending' → yes; 'paid' or 'pushed' → no;
+ *   • weekly priority — still 'open' → yes; 'paid', 'resolved' or 'carried' → no;
+ *   • the row is already gone → yes (the request simply returns to the queue).
+ *
+ * Shared by the API (which enforces it, and the DB function re-checks it under a row lock) and
+ * the client (which uses it to disable the button and say why).
+ */
+export function unplaceRefusal(
+  r: { status: CmrRequestStatus },
+  placed: CmrPlacedRowState | null,
+): string | null {
+  if (r.status !== 'placed') {
+    return r.status === 'queued' ? 'That request is still in the queue.' : `That request was ${CMR_REQUEST_STATUS_LABEL[r.status].toLowerCase()}, not placed.`
+  }
+  if (!placed || !placed.present) return null
+  switch (placed.status) {
+    case 'paid':
+      return 'It was already paid — undoing would erase the payment. Mark it unpaid first.'
+    case 'pushed':
+      return 'The pending item was pushed to another day. Undo the push there first.'
+    case 'carried':
+      return 'The priority was carried to another week. Undo the carry there first.'
+    case 'resolved':
+      return 'The priority was already resolved. Reopen it first.'
+    default:
+      return null
+  }
+}
+
 export function toCmrRequest(
   r: CmrRequestRow,
   accounts: Map<string, CmrRequestAccountRef> = new Map(),
   names: Map<string, string> = new Map(),
+  placed: Map<string, CmrPlacedRowState> = new Map(),
 ): CmrRequest {
   const acc = accounts.get(r.account_id)
   return {
@@ -148,6 +194,9 @@ export function toCmrRequest(
     placedBy: r.placed_by,
     placedByName: r.placed_by ? names.get(r.placed_by) ?? null : null,
     createdAt: r.created_at,
+    canUnplace: r.status === 'placed' && unplaceRefusal(r, r.placed_ref_id ? placed.get(r.placed_ref_id) ?? null : null) === null,
+    unplaceBlockedReason:
+      r.status === 'placed' ? unplaceRefusal(r, r.placed_ref_id ? placed.get(r.placed_ref_id) ?? null : null) : null,
   }
 }
 

@@ -22,11 +22,13 @@ let store: CmrPriority[]
 let canEdit: boolean
 let calls: { method: string; url: string; body: unknown }[]
 let reorderFails = false
+let carryFails = false
 let nextId = 0
 
 const pr = (id: string, weekStart: string, description: string, amountCents: number, sortOrder: number, over: Partial<CmrPriority> = {}): CmrPriority => ({
   id, weekStart, description, amountCents, sortOrder,
   dueDate: null, notes: null, isTopPriority: false, status: 'open', carriedFromId: null,
+  carriedToWeek: null, carriedFromWeek: null,
   paidAt: null, paidBy: null, paidByName: null, createdAt: '2026-09-14T15:00:00Z', ...over,
 })
 
@@ -57,6 +59,7 @@ beforeEach(() => {
   canEdit = true
   calls = []
   reorderFails = false
+  carryFails = false
   nextId = 0
   window.confirm = vi.fn(() => true)
   window.alert = vi.fn()
@@ -91,6 +94,14 @@ beforeEach(() => {
         store = store.filter((p) => p.id !== u.searchParams.get('id'))
         return json({ success: true, data: { deleted: true } })
       }
+    }
+    if (u.pathname === '/api/cmr/priorities/carry' && method === 'POST') {
+      if (carryFails) return json({ success: false, error: 'Only an open priority can be carried.', code: 'NOT_OPEN' })
+      const src = store.find((p) => p.id === body.id)!
+      const to = weekStartSunday(body.targetWeek)
+      store = store.map((p) => (p.id === src.id ? { ...p, status: 'carried', carriedToWeek: to } : p))
+      store.push({ ...src, id: `y${++nextId}`, weekStart: to, sortOrder: 99, status: 'open', carriedFromId: src.id, carriedFromWeek: src.weekStart, carriedToWeek: null })
+      return json({ success: true, data: { carriedId: src.id, to: { weekStart: to }, where: to } })
     }
     if (u.pathname === '/api/cmr/priorities/reorder') {
       if (reorderFails) return json({ success: false, error: 'Boom', code: 'INTERNAL_ERROR' })
@@ -406,5 +417,106 @@ describe('CmrPrioritiesClient — controller', () => {
     expect(screen.getByLabelText('Loading priorities for Sun, Sep 20 – Sat, Sep 26, 2026')).toBeTruthy()
     release()
     await screen.findByText('Next week only')
+  })
+})
+
+// ── Phase 6: carrying a priority to another week ────────────────────────────
+
+describe('CmrPrioritiesClient — carry forward', () => {
+  const dialog = () => screen.getByRole('dialog')
+  const carryBtn = (name: string) => within(rowOf(name)).getByRole('button', { name: `Carry ${name} to another week` })
+
+  it('read-only roles see the history but get no Carry button', async () => {
+    canEdit = false
+    store = [
+      pr('c1', '2026-09-13', 'CDTFA sales tax', 6_450_000, 0, { status: 'carried', carriedToWeek: '2026-09-20' }),
+      pr('c2', '2026-09-13', 'From last week', 100_000, 1, { carriedFromId: 'old', carriedFromWeek: '2026-09-06' }),
+    ]
+    mount()
+    await screen.findByText('CDTFA sales tax')
+    expect(rowOf('CDTFA sales tax').textContent).toContain('Carried to the week of Sep 20 – 26')
+    expect(rowOf('CDTFA sales tax').textContent).toContain('Carried forward')
+    expect(rowOf('From last week').textContent).toContain('Carried from the week of Sep 6 – 12')
+    expect(screen.queryByRole('button', { name: /^Carry / })).toBeNull()
+  })
+
+  it('Carry is offered on open priorities only', async () => {
+    mount()
+    await screen.findByText('CDTFA sales tax')
+    expect(carryBtn('CDTFA sales tax')).toBeTruthy()
+    expect(carryBtn('Call Sunbelt about the hold')).toBeTruthy()
+    expect(within(rowOf('Fuel card')).queryByRole('button', { name: /^Carry / })).toBeNull()
+  })
+
+  it('defaults to next week, keeps the Top flag, and leaves history behind', async () => {
+    mount()
+    await screen.findByText('CDTFA sales tax')
+    fireEvent.click(carryBtn('CDTFA sales tax'))
+
+    const d = dialog()
+    expect(within(d).getByText('Carry CDTFA sales tax')).toBeTruthy()
+    expect((within(d).getByLabelText('Week') as HTMLInputElement).value).toBe('2026-09-20')
+    expect(d.textContent).toContain('keeping its amount, due date, notes and Top flag')
+
+    fireEvent.click(within(d).getByRole('button', { name: 'Carry it forward' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(writes().at(-1)).toMatchObject({ method: 'POST', url: '/api/cmr/priorities/carry', body: { id: 'c1', targetWeek: '2026-09-20' } })
+
+    await waitFor(() => expect(rowOf('CDTFA sales tax').textContent).toContain('Carried to the week of Sep 20 – 26'))
+    expect(within(rowOf('CDTFA sales tax')).queryByRole('button', { name: /^Carry / })).toBeNull()
+    expect(liveStatus()).toContain('carried to the week of')
+  })
+
+  it('a carried priority leaves “still needed this week” and arrives open in the next one', async () => {
+    mount()
+    await screen.findByText('CDTFA sales tax')
+    // $64,500 + $32,000 = $96,500 open this week
+    expect(hero().querySelector('.cmr-hero-big')?.textContent).toBe('$96,500.00')
+
+    fireEvent.click(carryBtn('CDTFA sales tax'))
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Carry it forward' }))
+    await waitFor(() => expect(hero().querySelector('.cmr-hero-big')?.textContent).toBe('$32,000.00'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next week' }))
+    await screen.findByText('CDTFA sales tax')
+    expect(rowOf('CDTFA sales tax').textContent).toContain('Carried from the week of Sep 13 – 19')
+    expect(within(rowOf('CDTFA sales tax')).getByRole('button', { name: /^Carry / })).toBeTruthy()
+  })
+
+  it('another week can be chosen, and any day in it resolves to its Sunday', async () => {
+    mount()
+    await screen.findByText('Call Sunbelt about the hold')
+    fireEvent.click(carryBtn('Call Sunbelt about the hold'))
+    const d = dialog()
+    fireEvent.change(within(d).getByLabelText('Week'), { target: { value: '2026-09-30' } }) // a Wednesday
+    expect((within(d).getByLabelText('Week') as HTMLInputElement).value).toBe('2026-09-27')
+    fireEvent.click(within(d).getByRole('button', { name: 'Carry it forward' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(writes().at(-1)).toMatchObject({ body: { id: 't1', targetWeek: '2026-09-27' } })
+  })
+
+  it('the dialog refuses the week it is already in, and Escape closes it without writing', async () => {
+    mount()
+    await screen.findByText('CDTFA sales tax')
+    fireEvent.click(carryBtn('CDTFA sales tax'))
+    const d = dialog()
+    fireEvent.change(within(d).getByLabelText('Week'), { target: { value: '2026-09-13' } })
+    expect((within(d).getByRole('button', { name: 'Carry it forward' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(d.textContent).toContain('already in')
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(writes()).toHaveLength(0)
+  })
+
+  it('a refused carry is reported in-app and the week is unchanged', async () => {
+    carryFails = true
+    mount()
+    await screen.findByText('CDTFA sales tax')
+    fireEvent.click(carryBtn('CDTFA sales tax'))
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Carry it forward' }))
+    await screen.findByText('Could not carry the priority')
+    expect(window.alert).not.toHaveBeenCalled()
+    expect(rowOf('CDTFA sales tax').textContent).not.toContain('Carried to')
   })
 })

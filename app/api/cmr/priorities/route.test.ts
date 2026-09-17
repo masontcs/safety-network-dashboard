@@ -480,14 +480,14 @@ describe('PATCH /api/cmr/priorities', () => {
     expect(auditCalls()[0].metadata).toMatchObject({ before: { amountCents: 3_200_000 }, after: { amountCents: 3_300_000 } })
   })
 
-  it("refuses status 'carried' (Phase 6) and moving weeks — nothing written", async () => {
+  it("refuses status 'carried' and moving weeks by PATCH — that's the carry route's job", async () => {
     const fake = world(CONTROLLER)
     const c = await api.edit({ id: P.CDTFA, status: 'carried' })
     expect(c.status).toBe(400)
-    expect((await bodyOf(c)).code).toBe('CARRY_NOT_AVAILABLE')
+    expect((await bodyOf(c)).code).toBe('USE_CARRY')
     const m = await api.edit({ id: P.CDTFA, weekStart: W.NEXT })
     expect(m.status).toBe(400)
-    expect((await bodyOf(m)).code).toBe('CARRY_NOT_AVAILABLE')
+    expect((await bodyOf(m)).code).toBe('USE_CARRY')
     expect((await api.edit({ id: P.CDTFA, carriedFromId: P.LOAN })).status).toBe(400)
     expect((await api.edit({ id: P.CDTFA, status: 'pushed' })).status).toBe(400)
     expect(rowOf(fake, P.CDTFA)).toMatchObject({ status: 'open', week_start: W.THIS })

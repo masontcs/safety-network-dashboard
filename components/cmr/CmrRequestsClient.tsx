@@ -176,6 +176,27 @@ export default function CmrRequestsClient() {
     await load()
   }
 
+  async function unplace(q: CmrRequest) {
+    const where = q.placedKind ? CMR_REQUEST_PLACED_KIND_LABEL[q.placedKind].toLowerCase() : 'the ledger'
+    const ok = await confirm({
+      title: `Undo the placement of ${q.vendor}?`,
+      message: `This deletes the ${where} line this request became and puts the request back in the queue, where it can be placed somewhere else or declined. The change is recorded in the audit log.`,
+      confirmLabel: 'Undo placement',
+      danger: true,
+    })
+    if (!ok) return
+    setBusyId(q.id)
+    const r = await api<{ request: CmrRequest | null }>('/api/cmr/requests/unplace', {
+      method: 'POST',
+      body: JSON.stringify({ id: q.id }),
+    })
+    setBusyId(null)
+    if (!r.success) { await alert({ title: 'Could not undo the placement', message: r.error }); await load(); return }
+    setStatus(`${q.vendor} is back in the queue.`)
+    await load()
+    focusLater(`place:${q.id}`)
+  }
+
   async function place(q: CmrRequest, body: Record<string, unknown>): Promise<boolean> {
     setBusyId(q.id)
     const r = await api<{ where: string; placedKind: 'pending' | 'priority' }>('/api/cmr/requests/place', {
@@ -347,17 +368,29 @@ export default function CmrRequestsClient() {
               ) : (
                 <ul className="cmr-lg-list" aria-label="Requests already placed or declined">
                   {history.map((q) => (
-                    <HistoryRow key={q.id} q={q} today={view.today} mine={mine(q)} />
+                    <HistoryRow
+                      key={q.id}
+                      q={q}
+                      today={view.today}
+                      mine={mine(q)}
+                      canEdit={canEdit}
+                      busy={busyId === q.id}
+                      locked={locked}
+                      undoRef={refFor(`undo:${q.id}`)}
+                      onUndo={() => void unplace(q)}
+                    />
                   ))}
                 </ul>
               )}
             </div>
           </section>
 
-          {canEdit && queued.length > 0 && (
+          {canEdit && (queued.length > 0 || view.totals.placedCount > 0) && (
             <p className="cmr-hint">
               Place puts the request on a day’s pending list or in a week’s priorities — you pick which when you place it.
-              Declining keeps it in the history so the requester can see the answer.
+              Declining keeps it in the history so the requester can see the answer. Undo placement takes a placed request
+              back: the line it became is deleted and the request returns to the queue — until that line has been paid or
+              moved on, which the row will say.
             </p>
           )}
         </>
@@ -514,9 +547,30 @@ function RequestRow({
 
 // ── one settled request (read-only, every role) ─────────────────────────────
 
-function HistoryRow({ q, today, mine }: { q: CmrRequest; today: string; mine: boolean }) {
+function HistoryRow({
+  q,
+  today,
+  mine,
+  canEdit,
+  busy,
+  locked,
+  undoRef,
+  onUndo,
+}: {
+  q: CmrRequest
+  today: string
+  mine: boolean
+  canEdit: boolean
+  busy: boolean
+  locked: boolean
+  undoRef: (el: HTMLElement | null) => void
+  onUndo: () => void
+}) {
   const declined = q.status === 'declined'
   const year = today.slice(0, 4)
+  // Undo is offered on a PLACED request only, and disabled — with the reason — once the row it
+  // created has been paid or moved on. The API re-checks both.
+  const showUndo = canEdit && q.status === 'placed'
   return (
     <li className={`cmr-row cmr-lg-row cmr-rq-row done${declined ? ' declined' : ''}`}>
       <div className="who">
@@ -555,10 +609,30 @@ function HistoryRow({ q, today, mine }: { q: CmrRequest; today: string; mine: bo
           )}
         </span>
         {q.notes && <span className="note">{q.notes}</span>}
+        {showUndo && q.unplaceBlockedReason && (
+          <span className="mt cmr-rq-blocked">
+            <CmrIcon name="lock" size={11} /> Can’t be undone: {q.unplaceBlockedReason}
+          </span>
+        )}
       </div>
       <span className="amt cmr-num">
         {q.amountCents > 0 ? amountText(q.amountCents) : <span className="cmr-sr-only">No amount</span>}
       </span>
+      {showUndo && (
+        <div className="ctl">
+          <button
+            type="button"
+            ref={undoRef}
+            className="cmr-btn sm ghost"
+            onClick={onUndo}
+            disabled={locked || busy || !q.canUnplace}
+            aria-label={`Undo the placement of ${q.vendor}`}
+            title={q.unplaceBlockedReason ?? 'Delete the line it became and put it back in the queue'}
+          >
+            <CmrIcon name="undo" size={14} /> <span className="cmr-pr-lbl">Undo placement</span>
+          </button>
+        </div>
+      )}
     </li>
   )
 }

@@ -556,6 +556,24 @@ li.cmr-lg-row:not(:has(> .cmr-handle)) { padding-left: 16px; }
 .cmr-lg-row .ctl { display: flex; align-items: center; gap: 8px; flex: none; }
 .cmr-lg-row .moves { display: flex; gap: 4px; }
 .cmr-lg-row.warned { box-shadow: inset 3px 0 0 var(--cmr-amber); }
+/* A pushed item is history: it stays on its day, greyed, and no longer counts. */
+.cmr-lg-row.pushed .nm, .cmr-lg-row.pushed .amt { color: var(--cmr-dim); }
+.cmr-lg-row.pushed .nm { text-decoration: line-through; }
+.cmr-lg-row.pushed .mt, .cmr-lg-row.pushed .note { color: var(--cmr-dim); }
+
+/* the paid check-off on a pending item */
+.cmr-lg-check {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 4px;
+  font-size: 12px; font-weight: 500; color: var(--cmr-muted); cursor: pointer; white-space: nowrap;
+  border-radius: var(--cmr-radius-sm);
+}
+.cmr-lg-check.on { color: var(--cmr-accent-ink); }
+.cmr-lg-check input {
+  width: 17px; height: 17px; margin: 0; accent-color: var(--cmr-accent-ink); cursor: pointer;
+}
+.cmr-lg-check:has(input:disabled) { color: var(--cmr-dim); cursor: default; }
+.cmr-lg-check:has(input:disabled) input { cursor: default; }
+.cmr-lg-check:has(input:focus-visible) { outline: 2px solid var(--cmr-accent-ink); outline-offset: 2px; }
 .cmr-lg-row.editing, .cmr-lg-row.editing:hover { background: var(--cmr-surface-2); }
 .cmr-lg-row.editing { box-shadow: none; }
 .cmr-lg-editwrap { flex: 1; min-width: 0; }
@@ -598,6 +616,8 @@ li.cmr-pr-row:not(:has(> .cmr-handle)) { padding-left: 10px; }
 .cmr-pr-row.top:not(.done):not(.editing):hover { background: var(--cmr-surface-2); }
 .cmr-pr-row.done .nm, .cmr-pr-row.done .amt { color: var(--cmr-dim); }
 .cmr-pr-row.paid .nm { text-decoration: line-through; }
+/* A carried priority is history: it stays in its week, greyed, out of what's still needed. */
+.cmr-pr-row.done .note { color: var(--cmr-dim); }
 .cmr-pr-row.done .desc, .cmr-pr-row.done .mt { text-decoration: none; }
 .cmr-pr-row .cmr-pill .cmr-ic { stroke-width: 2.4; }
 .cmr-pr-row .amt { min-width: 1px; }
@@ -617,6 +637,8 @@ li.cmr-pr-row:not(:has(> .cmr-handle)) { padding-left: 10px; }
 .cmr-rq-row .cmr-pill .cmr-ic { stroke-width: 2.4; }
 .cmr-rq-row .amt { min-width: 1px; }
 .cmr-rq-when { color: var(--cmr-dim); }
+.cmr-rq-blocked { display: inline-flex; align-items: center; gap: 5px; color: var(--cmr-amber); }
+.cmr-rq-blocked .cmr-ic { flex: none; stroke-width: 2.2; }
 .cmr-rq-decide { display: flex; gap: 6px; justify-content: flex-end; }
 .cmr-rq-form .acts { align-self: end; }
 
@@ -697,11 +719,13 @@ li.cmr-pr-row:not(:has(> .cmr-handle)) { padding-left: 10px; }
   .cmr-lg-sh .tot { margin-left: 0; flex: 1; }
   .cmr-lg-row { flex-wrap: wrap; row-gap: 8px; }
   .cmr-lg-row .who { flex-basis: calc(100% - 130px); }
-  .cmr-lg-row .ctl { flex-basis: 100%; justify-content: flex-end; }
+  .cmr-lg-row .ctl { flex-basis: 100%; justify-content: flex-end; flex-wrap: wrap; row-gap: 8px; }
   .cmr-lg-row .ctl .moves { margin-right: auto; margin-left: 38px; }
+  .cmr-lg-check { margin-right: auto; }
   .cmr-lg-form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .cmr-rq-row .who { flex-basis: calc(100% - 130px); }
   .cmr-rq-row .ctl { flex-basis: 100%; justify-content: flex-end; flex-wrap: wrap; row-gap: 8px; }
+  .cmr-rq-row.done .ctl { margin-left: auto; }
   .cmr-rq-decide { margin-right: auto; }
   .cmr-rq-dialog { padding: 18px; }
   .cmr-pr-row .who { flex-basis: calc(100% - 160px); }
@@ -724,6 +748,9 @@ li.cmr-pr-row:not(:has(> .cmr-handle)) { padding-left: 10px; }
   .cmr-lg-row .who { flex-basis: calc(100% - 40px); }
   .cmr-lg-row .amt { margin-left: 38px; }
   li.cmr-lg-row:not(:has(> .cmr-handle)) .amt, .cmr-lg-rollup .amt, .cmr-lg-total .amt, div.cmr-lg-row > .amt { margin-left: auto; }
+  .cmr-lg-row .ctl { gap: 6px; }
+  .cmr-lg-row .ctl .cmr-btn.sm { padding-left: 9px; padding-right: 9px; }
+  .cmr-lg-check { margin-left: 38px; margin-right: auto; }
   .cmr-root input[type="date"].cmr-lg-date { width: 140px; }
   .cmr-rq-row .who { flex-basis: calc(100% - 40px); }
   .cmr-rq-row .amt { margin-left: 38px; }

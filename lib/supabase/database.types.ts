@@ -13,9 +13,9 @@ export type CmrRecurringSection = 'weekly' | 'monthly' | 'urgent'
 export type CmrLedgerPeriod = 'am' | 'pm'
 export type CmrPendingStatus = 'pending' | 'paid' | 'pushed'
 export type CmrPendingSource = 'manual' | 'recurring' | 'request'
-// SN Cash Ledger weekly priority status (cmr_weekly_priorities.status). 'carried' is Phase 6.
+// SN Cash Ledger weekly priority status (cmr_weekly_priorities.status).
 export type CmrPriorityStatus = 'open' | 'resolved' | 'paid' | 'carried'
-// SN Cash Ledger vendor request (cmr_vendor_requests check constraints). 'paid' is Phase 6.
+// SN Cash Ledger vendor request (cmr_vendor_requests check constraints).
 export type CmrRequestStatus = 'queued' | 'placed' | 'paid' | 'declined'
 export type CmrRequestPlacedKind = 'pending' | 'priority'
 
@@ -151,9 +151,9 @@ export type Database = {
         Relationships: []
       }
       cmr_pending_items: {
-        Row: { id: string; daily_ledger_id: string; account_id: string; payee: string; amount_cents: number; status: CmrPendingStatus; original_date: string | null; effective_date: string | null; paid_at: string | null; paid_by: string | null; source: CmrPendingSource; source_ref_id: string | null; notes: string | null; sort_order: number; created_by: string | null; created_at: string }
-        Insert: { id?: string; daily_ledger_id: string; account_id: string; payee: string; amount_cents: number; status?: CmrPendingStatus; original_date?: string | null; effective_date?: string | null; paid_at?: string | null; paid_by?: string | null; source?: CmrPendingSource; source_ref_id?: string | null; notes?: string | null; sort_order?: number; created_by?: string | null; created_at?: string }
-        Update: { id?: string; daily_ledger_id?: string; account_id?: string; payee?: string; amount_cents?: number; status?: CmrPendingStatus; original_date?: string | null; effective_date?: string | null; paid_at?: string | null; paid_by?: string | null; source?: CmrPendingSource; source_ref_id?: string | null; notes?: string | null; sort_order?: number; created_by?: string | null; created_at?: string }
+        Row: { id: string; daily_ledger_id: string; account_id: string; payee: string; amount_cents: number; status: CmrPendingStatus; original_date: string | null; effective_date: string | null; paid_at: string | null; paid_by: string | null; source: CmrPendingSource; source_ref_id: string | null; pushed_from_id: string | null; notes: string | null; sort_order: number; created_by: string | null; created_at: string }
+        Insert: { id?: string; daily_ledger_id: string; account_id: string; payee: string; amount_cents: number; status?: CmrPendingStatus; original_date?: string | null; effective_date?: string | null; paid_at?: string | null; paid_by?: string | null; source?: CmrPendingSource; source_ref_id?: string | null; pushed_from_id?: string | null; notes?: string | null; sort_order?: number; created_by?: string | null; created_at?: string }
+        Update: { id?: string; daily_ledger_id?: string; account_id?: string; payee?: string; amount_cents?: number; status?: CmrPendingStatus; original_date?: string | null; effective_date?: string | null; paid_at?: string | null; paid_by?: string | null; source?: CmrPendingSource; source_ref_id?: string | null; pushed_from_id?: string | null; notes?: string | null; sort_order?: number; created_by?: string | null; created_at?: string }
         Relationships: []
       }
       cmr_weekly_priorities: {
