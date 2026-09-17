@@ -13,6 +13,8 @@ export type CmrRecurringSection = 'weekly' | 'monthly' | 'urgent'
 export type CmrLedgerPeriod = 'am' | 'pm'
 export type CmrPendingStatus = 'pending' | 'paid' | 'pushed'
 export type CmrPendingSource = 'manual' | 'recurring' | 'request'
+// SN Cash Ledger weekly priority status (cmr_weekly_priorities.status). 'carried' is Phase 6.
+export type CmrPriorityStatus = 'open' | 'resolved' | 'paid' | 'carried'
 
 export type Role = 'admin' | 'executive' | 'district_manager' | 'branch_manager' | 'ar_manager' | 'ar_team' | 'office_team' | 'project_manager' | 'sales' | 'tech' | 'billing_branch_manager' | 'dispatcher' | 'biller' | 'accounting' | 'front_counter'
 export type LaborType =
@@ -149,6 +151,12 @@ export type Database = {
         Row: { id: string; daily_ledger_id: string; account_id: string; payee: string; amount_cents: number; status: CmrPendingStatus; original_date: string | null; effective_date: string | null; paid_at: string | null; paid_by: string | null; source: CmrPendingSource; source_ref_id: string | null; notes: string | null; sort_order: number; created_by: string | null; created_at: string }
         Insert: { id?: string; daily_ledger_id: string; account_id: string; payee: string; amount_cents: number; status?: CmrPendingStatus; original_date?: string | null; effective_date?: string | null; paid_at?: string | null; paid_by?: string | null; source?: CmrPendingSource; source_ref_id?: string | null; notes?: string | null; sort_order?: number; created_by?: string | null; created_at?: string }
         Update: { id?: string; daily_ledger_id?: string; account_id?: string; payee?: string; amount_cents?: number; status?: CmrPendingStatus; original_date?: string | null; effective_date?: string | null; paid_at?: string | null; paid_by?: string | null; source?: CmrPendingSource; source_ref_id?: string | null; notes?: string | null; sort_order?: number; created_by?: string | null; created_at?: string }
+        Relationships: []
+      }
+      cmr_weekly_priorities: {
+        Row: { id: string; week_start: string; description: string; amount_cents: number; due_date: string | null; notes: string | null; is_top_priority: boolean; status: CmrPriorityStatus; carried_from_id: string | null; paid_at: string | null; paid_by: string | null; sort_order: number; created_by: string | null; created_at: string }
+        Insert: { id?: string; week_start: string; description: string; amount_cents?: number; due_date?: string | null; notes?: string | null; is_top_priority?: boolean; status?: CmrPriorityStatus; carried_from_id?: string | null; paid_at?: string | null; paid_by?: string | null; sort_order?: number; created_by?: string | null; created_at?: string }
+        Update: { id?: string; week_start?: string; description?: string; amount_cents?: number; due_date?: string | null; notes?: string | null; is_top_priority?: boolean; status?: CmrPriorityStatus; carried_from_id?: string | null; paid_at?: string | null; paid_by?: string | null; sort_order?: number; created_by?: string | null; created_at?: string }
         Relationships: []
       }
       user_profiles: {

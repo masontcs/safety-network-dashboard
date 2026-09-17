@@ -62,6 +62,16 @@ export type AuditAction =
   | 'cmr.ledger.pending.update'
   | 'cmr.ledger.pending.delete'
   | 'cmr.ledger.pending.reorder'
+  // SN Cash Ledger — weekly priorities (Controller may hard-delete; carry-forward is Phase 6)
+  | 'cmr.priority.create'
+  | 'cmr.priority.update'
+  | 'cmr.priority.flag'
+  | 'cmr.priority.unflag'
+  | 'cmr.priority.resolve'
+  | 'cmr.priority.pay'
+  | 'cmr.priority.reopen'
+  | 'cmr.priority.delete'
+  | 'cmr.priority.reorder'
 
 // ── Payload ────────────────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 import type { CmrNavIcon } from '@/lib/cmr/roles'
 
-type IconName = CmrNavIcon | 'menu' | 'sun' | 'moon' | 'signout' | 'lock' | 'plus' | 'close' | 'user' | 'grip' | 'up' | 'down' | 'edit' | 'check' | 'trash' | 'left' | 'right' | 'alert'
+type IconName = CmrNavIcon | 'menu' | 'sun' | 'moon' | 'signout' | 'lock' | 'plus' | 'close' | 'user' | 'grip' | 'up' | 'down' | 'edit' | 'check' | 'trash' | 'left' | 'right' | 'alert' | 'star' | 'undo'
 
 const PATHS: Record<IconName, React.ReactNode> = {
   ledger: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></>,
@@ -27,6 +27,8 @@ const PATHS: Record<IconName, React.ReactNode> = {
   left: <path d="M15 6l-6 6 6 6" />,
   right: <path d="M9 6l6 6-6 6" />,
   alert: <><path d="M12 4 2.5 20h19z" /><path d="M12 10v4.5M12 17.5v.01" /></>,
+  star: <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />,
+  undo: <><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></>,
 }
 
 /** Stroke icons from the approved mockup. Decorative by default (aria-hidden). */

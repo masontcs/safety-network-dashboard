@@ -1,7 +1,7 @@
 /**
  * A tiny in-memory stand-in for the Supabase service client, for the CMR access tests.
  * Supports the query shapes lib/api/cmr.ts and the /api/cmr routes use:
- *   from(t).select(cols, {count, head}).eq(c, v).order(..).maybeSingle() / await
+ *   from(t).select(cols, {count, head}).eq(c, v).in(c, vs).order(..).maybeSingle() / await
  *   from(t).insert(row) / .update(patch).eq(..) / .delete().eq(..)
  *   from(t).insert(row).select(..).single()   (returns the inserted row)
  *   from(t).upsert(row, {onConflict, ignoreDuplicates}).select(..)   (returns written rows)
@@ -59,6 +59,7 @@ export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions =
       return this
     }
     eq(col: string, val: unknown) { this.filters.push([col, val]); return this }
+    in(col: string, vals: unknown[]) { this.filters.push([col, { in: vals }]); return this }
     order() { return this }
     insert(payload: Row) { this.op = 'insert'; this.payload = payload; return this }
     upsert(payload: Row, o?: { onConflict?: string; ignoreDuplicates?: boolean }) {
@@ -78,7 +79,12 @@ export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions =
       return this.exec('many').then(onok, onerr)
     }
 
-    private match = (r: Row) => this.filters.every(([c, v]) => r[c] === v)
+    private match = (r: Row) =>
+      this.filters.every(([c, v]) =>
+        v && typeof v === 'object' && Array.isArray((v as { in?: unknown[] }).in)
+          ? (v as { in: unknown[] }).in.includes(r[c])
+          : r[c] === v,
+      )
 
     private async exec(mode: 'many' | 'maybe' | 'single'): Promise<{ data: unknown; error: FakeError | null; count?: number | null }> {
       calls.push({ table: this.table, op: this.op, columns: this.columns, filters: [...this.filters], payload: this.payload })
