@@ -30,23 +30,31 @@ import CmrIcon from '@/components/cmr/CmrIcon'
 import { useAlert, useConfirm } from '@/components/ui/DialogProvider'
 import { pacificToday } from '@/lib/utils/date'
 import {
+  CMR_MONTH_LABEL,
   CMR_PLAN_TERMS_MAX,
-  CMR_RECURRENCE_MAX,
-  CMR_RECURRENCE_SUGGESTIONS,
   CMR_RECURRING_SECTIONS,
   CMR_RECURRING_SECTION_LABEL,
   CMR_VENDOR_NAME_MAX,
   CMR_VENDOR_NOTES_MAX,
+  CMR_WEEKDAY_LABEL,
+  describeSchedule,
   formatCents,
   formatPlanDate,
+  ordinal,
   sectionTotalCents,
   type CmrAccountRef,
+  type CmrRecurringSchedule,
   type CmrRecurringSection,
   type CmrRecurringVendor,
 } from '@/lib/cmr/recurring'
 
 /**
- * Recurring vendors — Weekly / Monthly / Urgent Payment Plans.
+ * Recurring vendors — Weekly / Monthly / Quarterly / Annually / Urgent Payment Plans.
+ *
+ * The section IS the frequency, and each frequency asks for exactly the schedule it needs: a
+ * day of the week (weekly), a day of the month (monthly), or a day of the month plus the first
+ * month of the cycle (quarterly, annually). That is what the Phase 7 suggestion engine reads,
+ * so it is picked from real controls rather than typed as free text.
  *
  * Every CMR role reads this screen. Only a Controller (`canEdit` from the API) gets the edit
  * controls: add, edit (incl. moving section and recording the last amount sent), on-hold,
@@ -76,8 +84,10 @@ interface Loaded {
 }
 
 const SECTION_BLURB: Record<CmrRecurringSection, string> = {
-  weekly: 'Paid every week.',
-  monthly: 'Paid once a month.',
+  weekly: 'Paid every week, on the same day.',
+  monthly: 'Paid once a month, on the same date.',
+  quarterly: 'Paid every three months, starting from the month you choose.',
+  annually: 'Paid once a year.',
   urgent: 'Catch-up plans with agreed terms and a due date.',
 }
 
@@ -117,7 +127,13 @@ export default function CmrRecurringClient() {
   const today = useMemo(() => pacificToday(), [])
   const canEdit = data?.canEdit === true
   const bySection = useMemo(() => {
-    const out: Record<CmrRecurringSection, CmrRecurringVendor[]> = { weekly: [], monthly: [], urgent: [] }
+    const out: Record<CmrRecurringSection, CmrRecurringVendor[]> = {
+      weekly: [],
+      monthly: [],
+      quarterly: [],
+      annually: [],
+      urgent: [],
+    }
     for (const v of data?.vendors ?? []) out[v.section].push(v)
     return out
   }, [data])
@@ -528,7 +544,11 @@ function VendorRow({
           {v.accountName}
           {!v.accountActive && <span className="acct-off"> (inactive account)</span>}
           {' · '}
-          {v.recurrenceDetail ?? 'No schedule noted'}
+          {v.scheduleComplete || v.section === 'urgent' ? (
+            describeSchedule(v.section, v.schedule)
+          ) : (
+            <span className="sched-off">No schedule set</span>
+          )}
           {' · '}
           Last sent{' '}
           <span className="cmr-num">{v.lastAmountSentCents === null ? '—' : formatCents(v.lastAmountSentCents)}</span>
@@ -685,15 +705,15 @@ const blankToNull = (s: string): string | null => (s.trim() ? s.trim() : null)
 function VendorForm(props: FormProps) {
   const { mode, accounts, onSubmit, onCancel } = props
   const v = props.vendor
-  const uid = mode === 'edit' ? v!.id : `new-${props.initialSection}`
-
   const activeAccounts = accounts.filter((a) => a.active)
   const [vendorName, setVendorName] = useState(v?.vendorName ?? '')
   const [accountId, setAccountId] = useState(v?.accountId ?? (activeAccounts.length === 1 ? activeAccounts[0].id : ''))
   const [section, setSection] = useState<CmrRecurringSection>(v?.section ?? props.initialSection!)
   const [amountCents, setAmountCents] = useState<number | null>(v ? v.amountCents : null)
   const [lastSentCents, setLastSentCents] = useState<number | null>(v?.lastAmountSentCents ?? null)
-  const [recurrence, setRecurrence] = useState(v?.recurrenceDetail ?? '')
+  const [weekday, setWeekday] = useState<string>(v?.schedule.weekday === null || v === undefined ? '' : String(v.schedule.weekday))
+  const [dayOfMonth, setDayOfMonth] = useState<string>(v?.schedule.dayOfMonth == null ? '' : String(v.schedule.dayOfMonth))
+  const [anchorMonth, setAnchorMonth] = useState<string>(v?.schedule.anchorMonth == null ? '' : String(v.schedule.anchorMonth))
   const [planTerms, setPlanTerms] = useState(v?.planTerms ?? '')
   const [planDueDate, setPlanDueDate] = useState(v?.planDueDate ?? '')
   const [notes, setNotes] = useState(v?.notes ?? '')
@@ -707,18 +727,41 @@ function VendorForm(props: FormProps) {
 
   const urgent = section === 'urgent'
   const currentInactive = v && !activeAccounts.some((a) => a.id === v.accountId) ? v : null
-  const listId = `cmr-rv-rec-${uid}`
+
+  // Which schedule controls this frequency asks for. Urgent Payment Plans ask for none.
+  const needsWeekday = section === 'weekly'
+  const needsDayOfMonth = section === 'monthly' || section === 'quarterly' || section === 'annually'
+  const needsAnchorMonth = section === 'quarterly' || section === 'annually'
+
+  /** Exactly the fields this frequency uses; everything else is explicitly null. */
+  function scheduleFields(): CmrRecurringSchedule {
+    return {
+      weekday: needsWeekday && weekday !== '' ? Number(weekday) : null,
+      dayOfMonth: needsDayOfMonth && dayOfMonth !== '' ? Number(dayOfMonth) : null,
+      anchorMonth: needsAnchorMonth && anchorMonth !== '' ? Number(anchorMonth) : null,
+    }
+  }
+
+  const preview = describeSchedule(section, scheduleFields())
 
   function buildBody(): Record<string, unknown> | string {
     if (!vendorName.trim()) return 'Enter a vendor name.'
     if (!accountId) return 'Choose an account.'
     if (amountCents === null) return 'Enter an amount (0 is fine if it varies).'
+    if (needsWeekday && weekday === '') return 'Choose the day of the week this is paid.'
+    if (needsDayOfMonth && dayOfMonth === '') return 'Choose the day of the month this is paid.'
+    if (needsAnchorMonth && anchorMonth === '') {
+      return section === 'quarterly' ? 'Choose the first month of the quarter.' : 'Choose the month this is paid.'
+    }
+    const schedule = scheduleFields()
     const fields = {
       vendorName: vendorName.trim(),
       accountId,
       section,
       amountCents,
-      recurrenceDetail: blankToNull(recurrence),
+      scheduleWeekday: schedule.weekday,
+      scheduleDayOfMonth: schedule.dayOfMonth,
+      scheduleAnchorMonth: schedule.anchorMonth,
       notes: blankToNull(notes),
       planTerms: urgent ? blankToNull(planTerms) : null,
       planDueDate: urgent ? planDueDate || null : null,
@@ -733,7 +776,16 @@ function VendorForm(props: FormProps) {
     if (fields.section !== base.section) out.section = fields.section
     if (fields.amountCents !== base.amountCents) out.amountCents = fields.amountCents
     if (lastSentCents !== base.lastAmountSentCents) out.lastAmountSentCents = lastSentCents
-    if (fields.recurrenceDetail !== base.recurrenceDetail) out.recurrenceDetail = fields.recurrenceDetail
+    // A frequency change re-states the whole schedule; within one frequency, only what moved.
+    if (fields.section !== base.section) {
+      out.scheduleWeekday = schedule.weekday
+      out.scheduleDayOfMonth = schedule.dayOfMonth
+      out.scheduleAnchorMonth = schedule.anchorMonth
+    } else {
+      if (schedule.weekday !== base.schedule.weekday) out.scheduleWeekday = schedule.weekday
+      if (schedule.dayOfMonth !== base.schedule.dayOfMonth) out.scheduleDayOfMonth = schedule.dayOfMonth
+      if (schedule.anchorMonth !== base.schedule.anchorMonth) out.scheduleAnchorMonth = schedule.anchorMonth
+    }
     if (fields.notes !== base.notes) out.notes = fields.notes
     if (urgent) {
       if (fields.planTerms !== base.planTerms) out.planTerms = fields.planTerms
@@ -762,10 +814,6 @@ function VendorForm(props: FormProps) {
       aria-label={heading}
       noValidate
     >
-      <datalist id={listId}>
-        {CMR_RECURRENCE_SUGGESTIONS[section].map((s) => <option key={s} value={s} />)}
-      </datalist>
-
       <label className="cmr-field span2">
         <span className="cmr-label">Vendor</span>
         <input
@@ -794,8 +842,8 @@ function VendorForm(props: FormProps) {
       </label>
 
       <label className="cmr-field">
-        <span className="cmr-label">Section</span>
-        <Select value={section} onChange={(s) => setSection(s as CmrRecurringSection)} ariaLabel="Section">
+        <span className="cmr-label">Frequency</span>
+        <Select value={section} onChange={(s) => setSection(s as CmrRecurringSection)} ariaLabel="Frequency">
           {CMR_RECURRING_SECTIONS.map((s) => <option key={s} value={s}>{CMR_RECURRING_SECTION_LABEL[s]}</option>)}
         </Select>
       </label>
@@ -808,18 +856,65 @@ function VendorForm(props: FormProps) {
         </span>
       </label>
 
-      <label className="cmr-field">
-        <span className="cmr-label">Recurrence <span className="opt">(optional)</span></span>
-        <input
-          className="cmr-input"
-          value={recurrence}
-          onChange={(e) => setRecurrence(e.target.value)}
-          maxLength={CMR_RECURRENCE_MAX}
-          list={listId}
-          placeholder={section === 'monthly' ? '1st of the month' : 'Every Thursday'}
-          autoComplete="off"
-        />
-      </label>
+      {needsWeekday && (
+        <label className="cmr-field">
+          <span className="cmr-label">Day of the week</span>
+          <Select value={weekday} onChange={setWeekday} ariaLabel="Day of the week">
+            <option value="" disabled>Choose a day…</option>
+            {CMR_WEEKDAY_LABEL.map((label, i) => (
+              <option key={label} value={String(i)}>{label}</option>
+            ))}
+          </Select>
+        </label>
+      )}
+
+      {needsDayOfMonth && (
+        <label className="cmr-field">
+          <span className="cmr-label">Day of the month</span>
+          <Select value={dayOfMonth} onChange={setDayOfMonth} ariaLabel="Day of the month">
+            <option value="" disabled>Choose a day…</option>
+            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+              <option key={d} value={String(d)}>{ordinal(d)}</option>
+            ))}
+          </Select>
+        </label>
+      )}
+
+      {needsAnchorMonth && (
+        <label className="cmr-field">
+          <span className="cmr-label">{section === 'quarterly' ? 'First month of the quarter' : 'Month'}</span>
+          <Select
+            value={anchorMonth}
+            onChange={setAnchorMonth}
+            ariaLabel={section === 'quarterly' ? 'First month of the quarter' : 'Month'}
+          >
+            <option value="" disabled>Choose a month…</option>
+            {CMR_MONTH_LABEL.map((label, i) => (
+              <option key={label} value={String(i + 1)}>{label}</option>
+            ))}
+          </Select>
+        </label>
+      )}
+
+      {!urgent && (
+        <p className="cmr-rv-schedpreview span-all" aria-live="polite">
+          {preview === 'No schedule set' ? (
+            <span className="cmr-rv-schedempty">
+              Pick the schedule above — it is what decides when this vendor is suggested.
+            </span>
+          ) : (
+            <>
+              Suggested <b>{preview.toLowerCase()}</b>, from the week it falls in until it is added.
+            </>
+          )}
+        </p>
+      )}
+
+      {needsDayOfMonth && dayOfMonth !== '' && Number(dayOfMonth) > 28 && (
+        <p className="cmr-rv-formnote span-all">
+          Months shorter than the {ordinal(Number(dayOfMonth))} use their last day instead.
+        </p>
+      )}
 
       {mode === 'edit' && (
         <label className="cmr-field">

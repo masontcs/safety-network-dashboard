@@ -51,6 +51,7 @@ export type AuditAction =
   | 'cmr.recurring.activate'
   | 'cmr.recurring.deactivate'
   | 'cmr.recurring.reorder'
+  | 'cmr.recurring.place'
   // SN Cash Ledger — daily ledger (AM/PM snapshots created on demand; lines may be deleted)
   | 'cmr.ledger.create'
   | 'cmr.ledger.beginning_cash'

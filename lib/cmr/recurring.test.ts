@@ -88,12 +88,16 @@ describe('recurring vendor helpers', () => {
 
   it('maps a row, joining the account name/state', () => {
     const row: CmrRecurringVendorRow = {
-      id: 'v', account_id: 'a', vendor_name: 'Rent', amount_cents: 100, section: 'monthly', recurrence_detail: null,
+      id: 'v', account_id: 'a', vendor_name: 'Rent', amount_cents: 100, section: 'monthly',
+      schedule_weekday: null, schedule_day_of_month: 15, schedule_anchor_month: null,
       last_amount_sent_cents: 90, plan_terms: null, plan_due_date: null, notes: null, on_hold: true, active: true,
       sort_order: 2, created_by: null, created_at: 'now',
     }
     const accounts = new Map([['a', { id: 'a', name: 'TCS', active: false, sortOrder: 0 }]])
-    expect(toCmrRecurringVendor(row, accounts)).toMatchObject({ accountName: 'TCS', accountActive: false, amountCents: 100, lastAmountSentCents: 90, onHold: true })
+    expect(toCmrRecurringVendor(row, accounts)).toMatchObject({
+      accountName: 'TCS', accountActive: false, amountCents: 100, lastAmountSentCents: 90, onHold: true,
+      schedule: { weekday: null, dayOfMonth: 15, anchorMonth: null }, scheduleComplete: true,
+    })
     expect(toCmrRecurringVendor(row, new Map())).toMatchObject({ accountName: 'Unknown account', accountActive: false })
   })
 })

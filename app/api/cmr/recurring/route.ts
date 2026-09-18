@@ -4,7 +4,6 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { logAudit, getClientIp, type AuditAction } from '@/lib/audit/log'
 import {
   CMR_PLAN_TERMS_MAX,
-  CMR_RECURRENCE_MAX,
   CMR_RECURRING_COLS,
   CMR_VENDOR_NOTES_MAX,
   PLAN_FIELDS_URGENT_ONLY,
@@ -12,21 +11,31 @@ import {
   parseCents,
   parseOptionalText,
   parsePlanDueDate,
+  parseSchedule,
   parseSection,
   parseVendorName,
+  scheduleColumns,
   toCmrRecurringVendor,
   type CmrAccountRef,
   type CmrRecurringVendorRow,
 } from '@/lib/cmr/recurring'
 
 /**
- * SN Cash Ledger — recurring vendors (Weekly / Monthly / Urgent Payment Plans).
+ * SN Cash Ledger — recurring vendors (Weekly / Monthly / Quarterly / Annually / Urgent Plans).
  *
  *   GET            → every vendor (inactive included) + the accounts to label/pick them.
  *                    ANY CMR role; `canEdit` is true only for a Controller.
  *   POST  {...}    → create at the end of its section. CONTROLLER.
- *   PATCH {id,...} → edit fields, move section, set last amount sent, hold/release,
+ *   PATCH {id,...} → edit fields, change frequency, set last amount sent, hold/release,
  *                    (de)activate. CONTROLLER.
+ *   (accepting a due suggestion lives at /api/cmr/recurring/place)
+ *
+ * Phase 7: the section IS the frequency, and a scheduled one must arrive with a COMPLETE
+ * schedule — schedule_weekday for weekly, schedule_day_of_month for monthly, and both
+ * schedule_day_of_month and schedule_anchor_month for quarterly and annual. The API is stricter
+ * than the database here on purpose (the DB also tolerates a schedule-less row so an insert
+ * from the build deployed at migration time can't error). Changing the frequency always
+ * re-states the schedule.
  *   (reorder lives at /api/cmr/recurring/reorder)
  *
  * There is deliberately NO DELETE: later phases reference these rows, so a vendor is retired
@@ -40,6 +49,9 @@ import {
 export const dynamic = 'force-dynamic'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** The schedule fields a PATCH may carry, in API (camelCase) terms. */
+const SCHEDULE_BODY_KEYS = ['scheduleWeekday', 'scheduleDayOfMonth', 'scheduleAnchorMonth'] as const
 
 type Supabase = ReturnType<typeof createServiceClient>
 type Row = CmrRecurringVendorRow
@@ -103,7 +115,9 @@ function snapshot(r: Partial<Editable>, accounts: Map<string, CmrAccountRef>): R
   }
   if ('section' in r) out.section = r.section
   if ('amount_cents' in r) out.amountCents = r.amount_cents == null ? null : Number(r.amount_cents)
-  if ('recurrence_detail' in r) out.recurrenceDetail = r.recurrence_detail
+  if ('schedule_weekday' in r) out.scheduleWeekday = r.schedule_weekday
+  if ('schedule_day_of_month' in r) out.scheduleDayOfMonth = r.schedule_day_of_month
+  if ('schedule_anchor_month' in r) out.scheduleAnchorMonth = r.schedule_anchor_month
   if ('notes' in r) out.notes = r.notes
   if ('plan_terms' in r) out.planTerms = r.plan_terms
   if ('plan_due_date' in r) out.planDueDate = r.plan_due_date
@@ -154,8 +168,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!section.ok) return bad(section.error)
     const amount = parseCents(body.amountCents, 'Amount')
     if (!amount.ok) return bad(amount.error)
-    const recurrence = parseOptionalText(body.recurrenceDetail, 'Recurrence', CMR_RECURRENCE_MAX)
-    if (!recurrence.ok) return bad(recurrence.error)
     const notes = parseOptionalText(body.notes, 'Notes', CMR_VENDOR_NOTES_MAX, { multiline: true })
     if (!notes.ok) return bad(notes.error)
     const planTerms = parseOptionalText(body.planTerms, 'Plan terms', CMR_PLAN_TERMS_MAX)
@@ -165,6 +177,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (section.value !== 'urgent' && (planTerms.value !== null || planDue.value !== null)) {
       return bad(PLAN_FIELDS_URGENT_ONLY)
     }
+    // Last, so a misused plan field is named for what it is rather than as a missing schedule.
+    const schedule = parseSchedule(section.value, body)
+    if (!schedule.ok) return bad(schedule.error)
 
     const supabase = createServiceClient()
     const accounts = await allAccounts(supabase)
@@ -179,7 +194,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       vendor_name: vendorName.value,
       amount_cents: amount.value as number,
       section: section.value,
-      recurrence_detail: recurrence.value,
+      ...scheduleColumns(schedule.value),
       last_amount_sent_cents: null,
       plan_terms: planTerms.value,
       plan_due_date: planDue.value,
@@ -252,11 +267,6 @@ export async function PATCH(request: Request): Promise<NextResponse> {
       if (!c.ok) return bad(c.error)
       patch.last_amount_sent_cents = c.value
     }
-    if ('recurrenceDetail' in body) {
-      const t = parseOptionalText(body.recurrenceDetail, 'Recurrence', CMR_RECURRENCE_MAX)
-      if (!t.ok) return bad(t.error)
-      patch.recurrence_detail = t.value
-    }
     if ('notes' in body) {
       const t = parseOptionalText(body.notes, 'Notes', CMR_VENDOR_NOTES_MAX, { multiline: true })
       if (!t.ok) return bad(t.error)
@@ -286,6 +296,26 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     const [accounts, found] = await Promise.all([allAccounts(supabase), vendorRows(supabase, { col: 'id', val: id })])
     const before = found[0]
     if (!before) return bad('That vendor does not exist.', 'NOT_FOUND', 404)
+
+    // ── the schedule, against the section this edit LEAVES the vendor in ──
+    // Changing the frequency always re-states the schedule: the fields the old frequency used
+    // mean nothing to the new one, so nothing is carried over (moving to Urgent clears them).
+    // Editing within a frequency may send just the field that changed.
+    const sectionChanged = patch.section !== undefined && patch.section !== before.section
+    const landsIn = patch.section ?? before.section
+    const sentSchedule = SCHEDULE_BODY_KEYS.some((k) => k in body)
+    if (sectionChanged || sentSchedule) {
+      const src: Record<string, unknown> = sectionChanged
+        ? body
+        : {
+            scheduleWeekday: 'scheduleWeekday' in body ? body.scheduleWeekday : before.schedule_weekday,
+            scheduleDayOfMonth: 'scheduleDayOfMonth' in body ? body.scheduleDayOfMonth : before.schedule_day_of_month,
+            scheduleAnchorMonth: 'scheduleAnchorMonth' in body ? body.scheduleAnchorMonth : before.schedule_anchor_month,
+          }
+      const schedule = parseSchedule(landsIn, src)
+      if (!schedule.ok) return bad(schedule.error)
+      Object.assign(patch, scheduleColumns(schedule.value))
+    }
 
     // ── keep only real changes ──
     const changes: Partial<Editable> = {}
@@ -336,17 +366,24 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     if (error) throw new Error(error.message)
 
     // ── audit: one entry per kind of change, each with before → after of its fields ──
-    const FIELD_KEYS: (keyof Editable)[] = ['vendor_name', 'account_id', 'amount_cents', 'recurrence_detail', 'notes']
+    const FIELD_KEYS: (keyof Editable)[] = ['vendor_name', 'account_id', 'amount_cents', 'notes']
     const MOVE_KEYS: (keyof Editable)[] = ['section', 'sort_order']
     const PLAN_KEYS: (keyof Editable)[] = ['plan_terms', 'plan_due_date']
+    const SCHEDULE_KEYS: (keyof Editable)[] = ['schedule_weekday', 'schedule_day_of_month', 'schedule_anchor_month']
     const changed = (keys: (keyof Editable)[]) => keys.filter((k) => k in changes)
 
     const entries: { action: AuditAction; keys: (keyof Editable)[] }[] = []
     const moved = changes.section !== undefined
-    // Plan-field edits ride along with a section move (where they're cleared) or a plain update.
-    const fieldKeys = [...changed(FIELD_KEYS), ...(moved ? [] : changed(PLAN_KEYS))]
+    // Plan-field and schedule edits ride along with a frequency move (where they are re-stated)
+    // or, otherwise, with a plain update.
+    const fieldKeys = [...changed(FIELD_KEYS), ...(moved ? [] : [...changed(SCHEDULE_KEYS), ...changed(PLAN_KEYS)])]
     if (fieldKeys.length) entries.push({ action: 'cmr.recurring.update', keys: fieldKeys })
-    if (moved) entries.push({ action: 'cmr.recurring.move', keys: [...changed(MOVE_KEYS), ...changed(PLAN_KEYS)] })
+    if (moved) {
+      entries.push({
+        action: 'cmr.recurring.move',
+        keys: [...changed(MOVE_KEYS), ...changed(SCHEDULE_KEYS), ...changed(PLAN_KEYS)],
+      })
+    }
     if ('last_amount_sent_cents' in changes) entries.push({ action: 'cmr.recurring.last_sent', keys: ['last_amount_sent_cents'] })
     if ('on_hold' in changes) entries.push({ action: after.on_hold ? 'cmr.recurring.hold' : 'cmr.recurring.release', keys: ['on_hold'] })
     if ('active' in changes) entries.push({ action: after.active ? 'cmr.recurring.activate' : 'cmr.recurring.deactivate', keys: ['active'] })

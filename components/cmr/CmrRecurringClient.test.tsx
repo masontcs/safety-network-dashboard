@@ -6,10 +6,11 @@ import { DialogProvider } from '@/components/ui/DialogProvider'
 import type { CmrRecurringVendor } from '@/lib/cmr/recurring'
 
 /**
- * Recurring screen behaviour: three sections; read-only roles see data but no controls;
- * the Controller adds (dollars → cents), edits (incl. last amount sent, moving section),
- * holds, deactivates through the in-app confirm (never window.confirm), and reorders a
- * section with the full id list (rolled back on failure).
+ * Recurring screen behaviour: five frequency sections; read-only roles see data but no
+ * controls; the Controller adds (dollars → cents, with the structured schedule its frequency
+ * needs), edits (incl. last amount sent, changing frequency), holds, deactivates through the
+ * in-app confirm (never window.confirm), and reorders a section with the full id list (rolled
+ * back on failure).
  */
 
 type V = CmrRecurringVendor
@@ -21,11 +22,24 @@ let reorderFails = false
 const mk = (id: string, vendorName: string, section: V['section'], sortOrder: number, over: Partial<V> = {}): V => ({
   id, vendorName, section, sortOrder,
   accountId: 'a1', accountName: 'TCS', accountActive: true,
-  amountCents: 10000, recurrenceDetail: null, lastAmountSentCents: null,
+  amountCents: 10000, lastAmountSentCents: null,
+  schedule: { weekday: null, dayOfMonth: null, anchorMonth: null },
+  scheduleComplete: section === 'urgent',
   planTerms: null, planDueDate: null, notes: null, onHold: false, active: true,
   createdAt: '2026-09-16T10:00:00Z',
   ...over,
 })
+
+/** A vendor with the schedule its frequency needs. */
+const withSchedule = (
+  id: string, vendorName: string, section: V['section'], sortOrder: number,
+  schedule: Partial<V['schedule']>, over: Partial<V> = {},
+): V =>
+  mk(id, vendorName, section, sortOrder, {
+    schedule: { weekday: null, dayOfMonth: null, anchorMonth: null, ...schedule },
+    scheduleComplete: true,
+    ...over,
+  })
 const accounts = [
   { id: 'a1', name: 'TCS', active: true, sortOrder: 0 },
   { id: 'a2', name: 'STS', active: true, sortOrder: 1 },
@@ -36,10 +50,12 @@ const json = (data: unknown) => Promise.resolve({ status: 200, json: () => Promi
 
 beforeEach(() => {
   vendors = [
-    mk('w1', 'Fuel card', 'weekly', 0, { amountCents: 120000, recurrenceDetail: 'Every Thursday' }),
-    mk('w2', 'Tire shop', 'weekly', 1, { amountCents: 45050, onHold: true, accountId: 'a2', accountName: 'STS' }),
-    mk('w3', 'Old uniforms', 'weekly', 2, { amountCents: 9900, active: false }),
-    mk('m1', 'Yard rent', 'monthly', 0, { amountCents: 250000, lastAmountSentCents: 249999, notes: 'Landlord: Bob' }),
+    withSchedule('w1', 'Fuel card', 'weekly', 0, { weekday: 4 }, { amountCents: 120000 }),
+    withSchedule('w2', 'Tire shop', 'weekly', 1, { weekday: 1 }, { amountCents: 45050, onHold: true, accountId: 'a2', accountName: 'STS' }),
+    withSchedule('w3', 'Old uniforms', 'weekly', 2, { weekday: 2 }, { amountCents: 9900, active: false }),
+    withSchedule('m1', 'Yard rent', 'monthly', 0, { dayOfMonth: 1 }, { amountCents: 250000, lastAmountSentCents: 249999, notes: 'Landlord: Bob' }),
+    withSchedule('q1', 'Insurance premium', 'quarterly', 0, { dayOfMonth: 10, anchorMonth: 2 }, { amountCents: 500000 }),
+    withSchedule('y1', 'Permit renewal', 'annually', 0, { dayOfMonth: 31, anchorMonth: 12 }, { amountCents: 75000 }),
     mk('u1', 'IRS plan', 'urgent', 0, { amountCents: 150000, planTerms: '$1,500/wk until paid', planDueDate: '2020-01-01' }),
   ]
   canEdit = true
@@ -187,12 +203,16 @@ describe('CmrRecurringClient — controller', () => {
     fireEvent.focus(amount)
     fireEvent.change(amount, { target: { value: '1234.5' } })
     fireEvent.blur(amount)
-    fireEvent.change(within(form).getByRole('combobox', { name: /Recurrence/ }), { target: { value: '15th of the month' } })
+    // A monthly vendor asks for a day of the month — and only that.
+    expect(within(form).queryByRole('combobox', { name: 'Day of the week' })).toBeNull()
+    expect(within(form).queryByRole('combobox', { name: /month of the quarter/ })).toBeNull()
+    fireEvent.change(within(form).getByRole('combobox', { name: 'Day of the month' }), { target: { value: '15' } })
     fireEvent.click(within(form).getByRole('button', { name: /Add vendor/ }))
     await waitFor(() =>
       expect(calls.find((c) => c.method === 'POST')?.body).toEqual({
         vendorName: 'Insurance', accountId: 'a2', section: 'monthly', amountCents: 123450,
-        recurrenceDetail: '15th of the month', notes: null, planTerms: null, planDueDate: null,
+        scheduleWeekday: null, scheduleDayOfMonth: 15, scheduleAnchorMonth: null,
+        notes: null, planTerms: null, planDueDate: null,
       }),
     )
     await waitFor(() => expect(namesIn('Monthly')).toEqual(['Yard rent', 'Insurance']))
@@ -234,16 +254,68 @@ describe('CmrRecurringClient — controller', () => {
     expect(screen.getByText('$2,500.00', { selector: '.mt .cmr-num' })).toBeTruthy()
   })
 
-  it('moving an urgent vendor to Weekly sends just the section (the server clears the plan)', async () => {
+  it('moving an urgent vendor to Weekly re-states the schedule and clears the plan', async () => {
     mount()
     await screen.findByText('IRS plan')
     fireEvent.click(screen.getByRole('button', { name: 'Edit IRS plan' }))
     const form = screen.getByRole('form', { name: 'Edit IRS plan' })
-    fireEvent.change(within(form).getByRole('combobox', { name: 'Section' }), { target: { value: 'weekly' } })
+    // Urgent asks for no schedule at all.
+    expect(within(form).queryByRole('combobox', { name: 'Day of the week' })).toBeNull()
+
+    fireEvent.change(within(form).getByRole('combobox', { name: 'Frequency' }), { target: { value: 'weekly' } })
     expect(within(form).queryByRole('textbox', { name: /Plan terms/ })).toBeNull()
     expect(within(form).getByText(/clears this vendor.s plan terms/)).toBeTruthy()
+
+    // The new frequency needs its own schedule before it can be saved.
     fireEvent.click(within(form).getByRole('button', { name: /Save/ }))
-    await waitFor(() => expect(calls.find((c) => c.method === 'PATCH')?.body).toEqual({ id: 'u1', section: 'weekly' }))
+    expect(await within(form).findByRole('alert')).toBeTruthy()
+    expect(calls.some((c) => c.method === 'PATCH')).toBe(false)
+
+    fireEvent.change(within(form).getByRole('combobox', { name: 'Day of the week' }), { target: { value: '3' } })
+    fireEvent.click(within(form).getByRole('button', { name: /Save/ }))
+    await waitFor(() =>
+      expect(calls.find((c) => c.method === 'PATCH')?.body).toEqual({
+        id: 'u1', section: 'weekly', scheduleWeekday: 3, scheduleDayOfMonth: null, scheduleAnchorMonth: null,
+      }),
+    )
+  })
+
+  it('a quarterly vendor asks for the day AND the first month of the quarter', async () => {
+    mount()
+    await screen.findByText('Insurance premium')
+    fireEvent.click(screen.getByRole('button', { name: 'Add a Quarterly vendor' }))
+    const form = screen.getByRole('form', { name: 'New Quarterly vendor' })
+    fireEvent.change(within(form).getByRole('textbox', { name: 'Vendor' }), { target: { value: 'Water district' } })
+    fireEvent.change(within(form).getByRole('combobox', { name: 'Account' }), { target: { value: 'a1' } })
+    const amount = within(form).getByRole('textbox', { name: 'Amount' })
+    fireEvent.focus(amount)
+    fireEvent.change(amount, { target: { value: '800' } })
+    fireEvent.blur(amount)
+
+    // Day alone is not enough.
+    fireEvent.change(within(form).getByRole('combobox', { name: 'Day of the month' }), { target: { value: '10' } })
+    fireEvent.click(within(form).getByRole('button', { name: /Add vendor/ }))
+    expect(await within(form).findByRole('alert')).toBeTruthy()
+    expect(calls.some((c) => c.method === 'POST')).toBe(false)
+
+    fireEvent.change(within(form).getByRole('combobox', { name: 'First month of the quarter' }), { target: { value: '2' } })
+    expect(within(form).getByText(/the 10th of feb, may, aug, nov/i)).toBeTruthy()
+    fireEvent.click(within(form).getByRole('button', { name: /Add vendor/ }))
+    await waitFor(() =>
+      expect(calls.find((c) => c.method === 'POST')?.body).toMatchObject({
+        section: 'quarterly', scheduleWeekday: null, scheduleDayOfMonth: 10, scheduleAnchorMonth: 2,
+      }),
+    )
+  })
+
+  it('warns that a day past the 28th falls back to a short month’s last day', async () => {
+    mount()
+    await screen.findByText('Yard rent')
+    fireEvent.click(screen.getByRole('button', { name: 'Add a Monthly vendor' }))
+    const form = screen.getByRole('form', { name: 'New Monthly vendor' })
+    expect(within(form).queryByText(/use their last day instead/)).toBeNull()
+    fireEvent.change(within(form).getByRole('combobox', { name: 'Day of the month' }), { target: { value: '31' } })
+    expect(within(form).getByText(/Months shorter than the 31st use their last day instead/)).toBeTruthy()
   })
 
   it('Escape cancels an edit with no request; an unchanged save sends nothing', async () => {

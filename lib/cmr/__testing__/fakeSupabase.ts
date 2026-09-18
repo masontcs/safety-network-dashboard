@@ -1,7 +1,8 @@
 /**
  * A tiny in-memory stand-in for the Supabase service client, for the CMR access tests.
  * Supports the query shapes lib/api/cmr.ts and the /api/cmr routes use:
- *   from(t).select(cols, {count, head}).eq(c, v).in(c, vs).order(..).maybeSingle() / await
+ *   from(t).select(cols, {count, head}).eq(c, v).in(c, vs).gte(c, v).lte(c, v).order(..)
+ *     .maybeSingle() / await
  *   from(t).insert(row) / .update(patch).eq(..) / .delete().eq(..)
  *   from(t).update(patch).eq(..).select(..)   (returns the rows the predicate actually matched)
  *   from(t).insert(row).select(..).single()   (returns the inserted row)
@@ -75,6 +76,10 @@ export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions =
     }
     eq(col: string, val: unknown) { this.filters.push([col, val]); return this }
     in(col: string, vals: unknown[]) { this.filters.push([col, { in: vals }]); return this }
+    // Range filters compare with <= / >= — every column CMR filters this way is a
+    // 'YYYY-MM-DD' day string, which orders correctly as text.
+    gte(col: string, val: unknown) { this.filters.push([col, { gte: val }]); return this }
+    lte(col: string, val: unknown) { this.filters.push([col, { lte: val }]); return this }
     order() { return this }
     insert(payload: Row) { this.op = 'insert'; this.payload = payload; return this }
     upsert(payload: Row, o?: { onConflict?: string; ignoreDuplicates?: boolean }) {
@@ -95,11 +100,15 @@ export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions =
     }
 
     private match = (r: Row) =>
-      this.filters.every(([c, v]) =>
-        v && typeof v === 'object' && Array.isArray((v as { in?: unknown[] }).in)
-          ? (v as { in: unknown[] }).in.includes(r[c])
-          : r[c] === v,
-      )
+      this.filters.every(([c, v]) => {
+        if (v && typeof v === 'object') {
+          const o = v as { in?: unknown[]; gte?: unknown; lte?: unknown }
+          if (Array.isArray(o.in)) return o.in.includes(r[c])
+          if ('gte' in o) return r[c] != null && (r[c] as string | number) >= (o.gte as string | number)
+          if ('lte' in o) return r[c] != null && (r[c] as string | number) <= (o.lte as string | number)
+        }
+        return r[c] === v
+      })
 
     private async exec(mode: 'many' | 'maybe' | 'single'): Promise<{ data: unknown; error: FakeError | null; count?: number | null }> {
       calls.push({ table: this.table, op: this.op, columns: this.columns, filters: [...this.filters], payload: this.payload })

@@ -8,7 +8,10 @@
 // SN Cash Ledger (CMR) role — a separate grant in cmr_access, NOT derived from Role.
 export type CmrRole = 'controller' | 'requester' | 'viewer'
 // SN Cash Ledger recurring-vendor section (cmr_recurring_vendors.section check constraint).
-export type CmrRecurringSection = 'weekly' | 'monthly' | 'urgent'
+// Phase 7: the scheduled sections ARE the frequency; 'urgent' (Urgent Payment Plans) carries no
+// schedule and is never suggested.
+export type CmrRecurringFrequency = 'weekly' | 'monthly' | 'quarterly' | 'annually'
+export type CmrRecurringSection = CmrRecurringFrequency | 'urgent'
 // SN Cash Ledger daily ledger enums (check constraints on cmr_daily_ledger / cmr_pending_items).
 export type CmrLedgerPeriod = 'am' | 'pm'
 export type CmrPendingStatus = 'pending' | 'paid' | 'pushed'
@@ -133,9 +136,9 @@ export type Database = {
         Relationships: []
       }
       cmr_recurring_vendors: {
-        Row: { id: string; account_id: string; vendor_name: string; amount_cents: number; section: CmrRecurringSection; recurrence_detail: string | null; last_amount_sent_cents: number | null; plan_terms: string | null; plan_due_date: string | null; notes: string | null; on_hold: boolean; active: boolean; sort_order: number; created_by: string | null; created_at: string }
-        Insert: { id?: string; account_id: string; vendor_name: string; amount_cents?: number; section: CmrRecurringSection; recurrence_detail?: string | null; last_amount_sent_cents?: number | null; plan_terms?: string | null; plan_due_date?: string | null; notes?: string | null; on_hold?: boolean; active?: boolean; sort_order?: number; created_by?: string | null; created_at?: string }
-        Update: { id?: string; account_id?: string; vendor_name?: string; amount_cents?: number; section?: CmrRecurringSection; recurrence_detail?: string | null; last_amount_sent_cents?: number | null; plan_terms?: string | null; plan_due_date?: string | null; notes?: string | null; on_hold?: boolean; active?: boolean; sort_order?: number; created_by?: string | null; created_at?: string }
+        Row: { id: string; account_id: string; vendor_name: string; amount_cents: number; section: CmrRecurringSection; schedule_weekday: number | null; schedule_day_of_month: number | null; schedule_anchor_month: number | null; recurrence_detail: string | null; last_amount_sent_cents: number | null; plan_terms: string | null; plan_due_date: string | null; notes: string | null; on_hold: boolean; active: boolean; sort_order: number; created_by: string | null; created_at: string }
+        Insert: { id?: string; account_id: string; vendor_name: string; amount_cents?: number; section: CmrRecurringSection; schedule_weekday?: number | null; schedule_day_of_month?: number | null; schedule_anchor_month?: number | null; recurrence_detail?: string | null; last_amount_sent_cents?: number | null; plan_terms?: string | null; plan_due_date?: string | null; notes?: string | null; on_hold?: boolean; active?: boolean; sort_order?: number; created_by?: string | null; created_at?: string }
+        Update: { id?: string; account_id?: string; vendor_name?: string; amount_cents?: number; section?: CmrRecurringSection; schedule_weekday?: number | null; schedule_day_of_month?: number | null; schedule_anchor_month?: number | null; recurrence_detail?: string | null; last_amount_sent_cents?: number | null; plan_terms?: string | null; plan_due_date?: string | null; notes?: string | null; on_hold?: boolean; active?: boolean; sort_order?: number; created_by?: string | null; created_at?: string }
         Relationships: []
       }
       cmr_daily_ledger: {
@@ -157,9 +160,9 @@ export type Database = {
         Relationships: []
       }
       cmr_weekly_priorities: {
-        Row: { id: string; week_start: string; description: string; amount_cents: number; due_date: string | null; notes: string | null; is_top_priority: boolean; status: CmrPriorityStatus; carried_from_id: string | null; paid_at: string | null; paid_by: string | null; sort_order: number; created_by: string | null; created_at: string }
-        Insert: { id?: string; week_start: string; description: string; amount_cents?: number; due_date?: string | null; notes?: string | null; is_top_priority?: boolean; status?: CmrPriorityStatus; carried_from_id?: string | null; paid_at?: string | null; paid_by?: string | null; sort_order?: number; created_by?: string | null; created_at?: string }
-        Update: { id?: string; week_start?: string; description?: string; amount_cents?: number; due_date?: string | null; notes?: string | null; is_top_priority?: boolean; status?: CmrPriorityStatus; carried_from_id?: string | null; paid_at?: string | null; paid_by?: string | null; sort_order?: number; created_by?: string | null; created_at?: string }
+        Row: { id: string; week_start: string; description: string; amount_cents: number; due_date: string | null; notes: string | null; is_top_priority: boolean; status: CmrPriorityStatus; carried_from_id: string | null; source_recurring_id: string | null; paid_at: string | null; paid_by: string | null; sort_order: number; created_by: string | null; created_at: string }
+        Insert: { id?: string; week_start: string; description: string; amount_cents?: number; due_date?: string | null; notes?: string | null; is_top_priority?: boolean; status?: CmrPriorityStatus; carried_from_id?: string | null; source_recurring_id?: string | null; paid_at?: string | null; paid_by?: string | null; sort_order?: number; created_by?: string | null; created_at?: string }
+        Update: { id?: string; week_start?: string; description?: string; amount_cents?: number; due_date?: string | null; notes?: string | null; is_top_priority?: boolean; status?: CmrPriorityStatus; carried_from_id?: string | null; source_recurring_id?: string | null; paid_at?: string | null; paid_by?: string | null; sort_order?: number; created_by?: string | null; created_at?: string }
         Relationships: []
       }
       cmr_vendor_requests: {

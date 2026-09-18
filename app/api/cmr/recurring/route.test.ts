@@ -52,7 +52,9 @@ type Row = Record<string, unknown>
 const vendor = (over: Row): Row => ({
   account_id: ACC.TCS,
   amount_cents: 0,
-  recurrence_detail: null,
+  schedule_weekday: null,
+  schedule_day_of_month: null,
+  schedule_anchor_month: null,
   last_amount_sent_cents: null,
   plan_terms: null,
   plan_due_date: null,
@@ -66,12 +68,12 @@ const vendor = (over: Row): Row => ({
 })
 
 const seedVendors = (): Row[] => [
-  vendor({ id: V.RENT, vendor_name: 'Yard rent', section: 'monthly', amount_cents: 250000, recurrence_detail: '1st of the month' }),
-  vendor({ id: V.TIRES, vendor_name: 'Tire shop', section: 'weekly', amount_cents: 45050, sort_order: 1, account_id: ACC.STS }),
-  vendor({ id: V.FUEL, vendor_name: 'Fuel card', section: 'weekly', amount_cents: 120000, sort_order: 0, recurrence_detail: 'Every Thursday' }),
+  vendor({ id: V.RENT, vendor_name: 'Yard rent', section: 'monthly', amount_cents: 250000, schedule_day_of_month: 1 }),
+  vendor({ id: V.TIRES, vendor_name: 'Tire shop', section: 'weekly', amount_cents: 45050, sort_order: 1, account_id: ACC.STS, schedule_weekday: 2 }),
+  vendor({ id: V.FUEL, vendor_name: 'Fuel card', section: 'weekly', amount_cents: 120000, sort_order: 0, schedule_weekday: 4 }),
   vendor({ id: V.IRS, vendor_name: 'IRS plan', section: 'urgent', amount_cents: 150000, plan_terms: '$1,500/wk until paid', plan_due_date: '2026-12-31' }),
-  vendor({ id: V.GONE, vendor_name: 'Old uniforms', section: 'weekly', amount_cents: 9900, sort_order: 2, active: false }),
-  vendor({ id: V.ORPHAN, vendor_name: 'Retired acct vendor', section: 'monthly', amount_cents: 100, sort_order: 1, active: false, account_id: ACC.OLD }),
+  vendor({ id: V.GONE, vendor_name: 'Old uniforms', section: 'weekly', amount_cents: 9900, sort_order: 2, active: false, schedule_weekday: 1 }),
+  vendor({ id: V.ORPHAN, vendor_name: 'Retired acct vendor', section: 'monthly', amount_cents: 100, sort_order: 1, active: false, account_id: ACC.OLD, schedule_day_of_month: 5 }),
 ]
 
 function world(userId: string | null, vendors: Row[] = seedVendors(), opts: { failTables?: string[] } = {}) {
@@ -136,12 +138,22 @@ const orderOf = (fake: ReturnType<typeof world>, section: string) =>
 type AuditArg = { action: string; resourceId?: string; resourceType?: string; userRole?: string; metadata?: Record<string, unknown> }
 const auditCalls = () => audit.logAudit.mock.calls.map((c) => c[0] as AuditArg)
 
+/** The schedule fields a frequency needs, for a create body. */
+const scheduleFor = (section: string): Row => {
+  if (section === 'weekly') return { scheduleWeekday: 5, scheduleDayOfMonth: null, scheduleAnchorMonth: null }
+  if (section === 'monthly') return { scheduleWeekday: null, scheduleDayOfMonth: 15, scheduleAnchorMonth: null }
+  if (section === 'quarterly' || section === 'annually') {
+    return { scheduleWeekday: null, scheduleDayOfMonth: 10, scheduleAnchorMonth: 2 }
+  }
+  return { scheduleWeekday: null, scheduleDayOfMonth: null, scheduleAnchorMonth: null }
+}
+
 const newVendor = (over: Row = {}) => ({
   accountId: ACC.TCS,
   vendorName: 'Porta-potty rental',
   section: 'weekly',
   amountCents: 32500,
-  recurrenceDetail: 'Every Friday',
+  scheduleWeekday: 5,
   ...over,
 })
 
@@ -248,27 +260,52 @@ describe('/api/cmr/recurring — create (controller)', () => {
     const created = (await w.json()).data.vendor
     expect(created).toMatchObject({ vendorName: 'Porta potty', section: 'weekly', amountCents: 32500, accountName: 'TCS', notes: 'Call Tue', onHold: false, active: true, sortOrder: 3 })
 
-    const m = await POST(req('POST', newVendor({ vendorName: 'Insurance', section: 'monthly', amountCents: 0, recurrenceDetail: '' })))
+    const m = await POST(
+      req('POST', newVendor({ vendorName: 'Insurance', section: 'monthly', amountCents: 0, scheduleWeekday: null, scheduleDayOfMonth: 15 })),
+    )
     expect(m.status).toBe(201)
-    expect((await m.json()).data.vendor).toMatchObject({ section: 'monthly', sortOrder: 2, amountCents: 0, recurrenceDetail: null })
+    expect((await m.json()).data.vendor).toMatchObject({
+      section: 'monthly', sortOrder: 2, amountCents: 0,
+      schedule: { weekday: null, dayOfMonth: 15, anchorMonth: null }, scheduleComplete: true,
+    })
 
-    const u = await POST(req('POST', newVendor({ vendorName: 'EDD', section: 'urgent', planTerms: '$500/mo', planDueDate: '2027-01-15', accountId: ACC.STS })))
+    const q = await POST(
+      req('POST', newVendor({ vendorName: 'Workers comp', section: 'quarterly', scheduleWeekday: null, scheduleDayOfMonth: 10, scheduleAnchorMonth: 2 })),
+    )
+    expect(q.status).toBe(201)
+    expect((await q.json()).data.vendor).toMatchObject({
+      section: 'quarterly', sortOrder: 0, schedule: { weekday: null, dayOfMonth: 10, anchorMonth: 2 },
+    })
+
+    const y = await POST(
+      req('POST', newVendor({ vendorName: 'Permit', section: 'annually', scheduleWeekday: null, scheduleDayOfMonth: 31, scheduleAnchorMonth: 12 })),
+    )
+    expect(y.status).toBe(201)
+    expect((await y.json()).data.vendor).toMatchObject({
+      section: 'annually', sortOrder: 0, schedule: { weekday: null, dayOfMonth: 31, anchorMonth: 12 },
+    })
+
+    const u = await POST(req('POST', newVendor({ vendorName: 'EDD', section: 'urgent', scheduleWeekday: null, planTerms: '$500/mo', planDueDate: '2027-01-15', accountId: ACC.STS })))
     expect(u.status).toBe(201)
-    expect((await u.json()).data.vendor).toMatchObject({ section: 'urgent', planTerms: '$500/mo', planDueDate: '2027-01-15', sortOrder: 1, accountName: 'STS' })
+    expect((await u.json()).data.vendor).toMatchObject({
+      section: 'urgent', planTerms: '$500/mo', planDueDate: '2027-01-15', sortOrder: 1, accountName: 'STS',
+      schedule: { weekday: null, dayOfMonth: null, anchorMonth: null },
+    })
 
     expect(orderOf(fake, 'weekly')).toEqual(['Fuel card', 'Tire shop', 'Old uniforms', 'Porta potty'])
     const inserted = fake.calls.filter((c) => c.op === 'insert' && c.table === 'cmr_recurring_vendors')
-    expect(inserted).toHaveLength(3)
+    expect(inserted).toHaveLength(5)
     expect(inserted[0].payload).toMatchObject({ created_by: CONTROLLER, last_amount_sent_cents: null, on_hold: false, active: true })
 
     const calls = auditCalls()
-    expect(calls.map((c) => c.action)).toEqual(['cmr.recurring.create', 'cmr.recurring.create', 'cmr.recurring.create'])
+    expect(calls.map((c) => c.action)).toEqual(Array(5).fill('cmr.recurring.create'))
     expect(calls[0]).toMatchObject({ resourceType: 'cmr_recurring_vendors', resourceId: created.id, userRole: 'cmr:controller' })
     expect(calls[0].metadata).toEqual({
       before: null,
       after: {
         vendorName: 'Porta potty', accountId: ACC.TCS, accountName: 'TCS', section: 'weekly', amountCents: 32500,
-        recurrenceDetail: 'Every Friday', notes: 'Call Tue', planTerms: null, planDueDate: null,
+        scheduleWeekday: 5, scheduleDayOfMonth: null, scheduleAnchorMonth: null,
+        notes: 'Call Tue', planTerms: null, planDueDate: null,
         lastAmountSentCents: null, onHold: false, active: true, sortOrder: 3,
       },
     })
@@ -277,12 +314,11 @@ describe('/api/cmr/recurring — create (controller)', () => {
   it('validates section, name and required fields', async () => {
     const fake = world(CONTROLLER)
     const cases: [Row, RegExp][] = [
-      [newVendor({ section: 'daily' }), /Choose a section/],
-      [newVendor({ section: undefined }), /Choose a section/],
+      [newVendor({ section: 'daily' }), /Choose a frequency/],
+      [newVendor({ section: undefined }), /Choose a frequency/],
       [newVendor({ vendorName: '   ' }), /Enter a vendor name/],
       [newVendor({ vendorName: 'x'.repeat(81) }), /at most 80/],
       [newVendor({ accountId: 'nope' }), /Choose an account/],
-      [newVendor({ recurrenceDetail: 'r'.repeat(81) }), /Recurrence can be at most 80/],
       [newVendor({ notes: 'n'.repeat(501) }), /Notes can be at most 500/],
       [newVendor({ notes: 12 }), /Notes must be text/],
     ]
@@ -314,18 +350,20 @@ describe('/api/cmr/recurring — create (controller)', () => {
     const fake = world(CONTROLLER)
     for (const section of ['weekly', 'monthly']) {
       for (const extra of [{ planTerms: '$100/wk' }, { planDueDate: '2026-12-01' }]) {
-        const r = await POST(req('POST', newVendor({ section, ...extra })))
+        const r = await POST(req('POST', newVendor({ section, ...scheduleFor(section), ...extra })))
         expect(r.status).toBe(400)
         expect((await r.json()).error).toMatch(/only apply to Urgent Payment Plans/)
       }
       // Blank plan fields are fine (they're simply null).
-      expect((await POST(req('POST', newVendor({ section, planTerms: '  ', planDueDate: '' })))).status).toBe(201)
+      expect(
+        (await POST(req('POST', newVendor({ section, planTerms: '  ', planDueDate: '', ...scheduleFor(section) })))).status,
+      ).toBe(201)
     }
     for (const planDueDate of ['2026-02-30', '12/01/2026', '2026-13-01', 20261201]) {
-      const r = await POST(req('POST', newVendor({ section: 'urgent', planDueDate })))
+      const r = await POST(req('POST', newVendor({ section: 'urgent', scheduleWeekday: null, planDueDate })))
       expect(r.status, String(planDueDate)).toBe(400)
     }
-    const r = await POST(req('POST', newVendor({ section: 'urgent', planTerms: 'p'.repeat(201) })))
+    const r = await POST(req('POST', newVendor({ section: 'urgent', scheduleWeekday: null, planTerms: 'p'.repeat(201) })))
     expect((await r.json()).error).toMatch(/Plan terms can be at most 200/)
     expect(fake.calls.filter((c) => c.op === 'insert')).toHaveLength(2)
   })
@@ -451,7 +489,7 @@ describe('/api/cmr/recurring — edit (controller)', () => {
 
   it('moving out of urgent clears plan fields, appends to the new section, and audits a move', async () => {
     const fake = world(CONTROLLER)
-    const r = await PATCH(req('PATCH', { id: V.IRS, section: 'weekly' }))
+    const r = await PATCH(req('PATCH', { id: V.IRS, section: 'weekly', scheduleWeekday: 3 }))
     expect(r.status).toBe(200)
     expect((await r.json()).data.vendor).toMatchObject({ section: 'weekly', planTerms: null, planDueDate: null, sortOrder: 3 })
     expect(rowOf(fake, V.IRS)).toMatchObject({ section: 'weekly', plan_terms: null, plan_due_date: null, sort_order: 3 })
@@ -461,13 +499,16 @@ describe('/api/cmr/recurring — edit (controller)', () => {
       expect.objectContaining({
         action: 'cmr.recurring.move',
         metadata: {
-          before: { section: 'urgent', sortOrder: 0, planTerms: '$1,500/wk until paid', planDueDate: '2026-12-31' },
-          after: { section: 'weekly', sortOrder: 3, planTerms: null, planDueDate: null },
+          before: {
+            section: 'urgent', sortOrder: 0, scheduleWeekday: null,
+            planTerms: '$1,500/wk until paid', planDueDate: '2026-12-31',
+          },
+          after: { section: 'weekly', sortOrder: 3, scheduleWeekday: 3, planTerms: null, planDueDate: null },
         },
       }),
     ])
     // ...but plan values can't ride along into a non-urgent section.
-    const bad = await PATCH(req('PATCH', { id: V.FUEL, section: 'monthly', planTerms: 'nope' }))
+    const bad = await PATCH(req('PATCH', { id: V.FUEL, section: 'monthly', scheduleDayOfMonth: 4, planTerms: 'nope' }))
     expect(bad.status).toBe(400)
   })
 
@@ -527,7 +568,12 @@ describe('/api/cmr/recurring — edit (controller)', () => {
 
   it('a combined edit writes once and audits each kind of change separately', async () => {
     const fake = world(CONTROLLER)
-    await PATCH(req('PATCH', { id: V.TIRES, amountCents: 50000, section: 'monthly', lastAmountSentCents: 45050, onHold: true, active: false }))
+    await PATCH(
+      req('PATCH', {
+        id: V.TIRES, amountCents: 50000, section: 'monthly', scheduleDayOfMonth: 20,
+        lastAmountSentCents: 45050, onHold: true, active: false,
+      }),
+    )
     expect(fake.calls.filter((c) => c.op === 'update')).toHaveLength(1)
     expect(auditCalls().map((c) => c.action)).toEqual([
       'cmr.recurring.update',
