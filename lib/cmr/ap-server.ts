@@ -7,7 +7,7 @@ import {
   type CmrApParsed,
   type CmrApParsedLine,
 } from '@/lib/cmr/ap-import'
-import type { CmrApAccountRef, CmrApImport, CmrApLine, CmrApPreviewSummary, CmrApView } from '@/lib/cmr/ap'
+import { apVendorGroups, type CmrApAccountRef, type CmrApImport, type CmrApLine, type CmrApPickerView, type CmrApPreviewSummary, type CmrApView } from '@/lib/cmr/ap'
 
 /**
  * Server-only helpers for /api/cmr/ap and /api/cmr/ap/import/{preview,commit}. They live here,
@@ -370,4 +370,52 @@ export async function replaceApImport(
   }
   if (typeof data !== 'string' || !UUID_RE.test(data)) throw new Error('The import did not return its id.')
   return data
+}
+
+// ── AP Phase 2: current lines for the request picker and the compose pre-check ─
+
+/**
+ * The lines of the CURRENT import of each account in `accountIds` — payable only by default,
+ * and only one vendor's when `vendorName` is given (exact QuickBooks spelling). Paged.
+ */
+export async function currentApLines(
+  supabase: Supabase,
+  accountIds: string[],
+  opts: { payableOnly?: boolean; vendorName?: string } = {},
+): Promise<CmrApLine[]> {
+  const ids = [...new Set(accountIds)]
+  if (!ids.length) return []
+  const { data: imps, error: impErr } = await supabase
+    .from('cmr_ap_imports')
+    .select('id')
+    .eq('is_current', true)
+    .in('account_id', ids)
+  if (impErr) throw new Error(impErr.message)
+  const importIds = ((imps ?? []) as { id: string }[]).map((r) => r.id)
+  if (!importIds.length) return []
+  const out: CmrApLineRow[] = []
+  for (let from = 0; ; from += PAGE) {
+    let q = supabase.from('cmr_ap_lines').select(CMR_AP_LINE_COLS).in('import_id', importIds)
+    if (opts.payableOnly !== false) q = q.eq('payable', true)
+    if (opts.vendorName !== undefined) q = q.eq('vendor_name', opts.vendorName)
+    const { data, error } = await q.order('id', { ascending: true }).range(from, from + PAGE - 1)
+    if (error) throw new Error(error.message)
+    const rows = (data ?? []) as unknown as CmrApLineRow[]
+    out.push(...rows)
+    if (rows.length < PAGE) break
+  }
+  return out.map(toCmrApLine)
+}
+
+/** One account's vendors and payable lines for the request picker. */
+export async function buildApPicker(supabase: Supabase, account: CmrApAccountRef): Promise<CmrApPickerView> {
+  const [imp] = await currentImports(supabase, account.id)
+  if (!imp) return { account, import: null, vendors: [] }
+  const lines = await currentApLines(supabase, [account.id])
+  return {
+    account,
+    import: { id: imp.id, importedAt: imp.imported_at, sourceFilename: imp.source_filename },
+    // A–Z: the requester is looking a vendor up by name.
+    vendors: apVendorGroups(lines, [account], account.id, 'name'),
+  }
 }

@@ -53,6 +53,9 @@ const rq = (id: string, over: Partial<CmrRequest> = {}): CmrRequest => ({
   createdAt: '2026-09-15T15:00:00Z',
   canUnplace: false,
   unplaceBlockedReason: null,
+  invoices: [],
+  fromAp: false,
+  staleInvoiceCount: 0,
   ...over,
 })
 
@@ -75,6 +78,28 @@ const viewNow = (): CmrRequestsView => {
     userId: ME,
   }
 }
+
+// The picker's A/P: TCS has an import (TRAFFIX with a credit, ZAP bills-only); Signs has none.
+const apl = (id: string, vendorName: string, invoiceNum: string, docType: string, cents: number) => ({
+  id, importId: 'imp-tcs', accountId: ACC.TCS, vendorName, invoiceNum, docType, billDate: '2025-11-24', dueDate: '2025-12-04',
+  agingDays: 292, agingBucket: '> 90', openBalanceCents: cents, payable: true,
+})
+const TRX = [apl('l-103', 'TRAFFIX DEVICES', '4092103', 'Bill', 293_080), apl('l-104', 'TRAFFIX DEVICES', '4092104', 'Bill', 1_530_050), apl('l-cm', 'TRAFFIX DEVICES', 'CM', 'Credit', -600_814)]
+const ZAP = [apl('l-9421', 'ZAP MANUFACTURING INC.', '9421', 'Bill', 171_000)]
+const group = (vendorName: string, lines: ReturnType<typeof apl>[]) => ({
+  key: `${ACC.TCS}\u0000${vendorName}`, accountId: ACC.TCS, accountName: 'TCS', vendorName,
+  owedCents: lines.reduce((s, l) => s + l.openBalanceCents, 0),
+  billCount: lines.filter((l) => l.docType === 'Bill').length, creditCount: lines.filter((l) => l.docType === 'Credit').length,
+  oldestAgingDays: 292, lines,
+})
+const pickerFor = (accountId: string) =>
+  accountId === ACC.TCS
+    ? {
+        account: { id: ACC.TCS, name: 'TCS', active: true, sortOrder: 0 },
+        import: { id: 'imp-tcs', importedAt: '2026-09-22T20:05:39Z', sourceFilename: 'TCS AP 92226.xlsx' },
+        vendors: [group('TRAFFIX DEVICES', TRX), group('ZAP MANUFACTURING INC.', ZAP)],
+      }
+    : { account: { id: accountId, name: 'Signs', active: true, sortOrder: 1 }, import: null, vendors: [] }
 
 const json = (data: unknown, status = 200) => Promise.resolve({ status, json: () => Promise.resolve(data) })
 
@@ -113,6 +138,7 @@ beforeEach(() => {
     const u = new URL(url, 'https://cmr.example')
 
     if (u.pathname === '/api/cmr/requests' && method === 'GET') return json({ success: true, data: viewNow() })
+    if (u.pathname === '/api/cmr/ap/vendors') return json({ success: true, data: pickerFor(u.searchParams.get('accountId')!) })
     if (u.pathname === '/api/cmr/requests' && method === 'POST') {
       const added = rq(`new-${store.length}`, { vendor: body.vendor, amountCents: body.amountCents ?? 0, accountId: body.accountId, dueDate: body.dueDate ?? null, notes: body.notes ?? null })
       store.push(added)
@@ -252,11 +278,12 @@ describe('role → controls', () => {
 // ── submitting ──────────────────────────────────────────────────────────────
 
 describe('submitting', () => {
-  it('submits vendor + account + amount and never sends a requestedBy', async () => {
+  it('CONTROLLER “Enter by hand”: submits vendor + account + amount and never sends a requestedBy', async () => {
     mount()
     await ready()
     fireEvent.click(screen.getByRole('button', { name: 'Submit a vendor payment request' }))
     const form = await screen.findByRole('form', { name: 'New vendor payment request' })
+    fireEvent.click(within(form).getByRole('button', { name: 'Enter by hand' }))
     fireEvent.change(within(form).getByRole('textbox', { name: 'Vendor' }), { target: { value: 'Pacific Gas' } })
     fireEvent.change(within(form).getByRole('combobox', { name: 'Account' }), { target: { value: ACC.SIGNS } })
     fireEvent.change(within(form).getByRole('textbox', { name: 'Amount (optional)' }), { target: { value: '1234.50' } })
@@ -284,6 +311,7 @@ describe('submitting', () => {
     await ready()
     fireEvent.click(screen.getByRole('button', { name: 'Submit a vendor payment request' }))
     const form = await screen.findByRole('form', { name: 'New vendor payment request' })
+    fireEvent.click(within(form).getByRole('button', { name: 'Enter by hand' }))
     fireEvent.submit(form)
     await screen.findByText('Enter a vendor name.')
     expect(writes()).toHaveLength(0)
@@ -293,8 +321,33 @@ describe('submitting', () => {
 // ── editing and withdrawing ─────────────────────────────────────────────────
 
 describe('editing and withdrawing', () => {
-  it('a requester edits their own request', async () => {
+  it('a requester edits the note of their own (hand-entered, pre-A/P) request — no amount field, no re-compose', async () => {
     canEdit = false
+    mount()
+    await ready()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit the request for Sunbelt Rentals' }))
+    const form = await screen.findByRole('form', { name: 'Edit the request for Sunbelt Rentals' })
+    expect(within(form).queryByRole('textbox', { name: 'Amount (optional)' })).toBeNull()
+    expect(within(form).getByText(/This request was entered by hand/)).toBeTruthy()
+    fireEvent.change(within(form).getByRole('textbox', { name: /Notes/ }), { target: { value: 'Called them' } })
+    fireEvent.submit(form)
+    await waitFor(() => expect(writes().some((c) => c.method === 'PATCH')).toBe(true))
+    expect(writes().find((c) => c.method === 'PATCH')!.body).toEqual({ id: 'mine', notes: 'Called them' })
+  })
+
+  it('a requester cannot silently move a hand-entered request to another account without picking invoices', async () => {
+    canEdit = false
+    mount()
+    await ready()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit the request for Sunbelt Rentals' }))
+    const form = await screen.findByRole('form', { name: 'Edit the request for Sunbelt Rentals' })
+    fireEvent.change(within(form).getByRole('combobox', { name: 'Account' }), { target: { value: ACC.SIGNS } })
+    fireEvent.submit(form)
+    await within(form).findByText(/To move this request to another account/)
+    expect(writes()).toHaveLength(0)
+  })
+
+  it('a CONTROLLER still hand-edits a hand-entered request', async () => {
     mount()
     await ready()
     fireEvent.click(screen.getByRole('button', { name: 'Edit the request for Sunbelt Rentals' }))
@@ -511,5 +564,131 @@ describe('undo placement', () => {
     fireEvent.click(within(rowFor('Sunbelt Rentals')).getByRole('button', { name: 'Undo the placement of Sunbelt Rentals' }))
     fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Undo placement' }))
     await waitFor(() => expect(within(rowFor('Sunbelt Rentals')).getByRole('button', { name: 'Place the request for Sunbelt Rentals' })).toBeTruthy())
+  })
+})
+
+// ── AP Phase 2: the A/P picker ──────────────────────────────────────────────
+
+const openNew = async () => {
+  mount()
+  await ready()
+  fireEvent.click(screen.getByRole('button', { name: 'Submit a vendor payment request' }))
+  return screen.findByRole('form', { name: 'New vendor payment request' })
+}
+const pickVendor = async (form: HTMLElement, label: string) => {
+  const box = await within(form).findByRole('combobox', { name: 'Vendor' })
+  fireEvent.focus(box)
+  fireEvent.mouseDown(await within(form).findByRole('option', { name: new RegExp(label) }))
+}
+
+describe('A/P picker (AP Phase 2)', () => {
+  // jsdom has no scrollIntoView (the Combobox keeps its highlighted option in view).
+  beforeEach(() => { Element.prototype.scrollIntoView = vi.fn() })
+
+  it('REQUESTER: no free-text vendor or amount — account → vendor → tick invoices; credits subtract; submits ids, never an amount', async () => {
+    canEdit = false
+    const form = await openNew()
+    expect(within(form).queryByRole('textbox', { name: 'Vendor' })).toBeNull()
+    expect(within(form).queryByRole('textbox', { name: 'Amount (optional)' })).toBeNull()
+    expect(within(form).queryByRole('button', { name: 'Enter by hand' })).toBeNull()
+    expect(calls.some((c) => c.url.includes(`/api/cmr/ap/vendors?accountId=${ACC.TCS}`))).toBe(true)
+
+    await pickVendor(form, 'TRAFFIX DEVICES')
+    const list = await within(form).findByRole('list', { name: 'TRAFFIX DEVICES invoices' })
+    fireEvent.click(within(list).getByRole('checkbox', { name: /Bill 4092103/ }))
+    fireEvent.click(within(list).getByRole('checkbox', { name: /Bill 4092104/ }))
+    fireEvent.click(within(list).getByRole('checkbox', { name: /Credit CM, −\$6,008\.14 \(subtracts\)/ }))
+    // live total = Σ bills − Σ credits
+    expect(within(form).getByText('$12,223.16')).toBeTruthy()
+    expect(within(form).getByRole('button', { name: /Request \$12,223\.16/ })).toBeTruthy()
+
+    fireEvent.submit(form)
+    await waitFor(() => expect(writes().some((c) => c.method === 'POST')).toBe(true))
+    const post = writes().find((c) => c.method === 'POST')!
+    expect(post.body).toEqual({ accountId: ACC.TCS, vendorName: 'TRAFFIX DEVICES', apLineIds: ['l-103', 'l-104', 'l-cm'], dueDate: null, notes: null })
+  })
+
+  it('a credit-only selection is refused in the browser — submit stays disabled', async () => {
+    canEdit = false
+    const form = await openNew()
+    await pickVendor(form, 'TRAFFIX DEVICES')
+    fireEvent.click(within(form).getByRole('checkbox', { name: /Credit CM/ }))
+    expect(within(form).getByText(/The credits cancel out the bills/)).toBeTruthy()
+    expect((within(form).getByRole('button', { name: 'Submit request' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('“Tick all bills” ticks bills only; switching vendor clears the ticks', async () => {
+    canEdit = false
+    const form = await openNew()
+    await pickVendor(form, 'TRAFFIX DEVICES')
+    fireEvent.click(within(form).getByRole('button', { name: 'Tick all 2 bills' }))
+    expect((within(form).getByRole('checkbox', { name: /Bill 4092103/ }) as HTMLInputElement).checked).toBe(true)
+    expect((within(form).getByRole('checkbox', { name: /Credit CM/ }) as HTMLInputElement).checked).toBe(false)
+    expect(within(form).getByText('$18,231.30')).toBeTruthy()
+    await pickVendor(form, 'ZAP MANUFACTURING INC.')
+    expect((within(form).getByRole('checkbox', { name: /Bill 9421/ }) as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('an account with no A/P import says “Import … A/P first” and cannot be submitted', async () => {
+    canEdit = false
+    const form = await openNew()
+    fireEvent.change(within(form).getByRole('combobox', { name: 'Account' }), { target: { value: ACC.SIGNS } })
+    expect(await within(form).findByText('Import Signs’s A/P first.')).toBeTruthy()
+    expect(within(form).queryByRole('link', { name: 'Accounts Payable' })?.getAttribute('href')).toBe('/cmr/ap')
+    expect((within(form).getByRole('button', { name: 'Submit request' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('VIEWER: no form, no picker — the A/P picker is never even fetched', async () => {
+    canEdit = false
+    canRequest = false
+    mount()
+    await ready()
+    expect(screen.queryByRole('button', { name: 'Submit a vendor payment request' })).toBeNull()
+    expect(screen.queryByRole('form')).toBeNull()
+    expect(calls.some((c) => c.url.includes('/api/cmr/ap/vendors'))).toBe(false)
+  })
+
+  it('lists a composed request’s invoices on its row and in the Place dialog, with the “no longer in current AP” hint', async () => {
+    const inv = (id: string, num: string, docType: string, cents: number, inCurrentAp: boolean) => ({
+      id, apLineId: null, vendorName: 'TRAFFIX DEVICES', invoiceNum: num, docType, billDate: '2025-11-24', dueDate: null,
+      openBalanceCents: cents, inCurrentAp, currentApLineId: inCurrentAp ? `l-${num}` : null, currentBalanceCents: null,
+    })
+    store.push(rq('ap1', {
+      vendor: 'TRAFFIX DEVICES', amountCents: 1_222_316, fromAp: true, staleInvoiceCount: 1, createdAt: '2026-09-15T19:00:00Z',
+      invoices: [inv('i1', '4092103', 'Bill', 293_080, true), inv('i2', '4092104', 'Bill', 1_530_050, false), inv('i3', 'CM', 'Credit', -600_814, true)],
+    }))
+    mount()
+    await ready()
+    const row = within(rowFor('TRAFFIX DEVICES'))
+    expect(row.getByText('3 invoices · 1 credit')).toBeTruthy()
+    expect(row.getByText('1 no longer in current AP')).toBeTruthy()
+
+    fireEvent.click(row.getByRole('button', { name: 'Place the request for TRAFFIX DEVICES' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Built from these 3 invoices')).toBeTruthy()
+    for (const t of ['4092103', '4092104', 'Credit CM', '−$6,008.14', '$12,223.16']) expect(within(dialog).getAllByText(t).length).toBeGreaterThan(0)
+    expect(within(dialog).getByText(/no longer in current AP/)).toBeTruthy()
+    expect(within(dialog).getByText(/You can still place it/)).toBeTruthy()
+    // not blocked
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add to that day' }))
+    await waitFor(() => expect(writes().some((c) => c.url.endsWith('/api/cmr/requests/place'))).toBe(true))
+  })
+
+  it('editing a composed request pre-ticks its invoices still in A/P; a note-only change sends just the note', async () => {
+    canEdit = false
+    store.push(rq('ap2', {
+      vendor: 'ZAP MANUFACTURING INC.', amountCents: 171_000, fromAp: true, accountId: ACC.TCS, createdAt: '2026-09-15T19:00:00Z',
+      invoices: [{ id: 'i1', apLineId: null, vendorName: 'ZAP MANUFACTURING INC.', invoiceNum: '9421', docType: 'Bill', billDate: '2025-01-24', dueDate: null, openBalanceCents: 171_000, inCurrentAp: true, currentApLineId: 'l-9421', currentBalanceCents: null }],
+    }))
+    mount()
+    await ready()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit the request for ZAP MANUFACTURING INC.' }))
+    const form = await screen.findByRole('form', { name: 'Edit the request for ZAP MANUFACTURING INC.' })
+    const box = await within(form).findByRole('checkbox', { name: /Bill 9421/ })
+    expect((box as HTMLInputElement).checked).toBe(true)
+    fireEvent.change(within(form).getByRole('textbox', { name: /Notes/ }), { target: { value: 'Urgent' } })
+    fireEvent.submit(form)
+    await waitFor(() => expect(writes().some((c) => c.method === 'PATCH')).toBe(true))
+    expect(writes().find((c) => c.method === 'PATCH')!.body).toEqual({ id: 'ap2', notes: 'Urgent' })
   })
 })

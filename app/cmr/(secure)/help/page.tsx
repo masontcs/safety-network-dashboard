@@ -138,7 +138,9 @@ export default async function CmrHelpPage() {
             <h3 className="cmr-serif">Requests <span className="cmr-help-aside">(Vendors → Requests)</span></h3>
             <p>
               The inbox between the team and the Controller. A <strong>Requester</strong> submits a vendor payment
-              here. The <strong>Controller</strong> then <strong>places</strong> each one — into a specific
+              here by picking the account, a vendor from that account&rsquo;s imported A/P, and ticking the
+              invoices to pay &mdash; credits subtract, and the total is worked out for them. The{' '}
+              <strong>Controller</strong> then <strong>places</strong> each one — into a specific
               day&rsquo;s pending list, or a specific week&rsquo;s priorities — or <strong>declines</strong> it. A
               placed request can be <strong>undone</strong> if it was placed by mistake (as long as it hasn&rsquo;t
               been paid or moved on).

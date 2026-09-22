@@ -13,7 +13,7 @@ import {
 import { parseWeek, toCmrPriority, type CmrPriorityRow } from '@/lib/cmr/priorities'
 import { weekRows, nextSortOrder as nextPrioritySortOrder } from '@/lib/cmr/priorities-server'
 import { formatWeekRangeShort } from '@/lib/cmr/week'
-import { CMR_REQUEST_COLS, parsePlaceTarget, toCmrRequest, type CmrRequestRow } from '@/lib/cmr/requests'
+import { CMR_REQUEST_COLS, parsePlaceTarget, placedNotesFor, toCmrRequest, type CmrRequestRow } from '@/lib/cmr/requests'
 import {
   PlacementConflict,
   UUID_RE,
@@ -23,6 +23,7 @@ import {
   placeRequestIntoPriority,
   readJson,
   requestById,
+  requestInvoicesFor,
   serverError,
   snapshot,
 } from '@/lib/cmr/requests-server'
@@ -42,6 +43,12 @@ import {
  * (cmr_place_request_pending / cmr_place_request_priority), which re-checks that the request
  * is still queued while holding its row locked: a request is never marked placed without its
  * row, and never placed twice.
+ *
+ * AP Phase 2: a request built from A/P invoices carries its snapshot total as the amount (it IS
+ * the request's amount_cents) and lists its invoices in the new row's notes (placedNotesFor), so
+ * the pending item / priority shows what it pays. An invoice that has since left the current A/P
+ * never blocks placing — the snapshot is the source of truth. The placement mechanics (the two
+ * functions below) are unchanged.
  *
  * NOTE (BUG-019): a route.ts may export only HTTP handlers + route config.
  */
@@ -73,6 +80,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     const [accounts, req] = await Promise.all([loadAccounts(supabase), requestById(supabase, id)])
     if (!req) return bad('That request does not exist.', 'NOT_FOUND', 404)
     if (req.status !== 'queued') return bad('That request has already been placed or declined.', 'NOT_QUEUED', 409)
+
+    // The invoices it was built from (none for a hand-entered request) go into the row's notes.
+    const invoices = (await requestInvoicesFor(supabase, [req])).get(id) ?? []
+    const notes = placedNotesFor(req.notes, invoices)
+    const apDetail = invoices.length
+      ? { invoiceCount: invoices.length, staleInvoiceCount: invoices.filter((i) => !i.inCurrentAp).length }
+      : {}
 
     const audit = auditor(ctx, request)
 
@@ -106,7 +120,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           accountId: req.account_id,
           payee: req.vendor,
           amountCents: Number(req.amount_cents),
-          notes: req.notes,
+          notes,
           date: date.value,
           sortOrder: nextSortOrder(group),
         })
@@ -129,6 +143,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         accountId: req.account_id,
         accountName: account.name,
         amountCents: Number(req.amount_cents),
+        ...apDetail,
         before: snapshot({ status: req.status, placed_kind: null, placed_ref_id: null, placed_at: null, placed_by: null }),
         after: after ? snapshot(pick(after), accounts) : { status: 'placed', placedKind: 'pending', placedRefId: newId },
       })
@@ -136,7 +151,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({
         success: true,
         data: {
-          request: after ? toCmrRequest(after, accounts) : null,
+          request: after ? toCmrRequest(after, accounts, undefined, undefined, invoices) : null,
           placedKind: 'pending' as const,
           placedRefId: newId,
           where: ledgerLabel(date.value, period.value),
@@ -159,7 +174,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         description: req.vendor,
         amountCents: Number(req.amount_cents),
         dueDate: req.due_date,
-        notes: req.notes,
+        notes,
         sortOrder: nextPrioritySortOrder(rowsInWeek),
       })
     } catch (e) {
@@ -178,6 +193,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       accountId: req.account_id,
       accountName: accounts.get(req.account_id)?.name ?? null,
       amountCents: Number(req.amount_cents),
+      ...apDetail,
       before: snapshot({ status: req.status, placed_kind: null, placed_ref_id: null, placed_at: null, placed_by: null }),
       after: after ? snapshot(pick(after), accounts) : { status: 'placed', placedKind: 'priority', placedRefId: newId },
     })
@@ -185,7 +201,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({
       success: true,
       data: {
-        request: after ? toCmrRequest(after, accounts) : null,
+        request: after ? toCmrRequest(after, accounts, undefined, undefined, invoices) : null,
         placedKind: 'priority' as const,
         placedRefId: newId,
         where: formatWeekRangeShort(week.value),

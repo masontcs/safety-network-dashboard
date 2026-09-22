@@ -183,6 +183,13 @@ export type Database = {
         Update: { id?: string; import_id?: string; account_id?: string; vendor_name?: string; invoice_num?: string | null; doc_type?: string; bill_date?: string | null; due_date?: string | null; aging_days?: number | null; aging_bucket?: string | null; open_balance_cents?: number; payable?: boolean; created_at?: string }
         Relationships: []
       }
+      // AP Phase 2 — written only by cmr_compose_vendor_request (never inserted directly).
+      cmr_vendor_request_invoices: {
+        Row: { id: string; request_id: string; ap_line_id: string | null; vendor_name: string; invoice_num: string | null; doc_type: string; bill_date: string | null; due_date: string | null; open_balance_cents: number; created_at: string }
+        Insert: { id?: string; request_id: string; ap_line_id?: string | null; vendor_name: string; invoice_num?: string | null; doc_type: string; bill_date?: string | null; due_date?: string | null; open_balance_cents: number; created_at?: string }
+        Update: { id?: string; request_id?: string; ap_line_id?: string | null; vendor_name?: string; invoice_num?: string | null; doc_type?: string; bill_date?: string | null; due_date?: string | null; open_balance_cents?: number; created_at?: string }
+        Relationships: []
+      }
       user_profiles: {
         Row: { id: string; role: Role; display_name: string; must_change_password: boolean; is_active: boolean; username: string | null; field_access: boolean; billing_role: Role | null; qb_export_enabled: boolean; qb_config_enabled: boolean }
         Insert: { id: string; role: Role; display_name?: string; must_change_password?: boolean; is_active?: boolean; username?: string | null; field_access?: boolean; billing_role?: Role | null; qb_export_enabled?: boolean; qb_config_enabled?: boolean }

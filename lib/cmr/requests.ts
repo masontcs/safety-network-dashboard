@@ -1,5 +1,5 @@
 import type { CmrRequestPlacedKind, CmrRequestStatus } from '@/lib/supabase/database.types'
-import { CMR_PAYEE_MAX, parseLedgerCents, parseOptionalText, parseRequiredText, type Parsed } from '@/lib/cmr/ledger'
+import { CMR_PAYEE_MAX, formatCents, parseLedgerCents, parseOptionalText, parseRequiredText, type Parsed } from '@/lib/cmr/ledger'
 import { parseDueDate } from '@/lib/cmr/priorities'
 
 /**
@@ -19,6 +19,17 @@ import { parseDueDate } from '@/lib/cmr/priorities'
  *     queue — but only while that row is untouched. Once it has been paid, or pushed / carried
  *     onward, undoing would erase work that has moved on, so it is refused and the row says why.
  *   • Money is integer cents; amount is optional and stored as 0 when there's no figure.
+ *
+ * AP Phase 2 — a request is COMPOSED from the account's current A/P (lib/cmr/ap):
+ *   • account → vendor (from that account's current A/P) → tick invoices. Credits are their own
+ *     tickable lines with a negative balance. amount = Σ selected bills − Σ selected credits,
+ *     computed on the server from the stored lines (cmr_compose_vendor_request) — a client amount
+ *     is never used.
+ *   • The ticked lines are SNAPSHOTTED into cmr_vendor_request_invoices, so a re-import that
+ *     drops or pays them can't erase what the request was built from. The snapshot is the source
+ *     of truth for the amount; an invoice that is no longer in the current A/P only gets a hint.
+ *   • Requesters can ONLY compose from A/P. A Controller may still enter a vendor + amount by hand
+ *     (and adds pending items / priorities straight on the ledger), so A/P never blocks them.
  */
 
 export type { CmrRequestStatus, CmrRequestPlacedKind }
@@ -68,6 +79,32 @@ export interface CmrRequest {
   canUnplace: boolean
   /** Why undoing is not possible, in the reader's terms — null when it is. */
   unplaceBlockedReason: string | null
+  /** The A/P invoices the request was built from (snapshot), bills then credits. Empty for a hand-entered request. */
+  invoices: CmrRequestInvoice[]
+  /** Built from A/P invoices (has a snapshot) — its amount can only change by re-picking invoices. */
+  fromAp: boolean
+  /** How many of its invoices are no longer in the account's current A/P. */
+  staleInvoiceCount: number
+}
+
+/** One snapshotted invoice of a request, with where it stands in the account's CURRENT A/P. */
+export interface CmrRequestInvoice {
+  id: string
+  /** The source A/P line while it still exists (null once a re-import replaced it). */
+  apLineId: string | null
+  vendorName: string
+  invoiceNum: string | null
+  docType: string
+  billDate: string | null
+  dueDate: string | null
+  /** Signed, as snapshotted at submit: bills positive, credits negative. */
+  openBalanceCents: number
+  /** The matching payable line in the account's current A/P (same vendor, type, number, date). */
+  inCurrentAp: boolean
+  /** That current line's id — what an edit pre-ticks. */
+  currentApLineId: string | null
+  /** That current line's open balance, when it differs from the snapshot (e.g. part-paid); else null. */
+  currentBalanceCents: number | null
 }
 
 export interface CmrRequestAccountRef {
@@ -174,6 +211,7 @@ export function toCmrRequest(
   accounts: Map<string, CmrRequestAccountRef> = new Map(),
   names: Map<string, string> = new Map(),
   placed: Map<string, CmrPlacedRowState> = new Map(),
+  invoices: CmrRequestInvoice[] = [],
 ): CmrRequest {
   const acc = accounts.get(r.account_id)
   return {
@@ -197,6 +235,9 @@ export function toCmrRequest(
     canUnplace: r.status === 'placed' && unplaceRefusal(r, r.placed_ref_id ? placed.get(r.placed_ref_id) ?? null : null) === null,
     unplaceBlockedReason:
       r.status === 'placed' ? unplaceRefusal(r, r.placed_ref_id ? placed.get(r.placed_ref_id) ?? null : null) : null,
+    invoices,
+    fromAp: invoices.length > 0,
+    staleInvoiceCount: invoices.filter((i) => !i.inCurrentAp).length,
   }
 }
 
@@ -288,4 +329,199 @@ export const parseRequestDueDate = parseDueDate
 /** The place target the Controller chose. */
 export function parsePlaceTarget(v: unknown): Parsed<CmrRequestPlacedKind> {
   return isPlacedKind(v) ? { ok: true, value: v } : { ok: false, error: 'Choose the daily pending list or a weekly priority.' }
+}
+
+// ── AP Phase 2: composing a request from A/P invoices ───────────────────────
+
+/** The most invoices one request may carry (a sanity bound on the payload). */
+export const CMR_REQUEST_MAX_INVOICES = 500
+/** A/P vendor names are stored exactly as QuickBooks prints them, up to this long. */
+export const CMR_AP_VENDOR_NAME_MAX = 200
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * The request's display vendor for an A/P vendor name: whitespace squashed (QuickBooks names
+ * can carry double spaces — "OMEGA  ACCOUNTING SOLUTIONS") and cut to the request vendor limit.
+ * Matching against the A/P lines always uses the EXACT name; this is only the label.
+ */
+export function requestVendorLabel(apVendorName: string): string {
+  const t = apVendorName.replace(/\s+/g, ' ').trim()
+  return t.length <= CMR_REQUEST_VENDOR_MAX ? t : `${cutCodePoints(t, CMR_REQUEST_VENDOR_MAX - 1).trimEnd()}…`
+}
+
+/**
+ * The first `n` UTF-16 units of `s`, never splitting a surrogate pair (an emoji): a lone
+ * surrogate is invalid JSON text for Postgres, and the write would fail.
+ */
+function cutCodePoints(s: string, n: number): string {
+  let out = ''
+  for (const ch of s) {
+    if (out.length + ch.length > n) break
+    out += ch
+  }
+  return out
+}
+
+/** The A/P vendor name, exactly as sent (it must match the stored lines byte for byte). */
+export function parseApVendorName(v: unknown): Parsed<string> {
+  if (typeof v !== 'string' || !v.trim()) return { ok: false, error: 'Choose a vendor.' }
+  if (v.length > CMR_AP_VENDOR_NAME_MAX) return { ok: false, error: 'That vendor name is too long.' }
+  return { ok: true, value: v }
+}
+
+/** The ticked A/P line ids: an array of 1…500 uuids, de-duplicated. */
+export function parseApLineIds(v: unknown): Parsed<string[]> {
+  if (!Array.isArray(v)) return { ok: false, error: 'Tick at least one invoice.' }
+  if (v.some((x) => typeof x !== 'string' || !UUID.test(x))) return { ok: false, error: 'One of the invoices is not valid.' }
+  const ids = [...new Set((v as string[]).map((x) => x.toLowerCase()))]
+  if (!ids.length) return { ok: false, error: 'Tick at least one invoice.' }
+  if (ids.length > CMR_REQUEST_MAX_INVOICES) return { ok: false, error: `A request can carry at most ${CMR_REQUEST_MAX_INVOICES} invoices.` }
+  return { ok: true, value: ids }
+}
+
+/** The part of an A/P line composing needs. */
+export interface CmrComposableLine {
+  id: string
+  accountId: string
+  vendorName: string
+  docType: string
+  payable: boolean
+  openBalanceCents: number
+}
+
+export type CmrComposeRefusal = 'NO_LINES' | 'STALE_LINES' | 'NOT_POSITIVE' | 'TOO_LARGE'
+
+/** The request amount ceiling (cmr_vendor_requests_amount_chk). */
+export const CMR_REQUEST_AMOUNT_MAX = 99_999_999_999
+
+/**
+ * THE compose rule, shared by the API's pre-check, the fake database in the tests and the
+ * picker's running total (cmr_compose_vendor_request applies the same rule in SQL, with the
+ * account locked, and is what actually decides):
+ *
+ *   • every ticked id must be a PAYABLE line of that vendor in that account's CURRENT A/P
+ *     (`current` is exactly that account's current lines) — one that isn't refuses the whole
+ *     request (STALE_LINES), it is never silently dropped;
+ *   • amount = Σ balances (bills +, credits −), and it must come out above zero.
+ */
+export function composeFromAp<L extends CmrComposableLine>(
+  current: L[],
+  sel: { accountId: string; vendorName: string; apLineIds: string[] },
+): { ok: true; lines: L[]; totalCents: number } | { ok: false; code: CmrComposeRefusal; staleIds: string[] } {
+  const ids = [...new Set(sel.apLineIds.map((x) => x.toLowerCase()))]
+  if (!ids.length) return { ok: false, code: 'NO_LINES', staleIds: [] }
+  const byId = new Map(current.map((l) => [l.id.toLowerCase(), l]))
+  const lines: L[] = []
+  const staleIds: string[] = []
+  for (const id of ids) {
+    const l = byId.get(id)
+    if (l && l.payable && l.accountId === sel.accountId && l.vendorName === sel.vendorName) lines.push(l)
+    else staleIds.push(id)
+  }
+  if (staleIds.length) return { ok: false, code: 'STALE_LINES', staleIds }
+  const totalCents = selectionTotal(lines)
+  if (totalCents <= 0) return { ok: false, code: 'NOT_POSITIVE', staleIds: [] }
+  if (totalCents > CMR_REQUEST_AMOUNT_MAX) return { ok: false, code: 'TOO_LARGE', staleIds: [] }
+  return { ok: true, lines, totalCents }
+}
+
+/** Σ selected bills − Σ selected credits (credits are stored negative, so it is a plain sum). */
+export function selectionTotal(lines: { openBalanceCents: number }[]): number {
+  return lines.reduce((s, l) => s + l.openBalanceCents, 0)
+}
+
+/** The picker's running figures: bills, credits (negative) and the net. */
+export function selectionBreakdown(lines: { docType: string; openBalanceCents: number }[]): {
+  billsCents: number
+  creditsCents: number
+  totalCents: number
+  billCount: number
+  creditCount: number
+} {
+  let billsCents = 0, creditsCents = 0, billCount = 0, creditCount = 0
+  for (const l of lines) {
+    if (l.openBalanceCents < 0 || l.docType === 'Credit') { creditsCents += l.openBalanceCents; creditCount++ }
+    else { billsCents += l.openBalanceCents; billCount++ }
+  }
+  return { billsCents, creditsCents, totalCents: billsCents + creditsCents, billCount, creditCount }
+}
+
+/** What the caller is told for each compose refusal. */
+export function composeRefusalMessage(code: CmrComposeRefusal, ctx: { accountName?: string; staleCount?: number } = {}): string {
+  switch (code) {
+    case 'NO_LINES':
+      return 'Tick at least one invoice.'
+    case 'STALE_LINES': {
+      const n = ctx.staleCount ?? 0
+      const which = n === 1 ? 'One of the invoices you ticked is' : n > 1 ? `${n} of the invoices you ticked are` : 'Some of the invoices you ticked are'
+      return `${which} no longer in ${ctx.accountName ?? 'this account'}’s current A/P — it may have been paid or re-imported. Reload the invoices and tick them again.`
+    }
+    case 'NOT_POSITIVE':
+      return 'The credits you ticked cancel out the bills. Tick more bills or fewer credits — a request has to pay something.'
+    case 'TOO_LARGE':
+      return 'That total is larger than a request can hold.'
+  }
+}
+
+/** The key an invoice is matched on across A/P re-imports (line ids change every import). */
+export const invoiceMatchKey = (i: { vendorName: string; docType: string; invoiceNum: string | null; billDate: string | null }): string =>
+  [i.vendorName, i.docType, i.invoiceNum ?? '', i.billDate ?? ''].join('\u0000')
+
+/** "Bill 9421 · 1/24/25" style label for one invoice. */
+export function invoiceLabel(i: { docType: string; invoiceNum: string | null }): string {
+  return `${i.docType === 'Credit' ? 'Credit' : 'Bill'} ${i.invoiceNum ?? '(no number)'}`
+}
+
+/** Signed money: "$1,234.56" / "−$50.00". */
+export const formatSignedCents = (c: number): string => (c < 0 ? `−${formatCents(-c)}` : formatCents(c))
+
+/** Bills first (oldest first), then credits — the order a request lists its invoices. */
+export function compareRequestInvoices(
+  a: { docType: string; billDate: string | null; invoiceNum: string | null },
+  b: { docType: string; billDate: string | null; invoiceNum: string | null },
+): number {
+  const ca = a.docType === 'Credit' ? 1 : 0
+  const cb = b.docType === 'Credit' ? 1 : 0
+  if (ca !== cb) return ca - cb
+  if (a.billDate !== b.billDate) {
+    if (a.billDate === null) return 1
+    if (b.billDate === null) return -1
+    return a.billDate < b.billDate ? -1 : 1
+  }
+  return (a.invoiceNum ?? '').localeCompare(b.invoiceNum ?? '', 'en-US', { numeric: true })
+}
+
+/** The notes limit of the row a placement creates (pending item / priority). */
+export const CMR_PLACED_NOTES_MAX = 500
+
+/**
+ * The notes a PLACED request carries onto its pending item / priority: the request's own notes,
+ * then its invoices ("Invoices: Bill 9421 $1,710.00; Credit CM −$6,008.14 = $12,223.16"). Cut to
+ * the 500-character limit with "+N more" so the total always shows. A hand-entered request (no
+ * invoices) keeps its notes unchanged.
+ */
+export function placedNotesFor(
+  notes: string | null,
+  invoices: { docType: string; invoiceNum: string | null; openBalanceCents: number }[],
+  max = CMR_PLACED_NOTES_MAX,
+): string | null {
+  if (!invoices.length) return notes
+  const parts = invoices.map((i) => `${invoiceLabel(i)} ${formatSignedCents(i.openBalanceCents)}`)
+  const total = ` = ${formatSignedCents(selectionTotal(invoices))}`
+  const head = notes ? `${notes} · ` : ''
+  const label = invoices.length === 1 ? 'Invoice: ' : `Invoices (${invoices.length}): `
+  const fits = (k: number) => {
+    const shown = parts.slice(0, k).join('; ')
+    const more = k < parts.length ? `${k ? '; ' : ''}+${parts.length - k} more` : ''
+    return `${head}${label}${shown}${more}${total}`
+  }
+  for (let k = parts.length; k >= 0; k--) {
+    const s = fits(k)
+    if (s.length <= max) return s
+  }
+  // Even the bare summary is too long only if the request's own notes fill the space.
+  const summary = `${label}+${parts.length} more${total}`
+  const room = max - summary.length
+  return room > 0 && notes ? `${cutCodePoints(notes, room - 4).trimEnd()}… · ${summary}` : summary.slice(0, max)
 }

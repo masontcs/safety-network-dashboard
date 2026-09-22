@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import MoneyInput from '@/components/billing/MoneyInput'
 import Select from '@/components/billing/Select'
 import CmrIcon from '@/components/cmr/CmrIcon'
+import { ApPicker, InvoiceList, initialSelection, tickedLines, usePicker } from '@/components/cmr/CmrRequestPicker'
 import { useAlert, useConfirm } from '@/components/ui/DialogProvider'
 import { CMR_LEDGER_PERIOD_LABEL, formatCents, formatLedgerDate, type CmrLedgerPeriod } from '@/lib/cmr/ledger'
 import { initialsOf } from '@/lib/cmr/priorities'
@@ -13,6 +14,7 @@ import {
   CMR_REQUEST_STATUS_LABEL,
   CMR_REQUEST_VENDOR_MAX,
   canModifyRequest,
+  selectionTotal,
   type CmrRequest,
   type CmrRequestAccountRef,
   type CmrRequestsView,
@@ -31,6 +33,12 @@ import { formatDueDate, formatWeekRangeShort, shiftWeek, weekStartSunday } from 
  *   • Requester — submits, and may edit or withdraw their OWN request while it is still queued.
  *     No Place, no Decline.
  *   • Viewer — reads. No form, no row controls.
+ *
+ * AP Phase 2 — a request is built from the account's A/P: account → vendor (its current A/P) →
+ * tick invoices (credits subtract) → the total is computed. A Requester has no free-text vendor
+ * or amount any more; a Controller may still switch the form to "Enter by hand". Every request
+ * built from invoices lists them on its row and in the Place dialog, with a hint on any that has
+ * since left the current A/P (placing is never blocked by that).
  *
  * Every confirmation is the root DialogProvider (useConfirm/useAlert) and the Place dialog is
  * an in-app modal — never a native confirm/alert/prompt.
@@ -333,6 +341,7 @@ export default function CmrRequestsClient() {
                 <div className="cmr-lg-addwrap">
                   <RequestForm
                     accounts={activeAccounts}
+                    canHandEnter={canEdit}
                     onSubmit={create}
                     onCancel={() => { setMode(null); focusLater('add') }}
                   />
@@ -456,7 +465,7 @@ function RequestRow({
     return (
       <li className={cls} aria-busy={busy || undefined}>
         <div className="cmr-lg-editwrap">
-          <RequestForm initial={q} accounts={accounts} onSubmit={onSave} onCancel={onCancel} />
+          <RequestForm initial={q} accounts={accounts} canHandEnter={canEdit} onSubmit={onSave} onCancel={onCancel} />
         </div>
       </li>
     )
@@ -485,6 +494,7 @@ function RequestRow({
           <span className="cmr-rq-when">{STAMP_FMT.format(new Date(q.createdAt))}</span>
         </span>
         {q.notes && <span className="note">{q.notes}</span>}
+        {q.fromAp && <InvoiceList invoices={q.invoices} totalCents={q.amountCents} />}
       </div>
       <span className="amt cmr-num">
         {q.amountCents > 0 ? amountText(q.amountCents) : <span className="cmr-sr-only">No amount</span>}
@@ -609,6 +619,7 @@ function HistoryRow({
           )}
         </span>
         {q.notes && <span className="note">{q.notes}</span>}
+        {q.fromAp && <InvoiceList invoices={q.invoices} totalCents={q.amountCents} />}
         {showUndo && q.unplaceBlockedReason && (
           <span className="mt cmr-rq-blocked">
             <CmrIcon name="lock" size={11} /> Can’t be undone: {q.unplaceBlockedReason}
@@ -639,50 +650,107 @@ function HistoryRow({
 
 // ── submit / edit form ──────────────────────────────────────────────────────
 
+/**
+ * account → vendor → invoices. A Requester only ever composes from A/P. A Controller may switch
+ * to "Enter by hand" (vendor + optional amount), and a request that was hand-entered opens that
+ * way. Editing a request built from invoices re-picks them only if the selection changes — a
+ * note or date change alone never re-composes it.
+ */
 function RequestForm({
   initial,
   accounts,
+  canHandEnter,
   onSubmit,
   onCancel,
 }: {
   initial?: CmrRequest
   accounts: CmrRequestAccountRef[]
+  canHandEnter: boolean
   onSubmit: (body: Record<string, unknown>) => Promise<boolean>
   onCancel: () => void
 }) {
   // Editing keeps the request's own account even if it has since been deactivated; the picker
   // otherwise offers active accounts only.
   const choices = accounts.filter((a) => a.active || a.id === initial?.accountId)
+  const startHand = !!initial && !initial.fromAp
+  const [hand, setHand] = useState(startHand && canHandEnter)
   const [accountId, setAccountId] = useState(initial?.accountId ?? choices[0]?.id ?? '')
-  const [vendor, setVendor] = useState(initial?.vendor ?? '')
-  const [amount, setAmount] = useState<number | null>(initial && initial.amountCents > 0 ? initial.amountCents : null)
   const [dueDate, setDueDate] = useState(initial?.dueDate ?? '')
   const [notes, setNotes] = useState(initial?.notes ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const vendorRef = useRef<HTMLInputElement>(null)
 
+  // A/P mode
+  const initialVendor = initial?.fromAp ? initial.invoices[0]?.vendorName ?? '' : ''
+  const [vendorName, setVendorName] = useState(initialVendor)
+  const [selected, setSelected] = useState<Set<string>>(() => (initial?.fromAp ? initialSelection(initial.invoices) : new Set()))
+  const [reload, setReload] = useState(0)
+  const picker = usePicker(hand ? '' : accountId, reload)
+
+  // Hand mode (Controller)
+  const [vendor, setVendor] = useState(initial && !initial.fromAp ? initial.vendor : '')
+  const [amount, setAmount] = useState<number | null>(initial && !initial.fromAp && initial.amountCents > 0 ? initial.amountCents : null)
+
+  const firstRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    requestAnimationFrame(() => { vendorRef.current?.focus(); if (initial) vendorRef.current?.select() })
-  }, [initial])
+    requestAnimationFrame(() => firstRef.current?.querySelector<HTMLElement>('input, select, button')?.focus())
+  }, [])
+
+  const ticked = tickedLines(picker, vendorName, selected)
+  const total = selectionTotal(ticked)
+  const account = choices.find((a) => a.id === accountId)
+  const staleOnOpen = initial?.fromAp ? initial.staleInvoiceCount : 0
+
+  function changeAccount(id: string) {
+    setAccountId(id)
+    if (!hand) { setVendorName(''); setSelected(new Set()) }
+  }
 
   function build(): Record<string, unknown> | string {
     if (!accountId) return 'Choose an account.'
-    if (!vendor.trim()) return 'Enter a vendor name.'
-    const fields = {
-      accountId,
-      vendor: vendor.trim(),
-      amountCents: amount ?? 0,
-      dueDate: dueDate || null,
-      notes: blankToNull(notes),
+    const base = { dueDate: dueDate || null, notes: blankToNull(notes) }
+
+    if (hand) {
+      if (!vendor.trim()) return 'Enter a vendor name.'
+      const fields = { accountId, vendor: vendor.trim(), amountCents: amount ?? 0, ...base }
+      if (!initial) return fields
+      const out: Record<string, unknown> = {}
+      if (fields.accountId !== initial.accountId) out.accountId = fields.accountId
+      if (fields.vendor !== initial.vendor) out.vendor = fields.vendor
+      if (fields.amountCents !== initial.amountCents) out.amountCents = fields.amountCents
+      if (fields.dueDate !== initial.dueDate) out.dueDate = fields.dueDate
+      if (fields.notes !== initial.notes) out.notes = fields.notes
+      return out
     }
-    if (!initial) return fields
+
+    // A request entered by hand before requests came from A/P: its note and date may still be
+    // changed on their own; picking invoices rebuilds it.
+    if (initial && !initial.fromAp && !vendorName && selected.size === 0) {
+      if (accountId !== initial.accountId) return 'To move this request to another account, pick that account’s vendor and invoices.'
+      const out: Record<string, unknown> = {}
+      if (base.dueDate !== initial.dueDate) out.dueDate = base.dueDate
+      if (base.notes !== initial.notes) out.notes = base.notes
+      return out
+    }
+    if (!vendorName) return 'Choose a vendor.'
+    if (!ticked.length) return 'Tick at least one invoice.'
+    if (total <= 0) return 'The credits you ticked cancel out the bills. Tick more bills or fewer credits.'
+    const composed = { accountId, vendorName, apLineIds: [...selected].filter((id) => ticked.some((l) => l.id === id)), ...base }
+    if (!initial) return composed
+
+    // Editing: re-compose only when the picked invoices actually change.
+    const before = initial.fromAp ? initialSelection(initial.invoices) : new Set<string>()
+    const sameSel =
+      initial.fromAp &&
+      initial.staleInvoiceCount === 0 &&
+      accountId === initial.accountId &&
+      vendorName === initialVendor &&
+      before.size === composed.apLineIds.length &&
+      composed.apLineIds.every((id) => before.has(id))
+    if (!sameSel) return composed
     const out: Record<string, unknown> = {}
-    if (fields.accountId !== initial.accountId) out.accountId = fields.accountId
-    if (fields.vendor !== initial.vendor) out.vendor = fields.vendor
-    if (fields.amountCents !== initial.amountCents) out.amountCents = fields.amountCents
-    if (fields.dueDate !== initial.dueDate) out.dueDate = fields.dueDate
-    if (fields.notes !== initial.notes) out.notes = fields.notes
+    if (base.dueDate !== initial.dueDate) out.dueDate = base.dueDate
+    if (base.notes !== initial.notes) out.notes = base.notes
     return out
   }
 
@@ -692,11 +760,15 @@ function RequestForm({
     if (typeof body === 'string') { setError(body); return }
     setError(null)
     setSaving(true)
-    await onSubmit(body)
+    const ok = await onSubmit(body)
     setSaving(false)
+    // A stale selection: fetch the account's A/P again so the list is current.
+    if (!ok && !hand) setReload((n) => n + 1)
   }
 
   const uid = initial?.id ?? 'new'
+  const legacyNoteEdit = !!initial && !initial.fromAp && !hand && !vendorName && selected.size === 0
+  const canSubmit = hand ? choices.length > 0 : legacyNoteEdit || (ticked.length > 0 && total > 0)
   return (
     <form
       className="cmr-rv-form cmr-lg-form cmr-rq-form"
@@ -705,41 +777,97 @@ function RequestForm({
       aria-label={initial ? `Edit the request for ${initial.vendor}` : 'New vendor payment request'}
       noValidate
     >
-      <label className="cmr-field span2">
-        <span className="cmr-label">Vendor</span>
-        <input
-          ref={vendorRef}
-          className="cmr-input"
-          value={vendor}
-          onChange={(e) => setVendor(e.target.value)}
-          maxLength={CMR_REQUEST_VENDOR_MAX}
-          placeholder="e.g. Sunbelt Rentals"
-          autoComplete="off"
-          required
+      <div ref={firstRef} className="cmr-rq-formtop span-all">
+        <label className="cmr-field">
+          <span className="cmr-label">Account</span>
+          <Select value={accountId} onChange={changeAccount} ariaLabel="Account">
+            {choices.length === 0 && <option value="">No active accounts</option>}
+            {choices.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+                {a.accountType ? ` — ${a.accountType}` : ''}
+                {a.active ? '' : ' (inactive)'}
+              </option>
+            ))}
+          </Select>
+        </label>
+        {canHandEnter && !initial?.fromAp && (
+          <div className="cmr-field">
+            <span className="cmr-label">Build it from</span>
+            <div className="cmr-seg cmr-rq-modeseg" role="group" aria-label="How to build this request">
+              <button type="button" aria-pressed={!hand} onClick={() => { setHand(false); setError(null) }} disabled={saving}>
+                A/P invoices
+              </button>
+              <button type="button" aria-pressed={hand} onClick={() => { setHand(true); setError(null) }} disabled={saving}>
+                Enter by hand
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {!hand && initial && !initial.fromAp && (
+        <p className="cmr-rv-formnote span-all">
+          This request was entered by hand ({initial.vendor}
+          {initial.amountCents > 0 ? `, ${formatCents(initial.amountCents)}` : ''}). You can change its note and date here, or
+          pick a vendor’s invoices to rebuild it from A/P.
+        </p>
+      )}
+
+      {!hand && staleOnOpen > 0 && (
+        <p className="cmr-rv-formnote span-all">
+          {staleOnOpen === initial?.invoices.length
+            ? 'None of this request’s invoices are in the current A/P any more.'
+            : `${staleOnOpen} of this request’s invoices ${staleOnOpen === 1 ? 'is' : 'are'} no longer in the current A/P.`}{' '}
+          Saving re-picks from what is there now.
+        </p>
+      )}
+
+      {!hand && (
+        <ApPicker
+          uid={uid}
+          state={picker}
+          accountName={account?.name ?? 'This account'}
+          vendorName={vendorName}
+          onVendor={setVendorName}
+          selected={selected}
+          onSelected={setSelected}
+          onRetry={() => setReload((n) => n + 1)}
+          disabled={saving}
+          handEntryHint={
+            canHandEnter ? (
+              <>
+                {' '}Or{' '}
+                <button type="button" className="cmr-linkbtn" onClick={() => setHand(true)}>enter this request by hand</button>.
+              </>
+            ) : undefined
+          }
         />
-      </label>
+      )}
 
-      <label className="cmr-field">
-        <span className="cmr-label">Account</span>
-        <Select value={accountId} onChange={setAccountId} ariaLabel="Account">
-          {choices.length === 0 && <option value="">No active accounts</option>}
-          {choices.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-              {a.accountType ? ` — ${a.accountType}` : ''}
-              {a.active ? '' : ' (inactive)'}
-            </option>
-          ))}
-        </Select>
-      </label>
-
-      <label className="cmr-field">
-        <span className="cmr-label">Amount <span className="opt">(optional)</span></span>
-        <span className="cmr-money">
-          <span aria-hidden="true">$</span>
-          <MoneyInput valueCents={amount} onChangeCents={setAmount} placeholder="No amount" ariaLabel="Amount (optional)" />
-        </span>
-      </label>
+      {hand && (
+        <>
+          <label className="cmr-field span2">
+            <span className="cmr-label">Vendor</span>
+            <input
+              className="cmr-input"
+              value={vendor}
+              onChange={(e) => setVendor(e.target.value)}
+              maxLength={CMR_REQUEST_VENDOR_MAX}
+              placeholder="e.g. Sunbelt Rentals"
+              autoComplete="off"
+              required
+            />
+          </label>
+          <label className="cmr-field">
+            <span className="cmr-label">Amount <span className="opt">(optional)</span></span>
+            <span className="cmr-money">
+              <span aria-hidden="true">$</span>
+              <MoneyInput valueCents={amount} onChangeCents={setAmount} placeholder="No amount" ariaLabel="Amount (optional)" />
+            </span>
+          </label>
+        </>
+      )}
 
       <label className="cmr-field">
         <span className="cmr-label">Needed by <span className="opt">(optional)</span></span>
@@ -754,7 +882,7 @@ function RequestForm({
         />
       </label>
 
-      <label className="cmr-field span-all">
+      <label className={`cmr-field ${hand ? 'span-all' : 'span2'}`}>
         <span className="cmr-label">Notes <span className="opt">(optional)</span></span>
         <textarea
           className="cmr-input"
@@ -770,9 +898,9 @@ function RequestForm({
 
       <div className="acts span-all">
         <button type="button" className="cmr-btn sm ghost" onClick={onCancel} disabled={saving}>Cancel</button>
-        <button type="submit" className="cmr-btn sm" disabled={saving || choices.length === 0}>
+        <button type="submit" className="cmr-btn sm" disabled={saving || !canSubmit}>
           <CmrIcon name={initial ? 'check' : 'plus'} size={14} />
-          {saving ? 'Saving…' : initial ? 'Save' : 'Submit request'}
+          {saving ? 'Saving…' : initial ? 'Save' : !hand && total > 0 ? `Request ${formatCents(total)}` : 'Submit request'}
         </button>
       </div>
     </form>
@@ -853,6 +981,21 @@ function PlaceDialog({
           {q.amountCents > 0 ? ` · ${formatCents(q.amountCents)}` : ' · no amount'}
           {q.dueDate ? ` · needed by ${formatDueDate(q.dueDate, today.slice(0, 4))}` : ''}
         </p>
+        {q.fromAp && (
+          <div className="cmr-rq-placeinvs">
+            <span className="cmr-label">Built from {q.invoices.length === 1 ? 'this invoice' : `these ${q.invoices.length} invoices`}</span>
+            <InvoiceList invoices={q.invoices} totalCents={q.amountCents} open />
+            {q.staleInvoiceCount > 0 && (
+              <p className="cmr-rq-dialognote cmr-rq-stale">
+                <CmrIcon name="alert" size={12} />{' '}
+                {q.staleInvoiceCount === q.invoices.length
+                  ? 'None of these are in the current A/P any more'
+                  : `${q.staleInvoiceCount} of these ${q.staleInvoiceCount === 1 ? 'is' : 'are'} no longer in the current A/P`}{' '}
+                — maybe paid or re-imported. You can still place it; it keeps the amount it was requested with.
+              </p>
+            )}
+          </div>
+        )}
 
         <form onSubmit={submit} noValidate>
           <div className="cmr-seg cmr-rq-seg" role="group" aria-label="Where to place this request">
@@ -898,7 +1041,7 @@ function PlaceDialog({
               <p className="cmr-rq-dialognote span-all">
                 Goes into the pending breakdown for{' '}
                 <b>{formatLedgerDate(date)} {CMR_LEDGER_PERIOD_LABEL[period]}</b> under {q.accountName}, and reduces that
-                snapshot’s balance.
+                snapshot’s balance.{q.fromAp && ' Its notes list the invoices.'}
               </p>
             </div>
           ) : (
@@ -930,7 +1073,7 @@ function PlaceDialog({
               </div>
               <p className="cmr-rq-dialognote span-all">
                 Goes into the priorities for the week of <b>{formatWeekRangeShort(week)}</b>, open, with the request’s
-                amount, due date and notes.
+                amount, due date and notes{q.fromAp && ' (listing the invoices)'}.
               </p>
             </div>
           )}

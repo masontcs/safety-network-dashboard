@@ -357,13 +357,15 @@ describe('/api/cmr/requests — access', () => {
 // ── submitting ──────────────────────────────────────────────────────────────
 
 describe('POST /api/cmr/requests — submit', () => {
-  it('a requester submits: 201, queued, requested_by = the caller, audited', async () => {
-    const fake = world(REQUESTER)
+  // Hand-entered requests (vendor + amount typed in) are CONTROLLER-only since AP Phase 2 — a
+  // Requester's requests are composed from A/P (see ap-compose.test.ts).
+  it('a controller hand-enters a request: 201, queued, requested_by = the caller, audited', async () => {
+    const fake = world(CONTROLLER)
     const res = await api.add({ accountId: ACC.SIGNS, vendor: '  Sunbelt   Rentals  ', amountCents: 250_000, dueDate: '2026-09-19', notes: 'Rental invoice' })
     expect(res.status).toBe(201)
     const { data } = await bodyOf(res)
     expect(data.request).toMatchObject({
-      requestedBy: REQUESTER,
+      requestedBy: CONTROLLER,
       accountId: ACC.SIGNS,
       accountName: 'Signs',
       vendor: 'Sunbelt Rentals', // squashed
@@ -374,26 +376,27 @@ describe('POST /api/cmr/requests — submit', () => {
       placedKind: null,
       placedRefId: null,
     })
+    expect(data.request).toMatchObject({ fromAp: false, invoices: [] })
     const row = rowOf(fake, data.request.id)!
-    expect(row.requested_by).toBe(REQUESTER)
+    expect(row.requested_by).toBe(CONTROLLER)
     expect(row.status).toBe('queued')
 
     const a = auditCalls()
     expect(a).toHaveLength(1)
-    expect(a[0]).toMatchObject({ action: 'cmr.request.submit', resourceType: 'cmr_vendor_requests', resourceId: data.request.id, resourceLabel: 'Sunbelt Rentals', userRole: 'cmr:requester' })
+    expect(a[0]).toMatchObject({ action: 'cmr.request.submit', resourceType: 'cmr_vendor_requests', resourceId: data.request.id, resourceLabel: 'Sunbelt Rentals', userRole: 'cmr:controller' })
     expect(a[0].metadata?.before).toBeNull()
-    expect(a[0].metadata?.after).toMatchObject({ requestedBy: REQUESTER, status: 'queued', amountCents: 250_000, accountName: 'Signs' })
+    expect(a[0].metadata?.after).toMatchObject({ requestedBy: CONTROLLER, status: 'queued', amountCents: 250_000, accountName: 'Signs' })
   })
 
   it('IGNORES a spoofed requestedBy in the body — the row belongs to the caller', async () => {
-    const fake = world(REQUESTER)
-    const res = await api.add({ accountId: ACC.TCS, vendor: 'Spoofed', requestedBy: CONTROLLER, amountCents: 100 })
+    const fake = world(CONTROLLER)
+    const res = await api.add({ accountId: ACC.TCS, vendor: 'Spoofed', requestedBy: REQUESTER, amountCents: 100 })
     expect(res.status).toBe(201)
     const { data } = await bodyOf(res)
-    expect(data.request.requestedBy).toBe(REQUESTER)
-    expect(rowOf(fake, data.request.id)!.requested_by).toBe(REQUESTER)
+    expect(data.request.requestedBy).toBe(CONTROLLER)
+    expect(rowOf(fake, data.request.id)!.requested_by).toBe(CONTROLLER)
     const insert = fake.calls.find((c) => c.table === 'cmr_vendor_requests' && c.op === 'insert')
-    expect((insert?.payload as Row).requested_by).toBe(REQUESTER)
+    expect((insert?.payload as Row).requested_by).toBe(CONTROLLER)
   })
 
   it('refuses to set status or placement on submit', async () => {
@@ -411,7 +414,7 @@ describe('POST /api/cmr/requests — submit', () => {
   })
 
   it('the account must exist and be ACTIVE', async () => {
-    const fake = world(REQUESTER)
+    const fake = world(CONTROLLER)
     const missing = await api.add({ accountId: '50000000-0000-4000-8000-00000000dead', vendor: 'V' })
     expect(missing.status).toBe(404)
     const inactive = await api.add({ accountId: ACC.OLD, vendor: 'V' })
@@ -422,7 +425,7 @@ describe('POST /api/cmr/requests — submit', () => {
   })
 
   it('validates vendor, amount and notes', async () => {
-    const fake = world(REQUESTER)
+    const fake = world(CONTROLLER)
     const bad = [
       { accountId: ACC.TCS, vendor: '   ' },
       { accountId: ACC.TCS, vendor: 'x'.repeat(81) },
@@ -437,7 +440,7 @@ describe('POST /api/cmr/requests — submit', () => {
   })
 
   it('amount is optional — a request with no dollar figure stores 0', async () => {
-    world(REQUESTER)
+    world(CONTROLLER)
     const { data } = await bodyOf(await api.add({ accountId: ACC.TCS, vendor: 'Call the bank' }))
     expect(data.request.amountCents).toBe(0)
   })
@@ -454,15 +457,35 @@ describe('POST /api/cmr/requests — submit', () => {
 // ── editing and withdrawing: own + still queued ─────────────────────────────
 
 describe('PATCH / DELETE /api/cmr/requests — own row, still queued', () => {
-  it('a requester edits their OWN queued request', async () => {
+  it('a requester edits the note and date of their OWN queued request', async () => {
     const fake = world(REQUESTER)
-    const res = await api.edit({ id: R.MINE, amountCents: 99_900, vendor: 'Sunbelt Rentals Inc' })
+    const res = await api.edit({ id: R.MINE, notes: 'Called them', dueDate: '2026-09-21' })
     expect(res.status).toBe(200)
-    expect((await bodyOf(res)).data.request).toMatchObject({ amountCents: 99_900, vendor: 'Sunbelt Rentals Inc' })
-    expect(rowOf(fake, R.MINE)).toMatchObject({ amount_cents: 99_900, vendor: 'Sunbelt Rentals Inc', status: 'queued' })
+    expect((await bodyOf(res)).data.request).toMatchObject({ notes: 'Called them', dueDate: '2026-09-21', amountCents: 125_000 })
+    expect(rowOf(fake, R.MINE)).toMatchObject({ notes: 'Called them', due_date: '2026-09-21', amount_cents: 125_000, status: 'queued' })
     const a = auditCalls()
     expect(a).toHaveLength(1)
     expect(a[0]).toMatchObject({ action: 'cmr.request.update', resourceId: R.MINE, userRole: 'cmr:requester' })
+    expect(a[0].metadata?.before).toMatchObject({ notes: 'Credit hold' })
+    expect(a[0].metadata?.after).toMatchObject({ notes: 'Called them' })
+  })
+
+  it('a requester may NOT hand-edit vendor, amount or account (400 AP_REQUIRED) — only the Controller can', async () => {
+    const fake = world(REQUESTER)
+    for (const body of [{ amountCents: 99_900 }, { vendor: 'Sunbelt Rentals Inc' }, { accountId: ACC.SIGNS }]) {
+      const res = await api.edit({ id: R.MINE, ...body })
+      expect(res.status).toBe(400)
+      expect((await bodyOf(res)).code).toBe('AP_REQUIRED')
+    }
+    expect(rowOf(fake, R.MINE)).toMatchObject({ amount_cents: 125_000, vendor: 'Sunbelt Rentals', account_id: ACC.TCS })
+    expect(writes(fake)).toHaveLength(0)
+
+    world(CONTROLLER)
+    const res = await api.edit({ id: R.MINE, amountCents: 99_900, vendor: 'Sunbelt Rentals Inc' })
+    expect(res.status).toBe(200)
+    expect((await bodyOf(res)).data.request).toMatchObject({ amountCents: 99_900, vendor: 'Sunbelt Rentals Inc' })
+    const a = auditCalls()
+    expect(a).toHaveLength(1)
     expect(a[0].metadata?.before).toMatchObject({ amountCents: 125_000, vendor: 'Sunbelt Rentals' })
     expect(a[0].metadata?.after).toMatchObject({ amountCents: 99_900, vendor: 'Sunbelt Rentals Inc' })
   })
@@ -541,7 +564,7 @@ describe('PATCH / DELETE /api/cmr/requests — own row, still queued', () => {
 
   it('a no-op edit changes nothing and is not audited', async () => {
     const fake = world(REQUESTER)
-    const res = await api.edit({ id: R.MINE, amountCents: 125_000 })
+    const res = await api.edit({ id: R.MINE, notes: 'Credit hold' })
     expect(res.status).toBe(200)
     expect((await bodyOf(res)).data.changed).toBe(false)
     expect(writes(fake)).toHaveLength(0)
@@ -557,7 +580,7 @@ describe('PATCH / DELETE /api/cmr/requests — own row, still queued', () => {
   })
 
   it('an edit may not move the request to an inactive account', async () => {
-    const fake = world(REQUESTER)
+    const fake = world(CONTROLLER)
     const res = await api.edit({ id: R.MINE, accountId: ACC.OLD })
     expect(res.status).toBe(409)
     expect((await bodyOf(res)).code).toBe('ACCOUNT_INACTIVE')

@@ -38,8 +38,9 @@ describe('cmr_ap migration', () => {
     const phase7 = readdirSync(DIR).filter((f) => f.endsWith('_cmr_recurring_schedule.sql'))
     expect(phase7).toHaveLength(1)
     expect(files[0] > phase7[0]).toBe(true)
+    // Only later CMR migrations (AP Phase 2's cmr_vendor_request_invoices, …) may sort after it.
     const all = readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
-    expect(all[all.length - 1]).toBe(files[0])
+    expect(all.filter((f) => f > files[0]).every((f) => /^\d{14}_cmr_/.test(f))).toBe(true)
   })
 
   it('keeps the service-role-only posture: RLS on, no policies, grants revoked', () => {

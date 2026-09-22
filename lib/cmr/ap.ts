@@ -235,3 +235,16 @@ export function accountFromFileName(fileName: string, accounts: CmrApAccountRef[
   if (!first) return null
   return accounts.find((a) => a.name.trim().toLowerCase() === first) ?? null
 }
+
+// ── AP Phase 2: the request picker ──────────────────────────────────────────
+
+/**
+ * What the Requests form's picker reads for ONE account (/api/cmr/ap/vendors?accountId=): the
+ * account, its current import (null → "import this account's A/P first"), and its vendors with
+ * their PAYABLE lines only — bills positive, credits negative, each tickable.
+ */
+export interface CmrApPickerView {
+  account: CmrApAccountRef
+  import: { id: string; importedAt: string; sourceFilename: string | null } | null
+  vendors: CmrApVendorGroup[]
+}

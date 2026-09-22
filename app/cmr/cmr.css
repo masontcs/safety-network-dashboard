@@ -646,6 +646,70 @@ li.cmr-pr-row:not(:has(> .cmr-handle)) { padding-left: 10px; }
 .cmr-rq-decide { display: flex; gap: 6px; justify-content: flex-end; }
 .cmr-rq-form .acts { align-self: end; }
 
+/* AP Phase 2 — the request picker (account → vendor → invoices) */
+.cmr-rq-formtop { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: end; }
+.cmr-rq-modeseg { width: 100%; }
+.cmr-rq-modeseg button { flex: 1; }
+.cmr-rq-vendorpick { gap: 5px; }
+.cmr-rq-apsrc { font-size: 11.5px; color: var(--cmr-dim); overflow-wrap: anywhere; }
+.cmr-rq-apempty {
+  display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--cmr-radius-sm);
+  background: var(--cmr-amber-soft); color: var(--cmr-amber); font-size: 12.5px; line-height: 1.5;
+}
+.cmr-rq-apempty .cmr-ic { flex: none; margin-top: 2px; stroke-width: 2; }
+.cmr-rq-apempty b { font-weight: 600; }
+.cmr-rq-apempty a, .cmr-linkbtn { color: inherit; text-decoration: underline; text-underline-offset: 2px; font-weight: 500; }
+.cmr-linkbtn { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+.cmr-rq-invpick { border: 1px solid var(--cmr-line); border-radius: var(--cmr-radius-sm); background: var(--cmr-surface); padding: 10px 0 0; margin: 0; min-width: 0; }
+.cmr-rq-invpick > legend { padding: 0 6px; margin-left: 8px; }
+.cmr-rq-invpick .opt { text-transform: none; letter-spacing: 0; font-weight: 400; overflow-wrap: anywhere; }
+.cmr-rq-invtools { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 12px 8px; }
+.cmr-rq-invlist { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto; border-top: 1px solid var(--cmr-hair); }
+.cmr-rq-invlist li { border-bottom: 1px solid var(--cmr-hair); }
+.cmr-rq-invlist li:last-child { border-bottom: none; }
+.cmr-rq-invlist label { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; min-width: 0; }
+.cmr-rq-invlist label:hover { background: var(--cmr-surface-2); }
+.cmr-rq-invlist li.on label { background: var(--cmr-accent-soft); }
+.cmr-rq-invlist input { flex: none; width: 17px; height: 17px; margin: 0; accent-color: var(--cmr-accent-ink); cursor: pointer; }
+.cmr-rq-invlist label:has(input:focus-visible) { outline: 2px solid var(--cmr-accent-ink); outline-offset: -2px; }
+.cmr-rq-invlist .inv, .cmr-rq-invs .inv { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.cmr-rq-invlist .num, .cmr-rq-invs .num { font-weight: 500; overflow-wrap: anywhere; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cmr-rq-invlist .mt, .cmr-rq-invs .mt { font-size: 11.5px; color: var(--cmr-dim); }
+.cmr-rq-invlist .bal, .cmr-rq-invs .bal { flex: none; white-space: nowrap; font-weight: 600; text-align: right; }
+.cmr-rq-invlist li.credit .bal, .cmr-rq-invs li.credit .bal { color: var(--cmr-accent-ink); }
+.cmr-rq-invtotal {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px;
+  padding: 10px 12px; border-top: 1px solid var(--cmr-line); background: var(--cmr-panel);
+  border-radius: 0 0 var(--cmr-radius-sm) var(--cmr-radius-sm); font-size: 12.5px;
+}
+.cmr-rq-invtotal .parts { color: var(--cmr-muted); }
+.cmr-rq-invtotal .tot b { font-size: 16px; font-weight: 600; margin-left: 6px; color: var(--cmr-text); }
+.cmr-rq-invtotal.bad .tot b { color: var(--cmr-red); }
+.cmr-rq-invtotal .why { flex-basis: 100%; color: var(--cmr-red); font-weight: 500; }
+
+/* a request's snapshotted invoices (row + Place dialog) */
+.cmr-rq-invdet { margin-top: 2px; font-size: 12px; }
+.cmr-rq-invdet > summary {
+  display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; cursor: pointer; list-style: none;
+  color: var(--cmr-muted); font-weight: 500; padding: 2px 0; border-radius: 4px;
+}
+.cmr-rq-invdet > summary::-webkit-details-marker { display: none; }
+.cmr-rq-invdet > summary .chev { transition: transform .12s var(--cmr-ease); }
+.cmr-rq-invdet[open] > summary .chev { transform: rotate(90deg); }
+.cmr-rq-invdet > summary:focus-visible { outline: 2px solid var(--cmr-accent-ink); outline-offset: 2px; }
+.cmr-rq-invs { list-style: none; margin: 6px 0 2px; padding: 0; border: 1px solid var(--cmr-hair); border-radius: var(--cmr-radius-sm); background: var(--cmr-panel); max-width: 520px; }
+.cmr-rq-invs li { display: flex; align-items: flex-start; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--cmr-hair); font-size: 12.5px; }
+.cmr-rq-invs li:last-child { border-bottom: none; }
+.cmr-rq-invs li.sum { background: var(--cmr-surface-2); }
+.cmr-rq-invs li.sum .num { font-weight: 600; }
+.cmr-rq-stale { color: var(--cmr-amber); }
+.cmr-rq-stale.nw { white-space: nowrap; }
+.cmr-rq-stale .cmr-ic { display: inline-block; vertical-align: -1px; stroke-width: 2.2; }
+p.cmr-rq-stale { display: flex; gap: 6px; align-items: flex-start; }
+p.cmr-rq-stale .cmr-ic { flex: none; margin-top: 3px; }
+.cmr-rq-placeinvs { display: flex; flex-direction: column; gap: 4px; margin: -6px 0 16px; }
+.cmr-rq-placeinvs .cmr-rq-invs { max-width: none; max-height: 220px; overflow-y: auto; }
+
 /* the Place dialog — in-app, never a native prompt */
 .cmr-rq-scrim {
   position: fixed; inset: 0; z-index: 80; display: grid; place-items: center;
@@ -981,6 +1045,8 @@ li.cmr-pr-row:not(:has(> .cmr-handle)) { padding-left: 10px; }
   .cmr-rq-decide { flex-basis: 100%; margin-right: 0; }
   .cmr-rq-decide .cmr-btn { flex: 1; }
   .cmr-rq-dialogfields { grid-template-columns: minmax(0, 1fr); }
+  .cmr-rq-formtop { grid-template-columns: minmax(0, 1fr); }
+  .cmr-rq-invlist { max-height: none; }
   .cmr-rq-dialog .acts .cmr-btn { flex: 1; }
   .cmr-pr-row .who { flex-basis: calc(100% - 76px); }
   .cmr-pr-row .amt { margin-left: 76px; }
