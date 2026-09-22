@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react'
 import Combobox from '@/components/billing/Combobox'
 import CmrIcon from '@/components/cmr/CmrIcon'
-import { formatApDate, type CmrApLine, type CmrApPickerView, type CmrApVendorGroup } from '@/lib/cmr/ap'
+import Select from '@/components/billing/Select'
+import { formatApDate, type CmrApLine, type CmrApPickerView } from '@/lib/cmr/ap'
+import { displayVendorName, pickerGroupOf } from '@/lib/cmr/vendors'
 import { formatCents } from '@/lib/cmr/ledger'
 import {
   formatSignedCents,
@@ -15,7 +17,11 @@ import {
 
 /**
  * AP Phase 2 — the vendor-request picker: vendor (from the chosen account's CURRENT A/P) →
- * tick invoices → live total. Credits are their own tickable lines with a negative balance, so
+ * tick invoices → live total. AP Phase 3a: vendors are listed by their CANONICAL name (the
+ * identity the Vendors rollup uses), still only within the chosen account — one request, one
+ * account. A request is matched on the exact QuickBooks spelling, so the parent keeps that raw
+ * name as `vendorName`; if a canonical vendor has more than one spelling in this account the
+ * picker asks which one, and the checklist shows that spelling's invoices. Credits are their own tickable lines with a negative balance, so
  * the total is Σ ticked bills − Σ ticked credits. The figure shown here is only a preview: the
  * server recomputes it from the stored lines when the request is submitted.
  *
@@ -137,20 +143,32 @@ export function ApPicker({
     )
   }
 
-  const vendor = view.vendors.find((v) => v.vendorName === vendorName) ?? null
+  const group = pickerGroupOf(view.vendors, vendorName)
   const options = view.vendors.map((v) => ({
-    value: v.vendorName,
-    label: requestVendorLabel(v.vendorName),
+    value: v.key,
+    label: requestVendorLabel(v.canonicalName),
     hint: formatSignedCents(v.owedCents),
   }))
+  // The ticked invoices all carry the chosen QuickBooks spelling (the request is matched on it).
+  const spelling = group
+    ? (() => {
+        const lines = group.lines.filter((l) => l.vendorName === vendorName)
+        return { vendorName, label: group.canonicalName, owedCents: lines.reduce((s, l) => s + l.openBalanceCents, 0), lines }
+      })()
+    : null
+  const qbNote = group && displayVendorName(vendorName) !== displayVendorName(group.canonicalName)
 
   return (
     <>
       <div className="cmr-field span-all cmr-rq-vendorpick">
         <span className="cmr-label" id={`cmr-rq-ven-${uid}`}>Vendor</span>
         <Combobox
-          value={vendorName}
-          onChange={(v) => { onVendor(v); onSelected(new Set()) }}
+          value={group?.key ?? ''}
+          onChange={(key) => {
+            const g = view.vendors.find((v) => v.key === key)
+            onVendor(g ? g.vendorName : '')
+            onSelected(new Set())
+          }}
           options={options}
           placeholder={`Search ${view.vendors.length} vendors in ${accountName}’s A/P`}
           ariaLabel="Vendor"
@@ -159,11 +177,43 @@ export function ApPicker({
         <span className="cmr-rq-apsrc">
           From {view.import.sourceFilename ?? 'the current A/P import'} · imported{' '}
           {PICK_STAMP.format(new Date(view.import.importedAt))}
+          {qbNote && group.rawNames.length === 1 && <> · in QuickBooks as “{displayVendorName(vendorName)}”</>}
         </span>
       </div>
-      {vendor && <InvoiceChecklist uid={uid} vendor={vendor} selected={selected} onSelected={onSelected} disabled={disabled} />}
+      {group && group.rawNames.length > 1 && (
+        <label className="cmr-field span-all">
+          <span className="cmr-label">QuickBooks name</span>
+          <Select
+            value={vendorName}
+            onChange={(v) => { onVendor(v); onSelected(new Set()) }}
+            ariaLabel="QuickBooks name"
+            disabled={disabled}
+          >
+            {group.rawNames.map((n) => {
+              // Spellings that differ only in spacing would read the same: show their spaces.
+              const clash = group.rawNames.some((m) => m !== n && displayVendorName(m) === displayVendorName(n))
+              const shown = clash ? `“${n.replace(/ /g, '\u2423')}”` : displayVendorName(n)
+              const owed = group.lines.filter((l) => l.vendorName === n).reduce((s, l) => s + l.openBalanceCents, 0)
+              return <option key={n} value={n}>{shown} · {formatSignedCents(owed)}</option>
+            })}
+          </Select>
+          <span className="cmr-rq-apsrc">
+            {group.canonicalName} is spelled {group.rawNames.length} ways in {accountName}’s A/P. A request pays one
+            QuickBooks name — pick which.
+          </span>
+        </label>
+      )}
+      {spelling && <InvoiceChecklist uid={uid} vendor={spelling} selected={selected} onSelected={onSelected} disabled={disabled} />}
     </>
   )
+}
+
+/** The invoices of one QuickBooks spelling, shown under its canonical vendor's name. */
+interface ChecklistVendor {
+  vendorName: string
+  label: string
+  owedCents: number
+  lines: CmrApLine[]
 }
 
 function InvoiceChecklist({
@@ -174,7 +224,7 @@ function InvoiceChecklist({
   disabled,
 }: {
   uid: string
-  vendor: CmrApVendorGroup
+  vendor: ChecklistVendor
   selected: Set<string>
   onSelected: (next: Set<string>) => void
   disabled: boolean
@@ -191,7 +241,7 @@ function InvoiceChecklist({
     onSelected(next)
   }
 
-  const label = requestVendorLabel(vendor.vendorName)
+  const label = requestVendorLabel(vendor.label)
   return (
     <fieldset className="cmr-rq-invpick span-all" disabled={disabled}>
       <legend className="cmr-label">
@@ -321,9 +371,12 @@ export function initialSelection(invoices: CmrRequestInvoice[]): Set<string> {
   return new Set(invoices.map((i) => i.currentApLineId).filter((x): x is string => !!x))
 }
 
-/** The ticked lines of the chosen vendor (for the running total / submit guard). */
+/**
+ * The ticked lines of the chosen QuickBooks spelling (for the running total / submit guard).
+ * Only lines carrying exactly `vendorName` count — that is what the server composes from.
+ */
 export function tickedLines(state: PickerState, vendorName: string, selected: Set<string>): CmrApLine[] {
   if (state.status !== 'ready') return []
-  const v = state.view.vendors.find((x) => x.vendorName === vendorName)
-  return v ? v.lines.filter((l) => selected.has(l.id)) : []
+  const g = pickerGroupOf(state.view.vendors, vendorName)
+  return g ? g.lines.filter((l) => l.vendorName === vendorName && selected.has(l.id)) : []
 }

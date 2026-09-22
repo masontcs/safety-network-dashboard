@@ -9,6 +9,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   recurring: <><path d="M4 8a8 8 0 0 1 13-3l3 3" /><path d="M20 4v4h-4" /><path d="M20 16a8 8 0 0 1-13 3l-3-3" /><path d="M4 20v-4h4" /></>,
   requests: <><path d="M3 5h18v14H3z" /><path d="M3 13h5l2 3h4l2-3h5" /></>,
   ap: <><path d="M6 3h9l4 4v14H6z" /><path d="M15 3v4h4" /><path d="M9 11h7M9 15h7M9 19h4" /></>,
+  vendors: <><path d="M4 9l1.5-5h13L20 9" /><path d="M4 9h16v1.5a2.7 2.7 0 0 1-5.3 0 2.7 2.7 0 0 1-5.4 0 2.7 2.7 0 0 1-5.3 0z" /><path d="M5.5 13v7h13v-7" /><path d="M10 20v-4h4v4" /></>,
   accounts: <><path d="M3 21h18" /><path d="M5 21V10l7-5 7 5v11" /><path d="M9 21v-6h6v6" /></>,
   access: <><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z" /><path d="M9.5 12l2 2 3.5-4" /></>,
   help: <><circle cx="12" cy="12" r="9" /><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.3-2.5 4" /><path d="M12 17.2v.01" /></>,

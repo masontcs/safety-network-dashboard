@@ -30,6 +30,7 @@ const ln = (over: Partial<CmrApLine> & { id: string }): CmrApLine => ({
   agingBucket: '1 - 30',
   openBalanceCents: 100_00,
   payable: true,
+  vendorId: null,
   ...over,
 })
 

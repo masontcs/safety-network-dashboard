@@ -34,12 +34,13 @@ describe('cmr_vendor_request_invoices migration', () => {
     expect(createHash('md5').update(readFileSync(path.join(DIR, files[0]))).digest('hex')).toBe(MD5)
   })
 
-  it('sorts after AP Phase 1 (cmr_ap) and is the newest migration', () => {
+  it('sorts after AP Phase 1 (cmr_ap), and only later CMR migrations sort after it', () => {
     const ap = readdirSync(DIR).filter((f) => f.endsWith('_cmr_ap.sql'))
     expect(ap).toHaveLength(1)
     expect(files[0] > ap[0]).toBe(true)
+    // Only later CMR migrations (AP Phase 3a's cmr_vendors, …) may sort after it.
     const all = readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
-    expect(all[all.length - 1]).toBe(files[0])
+    for (const f of all.slice(all.indexOf(files[0]) + 1)) expect(f).toMatch(/^\d{14}_cmr_[a-z0-9_]+\.sql$/)
   })
 
   it('keeps the service-role-only posture: RLS on, no policies, grants revoked', () => {

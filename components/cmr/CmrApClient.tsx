@@ -520,7 +520,7 @@ function VendorRow({
 
 // ── invoices ────────────────────────────────────────────────────────────────
 
-function InvoiceTable({ lines, showVendor = false, caption }: { lines: CmrApLine[]; showVendor?: boolean; caption: string }) {
+export function InvoiceTable({ lines, showVendor = false, caption }: { lines: CmrApLine[]; showVendor?: boolean; caption: string }) {
   return (
     <table className="cmr-ap-table">
       <caption className="cmr-sr-only">{caption}</caption>

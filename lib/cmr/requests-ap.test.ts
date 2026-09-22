@@ -28,6 +28,7 @@ const line = (id: string, over: Partial<CmrApLine> = {}): CmrApLine => ({
   agingBucket: '> 90',
   openBalanceCents: 100,
   payable: true,
+  vendorId: null,
   ...over,
 })
 const U = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`

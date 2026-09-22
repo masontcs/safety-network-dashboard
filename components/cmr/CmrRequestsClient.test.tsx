@@ -82,22 +82,26 @@ const viewNow = (): CmrRequestsView => {
 // The picker's A/P: TCS has an import (TRAFFIX with a credit, ZAP bills-only); Signs has none.
 const apl = (id: string, vendorName: string, invoiceNum: string, docType: string, cents: number) => ({
   id, importId: 'imp-tcs', accountId: ACC.TCS, vendorName, invoiceNum, docType, billDate: '2025-11-24', dueDate: '2025-12-04',
-  agingDays: 292, agingBucket: '> 90', openBalanceCents: cents, payable: true,
+  agingDays: 292, agingBucket: '> 90', openBalanceCents: cents, payable: true, vendorId: `vendor-${vendorName}`,
 })
 const TRX = [apl('l-103', 'TRAFFIX DEVICES', '4092103', 'Bill', 293_080), apl('l-104', 'TRAFFIX DEVICES', '4092104', 'Bill', 1_530_050), apl('l-cm', 'TRAFFIX DEVICES', 'CM', 'Credit', -600_814)]
 const ZAP = [apl('l-9421', 'ZAP MANUFACTURING INC.', '9421', 'Bill', 171_000)]
+// AP Phase 3a: the picker groups by canonical vendor; each group keeps its raw QuickBooks spelling(s).
 const group = (vendorName: string, lines: ReturnType<typeof apl>[]) => ({
-  key: `${ACC.TCS}\u0000${vendorName}`, accountId: ACC.TCS, accountName: 'TCS', vendorName,
+  key: `v:vendor-${vendorName}`, vendorId: `vendor-${vendorName}`, canonicalName: vendorName, rawNames: [vendorName],
+  accountId: ACC.TCS, accountName: 'TCS', vendorName,
   owedCents: lines.reduce((s, l) => s + l.openBalanceCents, 0),
   billCount: lines.filter((l) => l.docType === 'Bill').length, creditCount: lines.filter((l) => l.docType === 'Credit').length,
   oldestAgingDays: 292, lines,
 })
+/** AP Phase 3a: extra canonical groups a test adds to TCS's picker (reset before each test). */
+let extraVendors: unknown[] = []
 const pickerFor = (accountId: string) =>
   accountId === ACC.TCS
     ? {
         account: { id: ACC.TCS, name: 'TCS', active: true, sortOrder: 0 },
         import: { id: 'imp-tcs', importedAt: '2026-09-22T20:05:39Z', sourceFilename: 'TCS AP 92226.xlsx' },
-        vendors: [group('TRAFFIX DEVICES', TRX), group('ZAP MANUFACTURING INC.', ZAP)],
+        vendors: [group('TRAFFIX DEVICES', TRX), group('ZAP MANUFACTURING INC.', ZAP), ...extraVendors],
       }
     : { account: { id: accountId, name: 'Signs', active: true, sortOrder: 1 }, import: null, vendors: [] }
 
@@ -124,6 +128,7 @@ beforeEach(() => {
   ]
   canEdit = true
   canRequest = true
+  extraVendors = []
   calls = []
   placeFails = null
   unplaceFails = null
@@ -627,6 +632,46 @@ describe('A/P picker (AP Phase 2)', () => {
     expect(within(form).getByText('$18,231.30')).toBeTruthy()
     await pickVendor(form, 'ZAP MANUFACTURING INC.')
     expect((within(form).getByRole('checkbox', { name: /Bill 9421/ }) as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('AP Phase 3a: vendors are listed by CANONICAL name; a vendor spelled two ways asks which QuickBooks name, and the request uses it', async () => {
+    const a = apl('l-om1', 'OMEGA  ACCOUNTING SOLUTIONS', '231869', 'Bill', 1_651_139)
+    const b = apl('l-om2', 'omega accounting solutions.', '231870', 'Bill', 100_00)
+    extraVendors = [{
+      ...group('OMEGA  ACCOUNTING SOLUTIONS', [a, b]),
+      key: 'v:vendor-omega', vendorId: 'vendor-omega', canonicalName: 'Omega Accounting Solutions',
+      rawNames: ['OMEGA  ACCOUNTING SOLUTIONS', 'omega accounting solutions.'],
+    }]
+    canEdit = false
+    const form = await openNew()
+    await pickVendor(form, 'Omega Accounting Solutions')
+    const qb = within(form).getByRole('combobox', { name: 'QuickBooks name' }) as HTMLSelectElement
+    expect(qb.value).toBe('OMEGA  ACCOUNTING SOLUTIONS')
+    // only the chosen spelling's invoices are listed (a request pays one QuickBooks name)
+    let list = within(form).getByRole('list', { name: 'Omega Accounting Solutions invoices' })
+    expect(within(list).getAllByRole('checkbox')).toHaveLength(1)
+    fireEvent.change(qb, { target: { value: 'omega accounting solutions.' } })
+    list = within(form).getByRole('list', { name: 'Omega Accounting Solutions invoices' })
+    fireEvent.click(within(list).getByRole('checkbox', { name: /Bill 231870/ }))
+    expect(within(form).getByRole('button', { name: /Request \$100\.00/ })).toBeTruthy()
+    fireEvent.submit(form)
+    await waitFor(() => expect(writes().some((c) => c.method === 'POST')).toBe(true))
+    expect(writes().find((c) => c.method === 'POST')!.body).toEqual({
+      accountId: ACC.TCS, vendorName: 'omega accounting solutions.', apLineIds: ['l-om2'], dueDate: null, notes: null,
+    })
+  })
+
+  it('AP Phase 3a: two spellings that differ only in spacing are told apart in the QuickBooks-name choice', async () => {
+    const a = apl('l-ac1', 'ACME  INC', 'A1', 'Bill', 100_00)
+    const b = apl('l-ac2', 'ACME INC', 'A2', 'Bill', 200_00)
+    extraVendors = [{ ...group('ACME  INC', [a, b]), key: 'v:acme', vendorId: 'acme', canonicalName: 'ACME INC', rawNames: ['ACME  INC', 'ACME INC'] }]
+    canEdit = false
+    const form = await openNew()
+    await pickVendor(form, 'ACME INC')
+    const qb = within(form).getByRole('combobox', { name: 'QuickBooks name' }) as HTMLSelectElement
+    const labels = [...qb.options].map((o) => o.textContent)
+    expect(new Set(labels).size).toBe(2)
+    expect(labels[0]).toContain('ACME\u2423\u2423INC')
   })
 
   it('an account with no A/P import says “Import … A/P first” and cannot be submitted', async () => {

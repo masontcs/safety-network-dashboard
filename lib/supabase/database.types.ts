@@ -178,9 +178,9 @@ export type Database = {
         Relationships: []
       }
       cmr_ap_lines: {
-        Row: { id: string; import_id: string; account_id: string; vendor_name: string; invoice_num: string | null; doc_type: string; bill_date: string | null; due_date: string | null; aging_days: number | null; aging_bucket: string | null; open_balance_cents: number; payable: boolean; created_at: string }
-        Insert: { id?: string; import_id: string; account_id: string; vendor_name: string; invoice_num?: string | null; doc_type: string; bill_date?: string | null; due_date?: string | null; aging_days?: number | null; aging_bucket?: string | null; open_balance_cents: number; payable?: boolean; created_at?: string }
-        Update: { id?: string; import_id?: string; account_id?: string; vendor_name?: string; invoice_num?: string | null; doc_type?: string; bill_date?: string | null; due_date?: string | null; aging_days?: number | null; aging_bucket?: string | null; open_balance_cents?: number; payable?: boolean; created_at?: string }
+        Row: { id: string; import_id: string; account_id: string; vendor_name: string; invoice_num: string | null; doc_type: string; bill_date: string | null; due_date: string | null; aging_days: number | null; aging_bucket: string | null; open_balance_cents: number; payable: boolean; created_at: string; vendor_id: string | null }
+        Insert: { id?: string; import_id: string; account_id: string; vendor_name: string; invoice_num?: string | null; doc_type: string; bill_date?: string | null; due_date?: string | null; aging_days?: number | null; aging_bucket?: string | null; open_balance_cents: number; payable?: boolean; created_at?: string; vendor_id?: string | null }
+        Update: { id?: string; import_id?: string; account_id?: string; vendor_name?: string; invoice_num?: string | null; doc_type?: string; bill_date?: string | null; due_date?: string | null; aging_days?: number | null; aging_bucket?: string | null; open_balance_cents?: number; payable?: boolean; created_at?: string; vendor_id?: string | null }
         Relationships: []
       }
       // AP Phase 2 — written only by cmr_compose_vendor_request (never inserted directly).
@@ -188,6 +188,19 @@ export type Database = {
         Row: { id: string; request_id: string; ap_line_id: string | null; vendor_name: string; invoice_num: string | null; doc_type: string; bill_date: string | null; due_date: string | null; open_balance_cents: number; created_at: string }
         Insert: { id?: string; request_id: string; ap_line_id?: string | null; vendor_name: string; invoice_num?: string | null; doc_type: string; bill_date?: string | null; due_date?: string | null; open_balance_cents: number; created_at?: string }
         Update: { id?: string; request_id?: string; ap_line_id?: string | null; vendor_name?: string; invoice_num?: string | null; doc_type?: string; bill_date?: string | null; due_date?: string | null; open_balance_cents?: number; created_at?: string }
+        Relationships: []
+      }
+      // AP Phase 3a — canonical vendors across accounts. Written only by cmr_resolve_ap_vendors.
+      cmr_vendors: {
+        Row: { id: string; canonical_name: string; normalized_name: string; created_at: string; created_by: string | null }
+        Insert: { id?: string; canonical_name: string; normalized_name: string; created_at?: string; created_by?: string | null }
+        Update: { id?: string; canonical_name?: string; normalized_name?: string; created_at?: string; created_by?: string | null }
+        Relationships: []
+      }
+      cmr_vendor_aliases: {
+        Row: { id: string; vendor_id: string; raw_name: string; normalized_name: string; created_at: string }
+        Insert: { id?: string; vendor_id: string; raw_name: string; normalized_name: string; created_at?: string }
+        Update: { id?: string; vendor_id?: string; raw_name?: string; normalized_name?: string; created_at?: string }
         Relationships: []
       }
       user_profiles: {

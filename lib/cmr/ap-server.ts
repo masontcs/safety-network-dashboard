@@ -7,7 +7,8 @@ import {
   type CmrApParsed,
   type CmrApParsedLine,
 } from '@/lib/cmr/ap-import'
-import { apVendorGroups, type CmrApAccountRef, type CmrApImport, type CmrApLine, type CmrApPickerView, type CmrApPreviewSummary, type CmrApView } from '@/lib/cmr/ap'
+import { type CmrApAccountRef, type CmrApImport, type CmrApLine, type CmrApPickerView, type CmrApPreviewSummary, type CmrApView } from '@/lib/cmr/ap'
+import { normalizeVendorName, pickerVendorGroups, type CmrVendorRef, type CmrVendorsView } from '@/lib/cmr/vendors'
 
 /**
  * Server-only helpers for /api/cmr/ap and /api/cmr/ap/import/{preview,commit}. They live here,
@@ -172,12 +173,14 @@ export type CmrApLineRow = {
   aging_bucket: string | null
   open_balance_cents: number | string
   payable: boolean
+  /** AP Phase 3a — the canonical vendor (cmr_vendors); absent in rows read before it existed. */
+  vendor_id?: string | null
 }
 
 export const CMR_AP_IMPORT_COLS =
   'id, account_id, source_filename, report_total_cents, payable_total_cents, line_count, imported_by, imported_at, is_current'
 export const CMR_AP_LINE_COLS =
-  'id, import_id, account_id, vendor_name, invoice_num, doc_type, bill_date, due_date, aging_days, aging_bucket, open_balance_cents, payable'
+  'id, import_id, account_id, vendor_name, invoice_num, doc_type, bill_date, due_date, aging_days, aging_bucket, open_balance_cents, payable, vendor_id'
 
 const num = (v: number | string | null | undefined): number => (v == null ? 0 : Number(v))
 
@@ -228,6 +231,7 @@ export const toCmrApLine = (r: CmrApLineRow): CmrApLine => ({
   agingBucket: r.aging_bucket,
   openBalanceCents: num(r.open_balance_cents),
   payable: r.payable,
+  vendorId: r.vendor_id ?? null,
 })
 
 /** Every account's current AP snapshot, with each import's reconciliation computed from its lines. */
@@ -415,7 +419,65 @@ export async function buildApPicker(supabase: Supabase, account: CmrApAccountRef
   return {
     account,
     import: { id: imp.id, importedAt: imp.imported_at, sourceFilename: imp.source_filename },
-    // A–Z: the requester is looking a vendor up by name.
-    vendors: apVendorGroups(lines, [account], account.id, 'name'),
+    // A–Z by canonical name: the requester is looking a vendor up by name. Grouped by canonical
+    // vendor (AP Phase 3a); each group keeps the raw QuickBooks spelling a request matches on.
+    vendors: pickerVendorGroups(lines, account, await vendorRefs(supabase, lines.map((l) => l.vendorId))),
   }
+}
+
+// ── AP Phase 3a: canonical vendors ──────────────────────────────────────────
+
+/** Ids per `in.()` filter — keeps each request URL well under PostgREST's limit (AP Phase 2 lesson). */
+const IN_CHUNK = 150
+
+/** The canonical names of the given vendor ids (nulls ignored), read in batches. */
+export async function vendorRefs(supabase: Supabase, ids: (string | null)[]): Promise<CmrVendorRef[]> {
+  const unique = [...new Set(ids.filter((v): v is string => !!v))]
+  const out: CmrVendorRef[] = []
+  for (let i = 0; i < unique.length; i += IN_CHUNK) {
+    const { data, error } = await supabase
+      .from('cmr_vendors')
+      .select('id, canonical_name')
+      .in('id', unique.slice(i, i + IN_CHUNK))
+    if (error) throw new Error(error.message)
+    for (const r of (data ?? []) as { id: string; canonical_name: string }[]) out.push({ id: r.id, canonicalName: r.canonical_name })
+  }
+  return out
+}
+
+/**
+ * The Vendors page (GET /api/cmr/vendors): every account, each account's current import, every
+ * PAYABLE line of those imports with its vendor_id, and the canonical names those lines point
+ * at. The rollup (vendor → accounts → invoices), the account filter and search are computed in
+ * the browser from this one response (lib/cmr/vendors).
+ */
+export async function buildVendorsView(supabase: Supabase): Promise<CmrVendorsView> {
+  const [accounts, importRows] = await Promise.all([apAccounts(supabase), currentImports(supabase)])
+  const lines = await currentApLines(supabase, importRows.map((i) => i.account_id))
+  const vendors = await vendorRefs(supabase, lines.map((l) => l.vendorId))
+  return {
+    accounts,
+    imports: importRows.map((i) => ({ accountId: i.account_id, importedAt: i.imported_at, sourceFilename: i.source_filename })),
+    vendors,
+    lines,
+  }
+}
+
+/**
+ * Which of an import's spellings are already known canonical vendors (aliases), by normalized
+ * key — read just before a commit so the audit entry can say which vendors the import
+ * registered. Informational only: the database does the resolving.
+ */
+export async function knownVendorKeys(supabase: Supabase, rawNames: string[]): Promise<Set<string>> {
+  const keys = [...new Set(rawNames.map(normalizeVendorName).filter(Boolean))]
+  const known = new Set<string>()
+  for (let i = 0; i < keys.length; i += IN_CHUNK) {
+    const { data, error } = await supabase
+      .from('cmr_vendor_aliases')
+      .select('normalized_name')
+      .in('normalized_name', keys.slice(i, i + IN_CHUNK))
+    if (error) throw new Error(error.message)
+    for (const r of (data ?? []) as { normalized_name: string }[]) known.add(r.normalized_name)
+  }
+  return known
 }

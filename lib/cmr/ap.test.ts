@@ -21,7 +21,7 @@ const ACCOUNTS: CmrApAccountRef[] = [
 let n = 0
 const ln = (over: Partial<CmrApLine>): CmrApLine => ({
   id: `l${++n}`, importId: 'i', accountId: 'sts', vendorName: 'V', invoiceNum: null, docType: 'Bill',
-  billDate: '2026-09-01', dueDate: null, agingDays: null, agingBucket: 'Current', openBalanceCents: 100, payable: true, ...over,
+  billDate: '2026-09-01', dueDate: null, agingDays: null, agingBucket: 'Current', openBalanceCents: 100, payable: true, vendorId: null, ...over,
 })
 
 describe('apVendorGroups', () => {

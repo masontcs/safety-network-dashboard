@@ -834,6 +834,19 @@ p.cmr-rq-stale .cmr-ic { flex: none; margin-top: 3px; }
 .cmr-ap-table .bk { display: block; font-size: 10.5px; color: var(--cmr-dim); letter-spacing: .02em; }
 .cmr-ap-table td[data-label="Date"], .cmr-ap-table td[data-label="Due"], .cmr-ap-table td[data-label="Aging"] { white-space: nowrap; }
 
+/* ── vendors (AP Phase 3a): vendor → account shares → invoices ───────────── */
+.cmr-vn-row .cmr-ap-venbtn .desc { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cmr-vn-accs { background: var(--cmr-panel); border-top: 1px solid var(--cmr-hair); padding-left: 26px; }
+.cmr-vn-acc { border-bottom: 1px solid var(--cmr-hair); }
+.cmr-vn-acc:last-child { border-bottom: none; }
+.cmr-root .cmr-vn-accrow { padding-top: 10px; padding-bottom: 10px; }
+.cmr-ap-ven.open .cmr-vn-acc > .cmr-vn-accrow { background: transparent; }
+.cmr-ap-ven.open .cmr-vn-acc:not(.open) > .cmr-vn-accrow .chev { transform: none; color: var(--cmr-dim); }
+.cmr-vn-accrow .nm { font-weight: 600; }
+.cmr-vn-accrow .chev.fixed { transform: none; color: var(--cmr-dim); }
+.cmr-vn-accrow .mt { overflow-wrap: anywhere; }
+.cmr-ap-inv.cmr-vn-inv { background: var(--cmr-surface); padding-left: 24px; }
+
 .cmr-ap-other > summary {
   display: flex; align-items: center; gap: 8px; padding: 12px 16px; cursor: pointer; list-style: none;
   font-weight: 500; color: var(--cmr-muted);
@@ -1018,6 +1031,8 @@ p.cmr-rq-stale .cmr-ic { flex: none; margin-top: 3px; }
   .cmr-root .cmr-ap-filter .bx-select { min-width: 0; }
   .cmr-ap-search { max-width: none; flex-basis: 100%; }
   .cmr-ap-inv { padding-left: 0; }
+  .cmr-vn-accs { padding-left: 12px; }
+  .cmr-ap-inv.cmr-vn-inv { padding-left: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

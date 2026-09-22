@@ -12,6 +12,8 @@
  *     is Σ(payable lines) — bills minus credits — so it can be negative (a vendor in credit).
  */
 
+import type { CmrApPickerVendor } from '@/lib/cmr/vendors'
+
 export interface CmrApAccountRef {
   id: string
   name: string
@@ -32,6 +34,11 @@ export interface CmrApLine {
   agingBucket: string | null
   openBalanceCents: number
   payable: boolean
+  /**
+   * AP Phase 3a: the canonical vendor (cmr_vendors) this line's raw vendorName resolves to, set
+   * on every import. null only if a line has not been resolved (never after the backfill).
+   */
+  vendorId: string | null
 }
 
 /** An account's current import, with its reconciliation figures. */
@@ -241,10 +248,13 @@ export function accountFromFileName(fileName: string, accounts: CmrApAccountRef[
 /**
  * What the Requests form's picker reads for ONE account (/api/cmr/ap/vendors?accountId=): the
  * account, its current import (null → "import this account's A/P first"), and its vendors with
- * their PAYABLE lines only — bills positive, credits negative, each tickable.
+ * their PAYABLE lines only — bills positive, credits negative, each tickable. Since AP Phase 3a
+ * the vendors are canonical vendors (the same identity the Vendors rollup uses), each keeping
+ * the raw QuickBooks spelling(s) a request is matched on.
  */
 export interface CmrApPickerView {
   account: CmrApAccountRef
   import: { id: string; importedAt: string; sourceFilename: string | null } | null
-  vendors: CmrApVendorGroup[]
+  /** AP Phase 3a: grouped by CANONICAL vendor within this account (lib/cmr/vendors). */
+  vendors: CmrApPickerVendor[]
 }
