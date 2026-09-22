@@ -91,6 +91,12 @@ export type AuditAction =
   // SN Cash Ledger — accounts payable (AP Phase 1). One entry per committed A/P Aging Detail
   // upload; it records the snapshot it replaced, since the replaced import row is deleted.
   | 'cmr.ap.import'
+  // SN Cash Ledger — canonical vendors (AP Phase 3b). Controller-confirmed cleanup only; nothing
+  // merges automatically. A merge deletes the source vendor, so its entry records both names.
+  | 'cmr.vendor.merge'
+  | 'cmr.vendor.split'
+  | 'cmr.vendor.rename'
+  | 'cmr.vendor.dismiss'
 
 // ── Payload ────────────────────────────────────────────────────────────────────
 

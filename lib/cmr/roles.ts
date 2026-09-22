@@ -64,7 +64,7 @@ const VENDORS: CmrNavGroup = {
     // Controller-only and enforced by /api/cmr/ap/import/*.
     { href: '/cmr/ap', label: 'Accounts Payable', icon: 'ap' },
     // AP Phase 3a: canonical vendors across accounts. Every role reads the rollup; merging /
-    // renaming (Phase 3b) will be Controller-only and enforced by its API.
+    // splitting / renaming (AP Phase 3b) is Controller-only, enforced by /api/cmr/vendors/*.
     { href: '/cmr/vendors', label: 'Vendors', icon: 'vendors' },
   ],
 }

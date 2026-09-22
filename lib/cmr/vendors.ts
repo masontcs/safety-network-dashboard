@@ -21,11 +21,13 @@ import { compareApLines, type CmrApAccountRef, type CmrApLine } from '@/lib/cmr/
 
 /**
  * The canonical-vendor match key. Conservative on purpose, and IDENTICAL to the SQL function
- * public.cmr_vendor_normalize (supabase/migrations/*_cmr_vendors.sql):
+ * public.cmr_vendor_normalize (AP Phase 3a *_cmr_vendors.sql, redefined by AP Phase 3b
+ * *_cmr_vendor_merge.sql):
  *   1. ASCII a–z → A–Z (only ASCII: the SQL uses translate(), which ignores the DB locale)
  *   2. every run of whitespace — space, tab, LF, CR, FF, VT, no-break space — → one space
  *   3. trim leading/trailing spaces
  *   4. strip ONE trailing "." (unless the name is just ".")
+ *   5. trim again — the LAST step (AP Phase 3b), so "ACME INC ." → "ACME INC", not "ACME INC "
  * Nothing else: no INC/LLC/CORP stripping, no punctuation removal, no fuzzy folding.
  */
 export function normalizeVendorName(name: string): string {
@@ -33,7 +35,7 @@ export function normalizeVendorName(name: string): string {
     .replace(/[a-z]/g, (c) => c.toUpperCase())
     .replace(/[ \t\n\r\f\v\u00a0]+/g, ' ')
     .replace(/^ +| +$/g, '')
-  return t.length > 1 && t.endsWith('.') ? t.slice(0, -1) : t
+  return (t.length > 1 && t.endsWith('.') ? t.slice(0, -1) : t).replace(/^ +| +$/g, '')
 }
 
 /** A display form of a name: whitespace runs squashed (QuickBooks names can carry double spaces). */
@@ -59,6 +61,8 @@ export interface CmrVendorsView {
   vendors: CmrVendorRef[]
   /** Every PAYABLE line of every current import, with its vendorId. */
   lines: CmrApLine[]
+  /** AP Phase 3b: the caller is a Controller, so the page shows merge / split / rename. */
+  canManage?: boolean
 }
 
 /** One account's share of a canonical vendor. */
@@ -254,3 +258,78 @@ export function pickerVendorGroups(lines: CmrApLine[], account: CmrApAccountRef,
 /** The picker group a raw QuickBooks name belongs to, if any. */
 export const pickerGroupOf = (groups: CmrApPickerVendor[], rawName: string): CmrApPickerVendor | null =>
   groups.find((g) => g.rawNames.includes(rawName)) ?? null
+
+// ── AP Phase 3b: the Controller's cleanup tools (merge / split / rename / suggestions) ─────────
+
+/** One QuickBooks spelling a canonical vendor owns (cmr_vendor_aliases), with its current lines. */
+export interface CmrVendorAliasInfo {
+  id: string
+  rawName: string
+  /** Current A/P lines (every doc type) spelled this way, and the accounts they are in. */
+  lineCount: number
+  accountNames: string[]
+}
+
+/** A canonical vendor as the Controller's tools see it (GET /api/cmr/vendors/catalog). */
+export interface CmrVendorCatalogEntry {
+  id: string
+  canonicalName: string
+  aliases: CmrVendorAliasInfo[]
+  /** Accounts with current A/P lines for this vendor, in the accounts' order. */
+  accounts: { id: string; name: string }[]
+  /** Σ payable lines (bills − credits) across every account's current import. */
+  owedCents: number
+  /** Current A/P lines (every doc type). */
+  lineCount: number
+}
+
+/** One side of a suggested pair. */
+export interface CmrVendorSummary {
+  id: string
+  canonicalName: string
+  accounts: { id: string; name: string }[]
+  owedCents: number
+  spellings: string[]
+}
+
+export type CmrVendorSuggestionKind = 'punctuation' | 'suffix' | 'reorder' | 'spelling' | 'prefix' | 'contains' | 'words' | 'ai'
+
+/** A possible duplicate (GET /api/cmr/vendors/suggestions). Advisory only — nothing merges on its own. */
+export interface CmrVendorSuggestion {
+  a: CmrVendorSummary
+  b: CmrVendorSummary
+  kind: CmrVendorSuggestionKind
+  score: number
+  reason: string
+  /** Present when the optional AI review looked at this pair. */
+  ai: { verdict: 'same' | 'different' | 'unsure'; note: string } | null
+}
+
+export interface CmrVendorSuggestionsView {
+  pairs: CmrVendorSuggestion[]
+  vendorCount: number
+  /** Which engines produced the list. The heuristic always runs; the AI review only on request. */
+  engine: { heuristic: true; ai: 'off' | 'used' | 'unavailable'; aiMessage: string | null }
+}
+
+/** The label of a suggestion's test, for the review list. */
+export const SUGGESTION_KIND_LABEL: Record<CmrVendorSuggestionKind, string> = {
+  punctuation: 'Punctuation',
+  suffix: 'Company suffix',
+  reorder: 'Same words',
+  spelling: 'Spelling',
+  prefix: 'Run together',
+  contains: 'Contained',
+  words: 'Shared words',
+  ai: 'AI',
+}
+
+/** A canonical name the Controller types: trimmed, 1–200 characters. */
+export function parseVendorName(v: unknown): { ok: true; value: string } | { ok: false; error: string } {
+  if (typeof v !== 'string') return { ok: false, error: 'Enter a vendor name.' }
+  const t = v.trim()
+  if (!t) return { ok: false, error: 'Enter a vendor name.' }
+  // characters, as the database counts them (char_length), not UTF-16 units
+  if ([...t].length > 200) return { ok: false, error: 'A vendor name can be at most 200 characters.' }
+  return { ok: true, value: t }
+}

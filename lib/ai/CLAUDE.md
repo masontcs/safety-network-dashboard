@@ -10,11 +10,12 @@ Never change this without updating this file.
 
 ---
 
-## TWO AI FEATURES — NOTHING ELSE
+## THREE AI FEATURES — NOTHING ELSE
 
-This module handles exactly two AI tasks:
+This module handles exactly three AI tasks:
 1. Employee name matching (payroll + fuel imports)
 2. Payroll item group suggestion (payroll imports)
+3. Duplicate-vendor review for SN Cash Ledger (CMR AP Phase 3b) — `lib/ai/vendors.ts`
 
 Do not add AI features without updating this file and the root CLAUDE.md.
 
@@ -156,3 +157,26 @@ if (!VALID_GROUPS.includes(result.suggestedGroup)) {
 - [ ] Suggested group is validated against `VALID_GROUPS` — invalid responses fall back to 'Other'
 - [ ] AI match scores below 0.6 return empty array (no false matches forced on admin)
 - [ ] Prompts live in `/lib/ai/prompts.ts` — no inline prompt strings in API routes
+
+---
+
+## FEATURE 3: DUPLICATE-VENDOR REVIEW (SN Cash Ledger, AP Phase 3b)
+
+### When it's called
+Only when a Cash Ledger Controller presses "Ask AI to review" on the Vendors page
+(`GET /api/cmr/vendors/suggestions?ai=1`, guardCmrController). Never on import, never on a schedule.
+
+### What it does
+`reviewVendorDuplicates({ vendors, pairs })` sends the canonical vendor names (with their QuickBooks
+spellings and the account names that owe them — no amounts) and the rule-based matcher's proposed
+pairs (`lib/cmr/vendor-suggest.ts`). The model returns a verdict per pair (`same` / `different` /
+`unsure` + a short note) and up to 15 extra pairs. Prompt: `buildVendorDuplicatePrompt` in
+`/lib/ai/prompts.ts`.
+
+### Rules
+- ADVISORY ONLY. It never writes to the database. Its output only annotates the review list; the
+  Controller confirms every merge (`cmr_merge_vendors`) or dismisses the pair.
+- Output is validated: pair / vendor numbers must be ones it was given; anything else is dropped.
+- Any failure (no key, API error, timeout 25 s, bad JSON) → `{ status: 'unavailable' }` and the
+  page shows the rule-based suggestions alone. It never throws.
+

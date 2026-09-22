@@ -203,6 +203,13 @@ export type Database = {
         Update: { id?: string; vendor_id?: string; raw_name?: string; normalized_name?: string; created_at?: string }
         Relationships: []
       }
+      // AP Phase 3b — a suggested duplicate pair a Controller dismissed (vendor_id_a < vendor_id_b).
+      cmr_vendor_merge_dismissals: {
+        Row: { id: string; vendor_id_a: string; vendor_id_b: string; dismissed_by: string | null; dismissed_at: string }
+        Insert: { id?: string; vendor_id_a: string; vendor_id_b: string; dismissed_by?: string | null; dismissed_at?: string }
+        Update: { id?: string; vendor_id_a?: string; vendor_id_b?: string; dismissed_by?: string | null; dismissed_at?: string }
+        Relationships: []
+      }
       user_profiles: {
         Row: { id: string; role: Role; display_name: string; must_change_password: boolean; is_active: boolean; username: string | null; field_access: boolean; billing_role: Role | null; qb_export_enabled: boolean; qb_config_enabled: boolean }
         Insert: { id: string; role: Role; display_name?: string; must_change_password?: boolean; is_active?: boolean; username?: string | null; field_access?: boolean; billing_role?: Role | null; qb_export_enabled?: boolean; qb_config_enabled?: boolean }

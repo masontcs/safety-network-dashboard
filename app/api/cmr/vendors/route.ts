@@ -15,8 +15,10 @@ import { buildVendorsView, serverError } from '@/lib/cmr/ap-server'
  * credits), per-account subtotals and invoices — plus the account filter and the search are
  * computed in the browser from this one response (lib/cmr/vendors), like the AP page.
  *
- * There is deliberately NO write here: merging / splitting / renaming vendors and the AI merge
- * suggestions are AP Phase 3b, and will be Controller-only (guardCmrController).
+ * There is deliberately NO write here. Merging / splitting / renaming vendors and the duplicate
+ * suggestions (AP Phase 3b) live at /api/cmr/vendors/{merge,split,rename,dismiss,suggestions,
+ * catalog} and are Controller-only (guardCmrController); `canManage` only tells the page whether
+ * to show those controls.
  *
  * NOTE (BUG-019): a route.ts may export only HTTP handlers + route config — helpers live in
  * lib/cmr/ap-server.
@@ -32,7 +34,8 @@ export async function GET(): Promise<NextResponse> {
     if (guard) return guard
 
     const view = await buildVendorsView(createServiceClient())
-    return NextResponse.json({ success: true, data: view })
+    // AP Phase 3b: a Controller also gets the merge / split / rename tools (their routes check again).
+    return NextResponse.json({ success: true, data: { ...view, canManage: ctx.role === 'controller' } })
   } catch (err) {
     return serverError(err, 'api/cmr/vendors')
   }

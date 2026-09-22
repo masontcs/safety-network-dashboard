@@ -1,9 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import Select from '@/components/billing/Select'
 import CmrIcon from '@/components/cmr/CmrIcon'
 import { InvoiceTable } from '@/components/cmr/CmrApClient'
+import { DuplicatesPanel, MergeDialog, RenameDialog, SplitDialog, VendorToolbar, summaryOfEntry } from '@/components/cmr/CmrVendorTools'
+import { useAlert, useConfirm } from '@/components/ui/DialogProvider'
 import { formatAging } from '@/lib/cmr/ap'
 import { formatBalanceCents } from '@/lib/cmr/ledger'
 import {
@@ -12,25 +14,52 @@ import {
   vendorRollup,
   vendorRollupTotals,
   type CmrVendorAccountShare,
+  type CmrVendorCatalogEntry,
   type CmrVendorRollupRow,
   type CmrVendorSort,
+  type CmrVendorSuggestion,
+  type CmrVendorSuggestionsView,
+  type CmrVendorSummary,
   type CmrVendorsView,
 } from '@/lib/cmr/vendors'
 
 /**
- * Vendors — the cross-account rollup (AP Phase 3a). READ ONLY, for every CMR role.
+ * Vendors — the cross-account rollup (AP Phase 3a), plus the Controller's cleanup tools
+ * (AP Phase 3b). The rollup is for every CMR role.
  *
  * One row per canonical vendor with the total owed across every account's current A/P (Σ open
  * bills − open credits, payable lines only). Open a vendor for its per-account subtotals; open
  * an account for that account's invoices. The account filter narrows every figure to that one
  * account; search matches the vendor's name, any QuickBooks spelling of it, or an invoice #.
  *
- * Only identical spellings (after conservative normalization) are one vendor here. Merging
- * differently-spelled vendors, renaming and AI merge suggestions are AP Phase 3b — there is no
- * control on this screen that changes anything.
+ * Only identical spellings (after conservative normalization) unify on their own. A CONTROLLER
+ * (view.canManage) also sees "Possible duplicates" — suggested pairs, advisory only, with an
+ * optional AI review — and, on each open vendor, Merge with… / Rename / Split. Every merge is a
+ * Controller's confirmed choice; nothing merges automatically. A Viewer or Requester sees the
+ * rollup only (and the routes refuse them anyway).
  */
 
 type ApiResult<T> = { success: true; data: T } | { success: false; error: string; code?: string }
+
+async function postJson<T>(input: string, body: unknown): Promise<ApiResult<T>> {
+  try {
+    const res = await fetch(input, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const json = (await res.json().catch(() => null)) as ApiResult<T> | null
+    if (json) return json
+    return { success: false, error: `Request failed (${res.status}).` }
+  } catch {
+    return { success: false, error: 'Network error — check your connection and try again.' }
+  }
+}
+
+type Tool =
+  | { kind: 'merge'; a: CmrVendorSummary; b: CmrVendorSummary | null }
+  | { kind: 'rename'; vendor: { id: string; canonicalName: string } }
+  | { kind: 'split'; vendor: CmrVendorCatalogEntry }
 
 async function getJson<T>(input: string): Promise<ApiResult<T>> {
   try {
@@ -54,6 +83,48 @@ export default function CmrVendorsClient() {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState<Set<string>>(() => new Set())
 
+  // AP Phase 3b — Controller only
+  const confirm = useConfirm()
+  const alert = useAlert()
+  const [catalog, setCatalog] = useState<CmrVendorCatalogEntry[] | null>(null)
+  const [dups, setDups] = useState<CmrVendorSuggestionsView | null>(null)
+  const [dupError, setDupError] = useState<string | null>(null)
+  const [aiBusy, setAiBusy] = useState(false)
+  const [tool, setTool] = useState<Tool | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState<string | null>(null)
+
+  // The AI review is asked for on demand (it costs a model call). Its verdicts are remembered by
+  // pair, so a merge / dismiss / rename — which re-reads the rule-based list — does not lose them.
+  const aiMemo = useRef<Map<string, CmrVendorSuggestion> | null>(null)
+
+  const loadTools = useCallback(async (ai = false) => {
+    const [c, d] = await Promise.all([
+      getJson<{ vendors: CmrVendorCatalogEntry[] }>('/api/cmr/vendors/catalog'),
+      getJson<CmrVendorSuggestionsView>(`/api/cmr/vendors/suggestions${ai ? '?ai=1' : ''}`),
+    ])
+    if (c.success) setCatalog(c.data.vendors)
+    if (!d.success) { setDupError(d.error); return }
+    setDupError(null)
+    const pk = (p: CmrVendorSuggestion) => `${p.a.id}|${p.b.id}`
+    if (ai && d.data.engine.ai === 'used') aiMemo.current = new Map(d.data.pairs.filter((p) => p.ai).map((p) => [pk(p), p]))
+    const memo = aiMemo.current
+    if (ai || !memo || !c.success) { setDups(d.data); return }
+    // Re-apply the remembered AI notes: to rule-based pairs still listed, and the AI's own extra
+    // pairs whose two vendors both still exist (a dismissed one is dropped from the memo).
+    const exists = new Map(c.data.vendors.map((v) => [v.id, v]))
+    const pairs = d.data.pairs.map((p) => (memo.get(pk(p))?.ai ? { ...p, ai: memo.get(pk(p))!.ai } : p))
+    const listed = new Set(pairs.map(pk))
+    for (const [k, p] of memo) {
+      const a = exists.get(p.a.id)
+      const b = exists.get(p.b.id)
+      if (p.kind !== 'ai' || listed.has(k) || !a || !b) continue
+      pairs.push({ ...p, a: summaryOfEntry(a), b: summaryOfEntry(b) })
+    }
+    pairs.sort((x, y) => y.score - x.score)
+    setDups({ ...d.data, pairs, engine: { ...d.data.engine, ai: 'used' } })
+  }, [])
+
   const load = useCallback(async () => {
     const r = await getJson<CmrVendorsView>('/api/cmr/vendors')
     if (!r.success) {
@@ -64,9 +135,68 @@ export default function CmrVendorsClient() {
     }
     setLoadError(null)
     setView(r.data)
-  }, [])
+    if (r.data.canManage) await loadTools()
+  }, [loadTools])
 
   useEffect(() => { void load() }, [load])
+
+  const canManage = !!view?.canManage
+  const catalogById = useMemo(() => new Map((catalog ?? []).map((e) => [e.id, e])), [catalog])
+
+  async function askAi() {
+    setAiBusy(true)
+    await loadTools(true)
+    setAiBusy(false)
+  }
+
+  /** Run one Controller action, then refresh everything it can change. */
+  async function act(path: string, body: unknown, success: (data: Record<string, unknown>) => string): Promise<boolean> {
+    setBusy(true)
+    const r = await postJson<Record<string, unknown>>(path, body)
+    setBusy(false)
+    if (!r.success) {
+      await alert({ title: 'Not saved', message: r.error })
+      if (r.code === 'NOT_FOUND') { setTool(null); await load() }
+      return false
+    }
+    setTool(null)
+    setDone(success(r.data))
+    await load()
+    return true
+  }
+
+  const merge = (targetId: string, sourceId: string) => {
+    const t = catalogById.get(targetId)
+    const s = catalogById.get(sourceId)
+    void act('/api/cmr/vendors/merge', { targetId, sourceId }, () =>
+      `Merged ${displayVendorName(s?.canonicalName ?? 'the vendor')} into ${displayVendorName(t?.canonicalName ?? 'the vendor')}.`)
+  }
+
+  async function dismiss(p: CmrVendorSuggestion) {
+    const ok = await confirm({
+      title: 'Not the same vendor?',
+      message: `Stop suggesting “${displayVendorName(p.a.canonicalName)}” and “${displayVendorName(p.b.canonicalName)}” as duplicates? Nothing else changes.`,
+      confirmLabel: 'Stop suggesting',
+    })
+    if (!ok) return
+    aiMemo.current?.delete(`${p.a.id}|${p.b.id}`)
+    await act('/api/cmr/vendors/dismiss', { vendorIdA: p.a.id, vendorIdB: p.b.id }, () => 'Dismissed — that pair won’t be suggested again.')
+  }
+
+  function toolbarFor(vendorId: string | null, name: string) {
+    if (!canManage || !vendorId) return null
+    const e = catalogById.get(vendorId)
+    return (
+      <VendorToolbar
+        name={name}
+        spellingCount={e?.aliases.length ?? 1}
+        disabled={!e || busy}
+        onMerge={() => e && setTool({ kind: 'merge', a: summaryOfEntry(e), b: null })}
+        onRename={() => e && setTool({ kind: 'rename', vendor: { id: e.id, canonicalName: e.canonicalName } })}
+        onSplit={() => e && setTool({ kind: 'split', vendor: e })}
+      />
+    )
+  }
 
   const filter = accountId === '' ? null : accountId
   // Only accounts that have an A/P import can narrow the rollup.
@@ -145,9 +275,31 @@ export default function CmrVendorsClient() {
         </div>
       )}
 
+      {done && (
+        <div className="cmr-notice cmr-vn-done" role="status" style={{ marginBottom: 12 }}>
+          <CmrIcon name="check" size={14} />
+          <span style={{ flex: 1 }}>{done}</span>
+          <button type="button" className="cmr-btn sm ghost" onClick={() => setDone(null)} aria-label="Dismiss message">
+            <CmrIcon name="close" size={12} />
+          </button>
+        </div>
+      )}
+
       {view && !nothingImported && (
         <>
           <VendorsHero totals={totals} scope={scope} allAccounts={filter === null} />
+
+          {canManage && (
+            <DuplicatesPanel
+              data={dups}
+              error={dupError}
+              aiBusy={aiBusy}
+              onAskAi={() => void askAi()}
+              onRetry={() => void loadTools()}
+              onMerge={(p) => setTool({ kind: 'merge', a: p.a, b: p.b })}
+              onDismiss={(p) => void dismiss(p)}
+            />
+          )}
 
           <div className="cmr-ap-bar">
             <label className="cmr-ro-filter cmr-ap-filter">
@@ -190,7 +342,7 @@ export default function CmrVendorsClient() {
             </div>
             <p className="cmr-lg-blurb">
               Owed is every open Bill less every open Credit. A vendor spelled identically in QuickBooks under several
-              accounts is one vendor here; differently spelled ones are listed separately for now.
+              accounts is one vendor here; differently spelled ones stay separate until a Controller merges them.
             </p>
             {unlinked > 0 && (
               <div className="cmr-notice" role="note" style={{ marginBottom: 12 }}>
@@ -216,6 +368,7 @@ export default function CmrVendorsClient() {
                       open={open.has(r.key)}
                       isOpen={(k) => open.has(k)}
                       onToggle={toggle}
+                      tools={toolbarFor(r.vendorId, displayVendorName(r.name))}
                     />
                   ))}
                 </ul>
@@ -223,6 +376,31 @@ export default function CmrVendorsClient() {
             </div>
           </section>
         </>
+      )}
+
+      {tool?.kind === 'merge' && (
+        <MergeDialog a={tool.a} b={tool.b} catalog={catalog ?? []} busy={busy} onMerge={merge} onCancel={() => setTool(null)} />
+      )}
+      {tool?.kind === 'rename' && (
+        <RenameDialog
+          vendor={tool.vendor}
+          busy={busy}
+          onCancel={() => setTool(null)}
+          onRename={(name) =>
+            void act('/api/cmr/vendors/rename', { vendorId: tool.vendor.id, name }, () => `Renamed to ${displayVendorName(name)}.`)
+          }
+        />
+      )}
+      {tool?.kind === 'split' && (
+        <SplitDialog
+          vendor={tool.vendor}
+          busy={busy}
+          onCancel={() => setTool(null)}
+          onSplit={(aliasIds, name) =>
+            void act('/api/cmr/vendors/split', { vendorId: tool.vendor.id, aliasIds, name }, () =>
+              `Split ${aliasIds.length === 1 ? 'one spelling' : `${aliasIds.length} spellings`} off into ${displayVendorName(name)}.`)
+          }
+        />
       )}
     </>
   )
@@ -276,12 +454,15 @@ function VendorRow({
   open,
   isOpen,
   onToggle,
+  tools,
 }: {
   row: CmrVendorRollupRow
   allAccounts: boolean
   open: boolean
   isOpen: (key: string) => boolean
   onToggle: (key: string) => void
+  /** AP Phase 3b: the Controller's Merge / Rename / Split bar (null for everyone else). */
+  tools?: React.ReactNode
 }) {
   // useId, not the name: distinct vendors can share a punctuation-free name.
   const panel = `cmr-vn-acc-${useId().replace(/:/g, '')}`
@@ -312,6 +493,7 @@ function VendorRow({
       </button>
       {open && (
         <div id={panel} className="cmr-vn-accs">
+          {tools}
           <ul className="cmr-ap-list" aria-label={`${name} by account`}>
             {r.accounts.map((s) => {
               const key = `${r.key}\u0000${s.accountId}`

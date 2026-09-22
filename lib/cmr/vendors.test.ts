@@ -19,8 +19,8 @@ import {
 // ── normalization ─────────────────────────────────────────────────────────────
 
 /**
- * [input, what public.cmr_vendor_normalize returned for it on PostgreSQL 16 with this exact
- * migration]. The app and the database MUST agree, or the same spelling would group differently
+ * [input, what public.cmr_vendor_normalize returned for it on PostgreSQL 16 with the AP Phase 3b
+ * migration (cmr_vendor_merge) applied on top of AP Phase 3a's]. The app and the database MUST agree, or the same spelling would group differently
  * in the browser than in the resolver. Regenerate from the SQL if the rule ever changes (it can
  * only change in a NEW migration).
  */
@@ -32,7 +32,7 @@ const SQL_PARITY: [string, string][] = [
   ['ACME INC..', 'ACME INC.'],
   ['ACME LLC', 'ACME LLC'],
   ['ACME, INC.', 'ACME, INC'],
-  ['ACME .', 'ACME '],
+  ['ACME .', 'ACME'],
   ['.', '.'],
   ['..', '.'],
   ['a', 'A'],
@@ -50,6 +50,14 @@ const SQL_PARITY: [string, string][] = [
   ["NICK'S TRUCKING, INC.", "NICK'S TRUCKING, INC"],
   ['American Express 91000 &  92016', 'AMERICAN EXPRESS 91000 & 92016'],
   ['\r\n lead', 'LEAD'],
+  // AP Phase 3b: trimming is the LAST step (was "ACME INC " / "A " / ". " / "ACME " / "ACME ")
+  ['ACME INC .', 'ACME INC'],
+  ['A .', 'A'],
+  ['. .', '.'],
+  ['ACME\u00a0.', 'ACME'],
+  ['ACME \t. ', 'ACME'],
+  ['ACME  ..', 'ACME .'],
+  ['ACME .\u00a0', 'ACME'],
 ]
 
 describe('normalizeVendorName — conservative: case, whitespace, one trailing dot, nothing else', () => {

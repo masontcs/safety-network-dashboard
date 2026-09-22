@@ -165,6 +165,8 @@ No WH/Signs dashboards in V1.
 - AI matching uses legal names (raw_name_in_report) only — never preferred names
 - Store suggestions in DB, require human confirmation before acting
 - Prompt templates in `/lib/ai/prompts.ts` only
+- SN Cash Ledger duplicate-vendor review (AP Phase 3b, `lib/ai/vendors.ts`): Controller-triggered,
+  advisory only — a Controller confirms every vendor merge. See `lib/ai/CLAUDE.md` Feature 3.
 
 ---
 
