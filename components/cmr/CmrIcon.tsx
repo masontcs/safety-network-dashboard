@@ -10,6 +10,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   requests: <><path d="M3 5h18v14H3z" /><path d="M3 13h5l2 3h4l2-3h5" /></>,
   accounts: <><path d="M3 21h18" /><path d="M5 21V10l7-5 7 5v11" /><path d="M9 21v-6h6v6" /></>,
   access: <><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z" /><path d="M9.5 12l2 2 3.5-4" /></>,
+  help: <><circle cx="12" cy="12" r="9" /><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.3-2.5 4" /><path d="M12 17.2v.01" /></>,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   sun: <><circle cx="12" cy="12" r="4.5" /><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19" /></>,
   moon: <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />,

@@ -33,7 +33,7 @@ export const CMR_ROLE_DESCRIPTION: Record<CmrRole, string> = {
 /** Only a Controller may change anything outside of submitting a vendor request. */
 export const isCmrController = (role: CmrRole): boolean => role === 'controller'
 
-export type CmrNavIcon = 'ledger' | 'priorities' | 'rollup' | 'recurring' | 'requests' | 'accounts' | 'access'
+export type CmrNavIcon = 'ledger' | 'priorities' | 'rollup' | 'recurring' | 'requests' | 'accounts' | 'access' | 'help'
 
 export interface CmrNavItem {
   href: string
@@ -82,4 +82,21 @@ export function cmrNavFor(role: CmrRole): CmrNavGroup[] {
   if (role === 'controller') return [LEDGER, VENDORS, SETTINGS]
   if (role === 'requester' || role === 'viewer') return [LEDGER, VENDORS]
   return []
+}
+
+/** The in-app "How to use" page. Every CMR role may read it; it lives under (secure). */
+export const CMR_HELP_HREF = '/cmr/help'
+
+const HELP: CmrNavGroup = {
+  label: 'Help',
+  items: [{ href: CMR_HELP_HREF, label: 'How to use', icon: 'help' }],
+}
+
+/**
+ * What the sidebar actually renders: the role's sections (cmrNavFor, unchanged) with the Help
+ * group at the bottom, below Settings. Still fails closed — an unknown role gets nothing.
+ */
+export function cmrSidebarFor(role: CmrRole): CmrNavGroup[] {
+  const groups = cmrNavFor(role)
+  return groups.length ? [...groups, HELP] : []
 }

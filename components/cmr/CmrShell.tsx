@@ -5,14 +5,14 @@ import { usePathname } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import CmrIcon from '@/components/cmr/CmrIcon'
 import CmrSignOutButton from '@/components/cmr/CmrSignOutButton'
-import { CMR_ROLE_LABEL, cmrNavFor, type CmrRole } from '@/lib/cmr/roles'
+import { CMR_HELP_HREF, CMR_ROLE_LABEL, cmrSidebarFor, type CmrRole } from '@/lib/cmr/roles'
 import { CMR_THEME_COOKIE, type CmrTheme } from '@/lib/cmr/theme'
 
 /**
  * The Cash Ledger chrome: grouped sidebar (role-gated), slim top bar with the light/dark
  * toggle, and the content column. On narrow screens the sidebar becomes a drawer.
  *
- * The nav is filtered by cmrNavFor(role) — hiding a link is cosmetic; the (controller) layout
+ * The nav is cmrSidebarFor(role) — cmrNavFor(role) plus the Help group. Hiding a link is cosmetic; the (controller) layout
  * and the /api/cmr guards are what actually enforce it.
  */
 
@@ -35,7 +35,7 @@ export default function CmrShell({
   children: React.ReactNode
 }) {
   const pathname = usePathname() ?? '/cmr'
-  const groups = cmrNavFor(role)
+  const groups = cmrSidebarFor(role)
   const current = groups.flatMap((g) => g.items).find((i) => isActive(pathname, i.href))
 
   // ── mobile drawer ──
@@ -140,6 +140,15 @@ export default function CmrShell({
               <CmrIcon name="lock" size={11} /> {role === 'requester' ? 'Read only · can request' : 'Read only'}
             </span>
           )}
+          <Link
+            href={CMR_HELP_HREF}
+            className="cmr-iconbtn"
+            aria-label="How to use"
+            title="How to use"
+            aria-current={isActive(pathname, CMR_HELP_HREF) ? 'page' : undefined}
+          >
+            <CmrIcon name="help" />
+          </Link>
           <button
             type="button"
             className="cmr-iconbtn"
