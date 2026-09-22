@@ -33,7 +33,7 @@ export const CMR_ROLE_DESCRIPTION: Record<CmrRole, string> = {
 /** Only a Controller may change anything outside of submitting a vendor request. */
 export const isCmrController = (role: CmrRole): boolean => role === 'controller'
 
-export type CmrNavIcon = 'ledger' | 'priorities' | 'rollup' | 'recurring' | 'requests' | 'accounts' | 'access' | 'help'
+export type CmrNavIcon = 'ledger' | 'priorities' | 'rollup' | 'recurring' | 'requests' | 'ap' | 'accounts' | 'access' | 'help'
 
 export interface CmrNavItem {
   href: string
@@ -60,6 +60,9 @@ const VENDORS: CmrNavGroup = {
   items: [
     { href: '/cmr/recurring', label: 'Recurring', icon: 'recurring' },
     { href: '/cmr/requests', label: 'Requests', icon: 'requests' },
+    // Every role reads AP (Requesters build requests from it in AP Phase 2); importing is
+    // Controller-only and enforced by /api/cmr/ap/import/*.
+    { href: '/cmr/ap', label: 'Accounts Payable', icon: 'ap' },
   ],
 }
 

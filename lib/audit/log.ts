@@ -88,6 +88,9 @@ export type AuditAction =
   | 'cmr.request.place'
   | 'cmr.request.decline'
   | 'cmr.request.unplace'
+  // SN Cash Ledger — accounts payable (AP Phase 1). One entry per committed A/P Aging Detail
+  // upload; it records the snapshot it replaced, since the replaced import row is deleted.
+  | 'cmr.ap.import'
 
 // ── Payload ────────────────────────────────────────────────────────────────────
 

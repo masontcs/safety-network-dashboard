@@ -2,7 +2,7 @@
  * A tiny in-memory stand-in for the Supabase service client, for the CMR access tests.
  * Supports the query shapes lib/api/cmr.ts and the /api/cmr routes use:
  *   from(t).select(cols, {count, head}).eq(c, v).in(c, vs).gte(c, v).lte(c, v).order(..)
- *     .maybeSingle() / await
+ *     .range(from, to) .maybeSingle() / await
  *   from(t).insert(row) / .update(patch).eq(..) / .delete().eq(..)
  *   from(t).update(patch).eq(..).select(..)   (returns the rows the predicate actually matched)
  *   from(t).insert(row).select(..).single()   (returns the inserted row)
@@ -61,6 +61,7 @@ export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions =
     private filters: [string, unknown][] = []
     private payload: unknown
     private head = false
+    private rng: [number, number] | null = null
     private wantCount = false
     private returning = false
     private conflict: { keys: string[]; ignore: boolean } = { keys: ['id'], ignore: false }
@@ -81,6 +82,8 @@ export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions =
     gte(col: string, val: unknown) { this.filters.push([col, { gte: val }]); return this }
     lte(col: string, val: unknown) { this.filters.push([col, { lte: val }]); return this }
     order() { return this }
+    /** Paging, inclusive like PostgREST: range(0, 999) is the first 1,000 matching rows. */
+    range(from: number, to: number) { this.rng = [from, to]; return this }
     insert(payload: Row) { this.op = 'insert'; this.payload = payload; return this }
     upsert(payload: Row, o?: { onConflict?: string; ignoreDuplicates?: boolean }) {
       this.op = 'upsert'
@@ -162,9 +165,10 @@ export function fakeSupabase(initial: Record<string, Row[]>, opts: FakeOptions =
         return { data: null, error: null }
       }
 
-      const found = rows.filter(this.match).map((r) => ({ ...r }))
-      if (this.head) return { data: null, error: null, count: found.length }
-      if (mode === 'many') return { data: found, error: null, count: this.wantCount ? found.length : null }
+      const all = rows.filter(this.match).map((r) => ({ ...r }))
+      const found = this.rng ? all.slice(this.rng[0], this.rng[1] + 1) : all
+      if (this.head) return { data: null, error: null, count: all.length }
+      if (mode === 'many') return { data: found, error: null, count: this.wantCount ? all.length : null }
       if (found.length > 1) return { data: null, error: { message: 'multiple rows' } }
       if (found.length === 0 && mode === 'single') return { data: null, error: { message: 'no rows' } }
       return { data: found[0] ?? null, error: null }

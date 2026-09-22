@@ -1,6 +1,6 @@
 import type { CmrNavIcon } from '@/lib/cmr/roles'
 
-type IconName = CmrNavIcon | 'menu' | 'sun' | 'moon' | 'signout' | 'lock' | 'plus' | 'close' | 'user' | 'grip' | 'up' | 'down' | 'edit' | 'check' | 'trash' | 'left' | 'right' | 'alert' | 'star' | 'undo'
+type IconName = CmrNavIcon | 'menu' | 'sun' | 'moon' | 'signout' | 'lock' | 'plus' | 'close' | 'user' | 'grip' | 'up' | 'down' | 'edit' | 'check' | 'trash' | 'left' | 'right' | 'alert' | 'star' | 'undo' | 'upload'
 
 const PATHS: Record<IconName, React.ReactNode> = {
   ledger: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></>,
@@ -8,6 +8,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   rollup: <><path d="M12 3l9 5-9 5-9-5z" /><path d="M3 13l9 5 9-5" /></>,
   recurring: <><path d="M4 8a8 8 0 0 1 13-3l3 3" /><path d="M20 4v4h-4" /><path d="M20 16a8 8 0 0 1-13 3l-3-3" /><path d="M4 20v-4h4" /></>,
   requests: <><path d="M3 5h18v14H3z" /><path d="M3 13h5l2 3h4l2-3h5" /></>,
+  ap: <><path d="M6 3h9l4 4v14H6z" /><path d="M15 3v4h4" /><path d="M9 11h7M9 15h7M9 19h4" /></>,
   accounts: <><path d="M3 21h18" /><path d="M5 21V10l7-5 7 5v11" /><path d="M9 21v-6h6v6" /></>,
   access: <><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z" /><path d="M9.5 12l2 2 3.5-4" /></>,
   help: <><circle cx="12" cy="12" r="9" /><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.3-2.5 4" /><path d="M12 17.2v.01" /></>,
@@ -29,6 +30,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   right: <path d="M9 6l6 6-6 6" />,
   alert: <><path d="M12 4 2.5 20h19z" /><path d="M12 10v4.5M12 17.5v.01" /></>,
   star: <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />,
+  upload: <><path d="M12 15V4" /><path d="M7.5 8.5 12 4l4.5 4.5" /><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" /></>,
   undo: <><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></>,
 }
 
