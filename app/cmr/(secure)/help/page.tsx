@@ -50,14 +50,15 @@ export default async function CmrHelpPage() {
                 <th scope="row"><span className="cmr-pill controller">Controller</span></th>
                 <td>
                   Everything — edit the daily ledger, priorities, accounts and recurring vendors; place and
-                  decline requests; add recurring due-payments; and manage who has access.
+                  decline requests; add recurring due-payments; import each account&rsquo;s A/P and merge
+                  vendors; and manage who has access.
                 </td>
               </tr>
               <tr>
                 <th scope="row"><span className="cmr-pill requester">Requester</span></th>
                 <td>
-                  See everything, and submit vendor payment requests. That&rsquo;s the one thing a Requester
-                  changes — everything else is read-only for them.
+                  See everything, and submit vendor payment requests — built from the account&rsquo;s imported
+                  A/P. That&rsquo;s the one thing a Requester changes — everything else is read-only for them.
                 </td>
               </tr>
               <tr>
@@ -138,12 +139,78 @@ export default async function CmrHelpPage() {
             <h3 className="cmr-serif">Requests <span className="cmr-help-aside">(Vendors → Requests)</span></h3>
             <p>
               The inbox between the team and the Controller. A <strong>Requester</strong> submits a vendor payment
-              here by picking the account, a vendor from that account&rsquo;s imported A/P, and ticking the
-              invoices to pay &mdash; credits subtract, and the total is worked out for them. The{' '}
+              here, built from that account&rsquo;s imported A/P &mdash; see{' '}
+              <strong>Building a request from A/P</strong> below. The{' '}
               <strong>Controller</strong> then <strong>places</strong> each one — into a specific
               day&rsquo;s pending list, or a specific week&rsquo;s priorities — or <strong>declines</strong> it. A
               placed request can be <strong>undone</strong> if it was placed by mistake (as long as it hasn&rsquo;t
               been paid or moved on).
+            </p>
+          </div>
+
+          <div className="cmr-help-screen">
+            <h3 className="cmr-serif">
+              Accounts Payable <span className="cmr-help-aside">(Vendors → Accounts Payable)</span>
+            </h3>
+            <p>
+              A daily snapshot of what each account owes, taken straight from QuickBooks. A Controller clicks{' '}
+              <strong>Import A/P aging</strong>, picks the account and uploads that day&rsquo;s{' '}
+              <strong>A/P Aging Detail</strong> spreadsheet. The file is previewed first — including whether it
+              reconciles to the report&rsquo;s own TOTAL — and only on confirm does it <strong>replace</strong>{' '}
+              that account&rsquo;s snapshot. One import, one account, one current picture; nothing is merged with
+              yesterday&rsquo;s.
+            </p>
+            <p>
+              The screen lists vendors with the amount owed, and each one expands to its invoices. Only{' '}
+              <strong>Bill</strong> and <strong>Credit</strong> lines are payable, and credits show as negative.
+              The rest of the report — journal entries, bill payments, adjustments — is kept so the import adds up
+              to the report TOTAL, and is listed separately as never payable.
+            </p>
+            <p>
+              Every role can read this screen. Only a <strong>Controller</strong> can import.
+            </p>
+          </div>
+
+          <div className="cmr-help-screen">
+            <h3 className="cmr-serif">
+              Building a request from A/P <span className="cmr-help-aside">(Vendors → Requests)</span>
+            </h3>
+            <p>
+              A Requester builds a payment request by picking the <strong>account</strong>, then a{' '}
+              <strong>vendor</strong> from that account&rsquo;s current A/P, then <strong>ticking the
+              invoices</strong> to pay. Credits are tick-lines of their own and subtract, so the total is worked
+              out for them — and worked out again on the server when the request is submitted. One request covers
+              one account.
+            </p>
+            <p>
+              Typing a vendor and amount by hand is gone for Requesters. A <strong>Controller</strong> can still
+              switch the form to <strong>Enter by hand</strong> — which is what to do for an account whose A/P
+              hasn&rsquo;t been imported yet.
+            </p>
+            <p>
+              The ticked invoices are <strong>saved onto the request</strong>, so the next day&rsquo;s import
+              can&rsquo;t erase what it was built from. An invoice that has since been paid or dropped only adds a
+              hint on the request.
+            </p>
+          </div>
+
+          <div className="cmr-help-screen">
+            <h3 className="cmr-serif">Vendors <span className="cmr-help-aside">(Vendors → Vendors)</span></h3>
+            <p>
+              Every vendor owed across all the accounts: the total, then each account&rsquo;s share and its
+              invoices. Owed is every open Bill less every open Credit.
+            </p>
+            <p>
+              A vendor spelled <em>identically</em> in QuickBooks under several accounts is automatically one
+              vendor here. Differently-spelled ones stay separate until a Controller merges them — nothing merges
+              on its own.
+            </p>
+            <p>
+              A <strong>Controller</strong> can <strong>Merge</strong> two vendors, <strong>Split</strong> one back
+              apart, <strong>Rename</strong> the name shown here, and work through{' '}
+              <strong>Possible duplicates</strong>, the pairs the system suggests (with an optional{' '}
+              <strong>Ask AI to review</strong>). A merge keeps every QuickBooks spelling of both sides, so it
+              survives the daily imports — and Split separates them again.
             </p>
           </div>
 
@@ -195,6 +262,13 @@ export default async function CmrHelpPage() {
               <dt>Enter a recurring bill that&rsquo;s due</dt>
               <dd>
                 <strong>Weekly rollup → Due this week → Add</strong>, and pick where it goes.
+              </dd>
+            </div>
+            <div>
+              <dt>Refresh what the accounts owe</dt>
+              <dd>
+                <strong>Accounts Payable → Import A/P aging</strong>, pick the account and upload that
+                day&rsquo;s A/P Aging Detail — it replaces that account&rsquo;s snapshot.
               </dd>
             </div>
             <div>
