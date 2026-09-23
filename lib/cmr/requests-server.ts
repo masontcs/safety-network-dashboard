@@ -39,6 +39,21 @@ export type Supabase = ReturnType<typeof createServiceClient>
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+/**
+ * Ids per `in.(…)` filter (~37 URL characters each). The ids travel in the URL, so every read
+ * that filters on a list which only grows — the snapshot rows of every request, the row each
+ * placed request created — sends them in batches instead of one filter big enough to outgrow
+ * the gateway's URL limit.
+ */
+export const ID_BATCH = 150
+
+/** `ids` cut into ID_BATCH-sized batches, in order. */
+export function idBatches<T>(ids: readonly T[], size = ID_BATCH): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size) as T[])
+  return out
+}
+
 export function bad(error: string, code = 'VALIDATION_ERROR', status = 400): NextResponse {
   return NextResponse.json({ success: false, error, code }, { status })
 }
@@ -97,11 +112,15 @@ export async function placedRowStates(supabase: Supabase, rows: CmrRequestRow[])
   ]
   const read = async (table: 'cmr_pending_items' | 'cmr_weekly_priorities', ids: string[]) => {
     if (!ids.length) return
-    const { data, error } = await supabase.from(table).select('id, status').in('id', ids)
-    if (error) throw new Error(error.message)
-    const found = (data ?? []) as unknown as { id: string; status: PlacedStatus }[]
-    for (const r of found) out.set(r.id, { present: true, status: r.status })
-    for (const id of ids) if (!out.has(id)) out.set(id, { present: false })
+    // Placed requests only accumulate, so the ids go in batches (idBatches) — one `in.(…)`
+    // with every id would eventually outgrow the URL limit.
+    for (const batch of idBatches(ids)) {
+      const { data, error } = await supabase.from(table).select('id, status').in('id', batch)
+      if (error) throw new Error(error.message)
+      const found = (data ?? []) as unknown as { id: string; status: PlacedStatus }[]
+      for (const r of found) out.set(r.id, { present: true, status: r.status })
+      for (const id of batch) if (!out.has(id)) out.set(id, { present: false })
+    }
   }
   await Promise.all([read('cmr_pending_items', idsOf('pending')), read('cmr_weekly_priorities', idsOf('priority'))])
   return out
@@ -293,8 +312,6 @@ export const placeRequestIntoPriority = (
 
 /** PostgREST's default row cap; snapshot rows are read in pages. */
 const PAGE = 1000
-/** Request ids per `in.(…)` filter (~37 URL characters each). */
-export const ID_BATCH = 150
 
 export type CmrRequestInvoiceRow = {
   id: string
@@ -318,8 +335,7 @@ export async function requestInvoiceRows(supabase: Supabase, requestIds: string[
   const out: CmrRequestInvoiceRow[] = []
   // The ids travel in the URL (PostgREST `in.(…)`), so they go in batches — the request list
   // grows forever and one filter with every id would outgrow the gateway's URL limit.
-  for (let i = 0; i < ids.length; i += ID_BATCH) {
-    const batch = ids.slice(i, i + ID_BATCH)
+  for (const batch of idBatches(ids)) {
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await supabase
         .from('cmr_vendor_request_invoices')
