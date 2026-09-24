@@ -21,6 +21,10 @@ export type AuditAction =
   // only record of what was there before (metadata.replaced).
   | 'wh.ar.import'
   | 'wh.ap.import'
+  // Western Highways — the access allow-list. wh_access keeps no history of its own, so these
+  // two entries are the record of who was let into WH, by whom, and when.
+  | 'wh.access.grant'
+  | 'wh.access.revoke'
   // AR
   | 'ar.note.add'
   | 'ar.note.edit'

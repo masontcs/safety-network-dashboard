@@ -1,9 +1,7 @@
 import type { Metadata } from 'next'
-import { redirect } from 'next/navigation'
-import { createServerClient, createServiceClient } from '@/lib/supabase/server'
-import type { Role } from '@/lib/supabase/database.types'
+import { createServiceClient } from '@/lib/supabase/server'
 import WhAgingView from '@/components/wh/WhAgingView'
-import { canViewWh, canUploadWh } from '@/lib/wh/access'
+import { getWhPageContext, whPageRedirect } from '@/lib/wh/access'
 import type { WhAgingRow, WhAgingBucket } from '@/lib/wh/summary'
 
 /**
@@ -47,15 +45,12 @@ interface LineRow {
 }
 
 export default async function WhArPage() {
-  const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  // Explicit wh_access grant — an admin or executive who is not on the allow-list never gets
+  // here, and the layout has already applied the same gate.
+  const ctx = await getWhPageContext()
+  if (!ctx.ok) whPageRedirect(ctx.reason)
 
   const svc = createServiceClient()
-  const { data: profile } = await svc.from('user_profiles').select('role').eq('id', user.id).single()
-  if (!profile) redirect('/login')
-  const role = profile.role as Role
-  if (!canViewWh(role)) redirect('/dashboard')
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: importRow } = await (svc as any)
@@ -66,7 +61,7 @@ export default async function WhArPage() {
   const current = importRow as ImportRow | null
 
   if (!current) {
-    return <WhAgingView report="ar" snapshot={null} rows={[]} canUpload={canUploadWh(role)} />
+    return <WhAgingView report="ar" snapshot={null} rows={[]} canUpload />
   }
 
   const [{ data: lineRows }, { data: importer }] = await Promise.all([
@@ -110,7 +105,7 @@ export default async function WhArPage() {
         reconciled: current.reconciled,
       }}
       rows={rows}
-      canUpload={canUploadWh(role)}
+      canUpload
     />
   )
 }

@@ -179,8 +179,12 @@ export function allowedPrefixesFor(role: Role, fieldAccess = false, billingRole?
 
 /** Dashboard sub-areas per role. Only consulted when canUseDashboards(role). */
 const DASHBOARD_PREFIXES: Record<Role, string[]> = {
-  admin:            ['/dashboard', '/admin', '/fuel', '/ar', '/wh'],
-  executive:        ['/dashboard', '/executive', '/fuel', '/ar', '/wh'],
+  // NOTE: '/wh' is deliberately absent from EVERY role. Western Highways is not granted by a
+  // role at all — it needs a wh_access row, which the middleware's own /wh branch resolves
+  // before this allow-list is consulted (and the /wh layout again after it). Adding '/wh' back
+  // here would hand the section to a whole role and defeat the allow-list.
+  admin:            ['/dashboard', '/admin', '/fuel', '/ar'],
+  executive:        ['/dashboard', '/executive', '/fuel', '/ar'],
   district_manager: ['/dashboard', '/district', '/fuel', '/ar'],
   branch_manager:   ['/dashboard', '/manager', '/fuel', '/ar'],
   ar_manager:       ['/ar'],

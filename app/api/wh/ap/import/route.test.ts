@@ -25,6 +25,10 @@ import { POST } from './route'
 
 const ADMIN = '00000000-0000-4000-8000-0000000000a1'
 const EXEC = '00000000-0000-4000-8000-0000000000e1'
+// An admin and an executive who are NOT on the WH allow-list, and a sales user who is.
+const ADMIN_OFF_LIST = '00000000-0000-4000-8000-0000000000a2'
+const EXEC_OFF_LIST = '00000000-0000-4000-8000-0000000000e2'
+const GRANTED_SALES = '00000000-0000-4000-8000-0000000000f2'
 const AR_MANAGER = '00000000-0000-4000-8000-0000000000b1'
 const SALES = '00000000-0000-4000-8000-0000000000f1'
 
@@ -38,10 +42,15 @@ function world(userId: string | null, current: Record<string, unknown>[] = []) {
       user_profiles: [
         { id: ADMIN, role: 'admin', display_name: 'Ada Admin', is_active: true, billing_role: null, qb_export_enabled: false, qb_config_enabled: false },
         { id: EXEC, role: 'executive', display_name: 'Eve Exec', is_active: true, billing_role: null, qb_export_enabled: false, qb_config_enabled: false },
+        { id: ADMIN_OFF_LIST, role: 'admin', display_name: 'Una Granted', is_active: true, billing_role: null, qb_export_enabled: false, qb_config_enabled: false },
+        { id: EXEC_OFF_LIST, role: 'executive', display_name: 'Ex Cluded', is_active: true, billing_role: null, qb_export_enabled: false, qb_config_enabled: false },
+        { id: GRANTED_SALES, role: 'sales', display_name: 'Sal Sales', is_active: true, billing_role: null, qb_export_enabled: false, qb_config_enabled: false },
         { id: AR_MANAGER, role: 'ar_manager', display_name: 'Ari Manager', is_active: true, billing_role: null, qb_export_enabled: false, qb_config_enabled: false },
         { id: SALES, role: 'sales', display_name: 'Sam Sales', is_active: true, billing_role: null, qb_export_enabled: false, qb_config_enabled: false },
       ],
-      user_branch_assignments: [{ user_id: SALES, branch_id: 'b1' }],
+      user_branch_assignments: [{ user_id: SALES, branch_id: 'b1' }, { user_id: GRANTED_SALES, branch_id: 'b1' }],
+      // THE allow-list. Ada, Eve and Sal are on it; every other profile above is not.
+      wh_access: [ADMIN, EXEC, GRANTED_SALES].map((id) => ({ user_id: id, granted_by: null, granted_at: '2026-09-24T10:00:00Z' })),
       wh_ap_imports: current,
       wh_ap_lines: [],
     },
@@ -105,7 +114,12 @@ describe('/api/wh/ap/import — access', () => {
     expect(fake.calls.some((c) => c.op === 'rpc')).toBe(false)
   })
 
-  it.each([['ar_manager', AR_MANAGER], ['sales', SALES]])('403s a %s', async (_l, userId) => {
+  it.each([
+    ['ar_manager', AR_MANAGER],
+    ['sales', SALES],
+    ['platform admin with no wh_access row', ADMIN_OFF_LIST],
+    ['executive with no wh_access row', EXEC_OFF_LIST],
+  ])('403s a %s — WH needs an explicit grant, and no role inherits it', async (_l, userId) => {
     const fake = world(userId)
     const res = await POST(upload(tinyApFile(), 'a.xlsx', { mode: 'commit' }))
     expect(res.status).toBe(403)
@@ -114,7 +128,11 @@ describe('/api/wh/ap/import — access', () => {
     expect(audit.logAudit).not.toHaveBeenCalled()
   })
 
-  it.each([['admin', ADMIN], ['executive', EXEC]])('lets a %s in', async (_l, userId) => {
+  it.each([
+    ['granted admin', ADMIN],
+    ['granted executive', EXEC],
+    ['granted sales user', GRANTED_SALES],
+  ])('lets a %s in', async (_l, userId) => {
     world(userId)
     expect((await POST(upload(tinyApFile(), 'a.xlsx'))).status).toBe(200)
   })

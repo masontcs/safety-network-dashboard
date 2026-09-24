@@ -51,7 +51,9 @@ describe('cmr_vendors migration', () => {
     expect(p2).toHaveLength(1)
     expect(files[0] > p2[0]).toBe(true)
     const all = readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
-    for (const f of all.slice(all.indexOf(files[0]) + 1)) expect(f).toMatch(/^\d{14}_cmr_[a-z0-9_]+\.sql$/)
+    // Only a later subsystem may sort after it — another CMR migration, or a Western Highways
+    // one (wh_*, built on CMR's patterns and touching no cmr_* object).
+    for (const f of all.slice(all.indexOf(files[0]) + 1)) expect(f).toMatch(/^\d{14}_(cmr|wh)_[a-z0-9_]+\.sql$/)
   })
 
   it('keeps the service-role-only posture: RLS on, no policies, grants revoked, invoker + empty search_path', () => {

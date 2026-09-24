@@ -8,14 +8,16 @@ import { useTheme } from '@/lib/theme/ThemeContext'
 import InterfaceSwitcher from '@/components/billing/InterfaceSwitcher'
 import { interfacesFor, billingHomeFor } from '@/lib/utils/interfaces'
 import type { Role } from '@/lib/supabase/database.types'
-import { WH_ROLES } from '@/lib/wh/access'
 
 interface NavItem {
   href: string
   label: string
   icon: React.ReactNode
+  /** Roles that may see the item. Empty for an item granted per person (see whGrant). */
   roles: Role[]
   exactMatch?: boolean
+  /** Shown only to a user with an explicit wh_access grant, whatever their role. */
+  whGrant?: boolean
 }
 
 const GridIcon = () => (
@@ -193,9 +195,11 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/executive/data-explorer', label: 'Data Explorer', icon: <DatabaseIcon />, roles: ['executive'] },
   { href: '/executive/employees', label: 'Employees', icon: <PeopleIcon />, roles: ['executive'] },
   { href: '/fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['admin'] },
-  // Western Highways is a SEPARATE company, not an SN dashboard — its own section, gated
-  // on lib/wh/access so the sidebar can never advertise a door the server won't open.
-  { href: '/wh', label: 'Western Highways', icon: <HighwayIcon />, roles: [...WH_ROLES] },
+  // Western Highways is a SEPARATE company, not an SN dashboard — its own section, and the
+  // only item here that no role grants: `roles: []` keeps it out of the role filter entirely
+  // and `whAccess` (an explicit wh_access row, resolved by DashboardShell) puts it back for the
+  // people on the allow-list. So the sidebar can never advertise a door the server won't open.
+  { href: '/wh', label: 'Western Highways', icon: <HighwayIcon />, roles: [], whGrant: true },
   // TCR Billing is a SEPARATE interface — reached via the switcher below the
   // brand, not as a nav item here. See app/billing/layout.tsx.
   { href: '/admin/import',         label: 'Import',         icon: <UploadIcon />,   roles: ['admin'] },
@@ -209,6 +213,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/admin/allocations',     label: 'Allocations',     icon: <SplitIcon />,    roles: ['admin', 'executive'] },
   { href: '/admin/access-requests',   label: 'Access Requests',   icon: <InboxIcon />,   roles: ['admin'] },
   { href: '/admin/users',          label: 'Users',          icon: <UsersIcon />,    roles: ['admin'] },
+  { href: '/admin/wh-access',      label: 'WH Access',      icon: <HighwayIcon />,  roles: ['admin'] },
   { href: '/admin/audit',          label: 'Audit Log',      icon: <AuditIcon />,    roles: ['admin'] },
   { href: '/admin/settings',       label: 'Settings',       icon: <SettingsIcon />, roles: ['admin'] },
 ]
@@ -217,16 +222,19 @@ interface SidebarProps {
   role: Role
   fieldAccess?: boolean
   billingRole?: Role | null
+  /** An explicit wh_access grant — the ONLY thing that shows the Western Highways item. */
+  whAccess?: boolean
 }
 
 const COLLAPSED_W = 48
 const EXPANDED_W = 220
 
-export default function Sidebar({ role, fieldAccess = false, billingRole = null }: SidebarProps) {
+export default function Sidebar({ role, fieldAccess = false, billingRole = null, whAccess = false }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { theme, toggle: toggleTheme } = useTheme()
-  const items = NAV_ITEMS.filter((item) => item.roles.includes(role))
+  // A grant-gated item (Western Highways) is shown by its grant, never by the role filter.
+  const items = NAV_ITEMS.filter((item) => (item.whGrant ? whAccess : item.roles.includes(role)))
   const [expanded, setExpanded] = useState(false)
   const [accessRequestCount, setAccessRequestCount] = useState(0)
   const [allocationCount, setAllocationCount] = useState(0)

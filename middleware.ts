@@ -52,6 +52,29 @@ const ROLE_HOME: Record<Role, string> = {
 // lib/utils/interfaces — allow-lists only, so an unlisted role reaches nothing.
 
 /**
+ * Western Highways gate. WH access is an explicit wh_access grant — never the admin/executive
+ * role it used to be — and that table is service-role only (RLS on, no policies), so the check
+ * uses the service client. Fails CLOSED: a missing key, a read error, or no row all mean "no
+ * access". This is the first of three independent gates; the /wh layout and every page run
+ * getWhPageContext, and each /api/wh route runs getWhContext.
+ */
+async function hasWhGrant(userId: string): Promise<boolean> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return false
+  try {
+    const svc = createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+    // wh_access is not in the generated types yet — the same cast the WH routes use.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (svc as any).from('wh_access').select('user_id').eq('user_id', userId).maybeSingle()
+    if (error || !data) return false
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * SN Cash Ledger gate. CMR access is an explicit cmr_access grant — never a role — and that
  * table is service-role only (RLS on, no policies), so the check uses the service client.
  * Fails CLOSED: a missing key, a read error, or no row all mean "no access". This is the first
@@ -188,6 +211,17 @@ export async function middleware(request: NextRequest) {
     return res
   }
 
+  // Western Highways — explicit grant only, independent of profile.role. It is checked BEFORE
+  // the role allow-list below because '/wh' is intentionally in no role's prefixes: the grant is
+  // the whole rule. A signed-in user without a row is sent to their own home rather than a 403,
+  // which would confirm the section exists.
+  if (pathname === '/wh' || pathname.startsWith('/wh/')) {
+    if (!(await hasWhGrant(user.id))) {
+      return NextResponse.redirect(new URL(ROLE_HOME[profile.role], request.url))
+    }
+    return res
+  }
+
   // Block cross-role path access. allowedPrefixesFor is an allow-list: a role with no
   // grant reaches nothing, and is bounced to its home rather than shown a 403 (a 403
   // would confirm the page exists).
@@ -222,8 +256,8 @@ export const config = {
     '/manager/:path*',
     '/fuel/:path*',
     '/ar/:path*',
-    // Western Highways — a separate company in its own section. Matched so the role
-    // allow-list runs here too; the /wh layout and every /api/wh route check again.
+    // Western Highways — a separate company in its own section. Matched so the wh_access
+    // grant is checked here too; the /wh layout and every /api/wh route check again.
     '/wh',
     '/wh/:path*',
     // /billing was previously NOT matched, so the middleware never ran on it and the

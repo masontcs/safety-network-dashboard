@@ -1,13 +1,29 @@
-import { describe, it, expect } from 'vitest'
-import type { Role } from '@/lib/supabase/database.types'
-import { WH_ROLES, canViewWh, canUploadWh, guardWhAccess, guardWhUpload } from './access'
+import { describe, it, expect, vi } from 'vitest'
+import { fakeSupabase, fakeRouteClient } from '@/lib/cmr/__testing__/fakeSupabase'
 import { allowedPrefixesFor } from '@/lib/utils/interfaces'
+import type { Role } from '@/lib/supabase/database.types'
 
 /**
- * WH access is an ALLOW-LIST. This test exists so a future role added to the platform cannot
- * silently acquire Western Highways: every role that is not in WH_ROLES must be denied, and
- * the list itself is pinned.
+ * WH access is an EXPLICIT PER-PERSON GRANT with NO role inheritance.
+ *
+ * This file is the lock on that. The section used to be gated on the admin/executive role, which
+ * handed it to six people; if someone ever re-introduces a role shortcut, the non-granted admin
+ * and non-granted executive cases below fail. Do not weaken them.
  */
+
+const server = vi.hoisted(() => ({ routeClient: null as unknown, serviceClient: null as unknown }))
+vi.mock('@/lib/supabase/server', () => ({
+  createRouteClient: () => server.routeClient,
+  createServerClient: () => server.routeClient,
+  createServiceClient: () => server.serviceClient,
+}))
+
+import { getWhContext, hasWhGrant } from './access'
+
+const ADMIN = '00000000-0000-4000-8000-0000000000a1'
+const EXEC = '00000000-0000-4000-8000-0000000000e1'
+const GRANTED_SALES = '00000000-0000-4000-8000-0000000000s1'.replace('s', 'b')
+const INACTIVE = '00000000-0000-4000-8000-0000000000d1'
 
 const ALL_ROLES: Role[] = [
   'admin', 'executive', 'district_manager', 'branch_manager', 'ar_manager', 'ar_team',
@@ -15,51 +31,136 @@ const ALL_ROLES: Role[] = [
   'biller', 'accounting', 'front_counter',
 ]
 
-describe('WH access', () => {
-  it('grants exactly admin and executive', () => {
-    expect([...WH_ROLES]).toEqual(['admin', 'executive'])
+/** grants = the wh_access rows that exist. Nothing else decides. */
+function world(userId: string | null, grants: string[] = [], opts: { failTables?: string[] } = {}) {
+  const fake = fakeSupabase(
+    {
+      user_profiles: [
+        { id: ADMIN, role: 'admin', display_name: 'Ada Admin', is_active: true },
+        { id: EXEC, role: 'executive', display_name: 'Eve Exec', is_active: true },
+        { id: GRANTED_SALES, role: 'sales', display_name: 'Sal Sales', is_active: true },
+        { id: INACTIVE, role: 'executive', display_name: 'Old Timer', is_active: false },
+      ],
+      wh_access: grants.map((id) => ({ user_id: id, granted_by: null, granted_at: '2026-09-24T10:00:00Z' })),
+    },
+    opts,
+  )
+  server.routeClient = fakeRouteClient(userId)
+  server.serviceClient = fake.client
+  return fake
+}
+
+describe('getWhContext — the gate for /api/wh', () => {
+  it('no session → 401, and the grant is never even read', async () => {
+    const fake = world(null, [ADMIN])
+    const ctx = await getWhContext()
+    expect(ctx.ok).toBe(false)
+    if (ctx.ok) return
+    expect(ctx.status).toBe(401)
+    expect((await ctx.response.json()).code).toBe('UNAUTHORIZED')
+    expect(fake.calls).toHaveLength(0)
   })
 
-  it('denies every other role, reading and uploading alike', () => {
+  it('a platform ADMIN with no wh_access row → 403 (no role inheritance)', async () => {
+    world(ADMIN, [])
+    const ctx = await getWhContext()
+    expect(ctx.ok).toBe(false)
+    if (ctx.ok) return
+    expect(ctx.status).toBe(403)
+    expect(await ctx.response.json()).toMatchObject({ success: false, code: 'FORBIDDEN' })
+  })
+
+  it('an EXECUTIVE with no wh_access row → 403 (the role WH used to be gated on)', async () => {
+    world(EXEC, [])
+    const ctx = await getWhContext()
+    expect(ctx.ok).toBe(false)
+    if (ctx.ok) return
+    expect(ctx.status).toBe(403)
+  })
+
+  it('every role is denied without a grant — the role is irrelevant', async () => {
     for (const role of ALL_ROLES) {
-      const allowed = role === 'admin' || role === 'executive'
-      expect(canViewWh(role), `canViewWh(${role})`).toBe(allowed)
-      expect(canUploadWh(role), `canUploadWh(${role})`).toBe(allowed)
+      const uid = '00000000-0000-4000-8000-0000000000f1'
+      const fake = fakeSupabase({
+        user_profiles: [{ id: uid, role, display_name: 'Someone', is_active: true }],
+        wh_access: [],
+      })
+      server.routeClient = fakeRouteClient(uid)
+      server.serviceClient = fake.client
+      const ctx = await getWhContext()
+      expect(ctx.ok, `role ${role} must be denied without a grant`).toBe(false)
     }
   })
 
-  it('returns null for an allowed role and a 403 for everyone else', async () => {
-    expect(guardWhAccess('admin')).toBeNull()
-    expect(guardWhAccess('executive')).toBeNull()
-    expect(guardWhUpload('admin')).toBeNull()
-
-    for (const role of ALL_ROLES.filter((r) => r !== 'admin' && r !== 'executive')) {
-      const res = guardWhAccess(role)
-      expect(res, `guardWhAccess(${role})`).not.toBeNull()
-      expect(res!.status).toBe(403)
-      expect(await res!.json()).toMatchObject({ success: false, code: 'FORBIDDEN' })
-
-      const up = guardWhUpload(role)
-      expect(up, `guardWhUpload(${role})`).not.toBeNull()
-      expect(up!.status).toBe(403)
-    }
+  it('a granted user passes — even on a role that reaches almost nothing else', async () => {
+    world(GRANTED_SALES, [GRANTED_SALES])
+    const ctx = await getWhContext()
+    expect(ctx.ok).toBe(true)
+    if (!ctx.ok) return
+    expect(ctx).toMatchObject({ userId: GRANTED_SALES, role: 'sales', displayName: 'Sal Sales' })
   })
 
-  it('does not treat an AR role as a WH role — WH is not part of SN AR', () => {
-    expect(canViewWh('ar_manager')).toBe(false)
-    expect(canViewWh('ar_team')).toBe(false)
+  it('a granted but DEACTIVATED user → 403', async () => {
+    world(INACTIVE, [INACTIVE])
+    const ctx = await getWhContext()
+    expect(ctx.ok).toBe(false)
+    if (ctx.ok) return
+    expect(ctx.status).toBe(403)
   })
 
+  it('fails CLOSED with 500 when wh_access cannot be read', async () => {
+    world(ADMIN, [ADMIN], { failTables: ['wh_access'] })
+    const ctx = await getWhContext()
+    expect(ctx.ok).toBe(false)
+    if (ctx.ok) return
+    expect(ctx.status).toBe(500)
+    expect((await ctx.response.json()).code).toBe('INTERNAL_ERROR')
+  })
+
+  it('fails CLOSED with 500 when the profile cannot be read', async () => {
+    world(ADMIN, [ADMIN], { failTables: ['user_profiles'] })
+    const ctx = await getWhContext()
+    expect(ctx.ok).toBe(false)
+    if (ctx.ok) return
+    expect(ctx.status).toBe(500)
+  })
+
+  it('reads wh_access by user_id and consults no role column for the decision', async () => {
+    const fake = world(GRANTED_SALES, [GRANTED_SALES])
+    await getWhContext()
+    const grantRead = fake.calls.find((c) => c.table === 'wh_access')
+    expect(grantRead).toBeTruthy()
+    expect(grantRead!.filters).toEqual([['user_id', GRANTED_SALES]])
+  })
+})
+
+describe('hasWhGrant — the raw check the nav and middleware use', () => {
+  it('true only for a user with a row', async () => {
+    world(ADMIN, [GRANTED_SALES])
+    expect(await hasWhGrant(GRANTED_SALES)).toBe(true)
+    expect(await hasWhGrant(ADMIN)).toBe(false)
+    expect(await hasWhGrant(EXEC)).toBe(false)
+  })
+
+  it('false when the table cannot be read (fails closed)', async () => {
+    world(ADMIN, [ADMIN], { failTables: ['wh_access'] })
+    expect(await hasWhGrant(ADMIN)).toBe(false)
+  })
+})
+
+describe('no role carries /wh any more', () => {
   /**
-   * The middleware gates paths through allowedPrefixesFor, not through this module, so the two
-   * have to agree: a role that canViewWh must be able to reach /wh, and a role that cannot
-   * must not. Without this, widening one and forgetting the other produces either a dead link
-   * in the sidebar or a page the middleware lets through and the layout then bounces.
+   * The middleware gates paths through allowedPrefixesFor and then, for /wh only, through the
+   * grant. So '/wh' must be in NO role's prefixes: if it reappeared for a role, that whole role
+   * would reach the section again — the exact bug this phase removed.
    */
-  it('agrees with the middleware path allow-list', () => {
+  it('allowedPrefixesFor grants /wh to nobody', () => {
     for (const role of ALL_ROLES) {
-      const reachable = allowedPrefixesFor(role, false, null).includes('/wh')
-      expect(reachable, `allowedPrefixesFor(${role}) vs canViewWh(${role})`).toBe(canViewWh(role))
+      for (const fieldAccess of [false, true]) {
+        const prefixes = allowedPrefixesFor(role, fieldAccess, null)
+        expect(prefixes, `allowedPrefixesFor(${role})`).not.toContain('/wh')
+        expect(prefixes.some((p) => p === '/wh' || '/wh'.startsWith(p + '/')), `${role} must not reach /wh by prefix`).toBe(false)
+      }
     }
   })
 })

@@ -40,7 +40,10 @@ describe('cmr_ap migration', () => {
     expect(files[0] > phase7[0]).toBe(true)
     // Only later CMR migrations (AP Phase 2's cmr_vendor_request_invoices, …) may sort after it.
     const all = readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort()
-    expect(all.filter((f) => f > files[0]).every((f) => /^\d{14}_cmr_/.test(f))).toBe(true)
+    // Only a LATER SUBSYSTEM may sort after it: another CMR migration, or a Western Highways
+    // one (wh_*, which is built on top of CMR's patterns and never touches a cmr_* object).
+    // Anything else sorting in here would mean a migration was renumbered past this file.
+    expect(all.filter((f) => f > files[0]).every((f) => /^\d{14}_(cmr|wh)_/.test(f))).toBe(true)
   })
 
   it('keeps the service-role-only posture: RLS on, no policies, grants revoked', () => {

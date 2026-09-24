@@ -6,7 +6,14 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createBrowserClient } from '@/lib/supabase/client'
 import type { Role } from '@/lib/supabase/database.types'
 
-interface Props { role: Role }
+interface Props {
+  role: Role
+  /**
+   * An explicit wh_access grant. Western Highways is granted per PERSON, never by role, so it
+   * is NOT in NAV_CONFIG below — it is added to the More sheet only for a granted user.
+   */
+  whAccess?: boolean
+}
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -99,7 +106,6 @@ const NAV_CONFIG: Record<Role, NavConfig> = {
       { href: '/admin/employees', label: 'Employees', icon: (a) => <EmployeesIcon a={a} /> },
     ],
     more: [
-      { href: '/wh',                    label: 'Western Highways' },
       { href: '/admin/import',          label: 'Import' },
       { href: '/admin/review',          label: 'Review' },
       { href: '/admin/targets',         label: 'Targets' },
@@ -120,7 +126,6 @@ const NAV_CONFIG: Record<Role, NavConfig> = {
       { href: '/fuel',      label: 'Fuel',       icon: (a) => <FuelIcon a={a} /> },
     ],
     more: [
-      { href: '/wh', label: 'Western Highways' },
       { href: '/admin/data-explorer', label: 'Data Explorer' },
       { href: '/executive/employees',     label: 'Employees' },
       { href: '/admin/targets',           label: 'Targets' },
@@ -185,13 +190,17 @@ const NAV_CONFIG: Record<Role, NavConfig> = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function MobileBottomNav({ role }: Props) {
+export default function MobileBottomNav({ role, whAccess = false }: Props) {
   const pathname = usePathname()
   const router   = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const config  = NAV_CONFIG[role]
-  const hasMore = config.more.length > 0
+  const base = NAV_CONFIG[role]
+  // Western Highways rides on the grant, not the role, so it is added here rather than living
+  // in NAV_CONFIG — a role can never carry it by accident.
+  const more = whAccess ? [{ href: '/wh', label: 'Western Highways' }, ...base.more] : base.more
+  const config  = { ...base, more }
+  const hasMore = more.length > 0
 
   async function handleSignOut() {
     const supabase = createBrowserClient()

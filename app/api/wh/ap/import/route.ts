@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getAccessContext } from '@/lib/api/auth'
-import { guardWhAccess, guardWhUpload } from '@/lib/wh/access'
+import { getWhContext } from '@/lib/wh/access'
 import { createServiceClient } from '@/lib/supabase/server'
 import { parseWhApFile } from '@/lib/wh/ap-import'
 import { WH_BUCKET_ORDER, type WhAgingBucket } from '@/lib/wh/qbo'
@@ -24,13 +23,11 @@ const MAX_BYTES = 10 * 1024 * 1024
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const ctx = await getAccessContext()
+    // One gate, explicit grant only: no session → 401, no wh_access row → 403 (an admin or
+    // executive who is not on the allow-list included), unreadable grant → 500. A grant covers
+    // uploading, so there is no second role check.
+    const ctx = await getWhContext()
     if (!ctx.ok) return ctx.response
-
-    const accessGuard = guardWhAccess(ctx.access.role)
-    if (accessGuard) return accessGuard
-    const uploadGuard = guardWhUpload(ctx.access.role)
-    if (uploadGuard) return uploadGuard
 
     const form = await request.formData()
     const file = form.get('file')
@@ -131,7 +128,7 @@ export async function POST(request: Request): Promise<Response> {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: importId, error } = await (supabase as any).rpc('wh_ap_replace_import', {
-      p_actor: ctx.access.userId,
+      p_actor: ctx.userId,
       p_source_filename: file.name,
       p_report_as_of: reportAsOf,
       p_report_total_cents: data.reportTotalCents,
@@ -163,9 +160,9 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     await logAudit({
-      userId: ctx.access.userId,
-      userDisplayName: ctx.access.displayName,
-      userRole: ctx.access.role,
+      userId: ctx.userId,
+      userDisplayName: ctx.displayName,
+      userRole: ctx.role,
       action: 'wh.ap.import',
       resourceType: 'wh_ap_import',
       resourceId: typeof importId === 'string' ? importId : undefined,

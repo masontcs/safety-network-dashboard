@@ -8,11 +8,14 @@ import { fakeSupabase, fakeRouteClient } from '@/lib/cmr/__testing__/fakeSupabas
  * /api/wh/ar/import — the gate and the replace behaviour.
  *
  *   • no session                      → 401, nothing read, nothing written
- *   • any role outside WH_ROLES       → 403, no rpc, no audit (an AR role included: WH is NOT
- *                                       part of SN AR, and this is the assertion that keeps it
- *                                       that way if someone widens the guard by accident)
- *   • admin / executive, preview      → 200 with the real numbers, and STILL no write
- *   • admin, commit                   → wh_ar_replace_import called with the parsed lines, and
+ *   • no wh_access row                → 403, no rpc, no audit. Access is an explicit per-person
+ *                                       grant: an AR role, a branch role, AND a platform admin
+ *                                       or executive who is not on the allow-list are all
+ *                                       refused. Those last two are what keep the role gate
+ *                                       from creeping back in.
+ *   • a GRANTED user, preview         → 200 with the real numbers, and STILL no write — even on
+ *                                       a role that reaches nothing else here
+ *   • a granted user, commit          → wh_ar_replace_import called with the parsed lines, and
  *                                       an audit entry naming what it replaced
  *   • a file that isn't this report   → 400, no write
  */
@@ -33,6 +36,11 @@ const EXEC = '00000000-0000-4000-8000-0000000000e1'
 const AR_MANAGER = '00000000-0000-4000-8000-0000000000r1'.replace('r', 'b')
 const BRANCH = '00000000-0000-4000-8000-0000000000c1'
 const ACCOUNTING = '00000000-0000-4000-8000-0000000000d1'
+// An admin and an executive who are NOT on the WH allow-list — the roles WH used to be gated on.
+const ADMIN_OFF_LIST = '00000000-0000-4000-8000-0000000000a2'
+const EXEC_OFF_LIST = '00000000-0000-4000-8000-0000000000e2'
+// A sales user who IS on it: the grant, not the role, is what opens WH.
+const GRANTED_SALES = '00000000-0000-4000-8000-0000000000f2'
 
 const FIXTURE = join(process.cwd(), 'Western Highways Traffic Truck Products_A_R Aging Detail Report.csv')
 const AP_FIXTURE = join(process.cwd(), 'Western Highways Traffic Truck Products_A_P Aging Detail Report.xlsx')
@@ -47,8 +55,13 @@ function world(userId: string | null, current: Record<string, unknown>[] = []) {
         { id: AR_MANAGER, role: 'ar_manager', display_name: 'Ari Manager', is_active: true, billing_role: null, qb_export_enabled: false, qb_config_enabled: false },
         { id: BRANCH, role: 'branch_manager', display_name: 'Bo Branch', is_active: true, billing_role: null, qb_export_enabled: false, qb_config_enabled: false },
         { id: ACCOUNTING, role: 'accounting', display_name: 'Acc Ounting', is_active: true, billing_role: null, qb_export_enabled: false, qb_config_enabled: false },
+        { id: ADMIN_OFF_LIST, role: 'admin', display_name: 'Una Granted', is_active: true, billing_role: null, qb_export_enabled: false, qb_config_enabled: false },
+        { id: EXEC_OFF_LIST, role: 'executive', display_name: 'Ex Cluded', is_active: true, billing_role: null, qb_export_enabled: false, qb_config_enabled: false },
+        { id: GRANTED_SALES, role: 'sales', display_name: 'Sal Sales', is_active: true, billing_role: null, qb_export_enabled: false, qb_config_enabled: false },
       ],
-      user_branch_assignments: [{ user_id: BRANCH, branch_id: 'b1' }],
+      user_branch_assignments: [{ user_id: BRANCH, branch_id: 'b1' }, { user_id: GRANTED_SALES, branch_id: 'b1' }],
+      // THE allow-list. Ada, Eve and Sal are on it; every other profile above is not.
+      wh_access: [ADMIN, EXEC, GRANTED_SALES].map((id) => ({ user_id: id, granted_by: null, granted_at: '2026-09-24T10:00:00Z' })),
       wh_ar_imports: current,
       wh_ar_lines: [],
     },
@@ -119,7 +132,9 @@ describe('/api/wh/ar/import — access', () => {
     ['ar_manager', AR_MANAGER],
     ['branch_manager', BRANCH],
     ['accounting', ACCOUNTING],
-  ])('403s a %s — WH is not reachable from an SN role', async (_label, userId) => {
+    ['platform admin with no wh_access row', ADMIN_OFF_LIST],
+    ['executive with no wh_access row', EXEC_OFF_LIST],
+  ])('403s a %s — WH needs an explicit grant, and no role inherits it', async (_label, userId) => {
     const fake = world(userId)
     const res = await POST(upload(tinyArFile(), 'a.xlsx', { mode: 'commit' }))
     expect(res.status).toBe(403)
@@ -129,7 +144,11 @@ describe('/api/wh/ar/import — access', () => {
     expect(audit.logAudit).not.toHaveBeenCalled()
   })
 
-  it.each([['admin', ADMIN], ['executive', EXEC]])('lets a %s in', async (_label, userId) => {
+  it.each([
+    ['granted admin', ADMIN],
+    ['granted executive', EXEC],
+    ['granted sales user', GRANTED_SALES],
+  ])('lets a %s in', async (_label, userId) => {
     world(userId)
     const res = await POST(upload(tinyArFile(), 'a.xlsx'))
     expect(res.status).toBe(200)
