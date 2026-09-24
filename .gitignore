@@ -53,3 +53,8 @@ audit_payroll.js
 # supabase CLI local state (contains org/project IDs)
 supabase/.temp/
 NOT IN USE - AR Report w_ Notes - COMBINED AR.csv
+
+# Western Highways QuickBooks Online sample exports — real company financials kept in the
+# repo root for the WH parser tests (which skip when absent), never committed. *.xlsx / *.xls
+# above already cover the A/P, payroll and revenue samples; the A/R export arrives as CSV.
+Western Highways Traffic Truck Products_*.csv

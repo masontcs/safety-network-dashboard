@@ -222,6 +222,10 @@ export const config = {
     '/manager/:path*',
     '/fuel/:path*',
     '/ar/:path*',
+    // Western Highways — a separate company in its own section. Matched so the role
+    // allow-list runs here too; the /wh layout and every /api/wh route check again.
+    '/wh',
+    '/wh/:path*',
     // /billing was previously NOT matched, so the middleware never ran on it and the
     // /billing layout gate was the only thing standing between a user and the billing
     // interface. Matched now for defence in depth: two independent gates.

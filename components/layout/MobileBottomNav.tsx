@@ -99,6 +99,7 @@ const NAV_CONFIG: Record<Role, NavConfig> = {
       { href: '/admin/employees', label: 'Employees', icon: (a) => <EmployeesIcon a={a} /> },
     ],
     more: [
+      { href: '/wh',                    label: 'Western Highways' },
       { href: '/admin/import',          label: 'Import' },
       { href: '/admin/review',          label: 'Review' },
       { href: '/admin/targets',         label: 'Targets' },
@@ -119,6 +120,7 @@ const NAV_CONFIG: Record<Role, NavConfig> = {
       { href: '/fuel',      label: 'Fuel',       icon: (a) => <FuelIcon a={a} /> },
     ],
     more: [
+      { href: '/wh', label: 'Western Highways' },
       { href: '/admin/data-explorer', label: 'Data Explorer' },
       { href: '/executive/employees',     label: 'Employees' },
       { href: '/admin/targets',           label: 'Targets' },

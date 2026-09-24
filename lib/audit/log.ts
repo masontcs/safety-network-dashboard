@@ -17,6 +17,10 @@ export type AuditAction =
   | 'import.payroll.replace'
   | 'import.revenue'
   | 'import.fuel'
+  // Western Highways — each upload REPLACES that report's snapshot, so the log is the
+  // only record of what was there before (metadata.replaced).
+  | 'wh.ar.import'
+  | 'wh.ap.import'
   // AR
   | 'ar.note.add'
   | 'ar.note.edit'

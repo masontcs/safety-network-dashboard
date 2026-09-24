@@ -179,8 +179,8 @@ export function allowedPrefixesFor(role: Role, fieldAccess = false, billingRole?
 
 /** Dashboard sub-areas per role. Only consulted when canUseDashboards(role). */
 const DASHBOARD_PREFIXES: Record<Role, string[]> = {
-  admin:            ['/dashboard', '/admin', '/fuel', '/ar'],
-  executive:        ['/dashboard', '/executive', '/fuel', '/ar'],
+  admin:            ['/dashboard', '/admin', '/fuel', '/ar', '/wh'],
+  executive:        ['/dashboard', '/executive', '/fuel', '/ar', '/wh'],
   district_manager: ['/dashboard', '/district', '/fuel', '/ar'],
   branch_manager:   ['/dashboard', '/manager', '/fuel', '/ar'],
   ar_manager:       ['/ar'],

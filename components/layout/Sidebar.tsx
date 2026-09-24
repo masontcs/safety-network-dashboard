@@ -8,6 +8,7 @@ import { useTheme } from '@/lib/theme/ThemeContext'
 import InterfaceSwitcher from '@/components/billing/InterfaceSwitcher'
 import { interfacesFor, billingHomeFor } from '@/lib/utils/interfaces'
 import type { Role } from '@/lib/supabase/database.types'
+import { WH_ROLES } from '@/lib/wh/access'
 
 interface NavItem {
   href: string
@@ -131,6 +132,16 @@ const FuelIcon = () => (
   </svg>
 )
 
+const HighwayIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+    <path d="M4 22 8 2" />
+    <path d="M20 22 16 2" />
+    <path d="M12 4v3" />
+    <path d="M12 11v3" />
+    <path d="M12 18v3" />
+  </svg>
+)
+
 const LogOutIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -182,6 +193,9 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/executive/data-explorer', label: 'Data Explorer', icon: <DatabaseIcon />, roles: ['executive'] },
   { href: '/executive/employees', label: 'Employees', icon: <PeopleIcon />, roles: ['executive'] },
   { href: '/fuel', label: 'Fuel', icon: <FuelIcon />, roles: ['admin'] },
+  // Western Highways is a SEPARATE company, not an SN dashboard — its own section, gated
+  // on lib/wh/access so the sidebar can never advertise a door the server won't open.
+  { href: '/wh', label: 'Western Highways', icon: <HighwayIcon />, roles: [...WH_ROLES] },
   // TCR Billing is a SEPARATE interface — reached via the switcher below the
   // brand, not as a nav item here. See app/billing/layout.tsx.
   { href: '/admin/import',         label: 'Import',         icon: <UploadIcon />,   roles: ['admin'] },
