@@ -12,6 +12,21 @@ type Role = Database['public']['Tables']['user_profiles']['Row']['role']
 // Paths that are publicly accessible without auth
 const PUBLIC_PATHS = ['/', '/login', '/request-access']
 
+/**
+ * Static legal pages — public for EVERYONE, signed in or not, on every host.
+ *
+ * They are the privacy-policy and EULA URLs listed on the company's QuickBooks Online developer
+ * app, so Intuit's fetcher (and any anonymous visitor) must get the page itself, never a
+ * redirect to /login. Unlike PUBLIC_PATHS, these are not "public until you sign in": a signed-in
+ * user hitting /privacy must also get the page rather than being bounced to their role home.
+ *
+ * They are already public by construction — `config.matcher` below is an allow-list and does not
+ * include them, so the middleware never runs on these paths in production. This short-circuit is
+ * the second, independent guarantee: if the matcher is ever widened, these two paths still
+ * bypass every gate below.
+ */
+const PUBLIC_STATIC_PATHS = ['/privacy', '/terms']
+
 // Where each role lands after login (and after password-change redirect)
 const ROLE_HOME: Record<Role, string> = {
   admin:            '/dashboard',
@@ -60,6 +75,10 @@ async function hasCmrGrant(userId: string): Promise<boolean> {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const host = request.headers.get('host')
+
+  // ── Public legal pages ────────────────────────────────────────────────────────
+  // Before auth, before host routing, before anything: /privacy and /terms always render.
+  if (PUBLIC_STATIC_PATHS.includes(pathname)) return NextResponse.next()
 
   // ── Customer portal (its own world) ────────────────────────────────────────────
   // The portal has separate auth (portal accounts, no user_profiles), so the staff gating
