@@ -61,6 +61,15 @@ const REAL_PATH = path.join(process.cwd(), 'STS AP 92226.xlsx')
 const HAS_REAL = existsSync(REAL_PATH)
 const STS_FILE: Uint8Array = HAS_REAL ? readFileSync(REAL_PATH) : new Uint8Array()
 
+/**
+ * The WHWY export — the SAME report from QuickBooks ONLINE, in the contiguous-column layout.
+ * It is normalized into CMR's canonical model by lib/cmr/ap-import-qbo.ts, so it must travel
+ * these routes and cmr_ap_replace_import without a single change to either.
+ */
+const QBO_PATH = path.join(process.cwd(), 'Western Highways Traffic Truck Products_A_P Aging Detail Report.xlsx')
+const HAS_QBO = existsSync(QBO_PATH)
+const QBO_FILE: Uint8Array = HAS_QBO ? readFileSync(QBO_PATH) : new Uint8Array()
+
 const HEADER = ['', '', '', 'Type', '', 'Date', '', 'Num', '', 'Name', '', 'Due Date', '', 'Aging', '', 'Open Balance']
 const line = (type: string, num: string, name: string, bal: number, aging: number | '' = '') =>
   ['', '', '', type, '', 46265, '', num, '', name, '', 46295, '', aging, '', bal]
@@ -318,15 +327,26 @@ describe('AP import — preview', () => {
     expect((await bodyOf(old)).code).toBe('ACCOUNT_INACTIVE')
   })
 
-  it('refuses a missing account id, a missing file, and a file that is not .xlsx', async () => {
+  it('refuses a missing account id, a missing file, and a file type that is neither .xlsx nor .csv', async () => {
     world(CONTROLLER)
     expect((await preview(form('not-a-uuid', SAMPLE))).status).toBe(400)
     expect((await preview(form(ACC.STS, null))).status).toBe(400)
-    const csv = await preview(form(ACC.STS, new TextEncoder().encode('Type,Date\nBill,1/1/26'), 'ap.csv'))
-    expect((await bodyOf(csv)).code).toBe('NOT_XLSX')
+    const pdf = await preview(form(ACC.STS, new TextEncoder().encode('%PDF-1.7'), 'ap.pdf'))
+    expect((await bodyOf(pdf)).code).toBe('NOT_XLSX')
     // renamed, but not actually a workbook
     const fake = await preview(form(ACC.STS, new TextEncoder().encode('%PDF-1.7'), 'ap.xlsx'))
     expect((await bodyOf(fake)).code).toBe('NOT_XLSX')
+    // a workbook renamed to .csv is refused too — SheetJS would read it, but it is not what was meant
+    const renamed = await preview(form(ACC.STS, SAMPLE, 'ap.csv'))
+    expect((await bodyOf(renamed)).code).toBe('NOT_XLSX')
+  })
+
+  it('lets a .csv through the upload gate and judges it on its contents (QBO exports .csv too)', async () => {
+    world(CONTROLLER)
+    // Accepted as a file type, then refused by the parser because it is not an A/P aging report —
+    // NOT_AP_AGING rather than NOT_XLSX is the proof the gate no longer rejects .csv on sight.
+    const csv = await preview(form(ACC.STS, new TextEncoder().encode('Type,Date\nBill,1/1/26'), 'ap.csv'))
+    expect((await bodyOf(csv)).code).toBe('NOT_AP_AGING')
   })
 
   it('refuses a workbook that is not an A/P Aging Detail report', async () => {
@@ -555,5 +575,99 @@ describe('AP read', () => {
     server.serviceClient = fake.client
     vi.spyOn(console, 'error').mockImplementation(() => {})
     expect((await read()).status).toBe(500)
+  })
+})
+
+// ── the QuickBooks ONLINE layout, through the same routes ───────────────────
+
+describe.runIf(HAS_QBO)('AP import — the WHWY QuickBooks Online export', () => {
+  /**
+   * The point of these tests is that NOTHING here is WHWY-specific. The QBO file goes through
+   * the same preview and commit routes, is stored by the same cmr_ap_replace_import call with
+   * the same payload shape, and reads back through the same AP-page helpers as a Desktop file.
+   * (It is imported into the TCS test account because the fake world has no WHWY row — which
+   * account it lands in is exactly what does not matter.)
+   */
+
+  it('previews as normalized CMR doc types and reconciles to the report TOTAL', async () => {
+    world(CONTROLLER)
+    const r = await preview(form(ACC.TCS, QBO_FILE, 'WHWY A_P Aging Detail.xlsx'))
+    expect(r.status).toBe(200)
+    const { data } = await bodyOf(r)
+    expect(data.summary).toMatchObject({
+      lineCount: 685,
+      payableLineCount: 672,
+      reportTotalCents: 1_244_845_54,
+      importedTotalCents: 1_244_845_54,
+      payableTotalCents: 1_225_943_46,
+      reconciled: true,
+    })
+    expect(data.summary.docTypeCounts).toEqual({ Bill: 667, Credit: 5, 'General Journal': 12, 'Bill Pmt -Check': 1 })
+  })
+
+  it('commits through cmr_ap_replace_import with the identical payload shape a Desktop file uses', async () => {
+    const fake = world(CONTROLLER)
+    const r = await commit(form(ACC.TCS, QBO_FILE, 'WHWY A_P Aging Detail.xlsx', { expectedLineCount: '685', expectedReportTotalCents: '124484554' }))
+    expect(r.status).toBe(201)
+    expect(fake.tables.cmr_ap_imports).toHaveLength(1)
+    expect(fake.tables.cmr_ap_lines).toHaveLength(685)
+
+    const call = fake.calls.find((c) => c.op === 'rpc')
+    const sent = (call?.payload as { p_lines: Row[] }).p_lines
+    expect(sent).toHaveLength(685)
+    // the server still decides payability — the client never sends it
+    expect(sent.every((l) => !('payable' in l))).toBe(true)
+    // exactly the eight columns cmr_ap_lines takes, no QBO-only field smuggled through
+    expect(Object.keys(sent[0]).sort()).toEqual([
+      'aging_bucket', 'aging_days', 'bill_date', 'doc_type', 'due_date', 'invoice_num', 'open_balance_cents', 'vendor_name',
+    ])
+    // every doc_type is one the existing constraint and payable rule already know
+    const docTypes = new Set(sent.map((l) => l.doc_type as string))
+    expect([...docTypes].sort()).toEqual(['Bill', 'Bill Pmt -Check', 'Credit', 'General Journal'])
+    // every aging_bucket is one of the Desktop parser's own five labels
+    const buckets = new Set(sent.map((l) => l.aging_bucket as string))
+    expect([...buckets].sort()).toEqual(['1 - 30', '31 - 60', '61 - 90', '> 90', 'Current'])
+  })
+
+  it('reads back through the AP page helpers like any other import', async () => {
+    const fake = world(CONTROLLER)
+    await commit(form(ACC.TCS, QBO_FILE, 'WHWY A_P Aging Detail.xlsx'))
+    as(fake, VIEWER)
+    const view = await viewOf(await read())
+    expect(view.imports[0]).toMatchObject({
+      accountId: ACC.TCS,
+      sourceFilename: 'WHWY A_P Aging Detail.xlsx',
+      reportTotalCents: 1_244_845_54,
+      importedTotalCents: 1_244_845_54,
+      payableTotalCents: 1_225_943_46,
+      lineCount: 685,
+      payableLineCount: 672,
+      reconciled: true,
+    })
+    expect(apTotals(view, ACC.TCS)).toMatchObject({
+      payableCents: 1_225_943_46,
+      reportCents: 1_244_845_54,
+      importedCents: 1_244_845_54,
+      billCount: 667,
+      creditCount: 5,
+      otherCount: 13,
+      reconciled: true,
+    })
+    const vendors = apVendorGroups(view.lines, view.accounts, ACC.TCS)
+    expect(vendors.reduce((s, v) => s + v.owedCents, 0)).toBe(1_225_943_46)
+    // the QBO display name is what a Controller sees, VDR- code and all
+    expect(vendors.some((v) => v.vendorName === 'VER-MAC VDR-0179')).toBe(true)
+    // the journal + bill-payment lines are reconciliation-only, never a payable vendor
+    expect(apReconciliationLines(view.lines, ACC.TCS)).toHaveLength(13)
+  })
+
+  it('a Desktop import REPLACES a QBO one in the same account — one snapshot either way', async () => {
+    const fake = world(CONTROLLER)
+    await commit(form(ACC.TCS, QBO_FILE, 'WHWY A_P Aging Detail.xlsx'))
+    expect(fake.tables.cmr_ap_lines).toHaveLength(685)
+    await commit(form(ACC.TCS, SAMPLE, 'TCS AP.xlsx'))
+    expect(fake.tables.cmr_ap_imports).toHaveLength(1)
+    expect(fake.tables.cmr_ap_lines).toHaveLength(6)
+    expect(fake.tables.cmr_ap_imports[0].source_filename).toBe('TCS AP.xlsx')
   })
 })

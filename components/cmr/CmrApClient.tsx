@@ -624,7 +624,7 @@ function ImportDialog({
   async function runPreview(e: React.FormEvent) {
     e.preventDefault()
     if (!accountId) { setError('Choose the account this report is for.'); return }
-    if (!file) { setError('Choose the A/P Aging Detail .xlsx file.'); return }
+    if (!file) { setError('Choose the A/P Aging Detail file (.xlsx or .csv).'); return }
     setBusy(true)
     setError(null)
     const r = await upload<PreviewData>('/api/cmr/ap/import/preview', body())
@@ -685,11 +685,11 @@ function ImportDialog({
                   </Select>
                 </label>
                 <label className="cmr-field span-all">
-                  <span className="cmr-label">Report (.xlsx)</span>
+                  <span className="cmr-label">Report (.xlsx or .csv)</span>
                   <input
                     className="cmr-input cmr-ap-file"
                     type="file"
-                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                     onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
                     disabled={busy}
                   />

@@ -77,9 +77,19 @@ const optInt = (v: FormDataEntryValue | null): number | null | 'bad' => {
 }
 
 /**
- * Read and check the multipart body both import steps share: an `accountId` and one `.xlsx`
+ * Read and check the multipart body both import steps share: an `accountId` and one report
  * `file`. Returns the refusal response when anything is wrong. The workbook itself is parsed by
  * the caller (after the account is checked).
+ *
+ * Two file types are accepted, because CMR accounts export from two QuickBooks products:
+ *   • `.xlsx` — what QuickBooks Desktop produces, and what QBO produces by default. An .xlsx is
+ *     a zip archive, so it must start with the "PK\x03\x04" signature.
+ *   • `.csv` — QuickBooks Online's other export choice for the same A/P Aging Detail report
+ *     (WHWY). A .csv is text, so it must NOT be a zip — that rejects an .xlsx merely renamed
+ *     to .csv, which SheetJS would read but which is not what the person meant to send.
+ *
+ * The extension only chooses which of those two checks applies; the layout itself is decided by
+ * the parser from the sheet's own header row, never from the file name.
  */
 export async function readApUpload(request: Request): Promise<{ ok: true; value: ApUpload } | { ok: false; response: NextResponse }> {
   const fail = (error: string, code = 'VALIDATION_ERROR', status = 400) => ({ ok: false as const, response: bad(error, code, status) })
@@ -96,19 +106,26 @@ export async function readApUpload(request: Request): Promise<{ ok: true; value:
 
   const file = form.get('file')
   if (!file || typeof file === 'string' || typeof (file as Blob).arrayBuffer !== 'function') {
-    return fail('Choose the A/P Aging Detail .xlsx file to import.')
+    return fail('Choose the A/P Aging Detail file to import (.xlsx or .csv).')
   }
   const blob = file as File
   const fileName = cleanFileName(typeof blob.name === 'string' ? blob.name : '')
-  if (!/\.xlsx$/i.test(fileName)) {
-    return fail('Upload the report as an Excel .xlsx file (QuickBooks: Excel → Create New Worksheet).', 'NOT_XLSX')
+  const isCsv = /\.csv$/i.test(fileName)
+  if (!/\.xlsx$/i.test(fileName) && !isCsv) {
+    return fail(
+      'Upload the report as an Excel .xlsx file (QuickBooks Desktop: Excel → Create New Worksheet) or a .csv (QuickBooks Online: Export → Export to CSV).',
+      'NOT_XLSX',
+    )
   }
   if (blob.size === 0) return fail('That file is empty.', 'NOT_XLSX')
   if (blob.size > CMR_AP_MAX_FILE_BYTES) return fail('That file is larger than 10 MB — it is not a daily A/P aging report.', 'TOO_LARGE', 413)
 
   const bytes = new Uint8Array(await blob.arrayBuffer())
-  // An .xlsx is a zip archive: it always starts "PK\x03\x04".
-  if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b || bytes[2] !== 0x03 || bytes[3] !== 0x04) {
+  // An .xlsx is a zip archive: it always starts "PK\x03\x04". A .csv is text and must not.
+  const isZip = bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04
+  if (isCsv) {
+    if (isZip) return fail('That file is named .csv but is an Excel workbook. Upload it with its .xlsx name.', 'NOT_XLSX')
+  } else if (!isZip) {
     return fail('That file is not an Excel .xlsx workbook.', 'NOT_XLSX')
   }
 

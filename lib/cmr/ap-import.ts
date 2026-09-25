@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { isCmrApQboSheet, parseCmrApQboRows } from './ap-import-qbo'
 
 /**
  * SN Cash Ledger (CMR) — the QuickBooks **A/P Aging Detail** parser (AP Phase 1).
@@ -7,6 +8,12 @@ import * as XLSX from 'xlsx'
  * lines that become an account's AP snapshot, plus the figures that prove the import is whole.
  * The import routes call it twice (Preview, then Commit) and the unit tests run it against the
  * real `STS AP 92226.xlsx`.
+ *
+ * TWO LAYOUTS. This file is the QuickBooks **Desktop** parser, which every CMR account but one
+ * uses. WHWY is a separate QuickBooks **Online** company whose export of the same report uses
+ * contiguous columns; `lib/cmr/ap-import-qbo.ts` parses that layout and normalizes it into the
+ * model below, and `parseCmrApWorkbook` picks between the two from the sheet's own header row.
+ * Everything under this comment describes the Desktop layout only.
  *
  * The layout (verified against the real export — see research/cmr-ap-build-brief.md):
  *   • Blank spacer columns. The data sits in 0-based columns 3, 5, 7, 9, 11, 13, 15:
@@ -110,7 +117,7 @@ export type CmrApParseResult =
   | { ok: false; code: CmrApParseCode; error: string }
 
 const NOT_AP =
-  'That file is not a QuickBooks A/P Aging Detail report. Export Reports → Vendors & Payables → A/P Aging Detail to Excel and upload that.'
+  'That file is not a QuickBooks A/P Aging Detail report. In QuickBooks Desktop export Reports → Vendors & Payables → A/P Aging Detail to Excel; in QuickBooks Online export Reports → What you owe → A/P Aging Detail. Upload that file.'
 
 // ── cell readers ────────────────────────────────────────────────────────────
 
@@ -339,23 +346,56 @@ export function summarizeCmrApLines(lines: CmrApParsedLine[], reportTotalCents: 
 }
 
 /**
- * Parse an uploaded workbook. Reads every sheet and uses the first one carrying the A/P Aging
- * Detail header (QuickBooks sometimes adds a notes tab in front). Formulas are not evaluated
- * and nothing in the file is executed — only cell values are read.
+ * Parse an uploaded A/P Aging Detail export, in EITHER of the two layouts CMR accounts produce.
+ *
+ * Reads every sheet (QuickBooks sometimes adds a notes tab in front) and picks a parser by what
+ * the sheet actually contains:
+ *
+ *   1. **QuickBooks Desktop** — the blank-spacer-column layout above, identified by the seven
+ *      header labels in columns 3…15. Every CMR account but WHWY exports this.
+ *   2. **QuickBooks Online** — the contiguous-column layout, identified by a "Transaction type"
+ *      header row with "Past due" and "Open balance" at their A/P indexes. WHWY (Western
+ *      Highways) is a separate QBO company; `parseCmrApQboRows` normalizes its rows into the
+ *      same canonical model, so nothing downstream — preview, commit, `cmr_ap_replace_import`,
+ *      the `payable` rule — can tell the two apart.
+ *
+ * Desktop is tried across every sheet FIRST, so a Desktop workbook takes exactly the path it
+ * always has and its behaviour is unchanged. Formulas are not evaluated and nothing in the file
+ * is executed — only cell values are read. A .csv (which QBO also exports) is read through the
+ * same SheetJS path as an .xlsx, so neither parser cares which it was handed.
  */
 export function parseCmrApWorkbook(data: ArrayBuffer | Uint8Array): CmrApParseResult {
   let wb: XLSX.WorkBook
   try {
     const bytes = data instanceof Uint8Array ? data : new Uint8Array(data)
-    wb = XLSX.read(bytes, { type: 'array', cellFormula: false, cellHTML: false, cellStyles: false })
+    // An .xlsx is a zip ("PK\x03\x04"); anything else reaching here is the .csv QBO also exports.
+    // A CSV is read with `raw`, which keeps every cell the TEXT the file contains instead of
+    // letting SheetJS infer types: without it a Num of "00085001" is read as the number 85001
+    // and the invoice number silently loses its leading zeros (an .xlsx carries its own cell
+    // types, so it needs no such help — and its read options are untouched).
+    const isZip =
+      bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04
+    wb = isZip
+      ? XLSX.read(bytes, { type: 'array', cellFormula: false, cellHTML: false, cellStyles: false })
+      : XLSX.read(bytes, { type: 'array', cellFormula: false, cellHTML: false, cellStyles: false, raw: true })
   } catch {
     return { ok: false, code: 'UNREADABLE', error: 'That file could not be read as an Excel workbook.' }
   }
+
+  const sheets: unknown[][][] = []
   for (const name of wb.SheetNames) {
     const ws = wb.Sheets[name]
     if (!ws) continue
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '', raw: true, blankrows: true }) as unknown[][]
+    sheets.push(
+      XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '', raw: true, blankrows: true }) as unknown[][],
+    )
+  }
+
+  for (const rows of sheets) {
     if (findCmrApHeader(rows) >= 0) return parseCmrApRows(rows)
+  }
+  for (const rows of sheets) {
+    if (isCmrApQboSheet(rows)) return parseCmrApQboRows(rows)
   }
   return { ok: false, code: 'NOT_AP_AGING', error: NOT_AP }
 }
