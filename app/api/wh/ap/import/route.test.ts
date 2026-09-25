@@ -241,28 +241,28 @@ describe('/api/wh/ap/import — preview and commit', () => {
 })
 
 describe('/api/wh/ap/import — the real export', () => {
-  it.skipIf(!hasFixture)('imports 684 lines: $1,243,855.07 total, $1,224,952.99 payable', async () => {
+  it.skipIf(!hasFixture)('imports 685 lines: $1,244,845.54 total, $1,225,943.46 payable', async () => {
     const fake = world(ADMIN)
     const res = await POST(upload(readFileSync(FIXTURE), 'wh-ap.xlsx', { mode: 'commit' }))
     expect(res.status).toBe(200)
 
     const body = await res.json()
     expect(body.committed).toMatchObject({
-      lineCount: 684,
-      sumOpenCents: 124385507,
-      reportTotalCents: 124385507,
+      lineCount: 685,
+      sumOpenCents: 124484554,
+      reportTotalCents: 124484554,
       reconciled: true,
-      openTotalCents: 122495299,
-      openLineCount: 671,
+      openTotalCents: 122594346,
+      openLineCount: 672,
       intercompanyLineCount: 51,
-      reportAsOf: '2026-09-24',
+      reportAsOf: '2026-09-25',
       reportAsOfSource: 'derived',
-      reportAsOfEvidence: 655,
+      reportAsOfEvidence: 656,
     })
     expect(body.committed.typeCounts).toEqual({
-      'Bill': 666, 'Vendor Credit': 5, 'Journal Entry': 12, 'Bill Payment (Check)': 1,
+      'Bill': 667, 'Vendor Credit': 5, 'Journal Entry': 12, 'Bill Payment (Check)': 1,
     })
-    expect(fake.tables.wh_ap_lines).toHaveLength(684)
+    expect(fake.tables.wh_ap_lines).toHaveLength(685)
   })
 
   it.skipIf(!hasFixture)('a second import leaves exactly one snapshot', async () => {
@@ -270,7 +270,7 @@ describe('/api/wh/ap/import — the real export', () => {
     await POST(upload(readFileSync(FIXTURE), 'wh-ap.xlsx', { mode: 'commit' }))
     await POST(upload(readFileSync(FIXTURE), 'wh-ap-again.xlsx', { mode: 'commit' }))
     expect(fake.tables.wh_ap_imports).toHaveLength(1)
-    expect(fake.tables.wh_ap_lines).toHaveLength(684)
+    expect(fake.tables.wh_ap_lines).toHaveLength(685)
     expect(fake.tables.wh_ap_imports[0].source_filename).toBe('wh-ap-again.xlsx')
   })
 })

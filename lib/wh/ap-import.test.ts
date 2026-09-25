@@ -34,38 +34,38 @@ function asCsv(xlsx: Buffer): Buffer {
 describeFixture('parseWhApFile — the real WH A/P Aging Detail export', () => {
   const buffer = hasFixture ? readFileSync(FIXTURE) : Buffer.alloc(0)
 
-  it('parses 684 lines: 666 Bill, 5 Vendor Credit, 12 Journal Entry, 1 Bill Payment (Check)', () => {
+  it('parses 685 lines: 667 Bill, 5 Vendor Credit, 12 Journal Entry, 1 Bill Payment (Check)', () => {
     const result = parseWhApFile(buffer)
     expect(result.success).toBe(true)
     if (!result.success) return
 
-    expect(result.data.lines).toHaveLength(684)
+    expect(result.data.lines).toHaveLength(685)
     expect(result.data.typeCounts).toEqual({
-      'Bill': 666,
+      'Bill': 667,
       'Vendor Credit': 5,
       'Journal Entry': 12,
       'Bill Payment (Check)': 1,
     })
   })
 
-  it('sums ALL open balances to $1,243,855.07 and reconciles to the report TOTAL', () => {
+  it('sums ALL open balances to $1,244,845.54 and reconciles to the report TOTAL', () => {
     const result = parseWhApFile(buffer)
     expect(result.success).toBe(true)
     if (!result.success) return
 
-    expect(result.data.sumOpenCents).toBe(124385507)
-    expect(result.data.reportTotalCents).toBe(124385507)
+    expect(result.data.sumOpenCents).toBe(124484554)
+    expect(result.data.reportTotalCents).toBe(124484554)
     expect(result.data.reconciled).toBe(true)
   })
 
-  it('sums the payable (Bill + Vendor Credit) lines to $1,224,952.99', () => {
+  it('sums the payable (Bill + Vendor Credit) lines to $1,225,943.46', () => {
     const result = parseWhApFile(buffer)
     expect(result.success).toBe(true)
     if (!result.success) return
 
     const payable = result.data.lines.filter((l) => l.payable)
-    expect(payable).toHaveLength(671)
-    expect(result.data.payableTotalCents).toBe(122495299)
+    expect(payable).toHaveLength(672)
+    expect(result.data.payableTotalCents).toBe(122594346)
 
     // Journal Entries and the Bill Payment are kept so the file reconciles, but never payable.
     const nonPayable = result.data.lines.filter((l) => !l.payable)
@@ -94,8 +94,8 @@ describeFixture('parseWhApFile — the real WH A/P Aging Detail export', () => {
 
     // This export carries no title block at all, so there is no "As of" line to read.
     expect(result.data.reportAsOfSource).toBe('derived')
-    expect(result.data.reportAsOf).toBe('2026-09-24')
-    expect(result.data.reportAsOfEvidence).toBe(655)
+    expect(result.data.reportAsOf).toBe('2026-09-25')
+    expect(result.data.reportAsOfEvidence).toBe(656)
   })
 
   it('splits the five aging buckets', () => {
@@ -108,13 +108,13 @@ describeFixture('parseWhApFile — the real WH A/P Aging Detail export', () => {
       byBucket[l.agingBucket!] = (byBucket[l.agingBucket!] ?? 0) + l.openBalanceCents
     }
     expect(byBucket).toEqual({
-      'Current': 1811842,
-      '1-30':    7510361,
-      '31-60':   3099095,
-      '61-90':   6591417,
+      'Current': 1860292,
+      '1-30':    7560958,
+      '31-60':   2739095,
+      '61-90':   6951417,
       '>90':   105372792,
     })
-    expect(Object.values(byBucket).reduce((a, b) => a + b, 0)).toBe(124385507)
+    expect(Object.values(byBucket).reduce((a, b) => a + b, 0)).toBe(124484554)
   })
 
   it('reads the extra "Past due" column, negatives included', () => {
@@ -160,13 +160,13 @@ describeFixture('parseWhApFile — the real WH A/P Aging Detail export', () => {
     expect(fromCsv.success).toBe(true)
     if (!fromXlsx.success || !fromCsv.success) return
 
-    expect(fromCsv.data.lines).toHaveLength(684)
-    expect(fromCsv.data.sumOpenCents).toBe(124385507)
-    expect(fromCsv.data.reportTotalCents).toBe(124385507)
+    expect(fromCsv.data.lines).toHaveLength(685)
+    expect(fromCsv.data.sumOpenCents).toBe(124484554)
+    expect(fromCsv.data.reportTotalCents).toBe(124484554)
     expect(fromCsv.data.reconciled).toBe(true)
-    expect(fromCsv.data.payableTotalCents).toBe(122495299)
+    expect(fromCsv.data.payableTotalCents).toBe(122594346)
     expect(fromCsv.data.typeCounts).toEqual(fromXlsx.data.typeCounts)
-    expect(fromCsv.data.reportAsOf).toBe('2026-09-24')
+    expect(fromCsv.data.reportAsOf).toBe('2026-09-25')
   })
 
   it('refuses the A/R report — it has no "Past due" column', () => {
