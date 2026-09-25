@@ -53,3 +53,66 @@ export interface WhImportCommitted extends WhImportPreview {
   /** The snapshot this upload replaced, if there was one. */
   replaced: { reportAsOf: string | null; filename: string | null; lineCount: number } | null
 }
+
+// ── Payroll ────────────────────────────────────────────────────────────────────
+//
+// Payroll gets its own preview shape rather than bending the aging one: it has no buckets, no
+// counterparties and no intercompany split, and it has something the aging reports do not — a
+// PAY PERIOD, which decides whether this upload replaces an existing period or adds a new one
+// to the history. The preview says which of the two will happen before anything is written.
+
+export interface WhPayrollPreviewEmployee {
+  name: string
+  isActive: boolean
+  hours: number
+  grossCents: number
+  taxesCents: number
+  netCents: number
+}
+
+export interface WhPayrollImportPreview {
+  report: 'payroll'
+  filename: string
+  periodStart: string
+  periodEnd: string
+  employeeCount: number
+  inactiveCount: number
+  totalHours: number
+  grossTotalCents: number
+  /** Negative, as the report writes withholding. */
+  taxesTotalCents: number
+  adjustedGrossTotalCents: number
+  netTotalCents: number
+  /** The report's own Total column, for the reconciliation the uploader sees. */
+  reportTotals: {
+    hours: number
+    grossCents: number
+    taxesCents: number
+    adjustedGrossCents: number
+    netCents: number
+  }
+  /** Σ per-employee gross === the Total column's gross. */
+  reconciled: boolean
+  /** Every figure checked against the Total column. */
+  checks: Record<'hours' | 'grossCents' | 'taxesCents' | 'adjustedGrossCents' | 'netCents', boolean>
+  /**
+   * The period this upload would replace, when one is already stored for the same dates — the
+   * difference between "adds a week to the history" and "overwrites the week you have".
+   */
+  existingPeriod: {
+    periodStart: string
+    periodEnd: string
+    filename: string | null
+    employeeCount: number
+    grossTotalCents: number
+    importedAt: string | null
+  } | null
+  /** Every employee in the period, biggest gross first. */
+  employees: WhPayrollPreviewEmployee[]
+}
+
+export interface WhPayrollImportCommitted extends WhPayrollImportPreview {
+  periodId: string | null
+  /** True when this upload replaced a period that was already stored. */
+  replacedExisting: boolean
+}

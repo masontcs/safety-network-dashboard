@@ -509,6 +509,7 @@ a:active, button:active, [role="button"]:active {
    scrolls sideways at phone width.
 ───────────────────────────────────────────── */
 .wh-aging-grid     { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+.wh-payroll-grid   { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
 .wh-split-grid     { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .wh-preview-grid   { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .wh-preview-buckets{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
@@ -518,11 +519,16 @@ a:active, button:active, [role="button"]:active {
 
 @media (max-width: 960px) {
   .wh-aging-grid      { grid-template-columns: repeat(3, 1fr); }
+  .wh-payroll-grid    { grid-template-columns: repeat(3, 1fr); }
   .wh-preview-buckets { grid-template-columns: repeat(3, 1fr); }
 }
 
 @media (max-width: 767px) {
   .wh-aging-grid { grid-template-columns: repeat(2, 1fr); }
+  /* Gross pay spans full width, and so does the 5th so there is no orphan. */
+  .wh-payroll-grid { grid-template-columns: repeat(2, 1fr); }
+  .wh-payroll-grid > :first-child  { grid-column: 1 / -1; }
+  .wh-payroll-grid > :nth-child(5) { grid-column: 1 / -1; }
   /* Total card spans full width, and so does the 6th so there is no orphan. */
   .wh-aging-grid > :first-child  { grid-column: 1 / -1; }
   .wh-aging-grid > :nth-child(6) { grid-column: 1 / -1; }
@@ -532,6 +538,7 @@ a:active, button:active, [role="button"]:active {
   .wh-preview-buckets { grid-template-columns: repeat(2, 1fr); }
 
   .wh-aging-grid > *,
+  .wh-payroll-grid > *,
   .wh-split-grid > *,
   .wh-preview-grid > *,
   .wh-preview-buckets > * { min-width: 0; overflow: hidden; }

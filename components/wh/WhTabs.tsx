@@ -12,6 +12,7 @@ import { usePathname } from 'next/navigation'
 const TABS = [
   { href: '/wh/ar', label: 'A/R Aging' },
   { href: '/wh/ap', label: 'A/P Aging' },
+  { href: '/wh/payroll', label: 'Payroll' },
   { href: '/wh/import', label: 'Import' },
 ]
 
