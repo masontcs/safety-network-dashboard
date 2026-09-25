@@ -510,6 +510,10 @@ a:active, button:active, [role="button"]:active {
 ───────────────────────────────────────────── */
 .wh-aging-grid     { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
 .wh-payroll-grid   { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+/* What WH actually pays: the headline cost, then the two employer-side figures. */
+.wh-payroll-cost-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 12px; }
+/* One employee's four breakdown blocks, under their row. */
+.wh-breakdown-grid    { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px 24px; }
 .wh-split-grid     { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .wh-preview-grid   { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .wh-preview-buckets{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
@@ -520,6 +524,8 @@ a:active, button:active, [role="button"]:active {
 @media (max-width: 960px) {
   .wh-aging-grid      { grid-template-columns: repeat(3, 1fr); }
   .wh-payroll-grid    { grid-template-columns: repeat(3, 1fr); }
+  .wh-payroll-cost-grid { grid-template-columns: 1fr 1fr 1fr; }
+  .wh-breakdown-grid    { grid-template-columns: repeat(2, 1fr); }
   .wh-preview-buckets { grid-template-columns: repeat(3, 1fr); }
 }
 
@@ -529,6 +535,10 @@ a:active, button:active, [role="button"]:active {
   .wh-payroll-grid { grid-template-columns: repeat(2, 1fr); }
   .wh-payroll-grid > :first-child  { grid-column: 1 / -1; }
   .wh-payroll-grid > :nth-child(5) { grid-column: 1 / -1; }
+  /* Total payroll cost spans the row; employer taxes and contributions sit under it. */
+  .wh-payroll-cost-grid { grid-template-columns: repeat(2, 1fr); }
+  .wh-payroll-cost-grid > :first-child { grid-column: 1 / -1; }
+  .wh-breakdown-grid { grid-template-columns: 1fr; gap: 14px; }
   /* Total card spans full width, and so does the 6th so there is no orphan. */
   .wh-aging-grid > :first-child  { grid-column: 1 / -1; }
   .wh-aging-grid > :nth-child(6) { grid-column: 1 / -1; }
@@ -538,6 +548,7 @@ a:active, button:active, [role="button"]:active {
   .wh-preview-buckets { grid-template-columns: repeat(2, 1fr); }
 
   .wh-aging-grid > *,
+  .wh-payroll-cost-grid > *,
   .wh-payroll-grid > *,
   .wh-split-grid > *,
   .wh-preview-grid > *,
